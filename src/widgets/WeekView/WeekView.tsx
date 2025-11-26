@@ -1,13 +1,11 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment } from 'react';
 import { useDispatch } from 'react-redux';
 import { addDays, addMinutes, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Task } from '@/entities/task/model/types';
-import { toggleTaskCompletion } from '@/entities/task/model/taskSlice';
+import { addTask, toggleTaskCompletion } from '@/entities/task/model/taskSlice';
 import { addExperience } from '@/entities/account/model/accountSlice';
 import { EXPERIENCE_PER_TASK } from '@/entities/account/model/types';
-import { TaskForm } from '@/features/taskForm/ui/TaskForm';
-import { Modal } from '@/shared/ui/Modal/Modal';
 import styles from './WeekView.module.css';
 
 interface Props {
@@ -78,9 +76,18 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
   };
 
   const handleCellClick = (day: Date, hour: number) => {
-    setSelectedDate(format(day, 'yyyy-MM-dd'));
-    setSelectedStart(`${hour.toString().padStart(2, '0')}:00`);
-    setModalOpen(true);
+    const title = prompt('Введите название задачи для этого часа');
+    if (!title || !title.trim()) return;
+
+    const startTime = `${hour.toString().padStart(2, '0')}:00`;
+    dispatch(
+      addTask({
+        title: title.trim(),
+        date: format(day, 'yyyy-MM-dd'),
+        startTime,
+        durationMinutes: 60,
+      }),
+    );
   };
 
   return (
