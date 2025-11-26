@@ -1,0 +1,77 @@
+.wrapper {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: linear-gradient(120deg, var(--primary-weak), var(--primary));
+  color: #fff;
+  padding: 12px 10px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--bg);
+}
+
+.cell {
+  min-height: 140px;
+  border: 1px solid var(--border);
+  padding: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dateLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--bg-strong);
+  color: var(--primary-strong);
+  font-weight: 700;
+}
+
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.taskChip {
+  background: linear-gradient(120deg, rgba(91, 141, 239, 0.15), rgba(91, 141, 239, 0.05));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(91, 141, 239, 0.12);
+}
+
+.taskTitle {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.taskMeta {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .cell {
+    min-height: 120px;
+  }
+}
