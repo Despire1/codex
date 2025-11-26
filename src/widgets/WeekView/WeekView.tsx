@@ -19,6 +19,15 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
   const dispatch = useDispatch();
   const start = startOfWeek(baseDate, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedStart, setSelectedStart] = useState<string>('09:00');
+
+  const modalTitle = useMemo(() => {
+    if (!selectedDate) return 'Новая задача';
+    const formattedDate = format(new Date(selectedDate), 'd MMMM', { locale: ru });
+    return `Новая задача • ${formattedDate}, ${selectedStart}`;
+  }, [selectedDate, selectedStart]);
 
   const tasksByDay: Record<string, Task[]> = days.reduce((acc, day) => {
     const iso = format(day, 'yyyy-MM-dd');
@@ -107,6 +116,13 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
           </Fragment>
         ))}
       </div>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={modalTitle}>
+        <TaskForm
+          initialDate={selectedDate}
+          initialStartTime={selectedStart}
+          onSuccess={() => setModalOpen(false)}
+        />
+      </Modal>
     </div>
   );
 };
