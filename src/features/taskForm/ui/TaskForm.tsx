@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addTask } from '@/entities/task/model/taskSlice';
 import { Button } from '@/shared/ui/Button/Button';
@@ -9,13 +9,27 @@ import styles from './TaskForm.module.css';
 
 const durationOptions = [30, 45, 60, 90, 120];
 
-export const TaskForm = () => {
+interface TaskFormProps {
+  initialDate?: string;
+  initialStartTime?: string;
+  onSuccess?: () => void;
+}
+
+export const TaskForm = ({ initialDate, initialStartTime, onSuccess }: TaskFormProps) => {
   const dispatch = useDispatch();
   const today = useMemo(() => formatISO(new Date(), { representation: 'date' }), []);
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(today);
-  const [startTime, setStartTime] = useState('09:00');
+  const [date, setDate] = useState(initialDate ?? today);
+  const [startTime, setStartTime] = useState(initialStartTime ?? '09:00');
   const [duration, setDuration] = useState(60);
+
+  useEffect(() => {
+    if (initialDate) setDate(initialDate);
+  }, [initialDate]);
+
+  useEffect(() => {
+    if (initialStartTime) setStartTime(initialStartTime);
+  }, [initialStartTime]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,6 +44,7 @@ export const TaskForm = () => {
       }),
     );
     setTitle('');
+    onSuccess?.();
   };
 
   return (

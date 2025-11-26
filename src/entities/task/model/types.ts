@@ -6,4 +6,5 @@ export interface Task {
   date: string; // ISO date without time
   startTime: string; // HH:mm
   durationMinutes: number;
+  completed: boolean;
 }
