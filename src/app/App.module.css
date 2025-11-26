@@ -36,6 +36,10 @@
   color: var(--muted);
 }
 
+.gamification {
+  margin-bottom: 18px;
+}
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
