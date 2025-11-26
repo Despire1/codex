@@ -1,6 +1,7 @@
 import { Calendar } from '@/widgets/Calendar/Calendar';
 import { TaskForm } from '@/features/taskForm/ui/TaskForm';
 import { useTasks } from '@/entities/task/model/useTasks';
+import { GamificationPanel } from '@/widgets/Gamification/GamificationPanel';
 import styles from './App.module.css';
 
 export const App = () => {
@@ -16,6 +17,9 @@ export const App = () => {
           </div>
           <TaskForm />
         </header>
+        <div className={styles.gamification}>
+          <GamificationPanel tasks={tasks} />
+        </div>
         <Calendar tasks={tasks} />
       </div>
     </div>

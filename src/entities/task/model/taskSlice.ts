@@ -9,7 +9,7 @@ interface AddTaskPayload {
   durationMinutes: number;
 }
 
-interface TasksState {
+export interface TasksState {
   items: Task[];
 }
 
@@ -21,6 +21,7 @@ const initialState: TasksState = {
       date: formatISO(new Date(), { representation: 'date' }),
       startTime: '10:00',
       durationMinutes: 60,
+      completed: false,
     },
     {
       id: '2',
@@ -28,6 +29,7 @@ const initialState: TasksState = {
       date: formatISO(new Date(), { representation: 'date' }),
       startTime: '14:00',
       durationMinutes: 45,
+      completed: false,
     },
   ],
 };
@@ -44,11 +46,18 @@ const tasksSlice = createSlice({
         date,
         startTime,
         durationMinutes,
+        completed: false,
       };
       state.items.push(newTask);
+    },
+    toggleTaskCompletion: (state, action: PayloadAction<string>) => {
+      const task = state.items.find((item) => item.id === action.payload);
+      if (task) {
+        task.completed = true;
+      }
     },
   },
 });
 
-export const { addTask } = tasksSlice.actions;
+export const { addTask, toggleTaskCompletion } = tasksSlice.actions;
 export const tasksReducer = tasksSlice.reducer;
