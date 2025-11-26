@@ -1,12 +1,11 @@
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { useDispatch } from 'react-redux';
 import { addDays, addMinutes, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Task } from '@/entities/task/model/types';
-import { toggleTaskCompletion } from '@/entities/task/model/taskSlice';
+import { addTask, toggleTaskCompletion } from '@/entities/task/model/taskSlice';
 import { addExperience } from '@/entities/account/model/accountSlice';
 import { EXPERIENCE_PER_TASK } from '@/entities/account/model/types';
-import { AddTaskModal } from '@/features/taskForm/ui/AddTaskModal';
 import styles from './WeekView.module.css';
 
 interface Props {
@@ -23,6 +22,12 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedStart, setSelectedStart] = useState<string>('09:00');
+
+  const modalTitle = useMemo(() => {
+    if (!selectedDate) return 'Новая задача';
+    const formattedDate = format(new Date(selectedDate), 'd MMMM', { locale: ru });
+    return `Новая задача • ${formattedDate}, ${selectedStart}`;
+  }, [selectedDate, selectedStart]);
 
   const tasksByDay: Record<string, Task[]> = days.reduce((acc, day) => {
     const iso = format(day, 'yyyy-MM-dd');
@@ -71,9 +76,18 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
   };
 
   const handleCellClick = (day: Date, hour: number) => {
-    setSelectedDate(format(day, 'yyyy-MM-dd'));
-    setSelectedStart(`${hour.toString().padStart(2, '0')}:00`);
-    setModalOpen(true);
+    const title = prompt('Введите название задачи для этого часа');
+    if (!title || !title.trim()) return;
+
+    const startTime = `${hour.toString().padStart(2, '0')}:00`;
+    dispatch(
+      addTask({
+        title: title.trim(),
+        date: format(day, 'yyyy-MM-dd'),
+        startTime,
+        durationMinutes: 60,
+      }),
+    );
   };
 
   return (
@@ -102,12 +116,13 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
           </Fragment>
         ))}
       </div>
-      <AddTaskModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        initialDate={selectedDate}
-        initialStartTime={selectedStart}
-      />
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={modalTitle}>
+        <TaskForm
+          initialDate={selectedDate}
+          initialStartTime={selectedStart}
+          onSuccess={() => setModalOpen(false)}
+        />
+      </Modal>
     </div>
   );
 };
