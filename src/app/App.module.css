@@ -356,10 +356,40 @@
   background: transparent;
   font-weight: 600;
   color: #475569;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .tabActive {
   color: #2563eb;
+}
+
+.tabIcon {
+  font-size: 16px;
+}
+
+.topNav {
+  display: none;
+}
+
+.topNavButton {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.topNavActive {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
 }
 
 .switch {
@@ -423,5 +453,20 @@
 
   .daysGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .topNav {
+    display: flex;
+    gap: 10px;
+    padding: 12px 0 0;
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 5;
+    flex-wrap: wrap;
   }
 }

@@ -109,10 +109,10 @@ const initialLessons: Lesson[] = [
 ];
 
 const tabs = [
-  { id: 'dashboard', label: 'Главная' },
-  { id: 'students', label: 'Ученики' },
-  { id: 'schedule', label: 'Расписание' },
-  { id: 'settings', label: 'Настройки' },
+  { id: 'dashboard', label: 'Главная', icon: '🏠' },
+  { id: 'students', label: 'Ученики', icon: '👥' },
+  { id: 'schedule', label: 'Расписание', icon: '📅' },
+  { id: 'settings', label: 'Настройки', icon: '⚙️' },
 ] as const;
 
 type TabId = (typeof tabs)[number]['id'];
@@ -324,6 +324,21 @@ export const App = () => {
           </button>
         </div>
       </header>
+
+      <nav className={styles.topNav}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={`${styles.topNavButton} ${activeTab === tab.id ? styles.topNavActive : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className={styles.tabIcon} aria-hidden>
+              {tab.icon}
+            </span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
 
       <main className={styles.content}>
         {activeTab === 'dashboard' && (
@@ -607,7 +622,10 @@ export const App = () => {
             className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            {tab.label}
+            <span className={styles.tabIcon} aria-hidden>
+              {tab.icon}
+            </span>
+            <span>{tab.label}</span>
           </button>
         ))}
       </nav>
