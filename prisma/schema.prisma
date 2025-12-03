@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Teacher {
+  chatId                BigInt          @id
+  username              String?
+  name                  String?
+  defaultLessonDuration Int             @default(60)
+  reminderMinutesBefore Int             @default(30)
+  students              TeacherStudent[]
+  homeworks             Homework[]
+  lessons               Lesson[]
+  createdAt             DateTime        @default(now())
+  authUser              TeacherAuth?
+}
+
+model Student {
+  id           Int              @id @default(autoincrement())
+  username     String?
+  telegramId   BigInt?
+  teacherLinks TeacherStudent[]
+  homeworks    Homework[]
+  lessons      Lesson[]
+  createdAt    DateTime         @default(now())
+}
+
+model TeacherStudent {
+  id                 Int      @id @default(autoincrement())
+  teacherId          BigInt
+  studentId          Int
+  customName         String
+  autoRemindHomework Boolean @default(false)
+  balanceLessons     Int     @default(0)
+
+  teacher Teacher @relation(fields: [teacherId], references: [chatId])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([teacherId, studentId])
+}
+
+model Homework {
+  id        Int      @id @default(autoincrement())
+  text      String
+  deadline  DateTime?
+  isDone    Boolean  @default(false)
+  studentId Int
+  teacherId BigInt
+  student   Student  @relation(fields: [studentId], references: [id])
+  teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
+  createdAt DateTime @default(now())
+}
+
+model Lesson {
+  id              Int      @id @default(autoincrement())
+  teacherId       BigInt
+  studentId       Int
+  startAt         DateTime
+  durationMinutes Int
+  status          String   @default("SCHEDULED") // values: SCHEDULED, COMPLETED, CANCELED
+  isPaid          Boolean  @default(false)
+  teacher         Teacher  @relation(fields: [teacherId], references: [chatId])
+  student         Student  @relation(fields: [studentId], references: [id])
+  createdAt       DateTime @default(now())
+}
+
+model TeacherAuth {
+  id           Int     @id @default(autoincrement())
+  email        String  @unique
+  passwordHash String
+  teacherId    BigInt  @unique
+  teacher      Teacher @relation(fields: [teacherId], references: [chatId])
+  createdAt    DateTime @default(now())
+}
