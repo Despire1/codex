@@ -134,6 +134,8 @@ export const App = () => {
     durationMinutes: teacher.defaultLessonDuration,
   });
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [lessonModalOpen, setLessonModalOpen] = useState(false);
 
   const linkedStudents: LinkedStudent[] = useMemo(
     () =>
@@ -184,6 +186,7 @@ export const App = () => {
     setNewStudentDraft({ customName: '', username: '' });
     setSelectedStudentId(studentId);
     setActiveTab('students');
+    setStudentModalOpen(false);
   };
 
   const toggleAutoReminder = (studentId: number) => {
@@ -217,6 +220,9 @@ export const App = () => {
         isPaid: false,
       },
     ]);
+
+    setLessonModalOpen(false);
+    setActiveTab('schedule');
   };
 
   const markLessonCompleted = (lessonId: number) => {
@@ -317,10 +323,22 @@ export const App = () => {
           <h1 className={styles.title}>TeacherBot Web</h1>
         </div>
         <div className={styles.quickActions}>
-          <button className={styles.primaryButton} onClick={() => setActiveTab('students')}>
+          <button
+            className={styles.primaryButton}
+            onClick={() => {
+              setActiveTab('students');
+              setStudentModalOpen(true);
+            }}
+          >
             + Ученик
           </button>
-          <button className={styles.primaryGhost} onClick={() => setActiveTab('schedule')}>
+          <button
+            className={styles.primaryGhost}
+            onClick={() => {
+              setActiveTab('schedule');
+              setLessonModalOpen(true);
+            }}
+          >
             + Урок
           </button>
         </div>
@@ -353,10 +371,22 @@ export const App = () => {
             <div className={styles.card}>
               <div className={styles.cardHeader}>Быстрые действия</div>
               <div className={styles.actionsRow}>
-                <button className={styles.secondaryButton} onClick={() => setActiveTab('students')}>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setActiveTab('students');
+                    setStudentModalOpen(true);
+                  }}
+                >
                   Добавить ученика
                 </button>
-                <button className={styles.secondaryButton} onClick={() => setActiveTab('schedule')}>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setActiveTab('schedule');
+                    setLessonModalOpen(true);
+                  }}
+                >
                   Создать урок
                 </button>
                 <button className={styles.secondaryButton} onClick={() => selectedStudentId && remindHomework(selectedStudentId)}>
@@ -386,6 +416,9 @@ export const App = () => {
             <div className={styles.sectionHeader}>
               <h2>Ученики</h2>
               <span className={styles.muted}>Связка Teacher ↔ Student</span>
+              <button className={styles.secondaryButton} onClick={() => setStudentModalOpen(true)}>
+                + Добавить ученика
+              </button>
             </div>
             <div className={styles.studentList}>
               {linkedStudents.map((student) => (
@@ -479,29 +512,6 @@ export const App = () => {
               </div>
             )}
 
-            <div className={styles.formCard}>
-              <div className={styles.sectionHeader}>
-                <h3>Добавить ученика</h3>
-                <span className={styles.muted}>Создаст Student и связь TeacherStudent</span>
-              </div>
-              <div className={styles.formRow}>
-                <input
-                  className={styles.input}
-                  placeholder="Имя ученика"
-                  value={newStudentDraft.customName}
-                  onChange={(e) => setNewStudentDraft({ ...newStudentDraft, customName: e.target.value })}
-                />
-                <input
-                  className={styles.input}
-                  placeholder="Telegram username (опционально)"
-                  value={newStudentDraft.username}
-                  onChange={(e) => setNewStudentDraft({ ...newStudentDraft, username: e.target.value })}
-                />
-                <button className={styles.primaryButton} onClick={handleAddStudent}>
-                  Сохранить
-                </button>
-              </div>
-            </div>
           </section>
         )}
 
@@ -510,6 +520,9 @@ export const App = () => {
             <div className={styles.sectionHeader}>
               <h2>Расписание</h2>
               <span className={styles.muted}>Создание, завершение и оплата</span>
+              <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(true)}>
+                + Создать урок
+              </button>
             </div>
 
             <div className={styles.daysGrid}>
@@ -526,47 +539,6 @@ export const App = () => {
                 ))}
             </div>
 
-            <div className={styles.formCard}>
-              <div className={styles.sectionHeader}>
-                <h3>Создать урок</h3>
-                <span className={styles.muted}>По умолчанию длительность {teacher.defaultLessonDuration} мин</span>
-              </div>
-              <div className={styles.formRow}>
-                <select
-                  className={styles.input}
-                  value={newLessonDraft.studentId}
-                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, studentId: Number(e.target.value) })}
-                >
-                  {linkedStudents.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.link.customName}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className={styles.input}
-                  type="date"
-                  value={newLessonDraft.date}
-                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, date: e.target.value })}
-                />
-                <input
-                  className={styles.input}
-                  type="time"
-                  value={newLessonDraft.time}
-                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, time: e.target.value })}
-                />
-                <input
-                  className={styles.input}
-                  type="number"
-                  min={30}
-                  value={newLessonDraft.durationMinutes}
-                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, durationMinutes: Number(e.target.value) })}
-                />
-                <button className={styles.primaryButton} onClick={addLesson}>
-                  Создать урок
-                </button>
-              </div>
-            </div>
           </section>
         )}
 
@@ -630,6 +602,104 @@ export const App = () => {
           </button>
         ))}
       </nav>
+
+      {studentModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setStudentModalOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <div className={styles.modalLabel}>Добавление ученика</div>
+                <div className={styles.modalTitle}>Создать связь Teacher ↔ Student</div>
+              </div>
+              <button className={styles.closeButton} onClick={() => setStudentModalOpen(false)} aria-label="Закрыть модалку">
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formRow}>
+                <input
+                  className={styles.input}
+                  placeholder="Имя ученика"
+                  value={newStudentDraft.customName}
+                  onChange={(e) => setNewStudentDraft({ ...newStudentDraft, customName: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  placeholder="Telegram username (опционально)"
+                  value={newStudentDraft.username}
+                  onChange={(e) => setNewStudentDraft({ ...newStudentDraft, username: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.secondaryButton} onClick={() => setStudentModalOpen(false)}>
+                Отмена
+              </button>
+              <button className={styles.primaryButton} onClick={handleAddStudent}>
+                Сохранить ученика
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lessonModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setLessonModalOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <div className={styles.modalLabel}>Новый урок</div>
+                <div className={styles.modalTitle}>По умолчанию {teacher.defaultLessonDuration} мин</div>
+              </div>
+              <button className={styles.closeButton} onClick={() => setLessonModalOpen(false)} aria-label="Закрыть модалку">
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formRow}>
+                <select
+                  className={styles.input}
+                  value={newLessonDraft.studentId}
+                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, studentId: Number(e.target.value) })}
+                >
+                  {linkedStudents.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.link.customName}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={styles.input}
+                  type="date"
+                  value={newLessonDraft.date}
+                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, date: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  type="time"
+                  value={newLessonDraft.time}
+                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, time: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={30}
+                  value={newLessonDraft.durationMinutes}
+                  onChange={(e) => setNewLessonDraft({ ...newLessonDraft, durationMinutes: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(false)}>
+                Отмена
+              </button>
+              <button className={styles.primaryButton} onClick={addLesson}>
+                Создать урок
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
