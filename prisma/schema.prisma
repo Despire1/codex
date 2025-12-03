@@ -7,12 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum LessonStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELED
-}
-
 model Teacher {
   chatId                BigInt          @id
   username              String?
@@ -63,16 +57,16 @@ model Homework {
 }
 
 model Lesson {
-  id              Int          @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   teacherId       BigInt
   studentId       Int
   startAt         DateTime
   durationMinutes Int
-  status          LessonStatus
-  isPaid          Boolean      @default(false)
-  teacher         Teacher      @relation(fields: [teacherId], references: [chatId])
-  student         Student      @relation(fields: [studentId], references: [id])
-  createdAt       DateTime     @default(now())
+  status          String   @default("SCHEDULED") // values: SCHEDULED, COMPLETED, CANCELED
+  isPaid          Boolean  @default(false)
+  teacher         Teacher  @relation(fields: [teacherId], references: [chatId])
+  student         Student  @relation(fields: [studentId], references: [id])
+  createdAt       DateTime @default(now())
 }
 
 model TeacherAuth {

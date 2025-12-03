@@ -71,19 +71,13 @@ model Homework {
   createdAt DateTime @default(now())
 }
 
-enum LessonStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELED
-}
-
 model Lesson {
   id              Int          @id @default(autoincrement())
   teacherId       BigInt
   studentId       Int
   startAt         DateTime
   durationMinutes Int
-  status          LessonStatus
+  status          String       @default("SCHEDULED") // SCHEDULED | COMPLETED | CANCELED
   isPaid          Boolean @default(false)
   teacher         Teacher @relation(fields: [teacherId], references: [chatId])
   student         Student @relation(fields: [studentId], references: [id])
