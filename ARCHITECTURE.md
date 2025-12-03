@@ -100,6 +100,13 @@ model TeacherAuth {
 }
 ```
 
+## Local database (SQLite)
+
+- The repo ships with `.env.example` pointing `DATABASE_URL` at `file:./prisma/teacherbot.db`. Copy it to `.env` (or edit) to keep the DB co-located with the codebase for offline-friendly development.
+- Run `npm install` (needs Prisma CLI + client), then `npm run prisma:db-push` to materialize the SQLite file from `prisma/schema.prisma`. Use `npm run prisma:generate` if you need to regenerate the client after schema tweaks.
+- Inspect data with `npm run prisma:studio`. The same file can be mounted by the Telegram bot and the web server so they share state without extra configuration.
+- To pivot to PostgreSQL later, only swap `DATABASE_URL` and rerun `npm run prisma:db-push`; no schema changes rely on SQLite-specific features.
+
 ## API surface (Next.js App Router)
 
 - `POST /api/auth/register` — register `TeacherAuth` + bootstrap `Teacher` by `chatId` or deferred linking.
