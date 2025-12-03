@@ -1,5 +1,5 @@
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DashboardIcon, EventNoteIcon, PeopleIcon, SettingsIcon } from '../icons/MaterialIcons';
 import styles from './App.module.css';
 
@@ -61,53 +61,7 @@ const initialTeacher: Teacher = {
   reminderMinutesBefore: 30,
 };
 
-const initialStudents: Student[] = [
-  { id: 1, username: 'math_kid', telegramId: 555001 },
-  { id: 2, username: 'bio_star', telegramId: 555002 },
-  { id: 3, username: 'exam_ready', telegramId: undefined },
-];
-
-const initialLinks: TeacherStudent[] = [
-  { id: 1, teacherId: 111222333, studentId: 1, customName: 'Илья', autoRemindHomework: true, balanceLessons: 2 },
-  { id: 2, teacherId: 111222333, studentId: 2, customName: 'София', autoRemindHomework: false, balanceLessons: 1 },
-  { id: 3, teacherId: 111222333, studentId: 3, customName: 'Антон (ЕГЭ)', autoRemindHomework: true, balanceLessons: 0 },
-];
-
-const initialHomeworks: Homework[] = [
-  { id: 1, text: 'Сдать тест №14 на решуегэ', deadline: '2024-04-20', isDone: false, studentId: 1, teacherId: 111222333 },
-  { id: 2, text: 'Сочинение на тему "Экологические проблемы"', deadline: '2024-04-18', isDone: false, studentId: 2, teacherId: 111222333 },
-  { id: 3, text: 'Повторить формулы стереометрии', isDone: true, studentId: 3, teacherId: 111222333 },
-];
-
-const initialLessons: Lesson[] = [
-  {
-    id: 1,
-    teacherId: 111222333,
-    studentId: 1,
-    startAt: '2024-04-15T18:00:00.000Z',
-    durationMinutes: 60,
-    status: 'SCHEDULED',
-    isPaid: false,
-  },
-  {
-    id: 2,
-    teacherId: 111222333,
-    studentId: 2,
-    startAt: '2024-04-16T08:00:00.000Z',
-    durationMinutes: 60,
-    status: 'COMPLETED',
-    isPaid: false,
-  },
-  {
-    id: 3,
-    teacherId: 111222333,
-    studentId: 3,
-    startAt: '2024-04-17T15:00:00.000Z',
-    durationMinutes: 90,
-    status: 'SCHEDULED',
-    isPaid: true,
-  },
-];
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const tabs = [
   { id: 'dashboard', label: 'Главная', icon: DashboardIcon },
@@ -121,14 +75,14 @@ type TabId = (typeof tabs)[number]['id'];
 export const App = () => {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
-  const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [links, setLinks] = useState<TeacherStudent[]>(initialLinks);
-  const [homeworks, setHomeworks] = useState<Homework[]>(initialHomeworks);
-  const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(1);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [links, setLinks] = useState<TeacherStudent[]>([]);
+  const [homeworks, setHomeworks] = useState<Homework[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
   const [newLessonDraft, setNewLessonDraft] = useState({
-    studentId: 1,
+    studentId: undefined as number | undefined,
     date: format(new Date(), 'yyyy-MM-dd'),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
@@ -136,6 +90,73 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
+
+  const normalizeLesson = (lesson: any): Lesson => ({
+    ...lesson,
+    startAt: typeof lesson.startAt === 'string' ? lesson.startAt : new Date(lesson.startAt).toISOString(),
+  });
+
+  const normalizeHomework = (homework: any): Homework => ({
+    ...homework,
+    deadline: homework.deadline
+      ? (typeof homework.deadline === 'string'
+          ? homework.deadline.slice(0, 10)
+          : new Date(homework.deadline).toISOString().slice(0, 10))
+      : undefined,
+  });
+
+  useEffect(() => {
+    const loadInitial = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/bootstrap`);
+        if (!response.ok) throw new Error('Не удалось загрузить данные');
+        const data = await response.json();
+
+        setTeacher(data.teacher ?? initialTeacher);
+        setStudents(data.students ?? []);
+        setLinks(data.links ?? []);
+        setHomeworks((data.homeworks ?? []).map(normalizeHomework));
+        setLessons((data.lessons ?? []).map(normalizeLesson));
+
+        const firstStudentId = data.students?.[0]?.id ?? null;
+        setSelectedStudentId((prev) => prev ?? firstStudentId);
+        setNewLessonDraft((draft) => ({
+          ...draft,
+          studentId: draft.studentId ?? firstStudentId ?? undefined,
+          durationMinutes: data.teacher?.defaultLessonDuration ?? draft.durationMinutes,
+        }));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to bootstrap app', error);
+      }
+    };
+
+    loadInitial();
+  }, []);
+
+  useEffect(() => {
+    setNewLessonDraft((draft) => ({ ...draft, durationMinutes: teacher.defaultLessonDuration }));
+  }, [teacher.defaultLessonDuration]);
+
+  useEffect(() => {
+    if (selectedStudentId) {
+      setNewLessonDraft((draft) => ({ ...draft, studentId: selectedStudentId }));
+    }
+  }, [selectedStudentId]);
+
+  const apiFetch = async (path: string, options?: RequestInit) => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
+      ...options,
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Запрос не выполнен');
+    }
+
+    return response.json();
+  };
 
   const linkedStudents: LinkedStudent[] = useMemo(
     () =>
@@ -158,115 +179,171 @@ export const App = () => {
 
   const unpaidLessons = lessons.filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid).length;
 
-  const handleAddStudent = () => {
+  const handleAddStudent = async () => {
     if (!newStudentDraft.customName.trim()) return;
 
-    const existingByUsername =
-      newStudentDraft.username && students.find((student) => student.username === newStudentDraft.username);
+    try {
+      const data = await apiFetch('/api/students', {
+        method: 'POST',
+        body: JSON.stringify({
+          customName: newStudentDraft.customName,
+          username: newStudentDraft.username || undefined,
+        }),
+      });
 
-    const studentId = existingByUsername ? existingByUsername.id : Math.max(0, ...students.map((s) => s.id)) + 1;
+      const { student, link } = data;
 
-    if (!existingByUsername) {
-      setStudents([...students, { id: studentId, username: newStudentDraft.username || undefined }]);
+      setStudents((prev) => {
+        if (prev.find((s) => s.id === student.id)) return prev;
+        return [...prev, student];
+      });
+
+      setLinks((prev) => {
+        const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
+        if (exists) {
+          return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
+        }
+        return [...prev, link];
+      });
+
+      setNewStudentDraft({ customName: '', username: '' });
+      setSelectedStudentId(student.id);
+      setActiveTab('students');
+      setStudentModalOpen(false);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add student', error);
     }
-
-    const linkId = Math.max(0, ...links.map((l) => l.id)) + 1;
-    setLinks([
-      ...links,
-      {
-        id: linkId,
-        teacherId: teacher.chatId,
-        studentId,
-        customName: newStudentDraft.customName,
-        autoRemindHomework: true,
-        balanceLessons: 0,
-      },
-    ]);
-
-    setNewStudentDraft({ customName: '', username: '' });
-    setSelectedStudentId(studentId);
-    setActiveTab('students');
-    setStudentModalOpen(false);
   };
 
-  const toggleAutoReminder = (studentId: number) => {
-    setLinks(
-      links.map((link) =>
-        link.studentId === studentId ? { ...link, autoRemindHomework: !link.autoRemindHomework } : link,
-      ),
-    );
+  const toggleAutoReminder = async (studentId: number) => {
+    const link = links.find((l) => l.studentId === studentId);
+    if (!link) return;
+
+    try {
+      const data = await apiFetch(`/api/students/${studentId}/auto-remind`, {
+        method: 'POST',
+        body: JSON.stringify({ value: !link.autoRemindHomework }),
+      });
+
+      setLinks(links.map((l) => (l.studentId === studentId ? data.link : l)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle reminder', error);
+    }
   };
 
-  const adjustBalance = (studentId: number, delta: number) => {
-    setLinks(
-      links.map((link) =>
-        link.studentId === studentId ? { ...link, balanceLessons: Math.max(0, link.balanceLessons + delta) } : link,
-      ),
-    );
+  const adjustBalance = async (studentId: number, delta: number) => {
+    try {
+      const data = await apiFetch(`/api/students/${studentId}/balance`, {
+        method: 'POST',
+        body: JSON.stringify({ delta }),
+      });
+      setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to adjust balance', error);
+    }
   };
 
-  const addLesson = () => {
-    const id = Math.max(0, ...lessons.map((l) => l.id)) + 1;
+  const addLesson = async () => {
+    if (!newLessonDraft.studentId) return;
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
-    setLessons([
-      ...lessons,
-      {
-        id,
-        teacherId: teacher.chatId,
-        studentId: Number(newLessonDraft.studentId),
-        startAt,
-        durationMinutes: Number(newLessonDraft.durationMinutes),
-        status: 'SCHEDULED',
-        isPaid: false,
-      },
-    ]);
 
-    setLessonModalOpen(false);
-    setActiveTab('schedule');
-  };
+    try {
+      const data = await apiFetch('/api/lessons', {
+        method: 'POST',
+        body: JSON.stringify({
+          studentId: newLessonDraft.studentId,
+          startAt,
+          durationMinutes: Number(newLessonDraft.durationMinutes),
+        }),
+      });
 
-  const markLessonCompleted = (lessonId: number) => {
-    setLessons(
-      lessons.map((lesson) =>
-        lesson.id === lessonId ? { ...lesson, status: 'COMPLETED', isPaid: lesson.isPaid || false } : lesson,
-      ),
-    );
-
-    const lesson = lessons.find((l) => l.id === lessonId);
-    if (lesson) {
-      adjustBalance(lesson.studentId, -1);
+      setLessons([...lessons, normalizeLesson(data.lesson)]);
+      setLessonModalOpen(false);
+      setActiveTab('schedule');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to create lesson', error);
     }
   };
 
-  const togglePaid = (lessonId: number) => {
-    setLessons(lessons.map((lesson) => (lesson.id === lessonId ? { ...lesson, isPaid: !lesson.isPaid } : lesson)));
+  const markLessonCompleted = async (lessonId: number) => {
+    try {
+      const data = await apiFetch(`/api/lessons/${lessonId}/complete`, { method: 'POST' });
+      setLessons(
+        lessons.map((lesson) =>
+          lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson,
+        ),
+      );
+
+      if (data.link) {
+        setLinks(
+          links.map((link) =>
+            link.studentId === data.link.studentId && link.teacherId === data.link.teacherId ? data.link : link,
+          ),
+        );
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to complete lesson', error);
+    }
   };
 
-  const addHomework = () => {
+  const togglePaid = async (lessonId: number) => {
+    try {
+      const data = await apiFetch(`/api/lessons/${lessonId}/toggle-paid`, { method: 'POST' });
+      setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle payment', error);
+    }
+  };
+
+  const addHomework = async () => {
     if (!selectedStudentId || !newHomeworkDraft.text.trim()) return;
-    const id = Math.max(0, ...homeworks.map((hw) => hw.id)) + 1;
-    setHomeworks([
-      ...homeworks,
-      {
-        id,
-        text: newHomeworkDraft.text,
-        deadline: newHomeworkDraft.deadline || undefined,
-        isDone: false,
-        studentId: selectedStudentId,
-        teacherId: teacher.chatId,
-      },
-    ]);
-    setNewHomeworkDraft({ text: '', deadline: '' });
+
+    try {
+      const data = await apiFetch('/api/homeworks', {
+        method: 'POST',
+        body: JSON.stringify({
+          studentId: selectedStudentId,
+          text: newHomeworkDraft.text,
+          deadline: newHomeworkDraft.deadline || undefined,
+        }),
+      });
+
+      setHomeworks([...homeworks, normalizeHomework(data.homework)]);
+      setNewHomeworkDraft({ text: '', deadline: '' });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add homework', error);
+    }
   };
 
-  const toggleHomeworkDone = (homeworkId: number) => {
-    setHomeworks(
-      homeworks.map((hw) => (hw.id === homeworkId ? { ...hw, isDone: !hw.isDone } : hw)),
-    );
+  const toggleHomeworkDone = async (homeworkId: number) => {
+    try {
+      const data = await apiFetch(`/api/homeworks/${homeworkId}/toggle`, { method: 'PATCH' });
+      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle homework', error);
+    }
   };
 
-  const remindHomework = (studentId: number) => {
-    alert('Имитация: напоминание отправлено через Telegram ученику #' + studentId);
+  const remindHomework = async (studentId: number) => {
+    try {
+      await apiFetch('/api/reminders/homework', {
+        method: 'POST',
+        body: JSON.stringify({ studentId }),
+      });
+      alert('Напоминание отправлено ученику #' + studentId);
+    } catch (error) {
+      alert('Не удалось отправить напоминание');
+      // eslint-disable-next-line no-console
+      console.error('Failed to send reminder', error);
+    }
   };
 
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -659,7 +736,7 @@ export const App = () => {
               <div className={styles.formRow}>
                 <select
                   className={styles.input}
-                  value={newLessonDraft.studentId}
+                  value={newLessonDraft.studentId ?? ''}
                   onChange={(e) => setNewLessonDraft({ ...newLessonDraft, studentId: Number(e.target.value) })}
                 >
                   {linkedStudents.map((s) => (
