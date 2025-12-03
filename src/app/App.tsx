@@ -1,5 +1,6 @@
 import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { useMemo, useState } from 'react';
+import { DashboardIcon, EventNoteIcon, PeopleIcon, SettingsIcon } from '../icons/MaterialIcons';
 import styles from './App.module.css';
 
 // Domain types aligned with the Prisma schema from ARCHITECTURE.md
@@ -109,10 +110,10 @@ const initialLessons: Lesson[] = [
 ];
 
 const tabs = [
-  { id: 'dashboard', label: 'Главная', icon: '🏠' },
-  { id: 'students', label: 'Ученики', icon: '👥' },
-  { id: 'schedule', label: 'Расписание', icon: '📅' },
-  { id: 'settings', label: 'Настройки', icon: '⚙️' },
+  { id: 'dashboard', label: 'Главная', icon: DashboardIcon },
+  { id: 'students', label: 'Ученики', icon: PeopleIcon },
+  { id: 'schedule', label: 'Расписание', icon: EventNoteIcon },
+  { id: 'settings', label: 'Настройки', icon: SettingsIcon },
 ] as const;
 
 type TabId = (typeof tabs)[number]['id'];
@@ -333,7 +334,7 @@ export const App = () => {
             onClick={() => setActiveTab(tab.id)}
           >
             <span className={styles.tabIcon} aria-hidden>
-              {tab.icon}
+              <tab.icon />
             </span>
             <span>{tab.label}</span>
           </button>
@@ -623,7 +624,7 @@ export const App = () => {
             onClick={() => setActiveTab(tab.id)}
           >
             <span className={styles.tabIcon} aria-hidden>
-              {tab.icon}
+              <tab.icon />
             </span>
             <span>{tab.label}</span>
           </button>
