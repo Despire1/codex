@@ -10,7 +10,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import {
   CalendarMonthIcon,
   DashboardIcon,
@@ -298,6 +298,16 @@ export const App = () => {
     }
   };
 
+  const openLessonModal = (dateISO: string, time?: string) => {
+    setNewLessonDraft((draft) => ({
+      ...draft,
+      date: dateISO,
+      time: time ?? draft.time,
+    }));
+    setLessonModalOpen(true);
+    setActiveTab('schedule');
+  };
+
   const addLesson = async () => {
     if (!newLessonDraft.studentId) return;
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
@@ -499,6 +509,24 @@ export const App = () => {
       return { top, height };
     };
 
+    const handleWeekSlotClick = (dayIso: string) => (event: MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+
+      const container = event.currentTarget;
+      const rect = container.getBoundingClientRect();
+      const offsetY = event.clientY - rect.top + container.scrollTop;
+      const minutesFromStart = WEEK_START_HOUR * 60 + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
+      const clampedMinutes = Math.min(Math.max(minutesFromStart, WEEK_START_HOUR * 60), WEEK_END_HOUR * 60);
+      const roundedMinutes = Math.round(clampedMinutes / 30) * 30;
+      const hours = Math.floor(roundedMinutes / 60)
+        .toString()
+        .padStart(2, '0');
+      const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
+
+      openLessonModal(dayIso, `${hours}:${minutes}`);
+    };
+
     return (
       <div className={styles.weekView}>
         <div className={styles.weekHeaderRow}>
@@ -528,7 +556,11 @@ export const App = () => {
 
               return (
                 <div key={day.iso} className={styles.weekDayColumn}>
-                  <div className={styles.weekDayBody} style={{ height: dayHeight }}>
+                  <div
+                    className={styles.weekDayBody}
+                    style={{ height: dayHeight }}
+                    onClick={handleWeekSlotClick(day.iso)}
+                  >
                     {dayLessons.map((lesson) => {
                       const student = linkedStudents.find((s) => s.id === lesson.studentId);
                       const date = parseISO(lesson.startAt);
@@ -585,12 +617,19 @@ export const App = () => {
 
               {days.map((day) => {
                 const dayLessons = lessonsByDay[day.iso] ?? [];
+                const handleDayClick = (event: MouseEvent<HTMLDivElement>) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest(`.${styles.monthLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+                  openLessonModal(day.iso, '12:00');
+                };
+
                 return (
                   <div
                     key={`${monthLabel}-${day.iso}`}
                     className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
                       isToday(day.date) ? styles.todayCell : ''
                     }`}
+                    onClick={handleDayClick}
                   >
                     <div className={styles.monthDateRow}>
                       <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
