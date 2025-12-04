@@ -37,3 +37,15 @@ export const RubleIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M8 21h2v-3h4c2.76 0 5-2.24 5-5s-2.24-5-5-5H10V3H8v5H6v2h2v3H6v2h2v3zm2-5v-3h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4z" />
   </svg>
 );
+
+export const ViewWeekIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M3 5v14h18V5H3zm5 12H5V7h3v10zm6 0h-4V7h4v10zm5 0h-3V7h3v10z" />
+  </svg>
+);
+
+export const CalendarMonthIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V10h14v8zm0-10H5V6h14v2z" />
+  </svg>
+);

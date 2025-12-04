@@ -320,36 +320,6 @@
   margin-bottom: 6px;
 }
 
-.daysGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.viewToggle {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin: 8px 0 12px;
-}
-
-.toggleButton {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  font-weight: 700;
-  color: #0f172a;
-  transition: all 0.2s ease;
-}
-
-.toggleActive {
-  background: #0ea5e9;
-  color: #fff;
-  border-color: #0ea5e9;
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
-}
-
 .weekView {
   border: 1px solid #e2e8f0;
   border-radius: 14px;
@@ -471,6 +441,13 @@
   color: #0ea5e9;
 }
 
+.compactBadge {
+  position: static;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
 .paymentBadge svg {
   pointer-events: none;
 }
@@ -533,6 +510,168 @@
 .priceButtons {
   display: flex;
   gap: 8px;
+}
+
+.sectionActionsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.viewToggleIcons {
+  display: flex;
+  gap: 8px;
+}
+
+.iconToggleButton {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  transition: all 0.2s ease;
+}
+
+.toggleActive {
+  background: #0ea5e9;
+  color: #fff;
+  border-color: #0ea5e9;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+}
+
+.monthScroller {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 760px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.monthSection {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.monthHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.monthTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.monthSubtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(46px, 1fr));
+  gap: 6px;
+}
+
+.monthWeekday {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.monthCell {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 90px;
+  position: relative;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mutedDay {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.todayCell {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.monthDateRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthDateNumber {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.todayPill {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #0ea5e9;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.monthLessonList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.monthLesson {
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: #e0f2fe;
+  border: 1px solid #0ea5e9;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monthLessonInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.monthLessonTime {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.monthLessonName {
+  font-size: 12px;
+  color: #334155;
 }
 
 .label {

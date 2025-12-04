@@ -1,6 +1,26 @@
-import { addDays, format, isToday, isTomorrow, parseISO, startOfWeek } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  format,
+  isToday,
+  isTomorrow,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
-import { DashboardIcon, EditIcon, EventNoteIcon, PeopleIcon, RubleIcon, SettingsIcon } from '../icons/MaterialIcons';
+import {
+  CalendarMonthIcon,
+  DashboardIcon,
+  EditIcon,
+  EventNoteIcon,
+  PeopleIcon,
+  RubleIcon,
+  SettingsIcon,
+  ViewWeekIcon,
+} from '../icons/MaterialIcons';
 import styles from './App.module.css';
 
 // Domain types aligned with the Prisma schema from ARCHITECTURE.md
@@ -67,6 +87,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const WEEK_START_HOUR = 8;
 const WEEK_END_HOUR = 22;
 const HOUR_BLOCK_HEIGHT = 52;
+const WEEK_STARTS_ON = 1;
 
 const tabs = [
   { id: 'dashboard', label: 'Главная', icon: DashboardIcon },
@@ -97,6 +118,9 @@ export const App = () => {
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'week' | 'month'>('week');
+  const [monthAnchor] = useState<Date>(startOfMonth(new Date()));
+
+  const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
   const normalizeLesson = (lesson: any): Lesson => ({
     ...lesson,
@@ -374,8 +398,6 @@ export const App = () => {
     }
   };
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
       const day = lesson.startAt.slice(0, 10);
@@ -386,12 +408,11 @@ export const App = () => {
   }, [lessons]);
 
   const weekDays = useMemo(() => {
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const start = startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(start, i);
       return {
         iso: format(date, 'yyyy-MM-dd'),
-        label: format(date, 'EEE d MMM'),
         date,
       };
     });
@@ -404,6 +425,35 @@ export const App = () => {
 
   const dayHeight = useMemo(() => (WEEK_END_HOUR - WEEK_START_HOUR) * HOUR_BLOCK_HEIGHT, []);
 
+  const monthsToRender = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => addMonths(monthAnchor, i - 1)),
+    [monthAnchor],
+  );
+
+  const monthWeekdays = useMemo(() => {
+    const start = startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(start, i);
+      return capitalize(format(date, 'EEE', { locale: ru }));
+    });
+  }, []);
+
+  const buildMonthDays = (monthDate: Date) => {
+    const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    const end = startOfWeek(addDays(endOfMonth(monthDate), 7), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+
+    const days: { date: Date; iso: string; inMonth: boolean }[] = [];
+    for (let cursor = start; cursor < end; cursor = addDays(cursor, 1)) {
+      days.push({
+        date: cursor,
+        iso: format(cursor, 'yyyy-MM-dd'),
+        inMonth: cursor.getMonth() === monthDate.getMonth(),
+      });
+    }
+
+    return days;
+  };
+
   const renderLessonRow = (lesson: Lesson) => {
     const student = linkedStudents.find((s) => s.id === lesson.studentId);
     const date = parseISO(lesson.startAt);
@@ -411,7 +461,7 @@ export const App = () => {
       ? 'Сегодня'
       : isTomorrow(date)
       ? 'Завтра'
-      : format(date, 'd MMM');
+      : format(date, 'd MMM', { locale: ru });
 
     return (
       <div key={lesson.id} className={styles.lessonRow}>
@@ -455,8 +505,8 @@ export const App = () => {
           <div className={styles.timeColumnSpacer} />
           {weekDays.map((day) => (
             <div key={day.iso} className={`${styles.weekDayHeader} ${isToday(day.date) ? styles.todayHeader : ''}`}>
-              <div className={styles.weekDayName}>{format(day.date, 'EEEE')}</div>
-              <div className={styles.weekDayDate}>{format(day.date, 'd MMM')}</div>
+              <div className={styles.weekDayName}>{capitalize(format(day.date, 'EEEE', { locale: ru }))}</div>
+              <div className={styles.weekDayDate}>{format(day.date, 'd MMM', { locale: ru })}</div>
             </div>
           ))}
         </div>
@@ -513,6 +563,76 @@ export const App = () => {
       </div>
     );
   };
+
+  const renderMonthView = () => (
+    <div className={styles.monthScroller}>
+      {monthsToRender.map((monthDate) => {
+        const days = buildMonthDays(monthDate);
+        const monthLabel = capitalize(format(monthDate, 'LLLL yyyy', { locale: ru }));
+
+        return (
+          <section key={monthLabel} className={styles.monthSection}>
+            <div className={styles.monthHeader}>
+              <div className={styles.monthTitle}>{monthLabel}</div>
+              <div className={styles.monthSubtitle}>Просматривайте все дни и будущие месяцы, прокручивая вниз</div>
+            </div>
+            <div className={styles.monthGrid}>
+              {monthWeekdays.map((weekday) => (
+                <div key={weekday} className={styles.monthWeekday}>
+                  {weekday}
+                </div>
+              ))}
+
+              {days.map((day) => {
+                const dayLessons = lessonsByDay[day.iso] ?? [];
+                return (
+                  <div
+                    key={`${monthLabel}-${day.iso}`}
+                    className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
+                      isToday(day.date) ? styles.todayCell : ''
+                    }`}
+                  >
+                    <div className={styles.monthDateRow}>
+                      <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
+                      {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
+                    </div>
+                    <div className={styles.monthLessonList}>
+                      {dayLessons.map((lesson) => {
+                        const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                        const date = parseISO(lesson.startAt);
+                        return (
+                          <div
+                            key={lesson.id}
+                            className={`${styles.monthLesson} ${
+                              lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+                            }`}
+                          >
+                            <div className={styles.monthLessonInfo}>
+                              <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                              <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
+                            </div>
+                            <button
+                              className={`${styles.paymentBadge} ${styles.compactBadge} ${
+                                lesson.isPaid ? styles.paid : styles.unpaid
+                              }`}
+                              onClick={() => togglePaid(lesson.id)}
+                              aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                            >
+                              <RubleIcon width={14} height={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className={styles.page}>
@@ -758,43 +878,32 @@ export const App = () => {
             <div className={styles.sectionHeader}>
               <h2>Расписание</h2>
               <span className={styles.muted}>Создание, завершение и оплата</span>
-              <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(true)}>
-                + Создать урок
-              </button>
-            </div>
-
-            <div className={styles.viewToggle}>
-              <button
-                className={`${styles.toggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                onClick={() => setScheduleView('week')}
-              >
-                Неделя
-              </button>
-              <button
-                className={`${styles.toggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                onClick={() => setScheduleView('month')}
-              >
-                Месяц
-              </button>
+              <div className={styles.sectionActionsStack}>
+                <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(true)}>
+                  + Создать урок
+                </button>
+                <div className={styles.viewToggleIcons}>
+                  <button
+                    className={`${styles.iconToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('week')}
+                    aria-label="Вид на неделю"
+                  >
+                    <ViewWeekIcon width={22} height={22} />
+                  </button>
+                  <button
+                    className={`${styles.iconToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('month')}
+                    aria-label="Вид на месяц"
+                  >
+                    <CalendarMonthIcon width={22} height={22} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {scheduleView === 'week' && renderWeekGrid()}
 
-            {scheduleView === 'month' && (
-              <div className={styles.daysGrid}>
-                {Object.entries(lessonsByDay)
-                  .sort(([a], [b]) => (a > b ? 1 : -1))
-                  .map(([day, dayLessons]) => (
-                    <div key={day} className={styles.dayCard}>
-                      <div className={styles.dayHeader}>
-                        <div>{day === today ? 'Сегодня' : format(parseISO(day + 'T00:00:00.000Z'), 'EEEE, d MMM')}</div>
-                        <div className={styles.muted}>{dayLessons.length} урок(а)</div>
-                      </div>
-                      {dayLessons.map((lesson) => renderLessonRow(lesson))}
-                    </div>
-                  ))}
-              </div>
-            )}
+            {scheduleView === 'month' && renderMonthView()}
 
           </section>
         )}
