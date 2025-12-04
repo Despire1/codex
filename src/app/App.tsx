@@ -973,6 +973,68 @@ export const App = () => {
         {activeTab === 'schedule' && (
           <section className={styles.card}>
             <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitleRow}>
+                <div>
+                  <h2>Расписание</h2>
+                  <span className={styles.muted}>Создание, завершение и оплата</span>
+                </div>
+
+                <div className={styles.periodSwitcherInline}>
+                  {scheduleView === 'month' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
+                        &lt;
+                      </button>
+                      <div key={monthLabelKey} className={styles.monthName}>
+                        {currentMonthLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+
+                  {scheduleView === 'week' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(-1)} aria-label="Предыдущая неделя">
+                        &lt;
+                      </button>
+                      <div key={weekLabelKey} className={styles.monthName}>
+                        {weekRangeLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(1)} aria-label="Следующая неделя">
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+
+                  {scheduleView === 'day' && (
+                    <div className={styles.daySwitcher}>
+                      <div className={styles.monthSwitcher}>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(-1)} aria-label="Предыдущий день">
+                          &lt;
+                        </button>
+                        <div key={dayLabelKey} className={styles.monthName}>
+                          {dayLabel}
+                        </div>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(1)} aria-label="Следующий день">
+                          &gt;
+                        </button>
+                      </div>
+                      <input
+                        className={styles.dateInput}
+                        type="date"
+                        value={format(dayViewDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) setDayViewDate(new Date(`${value}T00:00:00`));
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className={styles.calendarToolbar}>
                 <div className={styles.viewToggleRow}>
                   <button
@@ -1008,67 +1070,6 @@ export const App = () => {
                   >
                     + Создать урок
                   </button>
-
-                  <div className={styles.periodSwitcher}>
-                    {scheduleView === 'month' && (
-                      <div className={styles.monthSwitcher}>
-                        <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
-                          &lt;
-                        </button>
-                        <div key={monthLabelKey} className={styles.monthName}>
-                          {currentMonthLabel}
-                        </div>
-                        <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
-                          &gt;
-                        </button>
-                      </div>
-                    )}
-
-                    {scheduleView === 'week' && (
-                      <div className={styles.monthSwitcher}>
-                        <button className={styles.monthNavButton} onClick={() => handleWeekShift(-1)} aria-label="Предыдущая неделя">
-                          &lt;
-                        </button>
-                        <div key={weekLabelKey} className={styles.monthName}>
-                          {weekRangeLabel}
-                        </div>
-                        <button className={styles.monthNavButton} onClick={() => handleWeekShift(1)} aria-label="Следующая неделя">
-                          &gt;
-                        </button>
-                      </div>
-                    )}
-
-                    {scheduleView === 'day' && (
-                      <div className={styles.daySwitcher}>
-                        <div className={styles.monthSwitcher}>
-                          <button className={styles.monthNavButton} onClick={() => handleDayShift(-1)} aria-label="Предыдущий день">
-                            &lt;
-                          </button>
-                          <div key={dayLabelKey} className={styles.monthName}>
-                            {dayLabel}
-                          </div>
-                          <button className={styles.monthNavButton} onClick={() => handleDayShift(1)} aria-label="Следующий день">
-                            &gt;
-                          </button>
-                        </div>
-                        <input
-                          className={styles.dateInput}
-                          type="date"
-                          value={format(dayViewDate, 'yyyy-MM-dd')}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value) setDayViewDate(new Date(`${value}T00:00:00`));
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className={styles.sectionHeaderMain}>
-                <div>
-                  <h2>Расписание</h2>
-                  <span className={styles.muted}>Создание, завершение и оплата</span>
                 </div>
               </div>
             </div>

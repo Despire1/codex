@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "api": "tsx src/backend/server.ts",
+    "api": "prisma generate && tsx src/backend/server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
