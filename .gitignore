@@ -4,3 +4,5 @@ dist
 .vscode
 .env
 prisma/*.db
+prisma/**/*.db
+prisma/**/*.db-journal

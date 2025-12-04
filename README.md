@@ -15,10 +15,10 @@
    ```bash
    cp .env.example .env
    ```
-3. Подготовьте SQLite-схему (создаст `prisma/teacherbot.db` и сгенерирует Prisma Client; `npm run api` теперь сам вызывает `prisma generate` на старте, но первый прогон лучше сделать вручную):
+3. Примените миграции и сгенерируйте Prisma Client (создаст `prisma/teacherbot.db`):
    ```bash
+   npm run prisma:migrate
    npm run prisma:generate
-   npm run prisma:db-push
    ```
 4. Запустите API (порт 4000 по умолчанию):
    ```bash
@@ -32,12 +32,12 @@
 
 ## Диагностика ошибки 500 при `/api/bootstrap`
 - Убедитесь, что API запущен (`npm run api`), а консоль показывает `API server running on http://localhost:4000`.
-- Проверьте, что Prisma клиент сгенерирован и база создана (`npm run prisma:generate && npm run prisma:db-push`).
+- Проверьте, что Prisma клиент сгенерирован и база создана (`npm run prisma:migrate && npm run prisma:generate`).
 - Убедитесь, что `.env` содержит корректный `DATABASE_URL` (по умолчанию `file:./prisma/teacherbot.db`).
 
-Если при обновлении цены видите сообщение вида `Unknown argument pricePerLesson`, значит локальный Prisma Client или база не обновились после последней схемы:
-- выполните `npm run prisma:generate` (чтобы клиент знал о поле цены)
-- выполните `npm run prisma:db-push` (чтобы добавить колонку `pricePerLesson` в SQLite)
+Если при обновлении цены или запуске API видите ошибки миграций/схемы, значит локальный Prisma Client или база не обновились после последней схемы:
+- выполните `npm run prisma:migrate` (чтобы накатить актуальные миграции на SQLite)
+- выполните `npm run prisma:generate` (чтобы клиент знал о новых полях вроде `pricePerLesson`)
 
 ## Полезные команды
 - `npm run prisma:studio` — визуальный просмотр базы в браузере.

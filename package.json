@@ -9,8 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "prisma:migrate": "prisma migrate dev --skip-generate",
     "prisma:generate": "prisma generate",
-    "prisma:db-push": "prisma db push --skip-generate",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
