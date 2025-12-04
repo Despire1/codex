@@ -341,10 +341,7 @@ export const App = () => {
 
   const dayHeight = useMemo(() => (WEEK_END_HOUR - WEEK_START_HOUR) * HOUR_BLOCK_HEIGHT, []);
 
-  const monthsToRender = useMemo(
-    () => Array.from({ length: 6 }, (_, i) => addMonths(addMonths(monthAnchor, monthOffset), i - 1)),
-    [monthAnchor, monthOffset],
-  );
+  const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
 
   const monthWeekdays = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -601,83 +598,81 @@ export const App = () => {
     );
   };
 
-  const renderMonthView = () => (
-    <div className={styles.monthScroller}>
-      {monthsToRender.map((monthDate) => {
-        const days = buildMonthDays(monthDate);
-        const monthLabel = capitalize(format(monthDate, 'LLLL yyyy', { locale: ru }));
+  const renderMonthView = () => {
+    const days = buildMonthDays(selectedMonth);
+    const monthLabel = capitalize(format(selectedMonth, 'LLLL yyyy', { locale: ru }));
 
-        return (
-          <section key={monthLabel} className={styles.monthSection}>
-            <div className={styles.monthHeader}>
-              <div className={styles.monthTitle}>{monthLabel}</div>
-              <div className={styles.monthSubtitle}>Просматривайте все дни и будущие месяцы, прокручивая вниз</div>
-            </div>
-            <div className={styles.monthGrid}>
-              {monthWeekdays.map((weekday) => (
-                <div key={weekday} className={styles.monthWeekday}>
-                  {weekday}
-                </div>
-              ))}
+    return (
+      <div className={styles.monthScroller}>
+        <section key={monthLabel} className={styles.monthSection}>
+          <div className={styles.monthHeader}>
+            <div className={styles.monthTitle}>{monthLabel}</div>
+            <div className={styles.monthSubtitle}>Текущий выбранный месяц</div>
+          </div>
+          <div className={styles.monthGrid}>
+            {monthWeekdays.map((weekday) => (
+              <div key={weekday} className={styles.monthWeekday}>
+                {weekday}
+              </div>
+            ))}
 
-              {days.map((day) => {
-                const dayLessons = lessonsByDay[day.iso] ?? [];
-                const handleDayClick = (event: MouseEvent<HTMLDivElement>) => {
-                  const target = event.target as HTMLElement;
-                  if (target.closest(`.${styles.monthLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
-                  setDayViewDate(day.date);
-                  openLessonModal(day.iso, '12:00');
-                };
+            {days.map((day) => {
+              const dayLessons = lessonsByDay[day.iso] ?? [];
+              const handleDayClick = (event: MouseEvent<HTMLDivElement>) => {
+                const target = event.target as HTMLElement;
+                if (target.closest(`.${styles.monthLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+                setDayViewDate(day.date);
+                openLessonModal(day.iso, '12:00');
+              };
 
-                return (
-                  <div
-                    key={`${monthLabel}-${day.iso}`}
-                    className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
-                      isToday(day.date) ? styles.todayCell : ''
-                    }`}
-                    onClick={handleDayClick}
-                  >
-                    <div className={styles.monthDateRow}>
-                      <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
-                      {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
-                    </div>
-                    <div className={styles.monthLessonList}>
-                      {dayLessons.map((lesson) => {
-                        const student = linkedStudents.find((s) => s.id === lesson.studentId);
-                        const date = parseISO(lesson.startAt);
-                        return (
-                          <div
-                            key={lesson.id}
-                            className={`${styles.monthLesson} ${
-                              lesson.status === 'CANCELED' ? styles.canceledLesson : ''
-                            }`}
-                          >
-                            <div className={styles.monthLessonInfo}>
-                              <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                              <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
-                            </div>
-                            <button
-                              className={`${styles.paymentBadge} ${styles.compactBadge} ${
-                                lesson.isPaid ? styles.paid : styles.unpaid
-                              }`}
-                              onClick={() => togglePaid(lesson.id)}
-                              aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                            >
-                      <CurrencyRubleIcon width={14} height={14} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+              return (
+                <div
+                  key={`${monthLabel}-${day.iso}`}
+                  className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
+                    isToday(day.date) ? styles.todayCell : ''
+                  }`}
+                  onClick={handleDayClick}
+                >
+                  <div className={styles.monthDateRow}>
+                    <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
+                    {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
+                  <div className={styles.monthLessonList}>
+                    {dayLessons.map((lesson) => {
+                      const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                      const date = parseISO(lesson.startAt);
+                      return (
+                        <div
+                          key={lesson.id}
+                          className={`${styles.monthLesson} ${
+                            lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+                          }`}
+                        >
+                          <div className={styles.monthLessonInfo}>
+                            <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                            <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
+                          </div>
+                          <button
+                            className={`${styles.paymentBadge} ${styles.compactBadge} ${
+                              lesson.isPaid ? styles.paid : styles.unpaid
+                            }`}
+                            onClick={() => togglePaid(lesson.id)}
+                            aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                          >
+                            <CurrencyRubleIcon width={14} height={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    );
+  };
 
   return (
     <div className={styles.page}>
