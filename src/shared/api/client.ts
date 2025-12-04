@@ -47,6 +47,8 @@ export const api = {
     }),
   createLesson: (payload: { studentId: number; startAt: string; durationMinutes: number }) =>
     apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
+  updateLesson: (id: number, payload: { studentId: number; startAt: string; durationMinutes: number }) =>
+    apiFetch<{ lesson: Lesson }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   markLessonCompleted: (lessonId: number) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {
       method: 'POST',

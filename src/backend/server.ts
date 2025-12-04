@@ -201,6 +201,28 @@ const createLesson = async (body: any) => {
   });
 };
 
+const updateLesson = async (lessonId: number, body: any) => {
+  const { studentId, startAt, durationMinutes } = body ?? {};
+  const teacher = await ensureTeacher();
+  const existing = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!existing || existing.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  const nextStudentId = studentId ?? existing.studentId;
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(nextStudentId) } },
+  });
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  return prisma.lesson.update({
+    where: { id: lessonId },
+    data: {
+      studentId: Number(nextStudentId),
+      startAt: startAt ? new Date(startAt) : existing.startAt,
+      durationMinutes: durationMinutes ? Number(durationMinutes) : existing.durationMinutes,
+    },
+  });
+};
+
 const markLessonCompleted = async (lessonId: number) => {
   const teacher = await ensureTeacher();
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
@@ -314,6 +336,14 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const lesson = await createLesson(body);
       return sendJson(res, 201, { lesson });
+    }
+
+    const lessonUpdateMatch = pathname.match(/^\/api\/lessons\/(\d+)$/);
+    if (req.method === 'PATCH' && lessonUpdateMatch) {
+      const lessonId = Number(lessonUpdateMatch[1]);
+      const body = await readBody(req);
+      const lesson = await updateLesson(lessonId, body);
+      return sendJson(res, 200, { lesson });
     }
 
     const lessonCompleteMatch = pathname.match(/^\/api\/lessons\/(\d+)\/complete$/);

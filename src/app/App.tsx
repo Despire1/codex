@@ -58,6 +58,7 @@ export const App = () => {
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -74,6 +75,8 @@ export const App = () => {
   const [monthAnchor] = useState<Date>(startOfMonth(new Date()));
   const [monthOffset, setMonthOffset] = useState(0);
   const [monthLabelKey, setMonthLabelKey] = useState(0);
+  const [weekLabelKey, setWeekLabelKey] = useState(0);
+  const [dayLabelKey, setDayLabelKey] = useState(0);
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
 
   const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -212,35 +215,60 @@ export const App = () => {
     }
   };
 
-  const openLessonModal = (dateISO: string, time?: string) => {
+  const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
       time: time ?? draft.time,
+      studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
+      durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
     }));
+    setEditingLessonId(existing?.id ?? null);
     setLessonModalOpen(true);
     setActiveTab('schedule');
     setDayViewDate(new Date(dateISO));
   };
 
-  const addLesson = async () => {
+  const closeLessonModal = () => {
+    setLessonModalOpen(false);
+    setEditingLessonId(null);
+  };
+
+  const saveLesson = async () => {
     if (!newLessonDraft.studentId) return;
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
 
     try {
-      const data = await api.createLesson({
-        studentId: newLessonDraft.studentId,
-        startAt,
-        durationMinutes: Number(newLessonDraft.durationMinutes),
-      });
+      if (editingLessonId) {
+        const data = await api.updateLesson(editingLessonId, {
+          studentId: newLessonDraft.studentId,
+          startAt,
+          durationMinutes: Number(newLessonDraft.durationMinutes),
+        });
+        setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+      } else {
+        const data = await api.createLesson({
+          studentId: newLessonDraft.studentId,
+          startAt,
+          durationMinutes: Number(newLessonDraft.durationMinutes),
+        });
 
-      setLessons([...lessons, normalizeLesson(data.lesson)]);
+        setLessons([...lessons, normalizeLesson(data.lesson)]);
+      }
+
       setLessonModalOpen(false);
+      setEditingLessonId(null);
       setActiveTab('schedule');
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
+  };
+
+  const startEditLesson = (lesson: Lesson) => {
+    const start = parseISO(lesson.startAt);
+    const time = format(start, 'HH:mm');
+    openLessonModal(format(start, 'yyyy-MM-dd'), time, lesson);
   };
 
   const markLessonCompleted = async (lessonId: number) => {
@@ -343,13 +371,15 @@ export const App = () => {
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
 
-  const monthWeekdays = useMemo(() => {
-    const start = startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = addDays(start, i);
-      return capitalize(format(date, 'EEE', { locale: ru }));
-    });
-  }, []);
+  const weekRangeLabel = useMemo(() => {
+    const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    const end = addDays(start, 6);
+    return `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`;
+  }, [dayViewDate]);
+
+  const dayLabel = useMemo(() => capitalize(format(dayViewDate, 'EEEE, d MMMM', { locale: ru })), [dayViewDate]);
+
+  const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
 
   const currentMonthLabel = useMemo(
     () => capitalize(format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru })),
@@ -369,6 +399,16 @@ export const App = () => {
       return next;
     });
     setMonthLabelKey((key) => key + 1);
+  };
+
+  const handleWeekShift = (delta: number) => {
+    setDayViewDate((prev) => addDays(prev, delta * 7));
+    setWeekLabelKey((key) => key + 1);
+  };
+
+  const handleDayShift = (delta: number) => {
+    setDayViewDate((prev) => addDays(prev, delta));
+    setDayLabelKey((key) => key + 1);
   };
 
   const buildMonthDays = (monthDate: Date) => {
@@ -495,6 +535,7 @@ export const App = () => {
                           key={lesson.id}
                           className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
                           style={{ top, height }}
+                          onClick={() => startEditLesson(lesson)}
                         >
                           <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                           <div className={styles.weekLessonMeta}>
@@ -502,7 +543,10 @@ export const App = () => {
                           </div>
                           <button
                             className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                            onClick={() => togglePaid(lesson.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              togglePaid(lesson.id);
+                            }}
                             aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
                           >
                             <CurrencyRubleIcon width={16} height={16} />
@@ -556,7 +600,9 @@ export const App = () => {
     return (
       <div className={styles.dayView}>
         <div className={styles.dayHeading}>
-          <div className={styles.dayTitle}>{capitalize(format(dayViewDate, 'EEEE, d MMMM', { locale: ru }))}</div>
+          <div key={dayLabelKey} className={styles.dayTitle}>
+            {dayLabel}
+          </div>
           <div className={styles.muted}>Тапните по пустой ячейке, чтобы быстро создать урок</div>
         </div>
         <div className={styles.dayGrid}>
@@ -579,12 +625,16 @@ export const App = () => {
                     lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                   }`}
                   style={{ top, height }}
+                  onClick={() => startEditLesson(lesson)}
                 >
                   <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                   <div className={styles.weekLessonMeta}>{format(date, 'HH:mm')} • {lesson.durationMinutes} мин</div>
                   <button
                     className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                    onClick={() => togglePaid(lesson.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      togglePaid(lesson.id);
+                    }}
                     aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
                   >
                     <CurrencyRubleIcon width={16} height={16} />
@@ -647,6 +697,7 @@ export const App = () => {
                           className={`${styles.monthLesson} ${
                             lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                           }`}
+                          onClick={() => startEditLesson(lesson)}
                         >
                           <div className={styles.monthLessonInfo}>
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
@@ -656,7 +707,10 @@ export const App = () => {
                             className={`${styles.paymentBadge} ${styles.compactBadge} ${
                               lesson.isPaid ? styles.paid : styles.unpaid
                             }`}
-                            onClick={() => togglePaid(lesson.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              togglePaid(lesson.id);
+                            }}
                             aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
                           >
                             <CurrencyRubleIcon width={14} height={14} />
@@ -940,28 +994,77 @@ export const App = () => {
                     <span className={styles.viewToggleLabel}>День</span>
                   </button>
                 </div>
-                {scheduleView === 'month' && (
-                  <div className={styles.monthSwitcher}>
-                    <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
-                      &lt;
-                    </button>
-                    <div key={monthLabelKey} className={styles.monthName}>
-                      {currentMonthLabel}
+
+                <div className={styles.periodSwitcher}>
+                  {scheduleView === 'month' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
+                        &lt;
+                      </button>
+                      <div key={monthLabelKey} className={styles.monthName}>
+                        {currentMonthLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
+                        &gt;
+                      </button>
                     </div>
-                    <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
-                      &gt;
-                    </button>
-                  </div>
-                )}
+                  )}
+
+                  {scheduleView === 'week' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(-1)} aria-label="Предыдущая неделя">
+                        &lt;
+                      </button>
+                      <div key={weekLabelKey} className={styles.monthName}>
+                        {weekRangeLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(1)} aria-label="Следующая неделя">
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+
+                  {scheduleView === 'day' && (
+                    <div className={styles.daySwitcher}>
+                      <div className={styles.monthSwitcher}>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(-1)} aria-label="Предыдущий день">
+                          &lt;
+                        </button>
+                        <div key={dayLabelKey} className={styles.monthName}>
+                          {dayLabel}
+                        </div>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(1)} aria-label="Следующий день">
+                          &gt;
+                        </button>
+                      </div>
+                      <input
+                        className={styles.dateInput}
+                        type="date"
+                        value={format(dayViewDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) setDayViewDate(new Date(`${value}T00:00:00`));
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setEditingLessonId(null);
+                    openLessonModal(todayISO(), newLessonDraft.time);
+                  }}
+                >
+                  + Создать урок
+                </button>
               </div>
               <div className={styles.sectionHeaderMain}>
                 <div>
                   <h2>Расписание</h2>
                   <span className={styles.muted}>Создание, завершение и оплата</span>
                 </div>
-                <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(true)}>
-                  + Создать урок
-                </button>
               </div>
             </div>
 
@@ -1076,14 +1179,14 @@ export const App = () => {
       )}
 
       {lessonModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setLessonModalOpen(false)}>
+        <div className={styles.modalOverlay} onClick={closeLessonModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <div>
-                <div className={styles.modalLabel}>Новый урок</div>
+                <div className={styles.modalLabel}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
                 <div className={styles.modalTitle}>По умолчанию {teacher.defaultLessonDuration} мин</div>
               </div>
-              <button className={styles.closeButton} onClick={() => setLessonModalOpen(false)} aria-label="Закрыть модалку">
+              <button className={styles.closeButton} onClick={closeLessonModal} aria-label="Закрыть модалку">
                 ×
               </button>
             </div>
@@ -1125,8 +1228,8 @@ export const App = () => {
               <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(false)}>
                 Отмена
               </button>
-              <button className={styles.primaryButton} onClick={addLesson}>
-                Создать урок
+              <button className={styles.primaryButton} onClick={saveLesson}>
+                {editingLessonId ? 'Сохранить изменения' : 'Создать урок'}
               </button>
             </div>
           </div>
