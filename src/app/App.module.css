@@ -625,6 +625,13 @@
   min-width: 220px;
 }
 
+.calendarCreateButton {
+  border: 1px solid #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .periodSwitcher {
   display: flex;
   align-items: center;

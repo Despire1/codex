@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev --skip-generate",
     "prisma:reset": "prisma migrate reset --force --skip-generate",
+    "prisma:repair": "./scripts/prisma-repair.sh",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio"
   },

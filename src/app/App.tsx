@@ -971,161 +971,157 @@ export const App = () => {
         )}
 
         {activeTab === 'schedule' && (
-            <section className={styles.card}>
+          <section className={styles.card}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitleRow}>
+                <div>
+                  <h2>Расписание</h2>
+                  <span className={styles.muted}>Создание, завершение и оплата</span>
+                </div>
+
+                <div className={styles.periodSwitcherInline}>
+                  {scheduleView === 'month' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
+                        &lt;
+                      </button>
+                      <div key={monthLabelKey} className={styles.monthName}>
+                        {currentMonthLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+
+                  {scheduleView === 'week' && (
+                    <div className={styles.monthSwitcher}>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(-1)} aria-label="Предыдущая неделя">
+                        &lt;
+                      </button>
+                      <div key={weekLabelKey} className={styles.monthName}>
+                        {weekRangeLabel}
+                      </div>
+                      <button className={styles.monthNavButton} onClick={() => handleWeekShift(1)} aria-label="Следующая неделя">
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+
+                  {scheduleView === 'day' && (
+                    <div className={styles.daySwitcher}>
+                      <div className={styles.monthSwitcher}>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(-1)} aria-label="Предыдущий день">
+                          &lt;
+                        </button>
+                        <div key={dayLabelKey} className={styles.monthName}>
+                          {dayLabel}
+                        </div>
+                        <button className={styles.monthNavButton} onClick={() => handleDayShift(1)} aria-label="Следующий день">
+                          &gt;
+                        </button>
+                      </div>
+                      <input
+                        className={styles.dateInput}
+                        type="date"
+                        value={format(dayViewDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) setDayViewDate(new Date(`${value}T00:00:00`));
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className={styles.calendarToolbar}>
                 <div className={styles.viewToggleRow}>
                   <button
-                      className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                      onClick={() => setScheduleView('month')}
+                    className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('month')}
                   >
-                    <CalendarMonthIcon width={20} height={20}/>
+                    <CalendarMonthIcon width={20} height={20} />
                     <span className={styles.viewToggleLabel}>Месяц</span>
                   </button>
                   <button
-                      className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                      onClick={() => setScheduleView('week')}
+                    className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('week')}
                   >
-                    <ViewWeekIcon width={20} height={20}/>
+                    <ViewWeekIcon width={20} height={20} />
                     <span className={styles.viewToggleLabel}>Неделя</span>
                   </button>
                   <button
-                      className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-                      onClick={() => setScheduleView('day')}
+                    className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('day')}
                   >
-                    <ViewDayIcon width={20} height={20}/>
+                    <ViewDayIcon width={20} height={20} />
                     <span className={styles.viewToggleLabel}>День</span>
                   </button>
                 </div>
 
                 <div className={styles.calendarActions}>
                   <button
-                      className={styles.secondaryButton}
-                      onClick={() => {
-                        setEditingLessonId(null);
-                        openLessonModal(todayISO(), newLessonDraft.time);
-                      }}
+                    className={`${styles.secondaryButton} ${styles.calendarCreateButton}`}
+                    onClick={() => {
+                      setEditingLessonId(null);
+                      openLessonModal(todayISO(), newLessonDraft.time);
+                    }}
                   >
                     + Создать урок
                   </button>
                 </div>
               </div>
-              <div className={styles.sectionHeader}>
-                <div className={styles.sectionTitleRow}>
-                  <div>
-                    <h2>Расписание</h2>
-                  </div>
+            </div>
 
-                  <div className={styles.periodSwitcherInline}>
-                    {scheduleView === 'month' && (
-                        <div className={styles.monthSwitcher}>
-                          <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)}
-                                  aria-label="Предыдущий месяц">
-                            &lt;
-                          </button>
-                          <div key={monthLabelKey} className={styles.monthName}>
-                            {currentMonthLabel}
-                          </div>
-                          <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)}
-                                  aria-label="Следующий месяц">
-                            &gt;
-                          </button>
-                        </div>
-                    )}
+            {scheduleView === 'week' && renderWeekGrid()}
 
-                    {scheduleView === 'week' && (
-                        <div className={styles.monthSwitcher}>
-                          <button className={styles.monthNavButton} onClick={() => handleWeekShift(-1)}
-                                  aria-label="Предыдущая неделя">
-                            &lt;
-                          </button>
-                          <div key={weekLabelKey} className={styles.monthName}>
-                            {weekRangeLabel}
-                          </div>
-                          <button className={styles.monthNavButton} onClick={() => handleWeekShift(1)}
-                                  aria-label="Следующая неделя">
-                            &gt;
-                          </button>
-                        </div>
-                    )}
+            {scheduleView === 'month' && renderMonthView()}
 
-                    {scheduleView === 'day' && (
-                        <div className={styles.daySwitcher}>
-                          <div className={styles.monthSwitcher}>
-                            <button className={styles.monthNavButton} onClick={() => handleDayShift(-1)}
-                                    aria-label="Предыдущий день">
-                              &lt;
-                            </button>
-                            <div key={dayLabelKey} className={styles.monthName}>
-                              {dayLabel}
-                            </div>
-                            <button className={styles.monthNavButton} onClick={() => handleDayShift(1)}
-                                    aria-label="Следующий день">
-                              &gt;
-                            </button>
-                          </div>
-                          <input
-                              className={styles.dateInput}
-                              type="date"
-                              value={format(dayViewDate, 'yyyy-MM-dd')}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value) setDayViewDate(new Date(`${value}T00:00:00`));
-                              }}
-                          />
-                        </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {scheduleView === 'day' && renderDayView()}
 
-              {scheduleView === 'week' && renderWeekGrid()}
-
-              {scheduleView === 'month' && renderMonthView()}
-
-              {scheduleView === 'day' && renderDayView()}
-
-            </section>
+          </section>
         )}
 
         {activeTab === 'settings' && (
-            <section className={styles.card}>
-              <div className={styles.sectionHeader}>
-                <h2>Профиль и настройки</h2>
-                <span className={styles.muted}>Email/пароль + Telegram chatId</span>
+          <section className={styles.card}>
+            <div className={styles.sectionHeader}>
+              <h2>Профиль и настройки</h2>
+              <span className={styles.muted}>Email/пароль + Telegram chatId</span>
+            </div>
+            <div className={styles.settingsGrid}>
+              <div>
+                <div className={styles.label}>Имя</div>
+                <div className={styles.settingValue}>{teacher.name}</div>
               </div>
-              <div className={styles.settingsGrid}>
-                <div>
-                  <div className={styles.label}>Имя</div>
-                  <div className={styles.settingValue}>{teacher.name}</div>
-                </div>
-                <div>
-                  <div className={styles.label}>Telegram</div>
-                  <div className={styles.settingValue}>@{teacher.username}</div>
-                </div>
-                <div>
-                  <div className={styles.label}>Chat ID</div>
-                  <div className={styles.settingValue}>{teacher.chatId}</div>
-                </div>
-                <div>
-                  <div className={styles.label}>Длительность урока по умолчанию</div>
-                  <input
-                      className={styles.input}
-                      type="number"
-                      value={teacher.defaultLessonDuration}
-                      onChange={(e) => setTeacher({...teacher, defaultLessonDuration: Number(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <div className={styles.label}>Напоминать за (мин)</div>
-                  <input
-                      className={styles.input}
-                      type="number"
-                      value={teacher.reminderMinutesBefore}
-                      onChange={(e) => setTeacher({...teacher, reminderMinutesBefore: Number(e.target.value)})}
-                  />
-                </div>
+              <div>
+                <div className={styles.label}>Telegram</div>
+                <div className={styles.settingValue}>@{teacher.username}</div>
               </div>
-              <div className={styles.helperBox}>
+              <div>
+                <div className={styles.label}>Chat ID</div>
+                <div className={styles.settingValue}>{teacher.chatId}</div>
+              </div>
+              <div>
+                <div className={styles.label}>Длительность урока по умолчанию</div>
+                <input
+                  className={styles.input}
+                  type="number"
+                  value={teacher.defaultLessonDuration}
+                  onChange={(e) => setTeacher({ ...teacher, defaultLessonDuration: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <div className={styles.label}>Напоминать за (мин)</div>
+                <input
+                  className={styles.input}
+                  type="number"
+                  value={teacher.reminderMinutesBefore}
+                  onChange={(e) => setTeacher({ ...teacher, reminderMinutesBefore: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className={styles.helperBox}>
               Telegram-бот и сайт используют единую базу. Авторизация учителя хранится в таблице TeacherAuth, а все данные,
               связанные с учениками и уроками, проверяются по teacherId.
             </div>
