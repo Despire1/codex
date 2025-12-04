@@ -65,8 +65,17 @@
 
 .sectionHeader {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sectionHeaderMain {
+  display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -417,6 +426,49 @@
   overflow: hidden;
 }
 
+.dayView {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+}
+
+.dayHeading {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dayTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.dayGrid {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+}
+
+.dayColumn {
+  position: relative;
+  background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+  background-size: 100% 52px;
+  cursor: cell;
+  background-color: #f8fafc;
+}
+
+.dayColumn:hover {
+  background-color: #f8fbff;
+}
+
+.dayLesson {
+  left: 12px;
+  right: 12px;
+}
+
 .canceledLesson {
   border-style: dashed;
   background: #f8fafc;
@@ -438,38 +490,34 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #0ea5e9;
-  background: #fff;
+  background: transparent;
   color: #0ea5e9;
+  border: none;
+  padding: 0;
 }
 
 .compactBadge {
   position: static;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
 }
 
 .paymentBadge svg {
   pointer-events: none;
+  width: 20px;
+  height: 20px;
 }
 
 .paid {
-  background: #0ea5e9;
-  color: #fff;
-  border-color: #0ea5e9;
+  color: #0ea5e9;
 }
 
 .unpaid {
   color: #dc2626;
-  border-color: #dc2626;
-  background: #fff;
 }
 
 .unpaid::after {
@@ -479,6 +527,7 @@
   height: 2px;
   background: #dc2626;
   transform: rotate(-35deg);
+  border-radius: 1px;
 }
 
 .priceRow {
@@ -520,36 +569,110 @@
   gap: 8px;
 }
 
-.sectionActionsStack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
-}
+  .sectionActionsStack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
 
-.viewToggleIcons {
-  display: flex;
-  gap: 8px;
-}
+  .calendarToolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
 
-.iconToggleButton {
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  .viewToggleRow {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .viewToggleButton {
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    transition: all 0.2s ease;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .viewToggleButton:hover {
+    border-color: #bae6fd;
+    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
+  }
+
+  .viewToggleLabel {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .toggleActive {
+    background: #0ea5e9;
+    color: #fff;
+    border-color: #0ea5e9;
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+  }
+
+  .monthSwitcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 8px 12px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  }
+
+  .monthNavButton {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .monthNavButton:hover {
+    background: #0ea5e9;
+    color: #fff;
+    border-color: #0ea5e9;
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
+  }
+
+.monthName {
+  min-width: 140px;
+  text-align: center;
+  font-weight: 800;
   color: #0f172a;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-  transition: all 0.2s ease;
+  font-size: 15px;
+  animation: monthFade 240ms ease;
 }
 
-.toggleActive {
-  background: #0ea5e9;
-  color: #fff;
-  border-color: #0ea5e9;
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+@keyframes monthFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .monthScroller {

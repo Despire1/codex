@@ -282,7 +282,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     const priceMatch = pathname.match(/^\/api\/students\/(\d+)\/price$/);
-    if (req.method === 'POST' && priceMatch) {
+    if ((req.method === 'POST' || req.method === 'PATCH') && priceMatch) {
       const studentId = Number(priceMatch[1]);
       const body = await readBody(req);
       const student = await updatePricePerLesson(studentId, Number(body.value));

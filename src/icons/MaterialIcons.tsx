@@ -38,6 +38,12 @@ export const RubleIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const CurrencyRubleIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M14 4H8v8H6v2h2v2H6v2h2v2h2v-2h4v-2h-4v-2h4v-2h-4V6h4a2 2 0 0 1 0 4h-1v2h1a4 4 0 1 0 0-8z" />
+  </svg>
+);
+
 export const ViewWeekIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M3 5v14h18V5H3zm5 12H5V7h3v10zm6 0h-4V7h4v10zm5 0h-3V7h3v10z" />
@@ -47,5 +53,11 @@ export const ViewWeekIcon = (props: SVGProps<SVGSVGElement>) => (
 export const CalendarMonthIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V10h14v8zm0-10H5V6h14v2z" />
+  </svg>
+);
+
+export const ViewDayIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M2 5v14h20V5H2zm6 12H4V7h4v10zm6 0h-4V7h4v10zm6 0h-4V7h4v10z" />
   </svg>
 );

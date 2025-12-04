@@ -13,66 +13,19 @@ import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import {
   CalendarMonthIcon,
+  CurrencyRubleIcon,
   DashboardIcon,
   EditIcon,
   EventNoteIcon,
   PeopleIcon,
-  RubleIcon,
   SettingsIcon,
+  ViewDayIcon,
   ViewWeekIcon,
 } from '../icons/MaterialIcons';
+import { Homework, Lesson, LessonStatus, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
+import { api } from '../shared/api/client';
+import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import styles from './App.module.css';
-
-// Domain types aligned with the Prisma schema from ARCHITECTURE.md
-export type LessonStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELED';
-
-export interface Teacher {
-  chatId: number;
-  name?: string;
-  username?: string;
-  defaultLessonDuration: number;
-  reminderMinutesBefore: number;
-}
-
-export interface Student {
-  id: number;
-  username?: string;
-  telegramId?: number;
-  pricePerLesson?: number;
-}
-
-export interface TeacherStudent {
-  id: number;
-  teacherId: number;
-  studentId: number;
-  customName: string;
-  autoRemindHomework: boolean;
-  balanceLessons: number;
-}
-
-export interface Homework {
-  id: number;
-  text: string;
-  deadline?: string;
-  isDone: boolean;
-  studentId: number;
-  teacherId: number;
-}
-
-export interface Lesson {
-  id: number;
-  teacherId: number;
-  studentId: number;
-  startAt: string; // ISO string
-  durationMinutes: number;
-  status: LessonStatus;
-  isPaid: boolean;
-}
-
-interface LinkedStudent extends Student {
-  link: TeacherStudent;
-  homeworks: Homework[];
-}
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -110,38 +63,25 @@ export const App = () => {
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const [newLessonDraft, setNewLessonDraft] = useState({
     studentId: undefined as number | undefined,
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: todayISO(),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
   });
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
-  const [scheduleView, setScheduleView] = useState<'week' | 'month'>('week');
+  const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('week');
   const [monthAnchor] = useState<Date>(startOfMonth(new Date()));
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [monthLabelKey, setMonthLabelKey] = useState(0);
+  const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
 
   const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-
-  const normalizeLesson = (lesson: any): Lesson => ({
-    ...lesson,
-    startAt: typeof lesson.startAt === 'string' ? lesson.startAt : new Date(lesson.startAt).toISOString(),
-  });
-
-  const normalizeHomework = (homework: any): Homework => ({
-    ...homework,
-    deadline: homework.deadline
-      ? (typeof homework.deadline === 'string'
-          ? homework.deadline.slice(0, 10)
-          : new Date(homework.deadline).toISOString().slice(0, 10))
-      : undefined,
-  });
 
   useEffect(() => {
     const loadInitial = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/bootstrap`);
-        if (!response.ok) throw new Error('Не удалось загрузить данные');
-        const data = await response.json();
+        const data = await api.bootstrap();
 
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
@@ -175,20 +115,6 @@ export const App = () => {
     }
   }, [selectedStudentId]);
 
-  const apiFetch = async (path: string, options?: RequestInit) => {
-    const response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
-      ...options,
-    });
-
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || 'Запрос не выполнен');
-    }
-
-    return response.json();
-  };
-
   const linkedStudents: LinkedStudent[] = useMemo(
     () =>
       links.map((link) => ({
@@ -214,12 +140,9 @@ export const App = () => {
     if (!newStudentDraft.customName.trim()) return;
 
     try {
-      const data = await apiFetch('/api/students', {
-        method: 'POST',
-        body: JSON.stringify({
-          customName: newStudentDraft.customName,
-          username: newStudentDraft.username || undefined,
-        }),
+      const data = await api.addStudent({
+        customName: newStudentDraft.customName,
+        username: newStudentDraft.username || undefined,
       });
 
       const { student, link } = data;
@@ -252,10 +175,7 @@ export const App = () => {
     if (!link) return;
 
     try {
-      const data = await apiFetch(`/api/students/${studentId}/auto-remind`, {
-        method: 'POST',
-        body: JSON.stringify({ value: !link.autoRemindHomework }),
-      });
+      const data = await api.toggleAutoRemind(studentId, !link.autoRemindHomework);
 
       setLinks(links.map((l) => (l.studentId === studentId ? data.link : l)));
     } catch (error) {
@@ -266,10 +186,7 @@ export const App = () => {
 
   const adjustBalance = async (studentId: number, delta: number) => {
     try {
-      const data = await apiFetch(`/api/students/${studentId}/balance`, {
-        method: 'POST',
-        body: JSON.stringify({ delta }),
-      });
+      const data = await api.adjustBalance(studentId, delta);
       setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -286,10 +203,7 @@ export const App = () => {
     const numeric = Number(priceEditState.value);
     if (Number.isNaN(numeric) || numeric < 0) return;
     try {
-      const data = await apiFetch(`/api/students/${priceEditState.id}/price`, {
-        method: 'POST',
-        body: JSON.stringify({ value: numeric }),
-      });
+      const data = await api.updatePrice(priceEditState.id, numeric);
       setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
       setPriceEditState({ id: null, value: '' });
     } catch (error) {
@@ -306,6 +220,7 @@ export const App = () => {
     }));
     setLessonModalOpen(true);
     setActiveTab('schedule');
+    setDayViewDate(new Date(dateISO));
   };
 
   const addLesson = async () => {
@@ -313,13 +228,10 @@ export const App = () => {
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
 
     try {
-      const data = await apiFetch('/api/lessons', {
-        method: 'POST',
-        body: JSON.stringify({
-          studentId: newLessonDraft.studentId,
-          startAt,
-          durationMinutes: Number(newLessonDraft.durationMinutes),
-        }),
+      const data = await api.createLesson({
+        studentId: newLessonDraft.studentId,
+        startAt,
+        durationMinutes: Number(newLessonDraft.durationMinutes),
       });
 
       setLessons([...lessons, normalizeLesson(data.lesson)]);
@@ -333,7 +245,7 @@ export const App = () => {
 
   const markLessonCompleted = async (lessonId: number) => {
     try {
-      const data = await apiFetch(`/api/lessons/${lessonId}/complete`, { method: 'POST' });
+      const data = await api.markLessonCompleted(lessonId);
       setLessons(
         lessons.map((lesson) =>
           lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson,
@@ -355,7 +267,7 @@ export const App = () => {
 
   const togglePaid = async (lessonId: number) => {
     try {
-      const data = await apiFetch(`/api/lessons/${lessonId}/toggle-paid`, { method: 'POST' });
+      const data = await api.togglePaid(lessonId);
       setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -367,13 +279,10 @@ export const App = () => {
     if (!selectedStudentId || !newHomeworkDraft.text.trim()) return;
 
     try {
-      const data = await apiFetch('/api/homeworks', {
-        method: 'POST',
-        body: JSON.stringify({
-          studentId: selectedStudentId,
-          text: newHomeworkDraft.text,
-          deadline: newHomeworkDraft.deadline || undefined,
-        }),
+      const data = await api.createHomework({
+        studentId: selectedStudentId,
+        text: newHomeworkDraft.text,
+        deadline: newHomeworkDraft.deadline || undefined,
       });
 
       setHomeworks([...homeworks, normalizeHomework(data.homework)]);
@@ -386,7 +295,7 @@ export const App = () => {
 
   const toggleHomeworkDone = async (homeworkId: number) => {
     try {
-      const data = await apiFetch(`/api/homeworks/${homeworkId}/toggle`, { method: 'PATCH' });
+      const data = await api.toggleHomework(homeworkId);
       setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -396,10 +305,7 @@ export const App = () => {
 
   const remindHomework = async (studentId: number) => {
     try {
-      await apiFetch('/api/reminders/homework', {
-        method: 'POST',
-        body: JSON.stringify({ studentId }),
-      });
+      await api.remindHomework(studentId);
       alert('Напоминание отправлено ученику #' + studentId);
     } catch (error) {
       alert('Не удалось отправить напоминание');
@@ -418,7 +324,7 @@ export const App = () => {
   }, [lessons]);
 
   const weekDays = useMemo(() => {
-    const start = startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(start, i);
       return {
@@ -426,7 +332,7 @@ export const App = () => {
         date,
       };
     });
-  }, []);
+  }, [dayViewDate]);
 
   const hours = useMemo(
     () => Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR + 1 }, (_, i) => WEEK_START_HOUR + i),
@@ -436,8 +342,8 @@ export const App = () => {
   const dayHeight = useMemo(() => (WEEK_END_HOUR - WEEK_START_HOUR) * HOUR_BLOCK_HEIGHT, []);
 
   const monthsToRender = useMemo(
-    () => Array.from({ length: 6 }, (_, i) => addMonths(monthAnchor, i - 1)),
-    [monthAnchor],
+    () => Array.from({ length: 6 }, (_, i) => addMonths(addMonths(monthAnchor, monthOffset), i - 1)),
+    [monthAnchor, monthOffset],
   );
 
   const monthWeekdays = useMemo(() => {
@@ -447,6 +353,26 @@ export const App = () => {
       return capitalize(format(date, 'EEE', { locale: ru }));
     });
   }, []);
+
+  const currentMonthLabel = useMemo(
+    () => capitalize(format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru })),
+    [monthAnchor, monthOffset],
+  );
+
+  const handleMonthShift = (delta: number) => {
+    setMonthOffset((prev) => {
+      const next = prev + delta;
+      const targetMonth = addMonths(monthAnchor, next);
+      if (scheduleView === 'month') {
+        setDayViewDate((current) => {
+          const day = Math.min(current.getDate(), endOfMonth(targetMonth).getDate());
+          return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), day);
+        });
+      }
+      return next;
+    });
+    setMonthLabelKey((key) => key + 1);
+  };
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -524,6 +450,7 @@ export const App = () => {
         .padStart(2, '0');
       const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
 
+      setDayViewDate(new Date(dayIso));
       openLessonModal(dayIso, `${hours}:${minutes}`);
     };
 
@@ -581,12 +508,90 @@ export const App = () => {
                             onClick={() => togglePaid(lesson.id)}
                             aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
                           >
-                            <RubleIcon width={16} height={16} />
+                            <CurrencyRubleIcon width={16} height={16} />
                           </button>
                         </div>
                       );
                     })}
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDayView = () => {
+    const dayIso = format(dayViewDate, 'yyyy-MM-dd');
+    const dayLessons = (lessonsByDay[dayIso] ?? []).sort(
+      (a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime(),
+    );
+
+    const handleDaySlotClick = (event: MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+
+      const container = event.currentTarget;
+      const rect = container.getBoundingClientRect();
+      const offsetY = event.clientY - rect.top + container.scrollTop;
+      const minutesFromStart = WEEK_START_HOUR * 60 + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
+      const clampedMinutes = Math.min(Math.max(minutesFromStart, WEEK_START_HOUR * 60), WEEK_END_HOUR * 60);
+      const roundedMinutes = Math.round(clampedMinutes / 30) * 30;
+      const hours = Math.floor(roundedMinutes / 60)
+        .toString()
+        .padStart(2, '0');
+      const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
+
+      openLessonModal(dayIso, `${hours}:${minutes}`);
+    };
+
+    const lessonPosition = (lesson: Lesson) => {
+      const start = parseISO(lesson.startAt);
+      const startMinutes = start.getHours() * 60 + start.getMinutes();
+      const baseMinutes = WEEK_START_HOUR * 60;
+      const top = Math.max(0, (startMinutes - baseMinutes) * (HOUR_BLOCK_HEIGHT / 60));
+      const height = Math.max(36, (lesson.durationMinutes * HOUR_BLOCK_HEIGHT) / 60);
+      return { top, height };
+    };
+
+    return (
+      <div className={styles.dayView}>
+        <div className={styles.dayHeading}>
+          <div className={styles.dayTitle}>{capitalize(format(dayViewDate, 'EEEE, d MMMM', { locale: ru }))}</div>
+          <div className={styles.muted}>Тапните по пустой ячейке, чтобы быстро создать урок</div>
+        </div>
+        <div className={styles.dayGrid}>
+          <div className={styles.timeColumn}>
+            {hours.map((hour) => (
+              <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
+                {hour}:00
+              </div>
+            ))}
+          </div>
+          <div className={styles.dayColumn} onClick={handleDaySlotClick} style={{ height: dayHeight }}>
+            {dayLessons.map((lesson) => {
+              const student = linkedStudents.find((s) => s.id === lesson.studentId);
+              const date = parseISO(lesson.startAt);
+              const { top, height } = lessonPosition(lesson);
+              return (
+                <div
+                  key={lesson.id}
+                  className={`${styles.weekLesson} ${styles.dayLesson} ${
+                    lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+                  }`}
+                  style={{ top, height }}
+                >
+                  <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                  <div className={styles.weekLessonMeta}>{format(date, 'HH:mm')} • {lesson.durationMinutes} мин</div>
+                  <button
+                    className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
+                    onClick={() => togglePaid(lesson.id)}
+                    aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                  >
+                    <CurrencyRubleIcon width={16} height={16} />
+                  </button>
                 </div>
               );
             })}
@@ -620,6 +625,7 @@ export const App = () => {
                 const handleDayClick = (event: MouseEvent<HTMLDivElement>) => {
                   const target = event.target as HTMLElement;
                   if (target.closest(`.${styles.monthLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+                  setDayViewDate(day.date);
                   openLessonModal(day.iso, '12:00');
                 };
 
@@ -657,7 +663,7 @@ export const App = () => {
                               onClick={() => togglePaid(lesson.id)}
                               aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
                             >
-                              <RubleIcon width={14} height={14} />
+                      <CurrencyRubleIcon width={14} height={14} />
                             </button>
                           </div>
                         );
@@ -915,34 +921,60 @@ export const App = () => {
         {activeTab === 'schedule' && (
           <section className={styles.card}>
             <div className={styles.sectionHeader}>
-              <h2>Расписание</h2>
-              <span className={styles.muted}>Создание, завершение и оплата</span>
-              <div className={styles.sectionActionsStack}>
+              <div className={styles.calendarToolbar}>
+                <div className={styles.viewToggleRow}>
+                  <button
+                    className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('month')}
+                  >
+                    <CalendarMonthIcon width={20} height={20} />
+                    <span className={styles.viewToggleLabel}>Месяц</span>
+                  </button>
+                  <button
+                    className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('week')}
+                  >
+                    <ViewWeekIcon width={20} height={20} />
+                    <span className={styles.viewToggleLabel}>Неделя</span>
+                  </button>
+                  <button
+                    className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+                    onClick={() => setScheduleView('day')}
+                  >
+                    <ViewDayIcon width={20} height={20} />
+                    <span className={styles.viewToggleLabel}>День</span>
+                  </button>
+                </div>
+                {scheduleView === 'month' && (
+                  <div className={styles.monthSwitcher}>
+                    <button className={styles.monthNavButton} onClick={() => handleMonthShift(-1)} aria-label="Предыдущий месяц">
+                      &lt;
+                    </button>
+                    <div key={monthLabelKey} className={styles.monthName}>
+                      {currentMonthLabel}
+                    </div>
+                    <button className={styles.monthNavButton} onClick={() => handleMonthShift(1)} aria-label="Следующий месяц">
+                      &gt;
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className={styles.sectionHeaderMain}>
+                <div>
+                  <h2>Расписание</h2>
+                  <span className={styles.muted}>Создание, завершение и оплата</span>
+                </div>
                 <button className={styles.secondaryButton} onClick={() => setLessonModalOpen(true)}>
                   + Создать урок
                 </button>
-                <div className={styles.viewToggleIcons}>
-                  <button
-                    className={`${styles.iconToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                    onClick={() => setScheduleView('week')}
-                    aria-label="Вид на неделю"
-                  >
-                    <ViewWeekIcon width={22} height={22} />
-                  </button>
-                  <button
-                    className={`${styles.iconToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                    onClick={() => setScheduleView('month')}
-                    aria-label="Вид на месяц"
-                  >
-                    <CalendarMonthIcon width={22} height={22} />
-                  </button>
-                </div>
               </div>
             </div>
 
             {scheduleView === 'week' && renderWeekGrid()}
 
             {scheduleView === 'month' && renderMonthView()}
+
+            {scheduleView === 'day' && renderDayView()}
 
           </section>
         )}
