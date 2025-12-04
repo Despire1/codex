@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addDays, addMinutes, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -6,6 +6,8 @@ import { Task } from '@/entities/task/model/types';
 import { addTask, toggleTaskCompletion } from '@/entities/task/model/taskSlice';
 import { addExperience } from '@/entities/account/model/accountSlice';
 import { EXPERIENCE_PER_TASK } from '@/entities/account/model/types';
+import { Modal } from '@/shared/ui/Modal/Modal';
+import { TaskForm } from '@/features/taskForm/ui/TaskForm';
 import styles from './WeekView.module.css';
 
 interface Props {
