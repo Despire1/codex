@@ -1,0 +1,58 @@
+# TeacherBot web (локальный запуск)
+
+Инструкция описывает, как поднять локально фронтенд (Vite) и API (Node + Prisma, SQLite).
+
+## Требования
+- Node.js 18+
+- Возможность скачать зависимости npm (для @prisma/client, prisma и tsx)
+
+## Быстрый старт
+1. Установите зависимости:
+   ```bash
+   npm install
+   ```
+2. Скопируйте пример переменных окружения и убедитесь, что путь БД устраивает:
+   ```bash
+   cp .env.example .env
+   ```
+3. Примените миграции и сгенерируйте Prisma Client (создаст `prisma/teacherbot.db`):
+   ```bash
+   npm run prisma:migrate
+   npm run prisma:generate
+   ```
+4. Запустите API (порт 4000 по умолчанию):
+   ```bash
+   npm run api
+   ```
+5. В отдельном окне поднимите фронтенд (Vite с прокси на API):
+   ```bash
+   npm run dev
+   ```
+6. Откройте http://localhost:5173. Все запросы `/api/*` уйдут на локальный сервер.
+
+## Диагностика ошибки 500 при `/api/bootstrap`
+- Убедитесь, что API запущен (`npm run api`), а консоль показывает `API server running on http://localhost:4000`.
+- Проверьте, что Prisma клиент сгенерирован и база создана (`npm run prisma:migrate && npm run prisma:generate`).
+- Убедитесь, что `.env` содержит корректный `DATABASE_URL` (по умолчанию `file:./prisma/teacherbot.db`).
+
+Если при обновлении цены или запуске API видите ошибки миграций/схемы, значит локальный Prisma Client или база не обновились после последней схемы:
+- выполните `npm run prisma:migrate` (чтобы накатить актуальные миграции на SQLite)
+- выполните `npm run prisma:generate` (чтобы клиент знал о новых полях вроде `pricePerLesson`)
+
+### Если миграция падает с P3006 (no such table: Student)
+Причина: в папке `prisma/migrations` остались локальные миграции от старой версии (`20241104200000_add_student_price` и т.п.). Их нужно удалить, пересоздать SQLite-файл и снова применить актуальную миграцию из репозитория:
+
+```bash
+rm -rf prisma/migrations/20241104200000_add_student_price prisma/teacherbot.db
+npm run prisma:migrate
+npm run prisma:generate
+```
+
+Если локальные миграции расходятся сильнее, выполните `git clean -xfd` (удалит незакоммиченные файлы) и повторите шаги установки.
+
+## Полезные команды
+- `npm run prisma:studio` — визуальный просмотр базы в браузере.
+- `npm run prisma:reset` — полная переинициализация базы (drop + повторное применение миграций) для устранения проблем с локальными миграциями.
+- `npm run lint` — типовой линт (tsc --noEmit).
+
+> Приложение использует демо-преподавателя с chatId из `DEMO_TEACHER_ID` (по умолчанию `111222333`) и автоматически создаст его при первом запросе к API.

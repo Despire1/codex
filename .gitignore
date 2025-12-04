@@ -2,3 +2,7 @@ node_modules
 .DS_Store
 dist
 .vscode
+.env
+prisma/*.db
+prisma/**/*.db
+prisma/**/*.db-journal
