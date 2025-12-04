@@ -371,7 +371,7 @@
 }
 
 .todayHeader {
-  color: #0ea5e9;
+  color: #2563eb;
 }
 
 .weekDayName {
@@ -434,7 +434,7 @@
   border-radius: 12px;
   padding: 8px 12px;
   background: #e0f2fe;
-  border: 1px solid #0ea5e9;
+  border: 1px solid #2563eb;
   color: #0f172a;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
   overflow: hidden;
@@ -568,7 +568,7 @@
 
 .priceValue {
   font-weight: 700;
-  color: #0ea5e9;
+  color: #2563eb;
 }
 
 .priceEditor {
@@ -673,9 +673,9 @@
   }
 
   .toggleActive {
-    background: #0ea5e9;
+    background: #2563eb;
     color: #fff;
-    border-color: #0ea5e9;
+    border-color: #2563eb;
     box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
   }
 
@@ -705,9 +705,9 @@
   }
 
   .monthNavButton:hover {
-    background: #0ea5e9;
+    background: #2563eb;
     color: #fff;
-    border-color: #0ea5e9;
+    border-color: #2563eb;
     box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
   }
 
@@ -817,7 +817,7 @@
 }
 
 .todayCell {
-  border-color: #0ea5e9;
+  border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
 }
 
@@ -842,7 +842,7 @@
 .todayPill {
   padding: 2px 6px;
   border-radius: 999px;
-  background: #0ea5e9;
+  background: #2563eb;
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -858,7 +858,7 @@
   border-radius: 10px;
   padding: 6px 8px;
   background: #e0f2fe;
-  border: 1px solid #0ea5e9;
+  border: 1px solid #2563eb;
   position: relative;
   display: flex;
   align-items: center;

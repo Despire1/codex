@@ -657,7 +657,6 @@ export const App = () => {
         <section key={monthLabel} className={styles.monthSection}>
           <div className={styles.monthHeader}>
             <div className={styles.monthTitle}>{monthLabel}</div>
-            <div className={styles.monthSubtitle}>Текущий выбранный месяц</div>
           </div>
           <div className={styles.monthGrid}>
             {monthWeekdays.map((weekday) => (
@@ -831,7 +830,6 @@ export const App = () => {
           <section className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Ученики</h2>
-              <span className={styles.muted}>Связка Teacher ↔ Student</span>
               <button className={styles.secondaryButton} onClick={() => setStudentModalOpen(true)}>
                 + Добавить ученика
               </button>
