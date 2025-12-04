@@ -14,6 +14,7 @@ declare module '@prisma/client' {
     id: number;
     username: string | null;
     telegramId: bigint | null;
+    pricePerLesson: number;
     createdAt: Date;
   };
 
@@ -58,6 +59,7 @@ declare module '@prisma/client' {
       findUnique(args: any): PrismaPromise<Student | null>;
       findMany(args?: any): PrismaPromise<Student[]>;
       create(args: any): PrismaPromise<Student>;
+      update(args: any): PrismaPromise<Student>;
     };
     teacherStudent: {
       findUnique(args: any): PrismaPromise<TeacherStudent | null>;

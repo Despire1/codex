@@ -1,6 +1,6 @@
-import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, format, isToday, isTomorrow, parseISO, startOfWeek } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
-import { DashboardIcon, EventNoteIcon, PeopleIcon, SettingsIcon } from '../icons/MaterialIcons';
+import { DashboardIcon, EditIcon, EventNoteIcon, PeopleIcon, RubleIcon, SettingsIcon } from '../icons/MaterialIcons';
 import styles from './App.module.css';
 
 // Domain types aligned with the Prisma schema from ARCHITECTURE.md
@@ -18,6 +18,7 @@ export interface Student {
   id: number;
   username?: string;
   telegramId?: number;
+  pricePerLesson?: number;
 }
 
 export interface TeacherStudent {
@@ -63,6 +64,10 @@ const initialTeacher: Teacher = {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
+const WEEK_START_HOUR = 8;
+const WEEK_END_HOUR = 22;
+const HOUR_BLOCK_HEIGHT = 52;
+
 const tabs = [
   { id: 'dashboard', label: 'Главная', icon: DashboardIcon },
   { id: 'students', label: 'Ученики', icon: PeopleIcon },
@@ -81,6 +86,7 @@ export const App = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
+  const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const [newLessonDraft, setNewLessonDraft] = useState({
     studentId: undefined as number | undefined,
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -90,6 +96,7 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
+  const [scheduleView, setScheduleView] = useState<'week' | 'month'>('week');
 
   const normalizeLesson = (lesson: any): Lesson => ({
     ...lesson,
@@ -246,6 +253,27 @@ export const App = () => {
     }
   };
 
+  const startEditPrice = (student: Student) => {
+    setPriceEditState({ id: student.id, value: String(student.pricePerLesson ?? '') });
+  };
+
+  const savePrice = async () => {
+    if (!priceEditState.id) return;
+    const numeric = Number(priceEditState.value);
+    if (Number.isNaN(numeric) || numeric < 0) return;
+    try {
+      const data = await apiFetch(`/api/students/${priceEditState.id}/price`, {
+        method: 'POST',
+        body: JSON.stringify({ value: numeric }),
+      });
+      setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
+      setPriceEditState({ id: null, value: '' });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update price', error);
+    }
+  };
+
   const addLesson = async () => {
     if (!newLessonDraft.studentId) return;
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
@@ -357,6 +385,25 @@ export const App = () => {
     }, {});
   }, [lessons]);
 
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(start, i);
+      return {
+        iso: format(date, 'yyyy-MM-dd'),
+        label: format(date, 'EEE d MMM'),
+        date,
+      };
+    });
+  }, []);
+
+  const hours = useMemo(
+    () => Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR + 1 }, (_, i) => WEEK_START_HOUR + i),
+    [],
+  );
+
+  const dayHeight = useMemo(() => (WEEK_END_HOUR - WEEK_START_HOUR) * HOUR_BLOCK_HEIGHT, []);
+
   const renderLessonRow = (lesson: Lesson) => {
     const student = linkedStudents.find((s) => s.id === lesson.studentId);
     const date = parseISO(lesson.startAt);
@@ -387,6 +434,81 @@ export const App = () => {
           <button className={styles.smallButton} onClick={() => togglePaid(lesson.id)}>
             {lesson.isPaid ? 'Не опл.' : 'Оплачено'}
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeekGrid = () => {
+    const lessonPosition = (lesson: Lesson) => {
+      const start = parseISO(lesson.startAt);
+      const startMinutes = start.getHours() * 60 + start.getMinutes();
+      const baseMinutes = WEEK_START_HOUR * 60;
+      const top = Math.max(0, (startMinutes - baseMinutes) * (HOUR_BLOCK_HEIGHT / 60));
+      const height = Math.max(36, (lesson.durationMinutes * HOUR_BLOCK_HEIGHT) / 60);
+      return { top, height };
+    };
+
+    return (
+      <div className={styles.weekView}>
+        <div className={styles.weekHeaderRow}>
+          <div className={styles.timeColumnSpacer} />
+          {weekDays.map((day) => (
+            <div key={day.iso} className={`${styles.weekDayHeader} ${isToday(day.date) ? styles.todayHeader : ''}`}>
+              <div className={styles.weekDayName}>{format(day.date, 'EEEE')}</div>
+              <div className={styles.weekDayDate}>{format(day.date, 'd MMM')}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.weekGrid}>
+          <div className={styles.timeColumn}>
+            {hours.map((hour) => (
+              <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
+                {hour}:00
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.weekColumns}>
+            {weekDays.map((day) => {
+              const dayLessons = lessons
+                .filter((lesson) => lesson.startAt.slice(0, 10) === day.iso)
+                .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+
+              return (
+                <div key={day.iso} className={styles.weekDayColumn}>
+                  <div className={styles.weekDayBody} style={{ height: dayHeight }}>
+                    {dayLessons.map((lesson) => {
+                      const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                      const date = parseISO(lesson.startAt);
+                      const { top, height } = lessonPosition(lesson);
+
+                      return (
+                        <div
+                          key={lesson.id}
+                          className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                          style={{ top, height }}
+                        >
+                          <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                          <div className={styles.weekLessonMeta}>
+                            {format(date, 'HH:mm')} • {lesson.durationMinutes} мин
+                          </div>
+                          <button
+                            className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
+                            onClick={() => togglePaid(lesson.id)}
+                            aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                          >
+                            <RubleIcon width={16} height={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -535,6 +657,45 @@ export const App = () => {
                     <span className={styles.slider} />
                   </label>
                 </div>
+                <div className={styles.priceRow}>
+                  <div className={styles.priceLabel}>Цена за занятие</div>
+                  {priceEditState.id === selectedStudent.id ? (
+                    <div className={styles.priceEditor}>
+                      <input
+                        className={styles.input}
+                        type="number"
+                        value={priceEditState.value}
+                        onChange={(e) => setPriceEditState({ ...priceEditState, value: e.target.value })}
+                      />
+                      <div className={styles.priceButtons}>
+                        <button className={styles.primaryButton} onClick={savePrice}>
+                          Сохранить
+                        </button>
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => setPriceEditState({ id: null, value: '' })}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.priceValueRow}>
+                      <span className={styles.priceValue}>
+                        {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                          ? `${selectedStudent.pricePerLesson} ₽`
+                          : '—'}
+                      </span>
+                      <button
+                        className={styles.iconButton}
+                        aria-label="Изменить цену"
+                        onClick={() => startEditPrice(selectedStudent)}
+                      >
+                        <EditIcon width={18} height={18} />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className={styles.balanceRow}>
                   <span>Предоплаченные уроки: {selectedStudent.link.balanceLessons}</span>
                   <div className={styles.balanceActions}>
@@ -602,19 +763,38 @@ export const App = () => {
               </button>
             </div>
 
-            <div className={styles.daysGrid}>
-              {Object.entries(lessonsByDay)
-                .sort(([a], [b]) => (a > b ? 1 : -1))
-                .map(([day, dayLessons]) => (
-                  <div key={day} className={styles.dayCard}>
-                    <div className={styles.dayHeader}>
-                      <div>{day === today ? 'Сегодня' : format(parseISO(day + 'T00:00:00.000Z'), 'EEEE, d MMM')}</div>
-                      <div className={styles.muted}>{dayLessons.length} урок(а)</div>
-                    </div>
-                    {dayLessons.map((lesson) => renderLessonRow(lesson))}
-                  </div>
-                ))}
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.toggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                onClick={() => setScheduleView('week')}
+              >
+                Неделя
+              </button>
+              <button
+                className={`${styles.toggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                onClick={() => setScheduleView('month')}
+              >
+                Месяц
+              </button>
             </div>
+
+            {scheduleView === 'week' && renderWeekGrid()}
+
+            {scheduleView === 'month' && (
+              <div className={styles.daysGrid}>
+                {Object.entries(lessonsByDay)
+                  .sort(([a], [b]) => (a > b ? 1 : -1))
+                  .map(([day, dayLessons]) => (
+                    <div key={day} className={styles.dayCard}>
+                      <div className={styles.dayHeader}>
+                        <div>{day === today ? 'Сегодня' : format(parseISO(day + 'T00:00:00.000Z'), 'EEEE, d MMM')}</div>
+                        <div className={styles.muted}>{dayLessons.length} урок(а)</div>
+                      </div>
+                      {dayLessons.map((lesson) => renderLessonRow(lesson))}
+                    </div>
+                  ))}
+              </div>
+            )}
 
           </section>
         )}

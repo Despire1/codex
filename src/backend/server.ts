@@ -68,7 +68,7 @@ const bootstrap = async () => {
 };
 
 const addStudent = async (body: any) => {
-  const { customName, username } = body ?? {};
+  const { customName, username, pricePerLesson } = body ?? {};
   if (!customName || typeof customName !== 'string' || !customName.trim()) {
     throw new Error('Имя ученика обязательно');
   }
@@ -84,6 +84,7 @@ const addStudent = async (body: any) => {
     (await prisma.student.create({
       data: {
         username: username || null,
+        pricePerLesson: typeof pricePerLesson === 'number' ? pricePerLesson : 0,
       },
     }));
 
@@ -117,6 +118,22 @@ const toggleAutoReminder = async (studentId: number, value: boolean) => {
   return prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { autoRemindHomework: value },
+  });
+};
+
+const updatePricePerLesson = async (studentId: number, value: number) => {
+  if (Number.isNaN(value) || value < 0) {
+    throw new Error('Цена должна быть неотрицательным числом');
+  }
+  const teacher = await ensureTeacher();
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  return prisma.student.update({
+    where: { id: studentId },
+    data: { pricePerLesson: Math.round(value) },
   });
 };
 
@@ -262,6 +279,14 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const link = await toggleAutoReminder(studentId, Boolean(body.value));
       return sendJson(res, 200, { link });
+    }
+
+    const priceMatch = pathname.match(/^\/api\/students\/(\d+)\/price$/);
+    if (req.method === 'POST' && priceMatch) {
+      const studentId = Number(priceMatch[1]);
+      const body = await readBody(req);
+      const student = await updatePricePerLesson(studentId, Number(body.value));
+      return sendJson(res, 200, { student });
     }
 
     const balanceMatch = pathname.match(/^\/api\/students\/(\d+)\/balance$/);
