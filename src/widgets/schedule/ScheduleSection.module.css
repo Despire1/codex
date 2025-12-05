@@ -19,7 +19,6 @@
   flex-wrap: wrap;
 }
 
-.headerAction 
 .calendarControlsWrapper {
   display: flex;
   align-items: center;

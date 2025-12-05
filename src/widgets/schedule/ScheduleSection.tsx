@@ -251,7 +251,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       </div>
     </div>
 
-  );  );
+  );
 
   const renderDayView = () => {
     const dayIso = format(dayViewDate, 'yyyy-MM-dd');
@@ -410,90 +410,94 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     <section className={styles.viewGrid}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Расписание</h2>
-        <div className={styles.viewToggleRow}>
-          <button
-            className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-            onClick={() => onScheduleViewChange('month')}
-          >
+        <div className={styles.calendarControlsWrapper}>
+          <div className={styles.viewToggleRow}>
+            <button
+                className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('month')}
+            >
             <span className={styles.viewToggleLabel}>
-              <CalendarMonthIcon /> Месяц
+              <CalendarMonthIcon/> Месяц
             </span>
-          </button>
-          <button
-            className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-            onClick={() => onScheduleViewChange('week')}
-          >
+            </button>
+            <button
+                className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('week')}
+            >
             <span className={styles.viewToggleLabel}>
-              <ViewWeekIcon /> Неделя
+              <ViewWeekIcon/> Неделя
             </span>
-          </button>
-          <button
-            className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-            onClick={() => onScheduleViewChange('day')}
-          >
+            </button>
+            <button
+                className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('day')}
+            >
             <span className={styles.viewToggleLabel}>
-              <ViewDayIcon /> День
+              <ViewDayIcon/> День
             </span>
+            </button>
+          </div>
+
+          <div className={styles.periodSwitcher}>
+            {scheduleView === 'week' && (
+                <div className={styles.monthSwitcher}>
+                  <button className={styles.monthNavButton} onClick={() => onWeekShift(-1)}
+                          aria-label="Предыдущая неделя">
+                    ←
+                  </button>
+                  <div key={weekLabelKey} className={styles.monthName}>
+                    {weekRangeLabel}
+                  </div>
+                  <button className={styles.monthNavButton} onClick={() => onWeekShift(1)}
+                          aria-label="Следующая неделя">
+                    →
+                  </button>
+                </div>
+            )}
+
+            {scheduleView === 'day' && (
+                <div className={styles.daySwitcher}>
+                  <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
+                    ←
+                  </button>
+                  <div key={dayLabelKey} className={styles.monthName}>
+                    {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
+                  </div>
+                  <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
+                    →
+                  </button>
+                </div>
+            )}
+
+            {scheduleView === 'month' && (
+                <div className={styles.monthSwitcher}>
+                  <button
+                      className={styles.monthNavButton}
+                      onClick={() => onMonthShift(-1)}
+                      aria-label="Предыдущий месяц"
+                  >
+                    ←
+                  </button>
+                  <div key={monthLabelKey} className={styles.monthName}>
+                    {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
+                  </div>
+                  <button
+                      className={styles.monthNavButton}
+                      onClick={() => onMonthShift(1)}
+                      aria-label="Следующий месяц"
+                  >
+                    →
+                  </button>
+                </div>
+            )}
+          </div>
+          <button
+              className={`${controls.primaryButton} ${styles.headerAction}`}
+              onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+          >
+            Создать урок
           </button>
         </div>
-
-        <div className={styles.periodSwitcher}>
-          {scheduleView === 'week' && (
-            <div className={styles.monthSwitcher}>
-              <button className={styles.monthNavButton} onClick={() => onWeekShift(-1)} aria-label="Предыдущая неделя">
-                ←
-              </button>
-              <div key={weekLabelKey} className={styles.monthName}>
-                {weekRangeLabel}
-              </div>
-              <button className={styles.monthNavButton} onClick={() => onWeekShift(1)} aria-label="Следующая неделя">
-                →
-              </button>
-            </div>
-          )}
-
-          {scheduleView === 'day' && (
-            <div className={styles.daySwitcher}>
-              <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
-                ←
-              </button>
-              <div key={dayLabelKey} className={styles.monthName}>
-                {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
-              </div>
-              <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
-                →
-              </button>
-            </div>
-          )}
-
-          {scheduleView === 'month' && (
-            <div className={styles.monthSwitcher}>
-              <button
-                className={styles.monthNavButton}
-                onClick={() => onMonthShift(-1)}
-                aria-label="Предыдущий месяц"
-              >
-                ←
-              </button>
-              <div key={monthLabelKey} className={styles.monthName}>
-                {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
-              </div>
-              <button
-                className={styles.monthNavButton}
-                onClick={() => onMonthShift(1)}
-                aria-label="Следующий месяц"
-              >
-                →
-              </button>
-            </div>
-          )}
-        </div>
-        <button
-          className={`${controls.primaryButton} ${styles.headerAction}`}
-          onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
-        >
-          Создать урок
-        </button>
       </div>
 
       {scheduleView === 'week' && renderWeekGrid()}
