@@ -319,14 +319,17 @@
 }
 
 .weekView {
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   background: #f8fafc;
+  max-height: 760px;
 }
 
 .weekGridScroll {
-  max-height: 760px;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -420,10 +423,14 @@
 }
 
 .dayView {
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  max-height: 760px;
+  overflow: hidden;
 }
 
 .dayHeading {
@@ -446,7 +453,7 @@
 }
 
 .dayGridScroll {
-  max-height: 760px;
+  flex: 1;
   overflow-y: auto;
 }
 
