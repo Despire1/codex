@@ -12,6 +12,7 @@ import { ru } from 'date-fns/locale';
 import { useMemo, type FC, type MouseEvent } from 'react';
 import { CalendarMonthIcon, CurrencyRubleIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
 import { Lesson, LinkedStudent } from '../../entities/types';
+import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
 
 const WEEK_START_HOUR = 8;
@@ -281,7 +282,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div key={monthLabelKey} className={styles.monthTitle}>
                 {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
               </div>
-              <div className={styles.monthSubtitle}>Нажмите на день, чтобы открыть расписание</div>
+              <div className={styles.monthSubtitle}>Нажмите на день, чтобы создать урок</div>
             </div>
             <div className={styles.monthLegend}>
               <span className={styles.legendDot} /> Уроки
@@ -297,7 +298,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               const dayLessons = lessonsByDay[day.iso] ?? [];
               const handleDayClick = () => {
                 onDayViewDateChange(day.date);
-                onScheduleViewChange('day');
+                onOpenLessonModal(day.iso);
               };
 
               return (
@@ -322,7 +323,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           className={`${styles.monthLesson} ${
                             lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                           }`}
-                          onClick={() => onStartEditLesson(lesson)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onStartEditLesson(lesson);
+                          }}
                         >
                           <div className={styles.monthLessonInfo}>
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
@@ -355,8 +359,26 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   return (
     <section className={styles.viewGrid}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>Расписание</h2>
+        <button
+          className={controls.primaryButton}
+          onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+        >
+          Создать урок
+        </button>
+      </div>
+
       <div className={styles.sectionTitleRow}>
         <div className={styles.viewToggleRow}>
+          <button
+            className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+            onClick={() => onScheduleViewChange('month')}
+          >
+            <span className={styles.viewToggleLabel}>
+              <CalendarMonthIcon /> Месяц
+            </span>
+          </button>
           <button
             className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
             onClick={() => onScheduleViewChange('week')}
@@ -371,14 +393,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           >
             <span className={styles.viewToggleLabel}>
               <ViewDayIcon /> День
-            </span>
-          </button>
-          <button
-            className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-            onClick={() => onScheduleViewChange('month')}
-          >
-            <span className={styles.viewToggleLabel}>
-              <CalendarMonthIcon /> Месяц
             </span>
           </button>
         </div>

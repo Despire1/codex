@@ -15,11 +15,12 @@ export const Tabbar: FC<TabbarProps> = ({ activeTab, onTabChange }) => {
           key={tab.id}
           className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
           onClick={() => onTabChange(tab.id)}
+          aria-label={tab.label}
         >
           <span className={styles.tabIcon} aria-hidden>
             <tab.icon />
           </span>
-          <span>{tab.label}</span>
+          <span className={styles.tabLabel}>{tab.label}</span>
         </button>
       ))}
     </nav>
