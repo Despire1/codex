@@ -15,8 +15,9 @@ import { Lesson, LinkedStudent } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
 
-const WEEK_START_HOUR = 8;
-const WEEK_END_HOUR = 22;
+const DAY_START_MINUTE = 0;
+const DAY_END_MINUTE = 24 * 60 - 1;
+const HOURS_IN_DAY = 24;
 const HOUR_BLOCK_HEIGHT = 52;
 const WEEK_STARTS_ON = 1;
 
@@ -81,12 +82,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     });
   }, [dayViewDate]);
 
-  const hours = useMemo(
-    () => Array.from({ length: WEEK_END_HOUR - WEEK_START_HOUR + 1 }, (_, i) => WEEK_START_HOUR + i),
-    [],
-  );
+  const hours = useMemo(() => Array.from({ length: HOURS_IN_DAY }, (_, i) => i), []);
 
-  const dayHeight = useMemo(() => (WEEK_END_HOUR - WEEK_START_HOUR) * HOUR_BLOCK_HEIGHT, []);
+  const dayHeight = useMemo(() => (DAY_END_MINUTE / 60 - DAY_START_MINUTE / 60) * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
 
@@ -124,8 +122,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const lessonPosition = (lesson: Lesson) => {
     const start = parseISO(lesson.startAt);
     const startMinutes = start.getHours() * 60 + start.getMinutes();
-    const baseMinutes = WEEK_START_HOUR * 60;
-    const top = Math.max(0, (startMinutes - baseMinutes) * (HOUR_BLOCK_HEIGHT / 60));
+    const top = Math.max(0, ((startMinutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT);
     const height = Math.max(36, (lesson.durationMinutes * HOUR_BLOCK_HEIGHT) / 60);
     return { top, height };
   };
@@ -139,7 +136,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   };
 
   const renderHoverIndicator = (minutes: number) => {
-    const top = Math.max(0, ((minutes - WEEK_START_HOUR * 60) / 60) * HOUR_BLOCK_HEIGHT);
+    const top = Math.max(0, ((minutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT);
     return (
       <div className={styles.hoverIndicator} style={{ top }}>
         <span className={styles.hoverTime}>{formatMinutesToTime(minutes)}</span>
@@ -151,9 +148,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
     const offsetY = event.clientY - rect.top + container.scrollTop;
-    const minutesFromStart = WEEK_START_HOUR * 60 + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
-    const clampedMinutes = Math.min(Math.max(minutesFromStart, WEEK_START_HOUR * 60), WEEK_END_HOUR * 60);
-    const roundedMinutes = Math.round(clampedMinutes / 10) * 10;
+    const minutesFromStart = DAY_START_MINUTE + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
+    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), DAY_END_MINUTE);
+    const roundedMinutes = Math.min(Math.round(clampedMinutes / 10) * 10, DAY_END_MINUTE);
     setHoverIndicator({ dayIso, minutes: roundedMinutes });
   };
 
@@ -164,9 +161,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
     const offsetY = event.clientY - rect.top + container.scrollTop;
-    const minutesFromStart = WEEK_START_HOUR * 60 + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
-    const clampedMinutes = Math.min(Math.max(minutesFromStart, WEEK_START_HOUR * 60), WEEK_END_HOUR * 60);
-    const roundedMinutes = Math.round(clampedMinutes / 30) * 30;
+    const minutesFromStart = DAY_START_MINUTE + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
+    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), DAY_END_MINUTE);
+    const roundedMinutes = Math.min(Math.round(clampedMinutes / 30) * 30, DAY_END_MINUTE);
     const hoursValue = Math.floor(roundedMinutes / 60)
       .toString()
       .padStart(2, '0');
@@ -188,70 +185,73 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         ))}
       </div>
 
-      <div className={styles.weekGrid}>
-        <div className={styles.timeColumn}>
-          {hours.map((hour) => (
-            <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
-              {hour}:00
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.weekColumns}>
-          {weekDays.map((day) => {
-            const dayLessons = lessons
-              .filter((lesson) => lesson.startAt.slice(0, 10) === day.iso)
-              .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
-
-            return (
-              <div
-                key={day.iso}
-                className={styles.weekDayColumn}
-                onMouseLeave={() => setHoverIndicator(null)}
-              >
-                <div
-                  className={styles.weekDayBody}
-                  style={{ height: dayHeight }}
-                  onClick={handleWeekSlotClick(day.iso)}
-                  onMouseMove={(event) => handleTimeHover(event, day.iso)}
-                >
-                  {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
-                  {dayLessons.map((lesson) => {
-                    const student = linkedStudents.find((s) => s.id === lesson.studentId);
-                    const position = lessonPosition(lesson);
-                    const startTime = format(parseISO(lesson.startAt), 'HH:mm');
-                    return (
-                      <div
-                        key={lesson.id}
-                        className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
-                        style={{ top: position.top, height: position.height }}
-                        onClick={() => onStartEditLesson(lesson)}
-                      >
-                        <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
-                        <div className={styles.weekLessonMeta}>
-                          {startTime} · {lesson.durationMinutes} мин
-                        </div>
-                        <button
-                          className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onTogglePaid(lesson.id);
-                          }}
-                          aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                        >
-                          <CurrencyRubleIcon width={16} height={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+      <div className={styles.weekGridScroll}>
+        <div className={styles.weekGrid}>
+          <div className={styles.timeColumn}>
+            {hours.map((hour) => (
+              <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
+                {hour}:00
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          <div className={styles.weekColumns}>
+            {weekDays.map((day) => {
+              const dayLessons = lessons
+                .filter((lesson) => lesson.startAt.slice(0, 10) === day.iso)
+                .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+
+              return (
+                <div
+                  key={day.iso}
+                  className={styles.weekDayColumn}
+                  onMouseLeave={() => setHoverIndicator(null)}
+                >
+                  <div
+                    className={styles.weekDayBody}
+                    style={{ height: dayHeight }}
+                    onClick={handleWeekSlotClick(day.iso)}
+                    onMouseMove={(event) => handleTimeHover(event, day.iso)}
+                  >
+                    {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
+                    {dayLessons.map((lesson) => {
+                      const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                      const position = lessonPosition(lesson);
+                      const startTime = format(parseISO(lesson.startAt), 'HH:mm');
+                      return (
+                        <div
+                          key={lesson.id}
+                          className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                          style={{ top: position.top, height: position.height }}
+                          onClick={() => onStartEditLesson(lesson)}
+                        >
+                          <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                          <div className={styles.weekLessonMeta}>
+                            {startTime} · {lesson.durationMinutes} мин
+                          </div>
+                          <button
+                            className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onTogglePaid(lesson.id);
+                            }}
+                            aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                          >
+                            <CurrencyRubleIcon width={16} height={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
-  );
+
+  );  );
 
   const renderDayView = () => {
     const dayIso = format(dayViewDate, 'yyyy-MM-dd');
@@ -265,56 +265,59 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM', { locale: ru })}</div>
           <div className={styles.weekDayDate}>{format(dayViewDate, 'yyyy-MM-dd')}</div>
         </div>
-        <div className={styles.dayGrid}>
-          <div className={styles.timeColumn}>
-            {hours.map((hour) => (
-              <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
-                {hour}:00
-              </div>
-            ))}
-          </div>
-          <div
-            className={styles.dayColumn}
-            style={{ height: dayHeight }}
-            onClick={handleWeekSlotClick(dayIso)}
-            onMouseMove={(event) => handleTimeHover(event, dayIso)}
-            onMouseLeave={() => setHoverIndicator(null)}
-          >
-            {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
-            {dayLessons.map((lesson) => {
-              const position = lessonPosition(lesson);
-              const student = linkedStudents.find((s) => s.id === lesson.studentId);
-              return (
-                <div
-                  key={lesson.id}
-                  className={`${styles.weekLesson} ${styles.dayLesson} ${
-                    lesson.status === 'CANCELED' ? styles.canceledLesson : ''
-                  }`}
-                  style={{ top: position.top, height: position.height }}
-                  onClick={() => onStartEditLesson(lesson)}
-                >
-                  <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
-                  <div className={styles.weekLessonMeta}>
-                    {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
-                  </div>
-                  <button
-                    className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onTogglePaid(lesson.id);
-                    }}
-                    aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                  >
-                    <CurrencyRubleIcon width={16} height={16} />
-                  </button>
+        <div className={styles.dayGridScroll}>
+          <div className={styles.dayGrid}>
+            <div className={styles.timeColumn}>
+              {hours.map((hour) => (
+                <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
+                  {hour}:00
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            <div
+              className={styles.dayColumn}
+              style={{ height: dayHeight }}
+              onClick={handleWeekSlotClick(dayIso)}
+              onMouseMove={(event) => handleTimeHover(event, dayIso)}
+              onMouseLeave={() => setHoverIndicator(null)}
+            >
+              {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
+              {dayLessons.map((lesson) => {
+                const position = lessonPosition(lesson);
+                const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                return (
+                  <div
+                    key={lesson.id}
+                    className={`${styles.weekLesson} ${styles.dayLesson} ${
+                      lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+                    }`}
+                    style={{ top: position.top, height: position.height }}
+                    onClick={() => onStartEditLesson(lesson)}
+                  >
+                    <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                    <div className={styles.weekLessonMeta}>
+                      {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
+                    </div>
+                    <button
+                      className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onTogglePaid(lesson.id);
+                      }}
+                      aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
+                    >
+                      <CurrencyRubleIcon width={16} height={16} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
     );
   };
+
 
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
@@ -407,93 +410,90 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     <section className={styles.viewGrid}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Расписание</h2>
-        <div className={styles.calendarControlsWrapper}>
-          <div className={styles.viewToggleRow}>
-            <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('month')}
-            >
-            <span className={styles.viewToggleLabel}>
-              <CalendarMonthIcon/> Месяц
-            </span>
-            </button>
-            <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('week')}
-            >
-            <span className={styles.viewToggleLabel}>
-              <ViewWeekIcon/> Неделя
-            </span>
-            </button>
-            <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('day')}
-            >
-            <span className={styles.viewToggleLabel}>
-              <ViewDayIcon/> День
-            </span>
-            </button>
-          </div>
-          <div className={styles.periodSwitcher}>
-            {scheduleView === 'week' && (
-                <div className={styles.monthSwitcher}>
-                  <button className={styles.monthNavButton} onClick={() => onWeekShift(-1)}
-                          aria-label="Предыдущая неделя">
-                    ←
-                  </button>
-                  <div key={weekLabelKey} className={styles.monthName}>
-                    {weekRangeLabel}
-                  </div>
-                  <button className={styles.monthNavButton} onClick={() => onWeekShift(1)}
-                          aria-label="Следующая неделя">
-                    →
-                  </button>
-                </div>
-            )}
-
-            {scheduleView === 'day' && (
-                <div className={styles.daySwitcher}>
-                  <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
-                    ←
-                  </button>
-                  <div key={dayLabelKey} className={styles.monthName}>
-                    {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
-                  </div>
-                  <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
-                    →
-                  </button>
-                </div>
-            )}
-
-            {scheduleView === 'month' && (
-                <div className={styles.monthSwitcher}>
-                  <button
-                      className={styles.monthNavButton}
-                      onClick={() => onMonthShift(-1)}
-                      aria-label="Предыдущий месяц"
-                  >
-                    ←
-                  </button>
-                  <div key={monthLabelKey} className={styles.monthName}>
-                    {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
-                  </div>
-                  <button
-                      className={styles.monthNavButton}
-                      onClick={() => onMonthShift(1)}
-                      aria-label="Следующий месяц"
-                  >
-                    →
-                  </button>
-                </div>
-            )}
-          </div>
+        <div className={styles.viewToggleRow}>
           <button
-              className={`${controls.primaryButton} ${styles.headerAction}`}
-              onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+            className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+            onClick={() => onScheduleViewChange('month')}
           >
-            Создать урок
+            <span className={styles.viewToggleLabel}>
+              <CalendarMonthIcon /> Месяц
+            </span>
+          </button>
+          <button
+            className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+            onClick={() => onScheduleViewChange('week')}
+          >
+            <span className={styles.viewToggleLabel}>
+              <ViewWeekIcon /> Неделя
+            </span>
+          </button>
+          <button
+            className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+            onClick={() => onScheduleViewChange('day')}
+          >
+            <span className={styles.viewToggleLabel}>
+              <ViewDayIcon /> День
+            </span>
           </button>
         </div>
+
+        <div className={styles.periodSwitcher}>
+          {scheduleView === 'week' && (
+            <div className={styles.monthSwitcher}>
+              <button className={styles.monthNavButton} onClick={() => onWeekShift(-1)} aria-label="Предыдущая неделя">
+                ←
+              </button>
+              <div key={weekLabelKey} className={styles.monthName}>
+                {weekRangeLabel}
+              </div>
+              <button className={styles.monthNavButton} onClick={() => onWeekShift(1)} aria-label="Следующая неделя">
+                →
+              </button>
+            </div>
+          )}
+
+          {scheduleView === 'day' && (
+            <div className={styles.daySwitcher}>
+              <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
+                ←
+              </button>
+              <div key={dayLabelKey} className={styles.monthName}>
+                {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
+              </div>
+              <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
+                →
+              </button>
+            </div>
+          )}
+
+          {scheduleView === 'month' && (
+            <div className={styles.monthSwitcher}>
+              <button
+                className={styles.monthNavButton}
+                onClick={() => onMonthShift(-1)}
+                aria-label="Предыдущий месяц"
+              >
+                ←
+              </button>
+              <div key={monthLabelKey} className={styles.monthName}>
+                {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
+              </div>
+              <button
+                className={styles.monthNavButton}
+                onClick={() => onMonthShift(1)}
+                aria-label="Следующий месяц"
+              >
+                →
+              </button>
+            </div>
+          )}
+        </div>
+        <button
+          className={`${controls.primaryButton} ${styles.headerAction}`}
+          onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+        >
+          Создать урок
+        </button>
       </div>
 
       {scheduleView === 'week' && renderWeekGrid()}

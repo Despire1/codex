@@ -19,6 +19,7 @@
   flex-wrap: wrap;
 }
 
+.headerAction 
 .calendarControlsWrapper {
   display: flex;
   align-items: center;
@@ -325,6 +326,11 @@
   background: #f8fafc;
 }
 
+.weekGridScroll {
+  max-height: 760px;
+  overflow-y: auto;
+}
+
 .weekHeaderRow {
   display: grid;
   grid-template-columns: 64px repeat(7, minmax(120px, 1fr));
@@ -438,6 +444,11 @@
 .dayGrid {
   display: grid;
   grid-template-columns: 64px 1fr;
+}
+
+.dayGridScroll {
+  max-height: 760px;
+  overflow-y: auto;
 }
 
 .dayColumn {
