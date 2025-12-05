@@ -255,7 +255,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px 26px 12px;
+  padding: 8px 7px 8px 12px;
   border-radius: 10px;
   background: #e0f2fe;
   color: #0f172a;
@@ -385,6 +385,7 @@
   height: 52px;
   padding: 8px 6px;
   font-size: 12px;
+  text-align: center;
   color: #64748b;
   border-bottom: 1px dashed #e2e8f0;
   box-sizing: border-box;
@@ -430,14 +431,13 @@
 .recurringBadge {
   position: absolute;
   top: 6px;
-  right: 8px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-radius: 10px;
-  padding: 2px 6px;
+  right: 11px;
+  background: transparent;
+  color: #94a3b8;
+  padding: 0;
   font-size: 11px;
   font-weight: 800;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
+  cursor: default;
 }
 
 .dayView {
@@ -539,21 +539,24 @@
 
 .paymentBadge {
   position: absolute;
-  right: 6px;
+  right: 7px;
   bottom: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  color: #94a3b8;
+  background: #eff6ff;
   border: none;
-  padding: 0;
+  color: #94a3b8;
+  border-radius: 4px;
+  padding: 2px 2px;
+  cursor: pointer;
 }
 
 .compactBadge {
+  align-self: end;
   position: static;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
