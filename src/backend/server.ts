@@ -211,7 +211,7 @@ const createLesson = async (body: any) => {
 };
 
 const createRecurringLessons = async (body: any) => {
-  const { startAt, repeatWeekdays } = body ?? {};
+  const { startAt, repeatWeekdays, repeatUntil } = body ?? {};
   if (!startAt) throw new Error('Заполните дату и время урока');
   const weekdays: number[] = Array.isArray(repeatWeekdays)
     ? Array.from(
@@ -228,7 +228,18 @@ const createRecurringLessons = async (body: any) => {
   if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата начала');
 
   const { teacher, durationValue } = await validateLessonPayload(body);
-  const endDate = addYears(startDate, 1);
+  const maxEndDate = addYears(startDate, 1);
+  const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
+  const endDate =
+    requestedEndDate && !Number.isNaN(requestedEndDate.getTime())
+      ? requestedEndDate > maxEndDate
+        ? maxEndDate
+        : requestedEndDate
+      : maxEndDate;
+
+  if (endDate < startDate) {
+    throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+  }
   const occurrences: Date[] = [];
 
   for (let cursor = new Date(startDate); cursor <= endDate; cursor = addDays(cursor, 1)) {
@@ -243,7 +254,6 @@ const createRecurringLessons = async (body: any) => {
   const existingLessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
-      studentId: Number(body.studentId),
       startAt: {
         gte: startDate,
         lte: endDate,
@@ -268,6 +278,8 @@ const createRecurringLessons = async (body: any) => {
         durationMinutes: durationValue,
         status: 'SCHEDULED',
         isPaid: false,
+        isRecurring: true,
+        recurrenceUntil: endDate,
       },
     });
     created.push(lesson);

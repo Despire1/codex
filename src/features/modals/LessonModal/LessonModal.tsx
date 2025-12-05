@@ -1,4 +1,4 @@
-import { addDays, addYears } from 'date-fns';
+import { addYears } from 'date-fns';
 import { type FC, useMemo } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import {
@@ -24,6 +24,7 @@ interface LessonDraft {
   durationMinutes: number;
   isRecurring: boolean;
   repeatWeekdays: number[];
+  repeatUntil: string | undefined;
 }
 
 interface LessonModalProps {
@@ -47,21 +48,6 @@ const weekdayOptions: { value: number; label: string }[] = [
   { value: 0, label: 'Вс' },
 ];
 
-const countOccurrences = (startAt: Date, weekdays: number[]) => {
-  if (Number.isNaN(startAt.getTime()) || weekdays.length === 0) return 0;
-  const endDate = addYears(startAt, 1);
-  let count = 0;
-
-  for (let cursor = new Date(startAt); cursor <= endDate; cursor = addDays(cursor, 1)) {
-    if (weekdays.includes(cursor.getUTCDay())) {
-      count += 1;
-    }
-    if (count > 500) break;
-  }
-
-  return count;
-};
-
 export const LessonModal: FC<LessonModalProps> = ({
   open,
   editingLessonId,
@@ -80,13 +66,11 @@ export const LessonModal: FC<LessonModalProps> = ({
     [draft.date, draft.time],
   );
 
-  const recurrencesCount = useMemo(
-    () => (draft.isRecurring ? countOccurrences(startAt, draft.repeatWeekdays) : 0),
-    [draft.isRecurring, startAt, draft.repeatWeekdays],
-  );
-
   const handleRecurringToggle = (checked: boolean) => {
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getUTCDay();
+    const defaultUntil = Number.isNaN(startAt.getTime())
+      ? ''
+      : addYears(startAt, 1).toISOString().slice(0, 10);
     onDraftChange({
       ...draft,
       isRecurring: checked,
@@ -95,6 +79,7 @@ export const LessonModal: FC<LessonModalProps> = ({
         : checked
           ? draft.repeatWeekdays
           : [],
+      repeatUntil: checked ? draft.repeatUntil || defaultUntil : undefined,
     });
   };
 
@@ -167,7 +152,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               <Typography>Выберите дни недели для повтора</Typography>
               <ToggleButtonGroup
                 value={draft.repeatWeekdays}
-                onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue })}
+                onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
               >
                 {weekdayOptions.map((day) => (
                   <ToggleButton key={day.value} value={day.value} aria-label={`repeat-${day.label}`}>
@@ -175,12 +160,23 @@ export const LessonModal: FC<LessonModalProps> = ({
                   </ToggleButton>
                 ))}
               </ToggleButtonGroup>
-              <Typography variant="caption">
-                Занятия будут запланированы до {addYears(startAt, 1).toISOString().slice(0, 10)} включительно.
-              </Typography>
-              {recurrencesCount > 0 && (
-                <Typography variant="caption">Будет создано {recurrencesCount} занятий</Typography>
-              )}
+              <Box
+                style={{
+                  marginTop: '16px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '12px',
+                }}
+              >
+                <TextField
+                  label="Повторять до"
+                  type="date"
+                  value={draft.repeatUntil ?? ''}
+                  onChange={(e) => onDraftChange({ ...draft, repeatUntil: e.target.value || undefined })}
+                  min={draft.date}
+                  helperText="Если не выбрано, уроки будут запланированы на год вперёд"
+                />
+              </Box>
               {draft.repeatWeekdays.length === 0 && (
                 <Typography variant="caption" className={controls.error}>
                   Отметьте хотя бы один день недели

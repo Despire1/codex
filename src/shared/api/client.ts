@@ -52,6 +52,7 @@ export const api = {
     startAt: string;
     durationMinutes: number;
     repeatWeekdays: number[];
+    repeatUntil?: string;
   }) => apiFetch<{ lessons: Lesson[] }>('/api/lessons/recurring', { method: 'POST', body: JSON.stringify(payload) }),
   updateLesson: (id: number, payload: { studentId: number; startAt: string; durationMinutes: number }) =>
     apiFetch<{ lesson: Lesson }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
