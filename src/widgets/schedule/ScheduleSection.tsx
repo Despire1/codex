@@ -392,6 +392,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
                             <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
                           </div>
+                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <button
                             className={`${styles.paymentBadge} ${styles.compactBadge} ${
                               lesson.isPaid ? styles.paid : styles.unpaid

@@ -385,6 +385,7 @@
   height: 52px;
   padding: 8px 6px;
   font-size: 12px;
+  text-align: center;
   color: #64748b;
   border-bottom: 1px dashed #e2e8f0;
   box-sizing: border-box;
@@ -552,9 +553,10 @@
 }
 
 .compactBadge {
+  align-self: end;
   position: static;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
