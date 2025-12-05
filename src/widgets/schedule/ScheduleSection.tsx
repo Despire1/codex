@@ -16,9 +16,10 @@ import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
 
 const DAY_START_MINUTE = 0;
-const DAY_END_MINUTE = 24 * 60 - 1;
+const DAY_END_MINUTE = 24 * 60;
 const HOURS_IN_DAY = 24;
 const HOUR_BLOCK_HEIGHT = 52;
+const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
 
 interface ScheduleSectionProps {
@@ -84,7 +85,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const hours = useMemo(() => Array.from({ length: HOURS_IN_DAY }, (_, i) => i), []);
 
-  const dayHeight = useMemo(() => (DAY_END_MINUTE / 60 - DAY_START_MINUTE / 60) * HOUR_BLOCK_HEIGHT, []);
+  const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
 
@@ -149,8 +150,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const rect = container.getBoundingClientRect();
     const offsetY = event.clientY - rect.top + container.scrollTop;
     const minutesFromStart = DAY_START_MINUTE + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
-    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), DAY_END_MINUTE);
-    const roundedMinutes = Math.min(Math.round(clampedMinutes / 10) * 10, DAY_END_MINUTE);
+    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), LAST_MINUTE);
+    const roundedMinutes = Math.min(Math.round(clampedMinutes / 10) * 10, LAST_MINUTE);
     setHoverIndicator({ dayIso, minutes: roundedMinutes });
   };
 
@@ -162,8 +163,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const rect = container.getBoundingClientRect();
     const offsetY = event.clientY - rect.top + container.scrollTop;
     const minutesFromStart = DAY_START_MINUTE + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
-    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), DAY_END_MINUTE);
-    const roundedMinutes = Math.min(Math.round(clampedMinutes / 30) * 30, DAY_END_MINUTE);
+    const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), LAST_MINUTE);
+    const roundedMinutes = Math.min(Math.round(clampedMinutes / 30) * 30, LAST_MINUTE);
     const hoursValue = Math.floor(roundedMinutes / 60)
       .toString()
       .padStart(2, '0');
