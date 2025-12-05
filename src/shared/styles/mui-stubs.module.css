@@ -1,0 +1,98 @@
+.formControl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.input,
+.select,
+.textInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input:focus,
+.select:focus,
+.textInput:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.helperText {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.error .textInput,
+.error .select {
+  border-color: #ef4444;
+}
+
+.errorText {
+  color: #dc2626;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkboxInput {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.toggleGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toggleButton {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toggleButton.selected {
+  background: #2563eb;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+
+.inlineLabel {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.caption {
+  font-size: 12px;
+  color: #475569;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
