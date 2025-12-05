@@ -41,6 +41,8 @@ export interface Lesson {
   durationMinutes: number;
   status: LessonStatus;
   isPaid: boolean;
+  isRecurring?: boolean;
+  recurrenceUntil?: string | null;
 }
 
 export interface LinkedStudent extends Student {

@@ -255,13 +255,14 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 8px;
+  padding: 8px 12px 26px 12px;
   border-radius: 10px;
   background: #e0f2fe;
   color: #0f172a;
   border: 1px solid #bae6fd;
   cursor: pointer;
   transition: all 0.12s ease;
+  position: relative;
 }
 
 .monthLesson:hover {
@@ -417,12 +418,26 @@
   left: 8px;
   right: 8px;
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 8px 12px 26px 12px;
   background: #e0f2fe;
   border: 1px solid #2563eb;
   color: #0f172a;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
   overflow: hidden;
+  cursor: pointer;
+}
+
+.recurringBadge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
 }
 
 .dayView {
@@ -477,11 +492,12 @@
   position: absolute;
   left: 0;
   right: 0;
+  top: 0;
   height: 2px;
   background: #2563eb;
   pointer-events: none;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-  transition: top 80ms ease;
+  transition: transform 80ms ease;
   z-index: 2;
 }
 
@@ -523,8 +539,8 @@
 
 .paymentBadge {
   position: absolute;
-  top: 6px;
   right: 6px;
+  bottom: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

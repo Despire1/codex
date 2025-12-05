@@ -139,7 +139,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderHoverIndicator = (minutes: number) => {
     const top = Math.max(0, ((minutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT);
     return (
-      <div className={styles.hoverIndicator} style={{ top }}>
+      <div className={styles.hoverIndicator} style={{ transform: `translateY(${top}px)` }}>
         <span className={styles.hoverTime}>{formatMinutesToTime(minutes)}</span>
       </div>
     );
@@ -225,7 +225,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
                           style={{ top: position.top, height: position.height }}
                           onClick={() => onStartEditLesson(lesson)}
+                          onMouseEnter={() => setHoverIndicator(null)}
                         >
+                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                           <div className={styles.weekLessonMeta}>
                             {startTime} · {lesson.durationMinutes} мин
@@ -294,7 +296,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     }`}
                     style={{ top: position.top, height: position.height }}
                     onClick={() => onStartEditLesson(lesson)}
+                    onMouseEnter={() => setHoverIndicator(null)}
                   >
+                    {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                     <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                     <div className={styles.weekLessonMeta}>
                       {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
@@ -378,6 +382,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             onStartEditLesson(lesson);
                           }}
                         >
+                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.monthLessonInfo}>
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
                             <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
