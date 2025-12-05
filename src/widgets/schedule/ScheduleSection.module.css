@@ -1,7 +1,7 @@
 .sectionHeader {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 60px;
   flex-wrap: wrap;
 }
 
@@ -9,6 +9,13 @@
   font-size: 20px;
   font-weight: 800;
   color: #0f172a;
+  margin-right: auto;
+}
+
+.calendarControlsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 24px;
 }
 
 .periodSwitcherInline,
@@ -17,10 +24,6 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.headerAction {
-  margin-left: auto;
 }
 
 .calendarActions {
@@ -62,6 +65,7 @@
 .viewToggleButton:hover {
   border-color: #bae6fd;
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
+  cursor: pointer;
 }
 
 .viewToggleLabel {
@@ -370,6 +374,7 @@
   height: 52px;
   padding: 8px 6px;
   font-size: 12px;
+  text-align: center;
   color: #64748b;
   border-bottom: 1px dashed #e2e8f0;
   box-sizing: border-box;
