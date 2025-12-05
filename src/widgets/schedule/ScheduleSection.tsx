@@ -226,6 +226,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           style={{ top: position.top, height: position.height }}
                           onClick={() => onStartEditLesson(lesson)}
                         >
+                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                           <div className={styles.weekLessonMeta}>
                             {startTime} · {lesson.durationMinutes} мин
@@ -295,6 +296,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     style={{ top: position.top, height: position.height }}
                     onClick={() => onStartEditLesson(lesson)}
                   >
+                    {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                     <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
                     <div className={styles.weekLessonMeta}>
                       {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
@@ -378,6 +380,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             onStartEditLesson(lesson);
                           }}
                         >
+                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.monthLessonInfo}>
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
                             <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
