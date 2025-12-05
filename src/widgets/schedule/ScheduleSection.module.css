@@ -19,7 +19,10 @@
   flex-wrap: wrap;
 }
 
-.headerAction {
+.calendarControlsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 24px;
   margin-left: auto;
 }
 
@@ -379,7 +382,6 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(140px, 1fr));
   background: #f8fafc;
-  cursor: none;
 }
 
 .weekDayColumn {
@@ -392,7 +394,6 @@
   position: relative;
   background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
   background-size: 100% 52px;
-  cursor: none;
 }
 
 .weekDayBody:hover {
@@ -437,14 +438,12 @@
 .dayGrid {
   display: grid;
   grid-template-columns: 64px 1fr;
-  cursor: none;
 }
 
 .dayColumn {
   position: relative;
   background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
   background-size: 100% 52px;
-  cursor: none;
   background-color: #f8fafc;
 }
 
