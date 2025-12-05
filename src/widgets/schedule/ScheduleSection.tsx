@@ -139,7 +139,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderHoverIndicator = (minutes: number) => {
     const top = Math.max(0, ((minutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT);
     return (
-      <div className={styles.hoverIndicator} style={{ top }}>
+      <div className={styles.hoverIndicator} style={{ transform: `translateY(${top}px)` }}>
         <span className={styles.hoverTime}>{formatMinutesToTime(minutes)}</span>
       </div>
     );
@@ -225,6 +225,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
                           style={{ top: position.top, height: position.height }}
                           onClick={() => onStartEditLesson(lesson)}
+                          onMouseEnter={() => setHoverIndicator(null)}
                         >
                           {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
@@ -295,6 +296,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     }`}
                     style={{ top: position.top, height: position.height }}
                     onClick={() => onStartEditLesson(lesson)}
+                    onMouseEnter={() => setHoverIndicator(null)}
                   >
                     {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                     <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>

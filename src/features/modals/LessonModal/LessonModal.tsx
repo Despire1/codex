@@ -154,11 +154,19 @@ export const LessonModal: FC<LessonModalProps> = ({
                 value={draft.repeatWeekdays}
                 onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
               >
-                {weekdayOptions.map((day) => (
-                  <ToggleButton key={day.value} value={day.value} aria-label={`repeat-${day.label}`}>
-                    {day.label}
-                  </ToggleButton>
-                ))}
+                {weekdayOptions.map((day) => {
+                  const selected = draft.repeatWeekdays.includes(day.value);
+                  return (
+                    <ToggleButton
+                      key={day.value}
+                      value={day.value}
+                      aria-label={`repeat-${day.label}`}
+                      className={selected ? modalStyles.weekdaySelected : undefined}
+                    >
+                      {day.label}
+                    </ToggleButton>
+                  );
+                })}
               </ToggleButtonGroup>
               <Box
                 style={{
