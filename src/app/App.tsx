@@ -39,6 +39,8 @@ export const App = () => {
     date: todayISO(),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
+    isRecurring: false,
+    repeatWeekdays: [] as number[],
   });
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
@@ -189,6 +191,8 @@ export const App = () => {
       time: time ?? draft.time,
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      isRecurring: existing ? false : draft.isRecurring,
+      repeatWeekdays: existing ? [] : draft.repeatWeekdays,
     }));
     setEditingLessonId(existing?.id ?? null);
     setLessonModalOpen(true);
@@ -199,10 +203,14 @@ export const App = () => {
   const closeLessonModal = () => {
     setLessonModalOpen(false);
     setEditingLessonId(null);
+    setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [] }));
   };
 
   const saveLesson = async () => {
-    if (!newLessonDraft.studentId) return;
+    if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
+    const durationMinutes = Number(newLessonDraft.durationMinutes);
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
+
     const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
 
     try {
@@ -210,14 +218,39 @@ export const App = () => {
         const data = await api.updateLesson(editingLessonId, {
           studentId: newLessonDraft.studentId,
           startAt,
-          durationMinutes: Number(newLessonDraft.durationMinutes),
+          durationMinutes,
         });
         setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+      } else if (newLessonDraft.isRecurring) {
+        if (newLessonDraft.repeatWeekdays.length === 0) {
+          alert('Выберите хотя бы один день недели для повтора');
+          return;
+        }
+        const data = await api.createRecurringLessons({
+          studentId: newLessonDraft.studentId,
+          startAt,
+          durationMinutes,
+          repeatWeekdays: newLessonDraft.repeatWeekdays,
+        });
+
+        const normalized = data.lessons.map(normalizeLesson);
+        setLessons((prev) => {
+          const existingKeys = new Set(prev.map((lesson) => `${lesson.studentId}-${lesson.startAt}`));
+          const next = [...prev];
+          normalized.forEach((lesson) => {
+            const key = `${lesson.studentId}-${lesson.startAt}`;
+            if (!existingKeys.has(key)) {
+              next.push(lesson);
+              existingKeys.add(key);
+            }
+          });
+          return next;
+        });
       } else {
         const data = await api.createLesson({
           studentId: newLessonDraft.studentId,
           startAt,
-          durationMinutes: Number(newLessonDraft.durationMinutes),
+          durationMinutes,
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);
@@ -226,7 +259,10 @@ export const App = () => {
       setLessonModalOpen(false);
       setEditingLessonId(null);
       setActiveTab('schedule');
+      setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [] }));
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось создать урок';
+      alert(message);
       // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
