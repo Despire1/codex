@@ -440,6 +440,19 @@
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
 }
 
+.recurringBadge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
+}
+
 .dayView {
   display: flex;
   flex-direction: column;
