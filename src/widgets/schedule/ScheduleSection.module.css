@@ -379,6 +379,7 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(140px, 1fr));
   background: #f8fafc;
+  cursor: none;
 }
 
 .weekDayColumn {
@@ -436,6 +437,7 @@
 .dayGrid {
   display: grid;
   grid-template-columns: 64px 1fr;
+  cursor: none;
 }
 
 .dayColumn {
@@ -459,6 +461,7 @@
   pointer-events: none;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   transition: top 80ms ease;
+  z-index: 2;
 }
 
 .hoverTime {
@@ -472,6 +475,7 @@
   font-size: 12px;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  z-index: 3;
 }
 
 .dayLesson {
