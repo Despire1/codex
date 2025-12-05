@@ -1,0 +1,515 @@
+.sectionTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.periodSwitcherInline,
+.periodSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.calendarActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  min-width: 220px;
+}
+
+.calendarCreateButton {
+  border: 1px solid #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.viewToggleRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.viewToggleButton {
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.viewToggleButton:hover {
+  border-color: #bae6fd;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
+}
+
+.viewToggleLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toggleActive {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+}
+
+.monthSwitcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 8px 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.monthNavButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.monthNavButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
+}
+
+.daySwitcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dateInput {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.monthName {
+  min-width: 140px;
+  text-align: center;
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 15px;
+  animation: monthFade 240ms ease;
+}
+
+@keyframes monthFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.monthScroller {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 760px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.monthSection {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.monthHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.monthTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.monthSubtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(46px, 1fr));
+  gap: 6px;
+}
+
+.monthWeekday {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.monthCell {
+  min-height: 92px;
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.monthCell:hover {
+  border-color: #2563eb;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.14);
+}
+
+.mutedDay {
+  opacity: 0.55;
+}
+
+.todayCell {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.monthDateRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monthDateNumber {
+  font-weight: 800;
+}
+
+.todayPill {
+  background: #2563eb;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.2);
+}
+
+.monthLessonList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.monthLesson {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #e0f2fe;
+  color: #0f172a;
+  border: 1px solid #bae6fd;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.monthLesson:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
+}
+
+.monthLessonInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.monthLessonTime {
+  font-weight: 700;
+}
+
+.monthLessonName {
+  font-size: 13px;
+}
+
+.monthLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+.dayCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.dayHeader {
+  display: flex;
+  justify-content: space-between;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.weekView {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.weekHeaderRow {
+  display: grid;
+  grid-template-columns: 64px repeat(7, minmax(120px, 1fr));
+  gap: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.timeColumnSpacer {
+  width: 64px;
+}
+
+.weekDayHeader {
+  text-align: center;
+  color: #0f172a;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.todayHeader {
+  color: #2563eb;
+}
+
+.weekDayName {
+  font-size: 13px;
+}
+
+.weekDayDate {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.weekGrid {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  overflow-x: auto;
+}
+
+.timeColumn {
+  border-right: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.timeSlot {
+  height: 52px;
+  padding: 8px 6px;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 1px dashed #e2e8f0;
+  box-sizing: border-box;
+}
+
+.weekColumns {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(140px, 1fr));
+  background: #f8fafc;
+}
+
+.weekDayColumn {
+  position: relative;
+  border-left: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.weekDayBody {
+  position: relative;
+  background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+  background-size: 100% 52px;
+  cursor: cell;
+}
+
+.weekDayBody:hover {
+  background-color: #f8fbff;
+  transition: background-color 0.2s ease;
+}
+
+.weekLesson {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #e0f2fe;
+  border: 1px solid #2563eb;
+  color: #0f172a;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
+  overflow: hidden;
+}
+
+.dayView {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+}
+
+.dayHeading {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dayTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.dayGrid {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+}
+
+.dayColumn {
+  position: relative;
+  background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+  background-size: 100% 52px;
+  cursor: cell;
+  background-color: #f8fafc;
+}
+
+.dayColumn:hover {
+  background-color: #f8fbff;
+}
+
+.dayLesson {
+  left: 12px;
+  right: 12px;
+}
+
+.canceledLesson {
+  border-style: dashed;
+  background: #f8fafc;
+  color: #94a3b8;
+  opacity: 0.6;
+}
+
+.weekLessonTitle {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.weekLessonMeta {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.paymentBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  padding: 0;
+}
+
+.compactBadge {
+  position: static;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.paid {
+  color: #16a34a;
+}
+
+.unpaid {
+  color: #b91c1c;
+}
+
+.viewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
