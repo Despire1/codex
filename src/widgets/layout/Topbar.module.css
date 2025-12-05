@@ -75,10 +75,6 @@
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
 }
 
-.topNavActive:hover {
-  background: #2563eb;
-}
-
 .tabIcon {
   display: inline-flex;
   width: 18px;
