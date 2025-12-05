@@ -255,7 +255,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 8px 7px 8px 12px;
+  padding: 8px 12px 26px 12px;
   border-radius: 10px;
   background: #e0f2fe;
   color: #0f172a;
@@ -431,13 +431,14 @@
 .recurringBadge {
   position: absolute;
   top: 6px;
-  right: 11px;
-  background: transparent;
-  color: #94a3b8;
-  padding: 0;
+  right: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 2px 6px;
   font-size: 11px;
   font-weight: 800;
-  cursor: default;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
 }
 
 .dayView {
@@ -539,17 +540,16 @@
 
 .paymentBadge {
   position: absolute;
-  right: 7px;
+  right: 6px;
   bottom: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eff6ff;
-  border: none;
+  background: #f8fafc;
   color: #94a3b8;
-  border-radius: 4px;
-  padding: 2px 2px;
-  cursor: pointer;
+  border: none;
+  padding: 6px;
+  border-radius: 9999px;
 }
 
 .compactBadge {
@@ -565,7 +565,8 @@
 }
 
 .unpaid {
-  color: #94a3b8;
+  color: #334155;
+  background: #ffc3cf;
 }
 
 .viewGrid {

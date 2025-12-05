@@ -62,7 +62,7 @@ export const LessonModal: FC<LessonModalProps> = ({
 
   const isEditing = Boolean(editingLessonId);
   const startAt = useMemo(
-    () => new Date(`${draft.date || ''}T${draft.time || '00:00'}:00.000Z`),
+    () => new Date(`${draft.date || ''}T${draft.time || '00:00'}`),
     [draft.date, draft.time],
   );
 
@@ -138,16 +138,10 @@ export const LessonModal: FC<LessonModalProps> = ({
             />
           </div>
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={draft.isRecurring}
-                onChange={(e) => handleRecurringToggle(e.target.checked)}
-                disabled={isEditing}
-              />
-            }
-            label={isEditing ? 'Повтор доступен только при создании нового урока' : 'Сделать урок повторяющимся'}
+            control={<Checkbox checked={draft.isRecurring} onChange={(e) => handleRecurringToggle(e.target.checked)} />}
+            label={'Сделать урок повторяющимся'}
           />
-          {draft.isRecurring && !isEditing && (
+          {draft.isRecurring && (
             <Box>
               <Typography>Выберите дни недели для повтора</Typography>
               <ToggleButtonGroup

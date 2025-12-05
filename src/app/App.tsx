@@ -31,6 +31,7 @@ export const App = () => {
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
+  const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -188,6 +189,11 @@ export const App = () => {
   const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
     const startDate = existing ? parseISO(existing.startAt) : undefined;
     const derivedDay = startDate ? startDate.getUTCDay() : undefined;
+    const recurrenceWeekdays = existing?.recurrenceWeekdays && existing.recurrenceWeekdays.length > 0
+      ? existing.recurrenceWeekdays
+      : derivedDay !== undefined
+        ? [derivedDay]
+        : [];
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
@@ -195,14 +201,11 @@ export const App = () => {
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
-      repeatWeekdays: existing
-        ? derivedDay !== undefined
-          ? [derivedDay]
-          : []
-        : draft.repeatWeekdays,
+      repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
       repeatUntil: existing?.recurrenceUntil ? existing.recurrenceUntil.slice(0, 10) : draft.repeatUntil,
     }));
     setEditingLessonId(existing?.id ?? null);
+    setEditingLessonOriginal(existing ?? null);
     setLessonModalOpen(true);
     setActiveTab('schedule');
     setDayViewDate(new Date(dateISO));
@@ -211,6 +214,7 @@ export const App = () => {
   const closeLessonModal = () => {
     setLessonModalOpen(false);
     setEditingLessonId(null);
+    setEditingLessonOriginal(null);
     setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   };
 
@@ -224,16 +228,43 @@ export const App = () => {
       return;
     }
 
-    const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
+    const startAtDate = new Date(`${newLessonDraft.date}T${newLessonDraft.time}:00`);
+    const startAt = startAtDate.toISOString();
 
     try {
       if (editingLessonId) {
+        const original = editingLessonOriginal;
+        const originalWeekdays = original?.recurrenceWeekdays ?? [];
+        const originalUntil = original?.recurrenceUntil?.slice(0, 10) ?? '';
+        const repeatChanged =
+          (newLessonDraft.repeatUntil ?? '') !== originalUntil ||
+          newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
+          newLessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
+
+        const applyToSeries =
+          original?.isRecurring && !repeatChanged
+            ? window.confirm('Изменить все повторяющиеся уроки? Нажмите ОК для всех или Отмена только для этого урока.')
+            : Boolean(original?.isRecurring && repeatChanged);
+
         const data = await api.updateLesson(editingLessonId, {
           studentId: newLessonDraft.studentId,
           startAt,
           durationMinutes,
+          applyToSeries,
+          repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
+          repeatUntil: newLessonDraft.isRecurring && newLessonDraft.repeatUntil ? `${newLessonDraft.repeatUntil}T23:59:59.999Z` : undefined,
         });
-        setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+
+        if (data.lessons && data.lessons.length > 0) {
+          const normalized = data.lessons.map(normalizeLesson);
+          setLessons((prev) => {
+            const groupId = normalized[0].recurrenceGroupId;
+            const filtered = groupId ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId) : prev;
+            return [...filtered, ...normalized];
+          });
+        } else if (data.lesson) {
+          setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+        }
       } else if (newLessonDraft.isRecurring) {
         if (newLessonDraft.repeatWeekdays.length === 0) {
           alert('Выберите хотя бы один день недели для повтора');

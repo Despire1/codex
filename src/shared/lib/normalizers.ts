@@ -10,6 +10,21 @@ export const normalizeLesson = (lesson: any): Lesson => ({
       : new Date(lesson.recurrenceUntil).toISOString()
     : lesson.recurrenceUntil ?? null,
   isRecurring: Boolean(lesson.isRecurring),
+  recurrenceGroupId: lesson.recurrenceGroupId ?? null,
+  recurrenceWeekdays: lesson.recurrenceWeekdays
+    ? Array.isArray(lesson.recurrenceWeekdays)
+      ? lesson.recurrenceWeekdays.map((value: any) => Number(value)).filter((v: number) => !Number.isNaN(v))
+      : (() => {
+          try {
+            const parsed = JSON.parse(lesson.recurrenceWeekdays);
+            return Array.isArray(parsed)
+              ? parsed.map((value: any) => Number(value)).filter((v: number) => !Number.isNaN(v))
+              : null;
+          } catch (error) {
+            return null;
+          }
+        })()
+    : null,
 });
 
 export const normalizeHomework = (homework: any): Homework => ({

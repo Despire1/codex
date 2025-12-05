@@ -67,6 +67,8 @@ model Lesson {
   isPaid          Boolean  @default(false)
   isRecurring     Boolean  @default(false)
   recurrenceUntil DateTime?
+  recurrenceGroupId String?
+  recurrenceWeekdays String?
   teacher         Teacher  @relation(fields: [teacherId], references: [chatId])
   student         Student  @relation(fields: [studentId], references: [id])
   createdAt       DateTime @default(now())
