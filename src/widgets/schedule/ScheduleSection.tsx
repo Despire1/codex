@@ -146,6 +146,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   };
 
   const handleTimeHover = (event: MouseEvent<HTMLDivElement>, dayIso: string) => {
+    const target = event.target as HTMLElement;
+    if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.dayLesson}`)) {
+      return;
+    }
+
     const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
     const offsetY = event.clientY - rect.top + container.scrollTop;

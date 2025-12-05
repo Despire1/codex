@@ -186,14 +186,21 @@ export const App = () => {
   };
 
   const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
+    const startDate = existing ? parseISO(existing.startAt) : undefined;
+    const derivedDay = startDate ? startDate.getUTCDay() : undefined;
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
-      time: time ?? draft.time,
+      time: time ?? (startDate ? format(startDate, 'HH:mm') : draft.time),
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
-      isRecurring: existing ? false : draft.isRecurring,
-      repeatWeekdays: existing ? [] : draft.repeatWeekdays,
+      isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
+      repeatWeekdays: existing
+        ? derivedDay !== undefined
+          ? [derivedDay]
+          : []
+        : draft.repeatWeekdays,
+      repeatUntil: existing?.recurrenceUntil ? existing.recurrenceUntil.slice(0, 10) : draft.repeatUntil,
     }));
     setEditingLessonId(existing?.id ?? null);
     setLessonModalOpen(true);
