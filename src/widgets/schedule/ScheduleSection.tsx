@@ -361,15 +361,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     <section className={styles.viewGrid}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Расписание</h2>
-        <button
-          className={controls.primaryButton}
-          onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
-        >
-          Создать урок
-        </button>
-      </div>
-
-      <div className={styles.sectionTitleRow}>
         <div className={styles.viewToggleRow}>
           <button
             className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
@@ -448,6 +439,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
           )}
         </div>
+        <button
+          className={`${controls.primaryButton} ${styles.headerAction}`}
+          onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+        >
+          Создать урок
+        </button>
       </div>
 
       {scheduleView === 'week' && renderWeekGrid()}

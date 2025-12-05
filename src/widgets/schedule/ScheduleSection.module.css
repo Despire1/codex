@@ -1,16 +1,6 @@
-.sectionTitleRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  flex-wrap: wrap;
-}
-
 .sectionHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -27,8 +17,10 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  width: 100%;
+}
+
+.headerAction {
+  margin-left: auto;
 }
 
 .calendarActions {
