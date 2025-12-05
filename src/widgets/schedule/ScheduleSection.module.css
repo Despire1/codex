@@ -325,12 +325,15 @@
   border-radius: 14px;
   overflow: hidden;
   background: #f8fafc;
-  max-height: 760px;
+  height: calc(100vh - 240px);
+  max-height: none;
+  min-height: 520px;
 }
 
 .weekGridScroll {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .weekHeaderRow {
@@ -429,7 +432,9 @@
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
-  max-height: 760px;
+  height: calc(100vh - 240px);
+  max-height: none;
+  min-height: 520px;
   overflow: hidden;
 }
 
@@ -455,6 +460,7 @@
 .dayGridScroll {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .dayColumn {
