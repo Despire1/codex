@@ -1,5 +1,7 @@
+import crypto from 'node:crypto';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
+import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
@@ -180,45 +182,216 @@ const toggleHomework = async (homeworkId: number) => {
   });
 };
 
-const createLesson = async (body: any) => {
-  const { studentId, startAt, durationMinutes } = body ?? {};
-  if (!studentId || !startAt || !durationMinutes) throw new Error('Заполните ученика, дату и длительность');
+const validateLessonPayload = async (body: any) => {
+  const { studentId, durationMinutes } = body ?? {};
+  if (!studentId || !durationMinutes) throw new Error('Заполните ученика и длительность');
+  const durationValue = Number(durationMinutes);
+  if (!Number.isFinite(durationValue) || durationValue <= 0) throw new Error('Длительность должна быть больше нуля');
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(studentId) } },
   });
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  return { teacher, durationValue };
+};
 
+const createLesson = async (body: any) => {
+  const { startAt } = body ?? {};
+  if (!startAt) throw new Error('Заполните дату и время урока');
+  const { teacher, durationValue } = await validateLessonPayload(body);
   return prisma.lesson.create({
     data: {
       teacherId: teacher.chatId,
-      studentId: Number(studentId),
+      studentId: Number(body.studentId),
       startAt: new Date(startAt),
-      durationMinutes: Number(durationMinutes),
+      durationMinutes: durationValue,
       status: 'SCHEDULED',
       isPaid: false,
     },
   });
 };
 
+const parseWeekdays = (repeatWeekdays: any): number[] => {
+  const raw = Array.isArray(repeatWeekdays)
+    ? repeatWeekdays
+    : typeof repeatWeekdays === 'string'
+      ? (() => {
+          try {
+            const parsed = JSON.parse(repeatWeekdays);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (error) {
+            return [];
+          }
+        })()
+      : [];
+
+  return Array.from(
+    new Set(raw.map((day: any) => Number(day)).filter((day: number) => Number.isInteger(day) && day >= 0 && day <= 6)),
+  );
+};
+
+const createRecurringLessons = async (body: any) => {
+  const { startAt, repeatWeekdays, repeatUntil } = body ?? {};
+  if (!startAt) throw new Error('Заполните дату и время урока');
+  const weekdays: number[] = parseWeekdays(repeatWeekdays);
+  if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
+
+  const startDate = new Date(startAt);
+  if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата начала');
+
+  const { teacher, durationValue } = await validateLessonPayload(body);
+  const maxEndDate = addYears(startDate, 1);
+  const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
+  const endDate =
+    requestedEndDate && !Number.isNaN(requestedEndDate.getTime())
+      ? requestedEndDate > maxEndDate
+        ? maxEndDate
+        : requestedEndDate
+      : maxEndDate;
+
+  if (endDate < startDate) {
+    throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+  }
+  const occurrences: Date[] = [];
+
+  for (let cursor = new Date(startDate); cursor <= endDate; cursor = addDays(cursor, 1)) {
+    if (weekdays.includes(cursor.getUTCDay())) {
+      const withTime = new Date(
+        Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), startDate.getUTCHours(), startDate.getUTCMinutes()),
+      );
+      occurrences.push(withTime);
+    }
+    if (occurrences.length > 500) break;
+  }
+
+  if (occurrences.length === 0) throw new Error('Не найдено подходящих дат для создания повторов');
+
+  const existingLessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      startAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+  });
+
+  const existingStartAt = new Set(existingLessons.map((lesson) => lesson.startAt.toISOString()));
+  const slotsToCreate = occurrences.filter((date) => !existingStartAt.has(date.toISOString()));
+
+  if (slotsToCreate.length === 0) {
+    throw new Error('Все выбранные даты уже заняты или запланированы');
+  }
+
+  const recurrenceGroupId = crypto.randomUUID();
+  const weekdaysPayload = JSON.stringify(weekdays);
+  const created: any[] = [];
+  for (const date of slotsToCreate) {
+    const lesson = await prisma.lesson.create({
+      data: {
+        teacherId: teacher.chatId,
+        studentId: Number(body.studentId),
+        startAt: date,
+        durationMinutes: durationValue,
+        status: 'SCHEDULED',
+        isPaid: false,
+        isRecurring: true,
+        recurrenceUntil: endDate,
+        recurrenceGroupId,
+        recurrenceWeekdays: weekdaysPayload,
+      },
+    });
+    created.push(lesson);
+  }
+
+  return created;
+};
+
 const updateLesson = async (lessonId: number, body: any) => {
-  const { studentId, startAt, durationMinutes } = body ?? {};
+  const { studentId, startAt, durationMinutes, applyToSeries, repeatWeekdays, repeatUntil } = body ?? {};
   const teacher = await ensureTeacher();
   const existing = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!existing || existing.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
   const nextStudentId = studentId ?? existing.studentId;
+  const nextDuration =
+    durationMinutes !== undefined && durationMinutes !== null ? Number(durationMinutes) : existing.durationMinutes;
+  if (!Number.isFinite(nextDuration) || nextDuration <= 0) throw new Error('Длительность должна быть больше нуля');
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(nextStudentId) } },
   });
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
+  const targetStart = startAt ? new Date(startAt) : existing.startAt;
+  const existingLesson = existing as any;
+  const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
+  const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+
+  if (applyToSeries && existingLesson.isRecurring && existingLesson.recurrenceGroupId) {
+    if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
+    if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
+
+    const maxEnd = addYears(targetStart, 1);
+    const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
+    const recurrenceEnd =
+      requestedEnd && !Number.isNaN(requestedEnd.getTime())
+        ? requestedEnd > maxEnd
+          ? maxEnd
+          : requestedEnd
+        : maxEnd;
+
+    if (recurrenceEnd < targetStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+
+    const existingIds = (
+      await prisma.lesson.findMany({
+        where: { recurrenceGroupId: existingLesson.recurrenceGroupId, teacherId: teacher.chatId, status: 'SCHEDULED' },
+      })
+    ).map((lesson) => lesson.id);
+
+    if (existingIds.length) {
+      await (prisma.lesson as any).deleteMany({ where: { id: { in: existingIds } } });
+    }
+
+    const seriesLessons: any[] = [];
+    const weekdaysPayload = JSON.stringify(weekdays);
+    for (let cursor = new Date(targetStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
+      if (weekdays.includes(cursor.getUTCDay())) {
+        const start = new Date(
+          Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
+        );
+
+        const created = await prisma.lesson.create({
+          data: {
+            teacherId: teacher.chatId,
+            studentId: Number(nextStudentId),
+            startAt: start,
+            durationMinutes: nextDuration,
+            status: 'SCHEDULED',
+            isPaid: false,
+            isRecurring: true,
+            recurrenceUntil: recurrenceEnd,
+            recurrenceGroupId: existingLesson.recurrenceGroupId,
+            recurrenceWeekdays: weekdaysPayload,
+          },
+        });
+        seriesLessons.push(created);
+      }
+      if (seriesLessons.length > 500) break;
+    }
+
+    if (seriesLessons.length === 0) {
+      throw new Error('Не найдено дат для обновления серии');
+    }
+
+    return { lessons: seriesLessons };
+  }
+
   return prisma.lesson.update({
     where: { id: lessonId },
     data: {
       studentId: Number(nextStudentId),
-      startAt: startAt ? new Date(startAt) : existing.startAt,
-      durationMinutes: durationMinutes ? Number(durationMinutes) : existing.durationMinutes,
+      startAt: targetStart,
+      durationMinutes: nextDuration,
     },
   });
 };
@@ -332,6 +505,12 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 200, { homework });
     }
 
+    if (req.method === 'POST' && pathname === '/api/lessons/recurring') {
+      const body = await readBody(req);
+      const lessons = await createRecurringLessons(body);
+      return sendJson(res, 201, { lessons });
+    }
+
     if (req.method === 'POST' && pathname === '/api/lessons') {
       const body = await readBody(req);
       const lesson = await createLesson(body);
@@ -342,8 +521,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'PATCH' && lessonUpdateMatch) {
       const lessonId = Number(lessonUpdateMatch[1]);
       const body = await readBody(req);
-      const lesson = await updateLesson(lessonId, body);
-      return sendJson(res, 200, { lesson });
+      const result = await updateLesson(lessonId, body);
+      if (result && typeof result === 'object' && 'lessons' in result) {
+        return sendJson(res, 200, { lessons: (result as any).lessons });
+      }
+      return sendJson(res, 200, { lesson: result });
     }
 
     const lessonCompleteMatch = pathname.match(/^\/api\/lessons\/(\d+)\/complete$/);
