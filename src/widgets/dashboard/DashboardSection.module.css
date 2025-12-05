@@ -1,0 +1,85 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.cardHeader {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.actionsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.statCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.statValue {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.statLabel {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.lessonRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: #f8fafc;
+}
+
+.lessonTitle {
+  font-weight: 600;
+}
+
+.lessonTime {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.lessonMeta {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.lessonActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.muted {
+  color: #94a3b8;
+  font-size: 13px;
+}
