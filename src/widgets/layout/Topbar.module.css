@@ -1,0 +1,88 @@
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(56, 130, 246, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.topbarGreeting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 2px 0 0;
+  font-size: 22px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.quickActions {
+  display: flex;
+  gap: 8px;
+}
+
+.topbarNav {
+  flex: 1;
+  display: none;
+  justify-content: center;
+  min-width: 240px;
+}
+
+.topNav {
+  display: inline-flex;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  gap: 6px;
+}
+
+.topNavButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.topNavButton:hover {
+  background: #eef2ff;
+}
+
+.topNavActive {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
+}
+
+.tabIcon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+
+@media (min-width: 860px) {
+  .topbarNav {
+    display: flex;
+  }
+}
