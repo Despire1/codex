@@ -411,6 +411,22 @@ const updateLesson = async (lessonId: number, body: any) => {
   });
 };
 
+const deleteLesson = async (lessonId: number, applyToSeries?: boolean) => {
+  const teacher = await ensureTeacher();
+  const lesson = (await prisma.lesson.findUnique({ where: { id: lessonId } })) as any;
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  if (applyToSeries && lesson.isRecurring && lesson.recurrenceGroupId) {
+    const deleted = await (prisma.lesson as any).deleteMany({
+      where: { teacherId: teacher.chatId, recurrenceGroupId: lesson.recurrenceGroupId },
+    });
+    return { deletedIds: [], deletedCount: deleted?.count ?? 0 };
+  }
+
+  await (prisma.lesson as any).delete({ where: { id: lessonId } });
+  return { deletedIds: [lessonId], deletedCount: 1 };
+};
+
 const markLessonCompleted = async (lessonId: number) => {
   const teacher = await ensureTeacher();
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
@@ -541,6 +557,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         return sendJson(res, 200, { lessons: (result as any).lessons });
       }
       return sendJson(res, 200, { lesson: result });
+    }
+
+    if (req.method === 'DELETE' && lessonUpdateMatch) {
+      const lessonId = Number(lessonUpdateMatch[1]);
+      const body = await readBody(req);
+      const result = await deleteLesson(lessonId, Boolean(body.applyToSeries));
+      return sendJson(res, 200, result);
     }
 
     const lessonCompleteMatch = pathname.match(/^\/api\/lessons\/(\d+)\/complete$/);

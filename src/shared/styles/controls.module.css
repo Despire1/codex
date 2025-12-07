@@ -46,6 +46,15 @@
   cursor: pointer;
 }
 
+.dangerButton {
+  padding: 10px;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
 .smallButton {
   padding: 8px 10px;
   border: 1px solid #e2e8f0;

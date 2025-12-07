@@ -66,6 +66,8 @@ export const api = {
       repeatUntil?: string;
     },
   ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[] }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteLesson: (id: number, payload?: { applyToSeries?: boolean }) =>
+    apiFetch<{ deletedIds?: number[] }>(`/api/lessons/${id}`, { method: 'DELETE', body: JSON.stringify(payload ?? {}) }),
   markLessonCompleted: (lessonId: number) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {
       method: 'POST',

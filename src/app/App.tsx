@@ -242,6 +242,64 @@ export const App = () => {
     setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   };
 
+  const performDeleteLesson = async (applyToSeries: boolean) => {
+    if (!editingLessonId) return;
+    const recurrenceGroupId = editingLessonOriginal?.recurrenceGroupId;
+
+    try {
+      await api.deleteLesson(editingLessonId, { applyToSeries });
+      setLessons((prev) => {
+        if (applyToSeries && recurrenceGroupId) {
+          return prev.filter((lesson) => lesson.recurrenceGroupId !== recurrenceGroupId);
+        }
+        return prev.filter((lesson) => lesson.id !== editingLessonId);
+      });
+      closeLessonModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
+      showInfoDialog('Ошибка', message);
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete lesson', error);
+    }
+  };
+
+  const requestDeleteLesson = () => {
+    if (!editingLessonId) return;
+    const original = editingLessonOriginal;
+
+    if (original?.isRecurring && original.recurrenceGroupId) {
+      setDialogState({
+        type: 'confirm',
+        title: 'Удалить этот урок или всю серию?',
+        message: 'Это повторяющийся урок. Можно удалить только выбранное занятие или всю серию.',
+        confirmText: 'Удалить серию',
+        cancelText: 'Только этот урок',
+        onConfirm: () => {
+          closeDialog();
+          performDeleteLesson(true);
+        },
+        onCancel: () => {
+          closeDialog();
+          performDeleteLesson(false);
+        },
+      });
+      return;
+    }
+
+    setDialogState({
+      type: 'confirm',
+      title: 'Удалить урок?',
+      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      onConfirm: () => {
+        closeDialog();
+        performDeleteLesson(false);
+      },
+      onCancel: closeDialog,
+    });
+  };
+
   const saveLesson = async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
     if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
     const durationMinutes = Number(newLessonDraft.durationMinutes);
@@ -315,7 +373,9 @@ export const App = () => {
             return [...filtered, ...normalized];
           });
         } else if (data.lesson) {
-          setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+          setLessons((prevLessons) =>
+            prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)),
+          );
         }
       } else if (newLessonDraft.isRecurring) {
         if (newLessonDraft.repeatWeekdays.length === 0) {
@@ -566,7 +626,9 @@ export const App = () => {
           defaultDuration={teacher.defaultLessonDuration}
           linkedStudents={linkedStudents}
           draft={newLessonDraft}
+          recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
           onDraftChange={setNewLessonDraft}
+          onDelete={editingLessonId ? requestDeleteLesson : undefined}
           onSubmit={saveLesson}
         />
         {dialogState && (
