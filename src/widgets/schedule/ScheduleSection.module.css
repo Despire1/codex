@@ -185,6 +185,22 @@
   font-size: 13px;
 }
 
+.monthLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  gap: 12px;
+  align-items: stretch;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.panelOpen {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.monthCalendar {
+  transition: transform 0.25s ease;
+}
+
 .monthGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(46px, 1fr));
@@ -208,12 +224,17 @@
   transition: all 0.15s ease;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
 .monthCell:hover {
   border-color: #2563eb;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.14);
+}
+
+.activeDay {
+  border-color: #2563eb;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16);
 }
 
 .mutedDay {
@@ -235,6 +256,21 @@
   font-weight: 800;
 }
 
+.lessonCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 4px 8px;
+  background: #e0f2fe;
+  color: #0f172a;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid #bae6fd;
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.18);
+}
+
 .todayPill {
   background: #2563eb;
   color: #fff;
@@ -242,12 +278,6 @@
   border-radius: 999px;
   font-size: 12px;
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.2);
-}
-
-.monthLessonList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .monthLesson {
@@ -304,6 +334,91 @@
   height: 10px;
   border-radius: 50%;
   background: #2563eb;
+}
+
+.dayPanel {
+  width: 100%;
+  max-width: 360px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(14px);
+  transition: transform 0.24s ease, opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.dayPanelOpen {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.dayPanelContent {
+  height: 100%;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dayPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dayPanelTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.dayPanelSubtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.closeButton {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+}
+
+.dayPanelList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emptyDayState {
+  padding: 16px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.panelAction {
+  align-self: stretch;
+  justify-content: center;
 }
 
 .dayCard {

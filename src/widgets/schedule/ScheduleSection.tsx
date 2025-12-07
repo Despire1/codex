@@ -88,6 +88,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
+  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
 
   const weekRangeLabel = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -358,6 +359,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
     const monthLabel = format(selectedMonth, 'LLLL yyyy', { locale: ru });
+    const selectedDayLessons = selectedMonthDay ? lessonsByDay[selectedMonthDay] ?? [] : [];
+    const selectedDayDate = selectedMonthDay ? parseISO(selectedMonthDay) : null;
 
     return (
       <div className={styles.monthScroller}>
@@ -367,88 +370,128 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div key={monthLabelKey} className={styles.monthTitle}>
                 {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
               </div>
-              <div className={styles.monthSubtitle}>Нажмите на день, чтобы создать урок</div>
+              <div className={styles.monthSubtitle}>Нажмите на день, чтобы открыть расписание</div>
             </div>
             <div className={styles.monthLegend}>
               <span className={styles.legendDot} /> Уроки
             </div>
           </div>
-          <div className={styles.monthGrid}>
-            {monthWeekdays.map((weekday) => (
-              <div key={`${monthLabel}-${weekday}`} className={styles.monthWeekday}>
-                {weekday}
+
+          <div className={`${styles.monthLayout} ${selectedMonthDay ? styles.panelOpen : ''}`}>
+            <div className={styles.monthCalendar}>
+              <div className={styles.monthGrid}>
+                {monthWeekdays.map((weekday) => (
+                  <div key={`${monthLabel}-${weekday}`} className={styles.monthWeekday}>
+                    {weekday}
+                  </div>
+                ))}
+                {days.map((day) => {
+                  const dayLessons = lessonsByDay[day.iso] ?? [];
+                  const handleDayClick = () => {
+                    setSelectedMonthDay(day.iso);
+                    onDayViewDateChange(day.date);
+                  };
+
+                  return (
+                    <div
+                      key={`${monthLabel}-${day.iso}`}
+                      className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
+                        isToday(day.date) ? styles.todayCell : ''
+                      } ${selectedMonthDay === day.iso ? styles.activeDay : ''}`}
+                      onClick={handleDayClick}
+                    >
+                      <div className={styles.monthDateRow}>
+                        <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
+                        {dayLessons.length > 0 && (
+                          <span className={styles.lessonCountBadge}>{dayLessons.length}</span>
+                        )}
+                      </div>
+                      {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-            {days.map((day) => {
-              const dayLessons = lessonsByDay[day.iso] ?? [];
-              const handleDayClick = () => {
-                onDayViewDateChange(day.date);
-                onOpenLessonModal(day.iso);
-              };
+            </div>
 
-              return (
-                <div
-                  key={`${monthLabel}-${day.iso}`}
-                  className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
-                    isToday(day.date) ? styles.todayCell : ''
-                  }`}
-                  onClick={handleDayClick}
-                >
-                  <div className={styles.monthDateRow}>
-                    <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
-                    {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
+            <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
+              <div className={styles.dayPanelContent}>
+                <div className={styles.dayPanelHeader}>
+                  <div>
+                    <div className={styles.dayPanelTitle}>
+                      {selectedDayDate ? format(selectedDayDate, 'd MMMM, EEEE', { locale: ru }) : 'Выберите день'}
+                    </div>
+                    {selectedDayLessons.length > 0 && (
+                      <div className={styles.dayPanelSubtitle}>
+                        {selectedDayLessons.length} занят{selectedDayLessons.length === 1 ? 'ие' : 'ия'} за день
+                      </div>
+                    )}
                   </div>
-                  <div className={styles.monthLessonList}>
-                    {dayLessons.map((lesson) => {
-                      const date = parseISO(lesson.startAt);
-                      const participants = lesson.participants && lesson.participants.length > 0
-                        ? lesson.participants
-                        : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
-                      const isGroupLesson = participants.length > 1;
-
-                      return (
-                        <div
-                          key={lesson.id}
-                          className={`${styles.monthLesson} ${
-                            lesson.status === 'CANCELED' ? styles.canceledLesson : ''
-                          }`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onStartEditLesson(lesson);
-                          }}
-                        >
-                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                          <div className={styles.monthLessonInfo}>
-                            <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                            <span className={styles.monthLessonName}>
-                              {isGroupLesson ? `Групповой (${participants.length})` : (participants[0]?.student?.link?.customName ?? 'Урок')}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '2px' }}>
-                            {participants.map((participant: any) => (
-                              <button
-                                key={participant.studentId}
-                                className={`${styles.paymentBadge} ${styles.compactBadge} ${
-                                  participant.isPaid ? styles.paid : styles.unpaid
-                                }`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onTogglePaid(lesson.id, participant.studentId);
-                                }}
-                                title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
-                                aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
-                              >
-                                <CurrencyRubleIcon width={14} height={14} />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <button className={styles.closeButton} onClick={() => setSelectedMonthDay(null)} aria-label="Закрыть панель">
+                    ×
+                  </button>
                 </div>
-              );
-            })}
+
+                {selectedDayLessons.length === 0 && (
+                  <div className={styles.emptyDayState}>Выберите день, чтобы увидеть занятия</div>
+                )}
+
+                <div className={styles.dayPanelList}>
+                  {selectedDayLessons.map((lesson) => {
+                    const date = parseISO(lesson.startAt);
+                    const participants = lesson.participants && lesson.participants.length > 0
+                      ? lesson.participants
+                      : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                    const isGroupLesson = participants.length > 1;
+
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`${styles.monthLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onStartEditLesson(lesson);
+                        }}
+                      >
+                        {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
+                        <div className={styles.monthLessonInfo}>
+                          <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                          <span className={styles.monthLessonName}>
+                            {isGroupLesson ? `Групповой (${participants.length})` : (participants[0]?.student?.link?.customName ?? 'Урок')}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '2px' }}>
+                          {participants.map((participant: any) => (
+                            <button
+                              key={participant.studentId}
+                              className={`${styles.paymentBadge} ${styles.compactBadge} ${
+                                participant.isPaid ? styles.paid : styles.unpaid
+                              }`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onTogglePaid(lesson.id, participant.studentId);
+                              }}
+                              title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
+                              aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
+                            >
+                              <CurrencyRubleIcon width={14} height={14} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedMonthDay && (
+                  <button
+                    className={`${controls.primaryButton} ${styles.panelAction}`}
+                    onClick={() => onOpenLessonModal(selectedMonthDay)}
+                  >
+                    Создать урок
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
