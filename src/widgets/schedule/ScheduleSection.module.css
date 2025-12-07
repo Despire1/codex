@@ -194,7 +194,7 @@
 }
 
 .panelOpen {
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 400px;
 }
 
 .monthCalendar {
@@ -337,8 +337,7 @@
 }
 
 .dayPanel {
-  width: 100%;
-  max-width: 360px;
+  width: 400px;
   overflow: hidden;
   opacity: 0;
   transform: translateX(14px);
