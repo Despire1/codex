@@ -1,4 +1,4 @@
-import { addDays, addMonths, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
+import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { AppProviders } from './providers';
 import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
@@ -31,6 +31,7 @@ export const App = () => {
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
+  const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -39,6 +40,9 @@ export const App = () => {
     date: todayISO(),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
+    isRecurring: false,
+    repeatWeekdays: [] as number[],
+    repeatUntil: undefined as string | undefined,
   });
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
@@ -183,14 +187,25 @@ export const App = () => {
   };
 
   const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
+    const startDate = existing ? parseISO(existing.startAt) : undefined;
+    const derivedDay = startDate ? startDate.getUTCDay() : undefined;
+    const recurrenceWeekdays = existing?.recurrenceWeekdays && existing.recurrenceWeekdays.length > 0
+      ? existing.recurrenceWeekdays
+      : derivedDay !== undefined
+        ? [derivedDay]
+        : [];
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
-      time: time ?? draft.time,
+      time: time ?? (startDate ? format(startDate, 'HH:mm') : draft.time),
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
+      repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
+      repeatUntil: existing?.recurrenceUntil ? existing.recurrenceUntil.slice(0, 10) : draft.repeatUntil,
     }));
     setEditingLessonId(existing?.id ?? null);
+    setEditingLessonOriginal(existing ?? null);
     setLessonModalOpen(true);
     setActiveTab('schedule');
     setDayViewDate(new Date(dateISO));
@@ -199,25 +214,92 @@ export const App = () => {
   const closeLessonModal = () => {
     setLessonModalOpen(false);
     setEditingLessonId(null);
+    setEditingLessonOriginal(null);
+    setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   };
 
   const saveLesson = async () => {
-    if (!newLessonDraft.studentId) return;
-    const startAt = `${newLessonDraft.date}T${newLessonDraft.time}:00.000Z`;
+    if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
+    const durationMinutes = Number(newLessonDraft.durationMinutes);
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
+
+    if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
+      alert('Дата окончания повторов должна быть не раньше даты начала');
+      return;
+    }
+
+    const startAtDate = new Date(`${newLessonDraft.date}T${newLessonDraft.time}:00`);
+    const startAt = startAtDate.toISOString();
 
     try {
       if (editingLessonId) {
+        const original = editingLessonOriginal;
+        const originalWeekdays = original?.recurrenceWeekdays ?? [];
+        const originalUntil = original?.recurrenceUntil?.slice(0, 10) ?? '';
+        const repeatChanged =
+          (newLessonDraft.repeatUntil ?? '') !== originalUntil ||
+          newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
+          newLessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
+
+        const applyToSeries =
+          original?.isRecurring && !repeatChanged
+            ? window.confirm('Изменить все повторяющиеся уроки? Нажмите ОК для всех или Отмена только для этого урока.')
+            : Boolean(original?.isRecurring && repeatChanged);
+
         const data = await api.updateLesson(editingLessonId, {
           studentId: newLessonDraft.studentId,
           startAt,
-          durationMinutes: Number(newLessonDraft.durationMinutes),
+          durationMinutes,
+          applyToSeries,
+          repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
+          repeatUntil: newLessonDraft.isRecurring && newLessonDraft.repeatUntil ? `${newLessonDraft.repeatUntil}T23:59:59.999Z` : undefined,
         });
-        setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+
+        if (data.lessons && data.lessons.length > 0) {
+          const normalized = data.lessons.map(normalizeLesson);
+          setLessons((prev) => {
+            const groupId = normalized[0].recurrenceGroupId;
+            const filtered = groupId ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId) : prev;
+            return [...filtered, ...normalized];
+          });
+        } else if (data.lesson) {
+          setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+        }
+      } else if (newLessonDraft.isRecurring) {
+        if (newLessonDraft.repeatWeekdays.length === 0) {
+          alert('Выберите хотя бы один день недели для повтора');
+          return;
+        }
+        const resolvedRepeatUntil = newLessonDraft.repeatUntil
+          ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
+          : `${addYears(new Date(startAt), 1).toISOString().slice(0, 10)}T23:59:59.999Z`;
+
+        const data = await api.createRecurringLessons({
+          studentId: newLessonDraft.studentId,
+          startAt,
+          durationMinutes,
+          repeatWeekdays: newLessonDraft.repeatWeekdays,
+          repeatUntil: resolvedRepeatUntil,
+        });
+
+        const normalized = data.lessons.map(normalizeLesson);
+        setLessons((prev) => {
+          const existingKeys = new Set(prev.map((lesson) => `${lesson.studentId}-${lesson.startAt}`));
+          const next = [...prev];
+          normalized.forEach((lesson) => {
+            const key = `${lesson.studentId}-${lesson.startAt}`;
+            if (!existingKeys.has(key)) {
+              next.push(lesson);
+              existingKeys.add(key);
+            }
+          });
+          return next;
+        });
       } else {
         const data = await api.createLesson({
           studentId: newLessonDraft.studentId,
           startAt,
-          durationMinutes: Number(newLessonDraft.durationMinutes),
+          durationMinutes,
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);
@@ -226,7 +308,10 @@ export const App = () => {
       setLessonModalOpen(false);
       setEditingLessonId(null);
       setActiveTab('schedule');
+      setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось создать урок';
+      alert(message);
       // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
