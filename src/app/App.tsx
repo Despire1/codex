@@ -4,6 +4,7 @@ import { AppProviders } from './providers';
 import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
+import { DialogModal } from '../shared/ui/Modal/DialogModal';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
@@ -54,6 +55,29 @@ export const App = () => {
   const [weekLabelKey, setWeekLabelKey] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
+  const [dialogState, setDialogState] = useState<
+    | {
+        type: 'info';
+        title: string;
+        message: string;
+        confirmText?: string;
+      }
+    | {
+        type: 'confirm';
+        title: string;
+        message: string;
+        confirmText?: string;
+        cancelText?: string;
+        onConfirm: () => void;
+        onCancel: () => void;
+      }
+    | null
+  >(null);
+
+  const closeDialog = () => setDialogState(null);
+
+  const showInfoDialog = (title: string, message: string, confirmText?: string) =>
+    setDialogState({ type: 'info', title, message, confirmText });
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -218,13 +242,13 @@ export const App = () => {
     setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   };
 
-  const saveLesson = async () => {
+  const saveLesson = async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
     if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
     const durationMinutes = Number(newLessonDraft.durationMinutes);
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
 
     if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
-      alert('Дата окончания повторов должна быть не раньше даты начала');
+      showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
       return;
     }
 
@@ -241,19 +265,47 @@ export const App = () => {
           newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
           newLessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
 
+        if (original?.isRecurring && !repeatChanged && options?.applyToSeriesOverride === undefined) {
+          setDialogState({
+            type: 'confirm',
+            title: 'Изменить только этот урок или всю серию?',
+            message:
+              'Это повторяющийся урок. Вы можете отредактировать только выбранное занятие или сразу всю серию.',
+            confirmText: 'Изменить серию',
+            cancelText: 'Только этот урок',
+            onConfirm: () => {
+              closeDialog();
+              saveLesson({ applyToSeriesOverride: true });
+            },
+            onCancel: () => {
+              closeDialog();
+              saveLesson({ applyToSeriesOverride: false, detachFromSeries: true });
+            },
+          });
+          return;
+        }
+
         const applyToSeries =
-          original?.isRecurring && !repeatChanged
-            ? window.confirm('Изменить все повторяющиеся уроки? Нажмите ОК для всех или Отмена только для этого урока.')
-            : Boolean(original?.isRecurring && repeatChanged);
+          options?.applyToSeriesOverride ?? Boolean(original?.isRecurring && (repeatChanged || newLessonDraft.isRecurring));
+        const shouldDetach = options?.detachFromSeries ?? (!applyToSeries && Boolean(original?.isRecurring));
 
         const data = await api.updateLesson(editingLessonId, {
           studentId: newLessonDraft.studentId,
           startAt,
           durationMinutes,
           applyToSeries,
-          repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
-          repeatUntil: newLessonDraft.isRecurring && newLessonDraft.repeatUntil ? `${newLessonDraft.repeatUntil}T23:59:59.999Z` : undefined,
+          detachFromSeries: shouldDetach,
+          repeatWeekdays:
+            newLessonDraft.isRecurring && applyToSeries ? newLessonDraft.repeatWeekdays : undefined,
+          repeatUntil:
+            newLessonDraft.isRecurring && applyToSeries && newLessonDraft.repeatUntil
+              ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
+              : undefined,
         });
+
+        if (shouldDetach) {
+          setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
+        }
 
         if (data.lessons && data.lessons.length > 0) {
           const normalized = data.lessons.map(normalizeLesson);
@@ -267,7 +319,7 @@ export const App = () => {
         }
       } else if (newLessonDraft.isRecurring) {
         if (newLessonDraft.repeatWeekdays.length === 0) {
-          alert('Выберите хотя бы один день недели для повтора');
+          showInfoDialog('Нужно выбрать дни недели', 'Выберите хотя бы один день недели для повтора');
           return;
         }
         const resolvedRepeatUntil = newLessonDraft.repeatUntil
@@ -311,7 +363,7 @@ export const App = () => {
       setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось создать урок';
-      alert(message);
+      showInfoDialog('Ошибка', message);
       // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
@@ -386,9 +438,9 @@ export const App = () => {
   const remindHomework = async (studentId: number) => {
     try {
       await api.remindHomework(studentId);
-      alert('Напоминание отправлено ученику #' + studentId);
+      showInfoDialog('Напоминание отправлено', `Напоминание отправлено ученику #${studentId}`);
     } catch (error) {
-      alert('Не удалось отправить напоминание');
+      showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
       // eslint-disable-next-line no-console
       console.error('Failed to send reminder', error);
     }
@@ -517,6 +569,24 @@ export const App = () => {
           onDraftChange={setNewLessonDraft}
           onSubmit={saveLesson}
         />
+        {dialogState && (
+          <DialogModal
+            open
+            title={dialogState.title}
+            description={dialogState.message}
+            confirmText={dialogState.confirmText}
+            cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
+            onClose={closeDialog}
+            onConfirm={() => {
+              if (dialogState.type === 'confirm') {
+                dialogState.onConfirm();
+              } else {
+                closeDialog();
+              }
+            }}
+            onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
+          />
+        )}
       </AppProviders>
     </div>
   );

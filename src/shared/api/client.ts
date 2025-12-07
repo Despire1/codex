@@ -61,6 +61,7 @@ export const api = {
       startAt: string;
       durationMinutes: number;
       applyToSeries?: boolean;
+      detachFromSeries?: boolean;
       repeatWeekdays?: number[];
       repeatUntil?: string;
     },

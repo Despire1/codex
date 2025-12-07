@@ -308,7 +308,7 @@ const createRecurringLessons = async (body: any) => {
 };
 
 const updateLesson = async (lessonId: number, body: any) => {
-  const { studentId, startAt, durationMinutes, applyToSeries, repeatWeekdays, repeatUntil } = body ?? {};
+  const { studentId, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
   const teacher = await ensureTeacher();
   const existing = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!existing || existing.teacherId !== teacher.chatId) throw new Error('Урок не найден');
@@ -326,6 +326,21 @@ const updateLesson = async (lessonId: number, body: any) => {
   const existingLesson = existing as any;
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+
+  if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
+    return prisma.lesson.update({
+      where: { id: lessonId },
+      data: {
+        studentId: Number(nextStudentId),
+        startAt: targetStart,
+        durationMinutes: nextDuration,
+        isRecurring: false,
+        recurrenceUntil: null,
+        recurrenceGroupId: null,
+        recurrenceWeekdays: null,
+      },
+    });
+  }
 
   if (applyToSeries && existingLesson.isRecurring && existingLesson.recurrenceGroupId) {
     if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');

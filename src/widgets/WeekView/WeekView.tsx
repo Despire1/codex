@@ -3,7 +3,7 @@ import { useDispatch } from 'react-redux';
 import { addDays, addMinutes, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Task } from '@/entities/task/model/types';
-import { addTask, toggleTaskCompletion } from '@/entities/task/model/taskSlice';
+import { toggleTaskCompletion } from '@/entities/task/model/taskSlice';
 import { addExperience } from '@/entities/account/model/accountSlice';
 import { EXPERIENCE_PER_TASK } from '@/entities/account/model/types';
 import { Modal } from '@/shared/ui/Modal/Modal';
@@ -78,18 +78,9 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
   };
 
   const handleCellClick = (day: Date, hour: number) => {
-    const title = prompt('Введите название задачи для этого часа');
-    if (!title || !title.trim()) return;
-
-    const startTime = `${hour.toString().padStart(2, '0')}:00`;
-    dispatch(
-      addTask({
-        title: title.trim(),
-        date: format(day, 'yyyy-MM-dd'),
-        startTime,
-        durationMinutes: 60,
-      }),
-    );
+    setSelectedDate(format(day, 'yyyy-MM-dd'));
+    setSelectedStart(`${hour.toString().padStart(2, '0')}:00`);
+    setModalOpen(true);
   };
 
   return (
