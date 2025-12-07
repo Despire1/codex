@@ -414,7 +414,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
 
             <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
-              <div className={`${styles.dayPanelContent} ${selectedMonthDay ? styles.dayPanelContentOpen : ''}`}>
+              <div className={styles.dayPanelContent}>
                 <div className={styles.dayPanelHeader}>
                   <div>
                     <div className={styles.dayPanelTitle}>

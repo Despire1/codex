@@ -187,7 +187,7 @@
 
 .monthLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 0;
   gap: 12px;
   align-items: stretch;
   transition: grid-template-columns 0.25s ease;
@@ -337,13 +337,19 @@
 }
 
 .dayPanel {
-  width: 0;
+  width: 100%;
+  max-width: 360px;
   overflow: hidden;
-  transition: width 0.28s ease;
+  opacity: 0;
+  transform: translateX(14px);
+  transition: transform 0.24s ease, opacity 0.18s ease;
+  pointer-events: none;
 }
 
 .dayPanelOpen {
-  width: 360px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .dayPanelContent {
@@ -353,17 +359,9 @@
   border-radius: 14px;
   padding: 12px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-  transform: translateX(24px);
-  opacity: 0;
-  transition: transform 0.28s ease, opacity 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.dayPanelContentOpen {
-  transform: translateX(0);
-  opacity: 1;
 }
 
 .dayPanelHeader {
