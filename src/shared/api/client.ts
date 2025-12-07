@@ -45,10 +45,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ value }),
     }),
-  createLesson: (payload: { studentId: number; startAt: string; durationMinutes: number }) =>
+  createLesson: (payload: { studentId?: number; studentIds?: number[]; startAt: string; durationMinutes: number }) =>
     apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
   createRecurringLessons: (payload: {
-    studentId: number;
+    studentId?: number;
+    studentIds?: number[];
     startAt: string;
     durationMinutes: number;
     repeatWeekdays: number[];
@@ -57,7 +58,8 @@ export const api = {
   updateLesson: (
     id: number,
     payload: {
-      studentId: number;
+      studentId?: number;
+      studentIds?: number[];
       startAt: string;
       durationMinutes: number;
       applyToSeries?: boolean;
@@ -74,6 +76,10 @@ export const api = {
     }),
   togglePaid: (lessonId: number) =>
     apiFetch<{ lesson: Lesson }>(`/api/lessons/${lessonId}/toggle-paid`, { method: 'POST' }),
+  toggleParticipantPaid: (lessonId: number, studentId: number) =>
+    apiFetch<{ participant: any; lesson: Lesson }>(`/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`, {
+      method: 'POST',
+    }),
   createHomework: (payload: { studentId: number; text: string; deadline?: string }) =>
     apiFetch<{ homework: Homework }>('/api/homeworks', { method: 'POST', body: JSON.stringify(payload) }),
   toggleHomework: (homeworkId: number) =>

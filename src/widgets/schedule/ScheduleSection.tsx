@@ -38,7 +38,7 @@ interface ScheduleSectionProps {
   monthOffset: number;
   onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
   onStartEditLesson: (lesson: Lesson) => void;
-  onTogglePaid: (lessonId: number) => void;
+  onTogglePaid: (lessonId: number, studentId?: number) => void;
   onDayViewDateChange: (date: Date) => void;
 }
 
@@ -221,9 +221,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   >
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
                     {dayLessons.map((lesson) => {
-                      const student = linkedStudents.find((s) => s.id === lesson.studentId);
                       const position = lessonPosition(lesson);
                       const startTime = format(parseISO(lesson.startAt), 'HH:mm');
+                      const participants = lesson.participants && lesson.participants.length > 0
+                        ? lesson.participants
+                        : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                      const isGroupLesson = participants.length > 1;
+
                       return (
                         <div
                           key={lesson.id}
@@ -233,20 +237,29 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           onMouseEnter={() => setHoverIndicator(null)}
                         >
                           {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                          <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                          <div className={styles.weekLessonTitle}>
+                            {isGroupLesson ? 'Групповой урок' : (participants[0]?.student?.link?.customName ?? 'Урок')}
+                          </div>
                           <div className={styles.weekLessonMeta}>
                             {startTime} · {lesson.durationMinutes} мин
+                            {isGroupLesson && ` · ${participants.length} уч.`}
                           </div>
-                          <button
-                            className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onTogglePaid(lesson.id);
-                            }}
-                            aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                          >
-                            <CurrencyRubleIcon width={16} height={16} />
-                          </button>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                            {participants.map((participant: any) => (
+                              <button
+                                key={participant.studentId}
+                                className={`${styles.paymentBadge} ${participant.isPaid ? styles.paid : styles.unpaid}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onTogglePaid(lesson.id, participant.studentId);
+                                }}
+                                title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
+                                aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
+                              >
+                                <CurrencyRubleIcon width={16} height={16} />
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       );
                     })}
@@ -292,7 +305,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
               {dayLessons.map((lesson) => {
                 const position = lessonPosition(lesson);
-                const student = linkedStudents.find((s) => s.id === lesson.studentId);
+                const participants = lesson.participants && lesson.participants.length > 0
+                  ? lesson.participants
+                  : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                const isGroupLesson = participants.length > 1;
+
                 return (
                   <div
                     key={lesson.id}
@@ -304,20 +321,29 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
                     {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                    <div className={styles.weekLessonTitle}>{student?.link.customName ?? 'Урок'}</div>
+                    <div className={styles.weekLessonTitle}>
+                      {isGroupLesson ? 'Групповой урок' : (participants[0]?.student?.link?.customName ?? 'Урок')}
+                    </div>
                     <div className={styles.weekLessonMeta}>
                       {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
+                      {isGroupLesson && ` · ${participants.length} уч.`}
                     </div>
-                    <button
-                      className={`${styles.paymentBadge} ${lesson.isPaid ? styles.paid : styles.unpaid}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onTogglePaid(lesson.id);
-                      }}
-                      aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                    >
-                      <CurrencyRubleIcon width={16} height={16} />
-                    </button>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                      {participants.map((participant: any) => (
+                        <button
+                          key={participant.studentId}
+                          className={`${styles.paymentBadge} ${participant.isPaid ? styles.paid : styles.unpaid}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onTogglePaid(lesson.id, participant.studentId);
+                          }}
+                          title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
+                          aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
+                        >
+                          <CurrencyRubleIcon width={16} height={16} />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
@@ -374,8 +400,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </div>
                   <div className={styles.monthLessonList}>
                     {dayLessons.map((lesson) => {
-                      const student = linkedStudents.find((s) => s.id === lesson.studentId);
                       const date = parseISO(lesson.startAt);
+                      const participants = lesson.participants && lesson.participants.length > 0
+                        ? lesson.participants
+                        : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                      const isGroupLesson = participants.length > 1;
+
                       return (
                         <div
                           key={lesson.id}
@@ -390,21 +420,28 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.monthLessonInfo}>
                             <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                            <span className={styles.monthLessonName}>{student?.link.customName ?? 'Урок'}</span>
+                            <span className={styles.monthLessonName}>
+                              {isGroupLesson ? `Групповой (${participants.length})` : (participants[0]?.student?.link?.customName ?? 'Урок')}
+                            </span>
                           </div>
-                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                          <button
-                            className={`${styles.paymentBadge} ${styles.compactBadge} ${
-                              lesson.isPaid ? styles.paid : styles.unpaid
-                            }`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onTogglePaid(lesson.id);
-                            }}
-                            aria-label={lesson.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}
-                          >
-                            <CurrencyRubleIcon width={14} height={14} />
-                          </button>
+                          <div style={{ display: 'flex', gap: '2px' }}>
+                            {participants.map((participant: any) => (
+                              <button
+                                key={participant.studentId}
+                                className={`${styles.paymentBadge} ${styles.compactBadge} ${
+                                  participant.isPaid ? styles.paid : styles.unpaid
+                                }`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onTogglePaid(lesson.id, participant.studentId);
+                                }}
+                                title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
+                                aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
+                              >
+                                <CurrencyRubleIcon width={14} height={14} />
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       );
                     })}

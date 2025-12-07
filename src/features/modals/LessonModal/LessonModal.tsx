@@ -2,6 +2,7 @@ import { addYears } from 'date-fns';
 import { type FC, useMemo } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import {
+  Autocomplete,
   Box,
   Checkbox,
   FormControl,
@@ -19,6 +20,7 @@ import modalStyles from '../modal.module.css';
 
 interface LessonDraft {
   studentId: number | undefined;
+  studentIds: number[];
   date: string;
   time: string;
   durationMinutes: number;
@@ -101,24 +103,24 @@ export const LessonModal: FC<LessonModalProps> = ({
           </button>
         </div>
         <div className={modalStyles.modalBody}>
+          <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
+            <Autocomplete
+              multiple
+              id="students-autocomplete"
+              options={linkedStudents}
+              getOptionLabel={(option) => option.link.customName}
+              value={linkedStudents.filter((s) => draft.studentIds.includes(s.id))}
+              onChange={(_, newValue) => {
+                const ids = newValue.map((student) => student.id);
+                onDraftChange({ ...draft, studentIds: ids, studentId: ids[0] });
+              }}
+              renderInput={(params) => (
+                <TextField {...params} label="Ученики" placeholder="Выберите учеников" />
+              )}
+              disableCloseOnSelect
+            />
+          </div>
           <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <FormControl fullWidth>
-              <InputLabel htmlFor="student-select">Ученик</InputLabel>
-              <Select
-                id="student-select"
-                value={draft.studentId ?? ''}
-                onChange={(e) =>
-                  onDraftChange({ ...draft, studentId: e.target.value ? Number(e.target.value) : undefined })
-                }
-              >
-                <MenuItem value="">Выберите ученика</MenuItem>
-                {linkedStudents.map((student) => (
-                  <MenuItem key={student.id} value={student.id}>
-                    {student.link.customName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
             <TextField
               label="Дата"
               type="date"

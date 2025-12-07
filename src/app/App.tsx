@@ -41,6 +41,7 @@ export const App = () => {
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const [newLessonDraft, setNewLessonDraft] = useState({
     studentId: undefined as number | undefined,
+    studentIds: [] as number[],
     date: todayISO(),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
@@ -229,11 +230,19 @@ export const App = () => {
       : derivedDay !== undefined
         ? [derivedDay]
         : [];
+
+    const existingStudentIds = existing?.participants && existing.participants.length > 0
+      ? existing.participants.map((p) => p.studentId)
+      : existing?.studentId
+        ? [existing.studentId]
+        : [];
+
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
       time: time ?? (startDate ? format(startDate, 'HH:mm') : draft.time),
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
+      studentIds: existingStudentIds.length > 0 ? existingStudentIds : draft.studentIds.length > 0 ? draft.studentIds : selectedStudentId ? [selectedStudentId] : [],
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
       repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
@@ -308,7 +317,10 @@ export const App = () => {
   };
 
   const saveLesson = async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
-    if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
+    if (newLessonDraft.studentIds.length === 0 || !newLessonDraft.date || !newLessonDraft.time) {
+      showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
+      return;
+    }
     const durationMinutes = Number(newLessonDraft.durationMinutes);
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
 
@@ -355,7 +367,7 @@ export const App = () => {
         const shouldDetach = options?.detachFromSeries ?? (!applyToSeries && Boolean(original?.isRecurring));
 
         const data = await api.updateLesson(editingLessonId, {
-          studentId: newLessonDraft.studentId,
+          studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
           applyToSeries,
@@ -394,7 +406,7 @@ export const App = () => {
           : `${addYears(new Date(startAt), 1).toISOString().slice(0, 10)}T23:59:59.999Z`;
 
         const data = await api.createRecurringLessons({
-          studentId: newLessonDraft.studentId,
+          studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
           repeatWeekdays: newLessonDraft.repeatWeekdays,
@@ -403,20 +415,19 @@ export const App = () => {
 
         const normalized = data.lessons.map(normalizeLesson);
         setLessons((prev) => {
-          const existingKeys = new Set(prev.map((lesson) => `${lesson.studentId}-${lesson.startAt}`));
+          const existingKeys = new Set(prev.map((lesson) => `${lesson.id}`));
           const next = [...prev];
           normalized.forEach((lesson) => {
-            const key = `${lesson.studentId}-${lesson.startAt}`;
-            if (!existingKeys.has(key)) {
+            if (!existingKeys.has(`${lesson.id}`)) {
               next.push(lesson);
-              existingKeys.add(key);
+              existingKeys.add(`${lesson.id}`);
             }
           });
           return next;
         });
       } else {
         const data = await api.createLesson({
-          studentId: newLessonDraft.studentId,
+          studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
         });
@@ -464,10 +475,15 @@ export const App = () => {
     }
   };
 
-  const togglePaid = async (lessonId: number) => {
+  const togglePaid = async (lessonId: number, studentId?: number) => {
     try {
-      const data = await api.togglePaid(lessonId);
-      setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+      if (studentId !== undefined) {
+        const data = await api.toggleParticipantPaid(lessonId, studentId);
+        setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+      } else {
+        const data = await api.togglePaid(lessonId);
+        setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to toggle payment', error);

@@ -33,6 +33,16 @@ export interface Homework {
   teacherId: number;
 }
 
+export interface LessonParticipant {
+  id: number;
+  lessonId: number;
+  studentId: number;
+  price: number;
+  isPaid: boolean;
+  attended?: boolean | null;
+  student?: Student;
+}
+
 export interface Lesson {
   id: number;
   teacherId: number;
@@ -45,6 +55,7 @@ export interface Lesson {
   recurrenceUntil?: string | null;
   recurrenceGroupId?: string | null;
   recurrenceWeekdays?: number[] | null;
+  participants?: LessonParticipant[];
 }
 
 export interface LinkedStudent extends Student {

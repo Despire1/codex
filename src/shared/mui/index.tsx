@@ -132,6 +132,56 @@ export const Box: React.FC<BoxProps> = ({ className, children, ...rest }) => (
   </div>
 );
 
+interface AutocompleteProps<T> {
+  multiple?: boolean;
+  id?: string;
+  options: T[];
+  getOptionLabel: (option: T) => string;
+  value: T | T[] | null;
+  onChange: (event: React.SyntheticEvent, value: T | T[] | null) => void;
+  renderInput: (params: any) => React.ReactNode;
+  disableCloseOnSelect?: boolean;
+}
+
+export const Autocomplete = <T,>({
+  multiple,
+  options,
+  getOptionLabel,
+  value,
+  onChange,
+  renderInput,
+  disableCloseOnSelect,
+  ...rest
+}: AutocompleteProps<T>) => {
+  const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+  const selectedIds = new Set(selectedValues.map((v: any) => JSON.stringify(v)));
+
+  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedOptions = Array.from(event.target.selectedOptions);
+    const newValues = selectedOptions.map((opt) => options[Number(opt.value)]);
+    onChange(event as any, multiple ? newValues : newValues[0] || null);
+  };
+
+  return (
+    <div className={styles.formControl}>
+      <select
+        className={styles.select}
+        multiple={multiple}
+        value={selectedValues.map((v) => String(options.indexOf(v)))}
+        onChange={handleChange}
+        size={multiple ? Math.min(options.length, 5) : 1}
+        {...rest}
+      >
+        {options.map((option, index) => (
+          <option key={index} value={String(index)}>
+            {getOptionLabel(option)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 export default {
   FormControl,
   InputLabel,
@@ -144,4 +194,5 @@ export default {
   ToggleButtonGroup,
   Typography,
   Box,
+  Autocomplete,
 };

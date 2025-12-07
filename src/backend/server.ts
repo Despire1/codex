@@ -64,7 +64,16 @@ const bootstrap = async () => {
     },
   });
   const homeworks = await prisma.homework.findMany({ where: { teacherId: teacher.chatId } });
-  const lessons = await prisma.lesson.findMany({ where: { teacherId: teacher.chatId } });
+  const lessons = await prisma.lesson.findMany({
+    where: { teacherId: teacher.chatId },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
 
   return { teacher, students, links, homeworks, lessons };
 };
@@ -183,32 +192,69 @@ const toggleHomework = async (homeworkId: number) => {
 };
 
 const validateLessonPayload = async (body: any) => {
-  const { studentId, durationMinutes } = body ?? {};
-  if (!studentId || !durationMinutes) throw new Error('Заполните ученика и длительность');
+  const { studentId, studentIds, durationMinutes } = body ?? {};
+  const ids = studentIds && Array.isArray(studentIds) && studentIds.length > 0
+    ? studentIds.map((id: any) => Number(id))
+    : studentId
+      ? [Number(studentId)]
+      : [];
+
+  if (ids.length === 0) throw new Error('Выберите хотя бы одного ученика');
+  if (!durationMinutes) throw new Error('Заполните длительность');
   const durationValue = Number(durationMinutes);
   if (!Number.isFinite(durationValue) || durationValue <= 0) throw new Error('Длительность должна быть больше нуля');
+
   const teacher = await ensureTeacher();
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(studentId) } },
+
+  const links = await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: { in: ids },
+    },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
-  return { teacher, durationValue };
+
+  if (links.length !== ids.length) {
+    throw new Error('Некоторые ученики не найдены у текущего преподавателя');
+  }
+
+  return { teacher, durationValue, studentIds: ids };
 };
 
 const createLesson = async (body: any) => {
   const { startAt } = body ?? {};
   if (!startAt) throw new Error('Заполните дату и время урока');
-  const { teacher, durationValue } = await validateLessonPayload(body);
-  return prisma.lesson.create({
+  const { teacher, durationValue, studentIds } = await validateLessonPayload(body);
+
+  const students = await prisma.student.findMany({
+    where: { id: { in: studentIds } },
+  });
+
+  const lesson = await prisma.lesson.create({
     data: {
       teacherId: teacher.chatId,
-      studentId: Number(body.studentId),
+      studentId: studentIds[0],
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
       isPaid: false,
+      participants: {
+        create: students.map((student) => ({
+          studentId: student.id,
+          price: student.pricePerLesson ?? 0,
+          isPaid: false,
+        })),
+      },
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
     },
   });
+
+  return lesson;
 };
 
 const parseWeekdays = (repeatWeekdays: any): number[] => {
@@ -239,7 +285,12 @@ const createRecurringLessons = async (body: any) => {
   const startDate = new Date(startAt);
   if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата начала');
 
-  const { teacher, durationValue } = await validateLessonPayload(body);
+  const { teacher, durationValue, studentIds } = await validateLessonPayload(body);
+
+  const students = await prisma.student.findMany({
+    where: { id: { in: studentIds } },
+  });
+
   const maxEndDate = addYears(startDate, 1);
   const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
   const endDate =
@@ -290,7 +341,7 @@ const createRecurringLessons = async (body: any) => {
     const lesson = await prisma.lesson.create({
       data: {
         teacherId: teacher.chatId,
-        studentId: Number(body.studentId),
+        studentId: studentIds[0],
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -299,6 +350,20 @@ const createRecurringLessons = async (body: any) => {
         recurrenceUntil: endDate,
         recurrenceGroupId,
         recurrenceWeekdays: weekdaysPayload,
+        participants: {
+          create: students.map((student) => ({
+            studentId: student.id,
+            price: student.pricePerLesson ?? 0,
+            isPaid: false,
+          })),
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            student: true,
+          },
+        },
       },
     });
     created.push(lesson);
@@ -308,19 +373,40 @@ const createRecurringLessons = async (body: any) => {
 };
 
 const updateLesson = async (lessonId: number, body: any) => {
-  const { studentId, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
+  const { studentId, studentIds, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
   const teacher = await ensureTeacher();
-  const existing = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  const existing = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { participants: true },
+  });
   if (!existing || existing.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
-  const nextStudentId = studentId ?? existing.studentId;
+  const ids = studentIds && Array.isArray(studentIds) && studentIds.length > 0
+    ? studentIds.map((id: any) => Number(id))
+    : studentId
+      ? [Number(studentId)]
+      : existing.participants.map((p: any) => p.studentId);
+
+  if (ids.length === 0) throw new Error('Выберите хотя бы одного ученика');
+
   const nextDuration =
     durationMinutes !== undefined && durationMinutes !== null ? Number(durationMinutes) : existing.durationMinutes;
   if (!Number.isFinite(nextDuration) || nextDuration <= 0) throw new Error('Длительность должна быть больше нуля');
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(nextStudentId) } },
+
+  const links = await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: { in: ids },
+    },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  if (links.length !== ids.length) {
+    throw new Error('Некоторые ученики не найдены у текущего преподавателя');
+  }
+
+  const students = await prisma.student.findMany({
+    where: { id: { in: ids } },
+  });
 
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   const existingLesson = existing as any;
@@ -328,16 +414,34 @@ const updateLesson = async (lessonId: number, body: any) => {
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
 
   if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
+    await prisma.lessonParticipant.deleteMany({
+      where: { lessonId },
+    });
+
     return prisma.lesson.update({
       where: { id: lessonId },
       data: {
-        studentId: Number(nextStudentId),
+        studentId: ids[0],
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
         recurrenceUntil: null,
         recurrenceGroupId: null,
         recurrenceWeekdays: null,
+        participants: {
+          create: students.map((student) => ({
+            studentId: student.id,
+            price: student.pricePerLesson ?? 0,
+            isPaid: false,
+          })),
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            student: true,
+          },
+        },
       },
     });
   }
@@ -378,7 +482,7 @@ const updateLesson = async (lessonId: number, body: any) => {
         const created = await prisma.lesson.create({
           data: {
             teacherId: teacher.chatId,
-            studentId: Number(nextStudentId),
+            studentId: ids[0],
             startAt: start,
             durationMinutes: nextDuration,
             status: 'SCHEDULED',
@@ -387,6 +491,20 @@ const updateLesson = async (lessonId: number, body: any) => {
             recurrenceUntil: recurrenceEnd,
             recurrenceGroupId: existingLesson.recurrenceGroupId,
             recurrenceWeekdays: weekdaysPayload,
+            participants: {
+              create: students.map((student) => ({
+                studentId: student.id,
+                price: student.pricePerLesson ?? 0,
+                isPaid: false,
+              })),
+            },
+          },
+          include: {
+            participants: {
+              include: {
+                student: true,
+              },
+            },
           },
         });
         seriesLessons.push(created);
@@ -401,12 +519,30 @@ const updateLesson = async (lessonId: number, body: any) => {
     return { lessons: seriesLessons };
   }
 
+  await prisma.lessonParticipant.deleteMany({
+    where: { lessonId },
+  });
+
   return prisma.lesson.update({
     where: { id: lessonId },
     data: {
-      studentId: Number(nextStudentId),
+      studentId: ids[0],
       startAt: targetStart,
       durationMinutes: nextDuration,
+      participants: {
+        create: students.map((student) => ({
+          studentId: student.id,
+          price: student.pricePerLesson ?? 0,
+          isPaid: false,
+        })),
+      },
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
     },
   });
 };
@@ -459,6 +595,35 @@ const toggleLessonPaid = async (lessonId: number) => {
   return prisma.lesson.update({
     where: { id: lessonId },
     data: { isPaid: !lesson.isPaid },
+  });
+};
+
+const toggleParticipantPaid = async (lessonId: number, studentId: number) => {
+  const teacher = await ensureTeacher();
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  const participant = await prisma.lessonParticipant.findUnique({
+    where: { lessonId_studentId: { lessonId, studentId } },
+  });
+
+  if (!participant) throw new Error('Участник урока не найден');
+
+  return prisma.lessonParticipant.update({
+    where: { lessonId_studentId: { lessonId, studentId } },
+    data: { isPaid: !participant.isPaid },
+    include: {
+      student: true,
+      lesson: {
+        include: {
+          participants: {
+            include: {
+              student: true,
+            },
+          },
+        },
+      },
+    },
   });
 };
 
@@ -578,6 +743,14 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const lessonId = Number(lessonPaidMatch[1]);
       const lesson = await toggleLessonPaid(lessonId);
       return sendJson(res, 200, { lesson });
+    }
+
+    const participantPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/participants\/(\d+)\/toggle-paid$/);
+    if (req.method === 'POST' && participantPaidMatch) {
+      const lessonId = Number(participantPaidMatch[1]);
+      const studentId = Number(participantPaidMatch[2]);
+      const result = await toggleParticipantPaid(lessonId, studentId);
+      return sendJson(res, 200, { participant: result, lesson: result.lesson });
     }
 
     const remindMatch = pathname.match(/^\/api\/reminders\/homework$/);
