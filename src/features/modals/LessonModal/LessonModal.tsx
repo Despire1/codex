@@ -148,7 +148,7 @@ export const LessonModal: FC<LessonModalProps> = ({
             control={
               <Checkbox
                 checked={draft.isRecurring}
-                disabled={recurrenceLocked}
+                disabled={recurrenceLocked && draft.isRecurring}
                 onChange={(e) => handleRecurringToggle(e.target.checked)}
               />
             }

@@ -446,6 +446,72 @@ const updateLesson = async (lessonId: number, body: any) => {
     });
   }
 
+  if (!existingLesson.isRecurring && weekdays.length > 0 && repeatWeekdays) {
+    if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
+
+    const maxEnd = addYears(targetStart, 1);
+    const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
+    const recurrenceEnd =
+      requestedEnd && !Number.isNaN(requestedEnd.getTime())
+        ? requestedEnd > maxEnd
+          ? maxEnd
+          : requestedEnd
+        : maxEnd;
+
+    if (recurrenceEnd < targetStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+
+    await (prisma.lesson as any).delete({ where: { id: lessonId } });
+
+    const recurrenceGroupId = crypto.randomUUID();
+    const seriesLessons: any[] = [];
+    const weekdaysPayload = JSON.stringify(weekdays);
+
+    for (let cursor = new Date(targetStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
+      if (weekdays.includes(cursor.getUTCDay())) {
+        const start = new Date(
+          Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
+        );
+
+        const created = await prisma.lesson.create({
+          data: {
+            teacherId: teacher.chatId,
+            studentId: ids[0],
+            startAt: start,
+            durationMinutes: nextDuration,
+            status: 'SCHEDULED',
+            isPaid: false,
+            isRecurring: true,
+            recurrenceUntil: recurrenceEnd,
+            recurrenceGroupId,
+            recurrenceWeekdays: weekdaysPayload,
+            participants: {
+              create: students.map((student) => ({
+                studentId: student.id,
+                price: student.pricePerLesson ?? 0,
+                isPaid: false,
+              })),
+            },
+          },
+          include: {
+            participants: {
+              include: {
+                student: true,
+              },
+            },
+          },
+        });
+        seriesLessons.push(created);
+      }
+      if (seriesLessons.length > 500) break;
+    }
+
+    if (seriesLessons.length === 0) {
+      throw new Error('Не найдено дат для создания повторяющихся уроков');
+    }
+
+    return { lessons: seriesLessons };
+  }
+
   if (applyToSeries && existingLesson.isRecurring && existingLesson.recurrenceGroupId) {
     if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
     if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');

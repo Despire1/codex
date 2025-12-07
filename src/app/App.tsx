@@ -373,9 +373,9 @@ export const App = () => {
           applyToSeries,
           detachFromSeries: shouldDetach,
           repeatWeekdays:
-            newLessonDraft.isRecurring && applyToSeries ? newLessonDraft.repeatWeekdays : undefined,
+            newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
           repeatUntil:
-            newLessonDraft.isRecurring && applyToSeries && newLessonDraft.repeatUntil
+            newLessonDraft.isRecurring && newLessonDraft.repeatUntil
               ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
               : undefined,
         });
@@ -388,7 +388,9 @@ export const App = () => {
           const normalized = data.lessons.map(normalizeLesson);
           setLessons((prev) => {
             const groupId = normalized[0].recurrenceGroupId;
-            const filtered = groupId ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId) : prev;
+            const filtered = groupId
+              ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId && lesson.id !== editingLessonId)
+              : prev.filter((lesson) => lesson.id !== editingLessonId);
             return [...filtered, ...normalized];
           });
         } else if (data.lesson) {
