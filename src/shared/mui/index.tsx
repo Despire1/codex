@@ -1,4 +1,5 @@
 import { Children, cloneElement, forwardRef, isValidElement } from 'react';
+import ReactSelect, { components, MultiValue, SingleValue, StylesConfig } from 'react-select';
 import styles from '../styles/mui-stubs.module.css';
 
 type ClassValue = string | false | null | undefined;
@@ -151,33 +152,93 @@ export const Autocomplete = <T,>({
   onChange,
   renderInput,
   disableCloseOnSelect,
+  id,
   ...rest
 }: AutocompleteProps<T>) => {
-  const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
-  const selectedIds = new Set(selectedValues.map((v: any) => JSON.stringify(v)));
+  const selectOptions = options.map((option, index) => ({
+    value: index,
+    label: getOptionLabel(option),
+    data: option,
+  }));
 
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(event.target.selectedOptions);
-    const newValues = selectedOptions.map((opt) => options[Number(opt.value)]);
-    onChange(event as any, multiple ? newValues : newValues[0] || null);
+  const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+  const selectValue = multiple
+    ? selectOptions.filter((opt) => selectedValues.includes(opt.data))
+    : selectOptions.find((opt) => opt.data === value) || null;
+
+  const handleChange = (
+    newValue: MultiValue<{ value: number; label: string; data: T }> | SingleValue<{ value: number; label: string; data: T }>
+  ) => {
+    if (multiple && Array.isArray(newValue)) {
+      const values = newValue.map((item) => item.data);
+      onChange({} as any, values);
+    } else if (!multiple && newValue && 'data' in newValue) {
+      onChange({} as any, newValue.data);
+    } else {
+      onChange({} as any, null);
+    }
+  };
+
+  const customStyles: StylesConfig<{ value: number; label: string; data: T }, boolean> = {
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '40px',
+      borderColor: state.isFocused ? '#2563eb' : '#d1d5db',
+      boxShadow: state.isFocused ? '0 0 0 3px rgba(37, 99, 235, 0.1)' : 'none',
+      '&:hover': {
+        borderColor: '#2563eb',
+      },
+    }),
+    multiValue: (provided) => ({
+      ...provided,
+      backgroundColor: '#e0e7ff',
+      borderRadius: '4px',
+    }),
+    multiValueLabel: (provided) => ({
+      ...provided,
+      color: '#3730a3',
+      fontSize: '14px',
+    }),
+    multiValueRemove: (provided) => ({
+      ...provided,
+      color: '#6366f1',
+      '&:hover': {
+        backgroundColor: '#c7d2fe',
+        color: '#4338ca',
+      },
+    }),
+    menu: (provided) => ({
+      ...provided,
+      zIndex: 9999,
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? '#4f46e5'
+        : state.isFocused
+          ? '#e0e7ff'
+          : 'white',
+      color: state.isSelected ? 'white' : '#1f2937',
+      '&:active': {
+        backgroundColor: '#6366f1',
+      },
+    }),
   };
 
   return (
     <div className={styles.formControl}>
-      <select
-        className={styles.select}
-        multiple={multiple}
-        value={selectedValues.map((v) => String(options.indexOf(v)))}
+      <ReactSelect
+        id={id}
+        isMulti={multiple}
+        options={selectOptions}
+        value={selectValue}
         onChange={handleChange}
-        size={multiple ? Math.min(options.length, 5) : 1}
+        closeMenuOnSelect={!disableCloseOnSelect}
+        styles={customStyles}
+        placeholder="Выберите..."
+        noOptionsMessage={() => 'Нет доступных вариантов'}
         {...rest}
-      >
-        {options.map((option, index) => (
-          <option key={index} value={String(index)}>
-            {getOptionLabel(option)}
-          </option>
-        ))}
-      </select>
+      />
     </div>
   );
 };
