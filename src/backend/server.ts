@@ -87,7 +87,7 @@ const addStudent = async (body: any) => {
   const teacher = await ensureTeacher();
   const existingStudent =
     username && typeof username === 'string'
-      ? await prisma.student.findUnique({ where: { username } })
+      ? await prisma.student.findFirst({ where: { username } })
       : null;
 
   const student =
