@@ -153,7 +153,6 @@
   gap: 18px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
@@ -191,6 +190,7 @@
   gap: 12px;
   align-items: stretch;
   transition: grid-template-columns 0.25s ease;
+  min-height: 0;
 }
 
 .panelOpen {
@@ -344,6 +344,8 @@
   transform: translateX(14px);
   transition: transform 0.24s ease, opacity 0.18s ease;
   pointer-events: none;
+  display: flex;
+  min-height: 0;
 }
 
 .dayPanelOpen {
@@ -362,6 +364,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .dayPanelHeader {
@@ -406,6 +409,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .emptyDayState {
@@ -543,7 +550,7 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .recurringBadge {
@@ -645,14 +652,27 @@
   opacity: 0.6;
 }
 
-.weekLessonTitle {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
 .weekLessonMeta {
   font-size: 12px;
   color: #0f172a;
+  line-height: 1.4;
+}
+
+.lessonHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lessonLabel {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.lessonDate {
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
 }
 
 .statusBadges {

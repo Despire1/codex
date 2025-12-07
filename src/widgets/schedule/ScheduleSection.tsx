@@ -271,9 +271,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
                     {dayLessons.map((lesson) => {
                       const position = lessonPosition(lesson);
-                      const startTime = format(parseISO(lesson.startAt), 'HH:mm');
+                      const startDate = parseISO(lesson.startAt);
                       const participants = buildParticipants(lesson);
                       const isGroupLesson = participants.length > 1;
+                      const dateTimeLabel = `${format(startDate, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
+                        isGroupLesson ? ` · ${participants.length} уч.` : ''
+                      }`;
+                      const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
 
                       return (
                         <div
@@ -284,14 +288,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           onMouseEnter={() => setHoverIndicator(null)}
                         >
                           {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                          <div className={styles.weekLessonTitle}>
-                            {isGroupLesson ? 'Групповой урок' : (participants[0]?.student?.link?.customName ?? 'Урок')}
-                          </div>
-                          <div className={styles.weekLessonMeta}>
-                            {startTime} · {lesson.durationMinutes} мин
-                            {isGroupLesson && ` · ${participants.length} уч.`}
+                          <div className={styles.lessonHeader}>
+                            <span className={styles.lessonLabel}>{lessonLabel}</span>
+                            <span className={styles.lessonDate}>{dateTimeLabel}</span>
                           </div>
                           {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                          <div className={styles.weekLessonMeta}>
+                            {isGroupLesson
+                              ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                              : participants[0]?.student?.link?.customName}
+                          </div>
                         </div>
                       );
                     })}
@@ -339,6 +345,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const position = lessonPosition(lesson);
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
+                const date = parseISO(lesson.startAt);
+                const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
+                  isGroupLesson ? ` · ${participants.length} уч.` : ''
+                }`;
+                const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
 
                 return (
                   <div
@@ -351,14 +362,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
                     {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                    <div className={styles.weekLessonTitle}>
-                      {isGroupLesson ? 'Групповой урок' : (participants[0]?.student?.link?.customName ?? 'Урок')}
-                    </div>
-                    <div className={styles.weekLessonMeta}>
-                      {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
-                      {isGroupLesson && ` · ${participants.length} уч.`}
+                    <div className={styles.lessonHeader}>
+                      <span className={styles.lessonLabel}>{lessonLabel}</span>
+                      <span className={styles.lessonDate}>{dateTimeLabel}</span>
                     </div>
                     {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    <div className={styles.weekLessonMeta}>
+                      {isGroupLesson
+                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                        : participants[0]?.student?.link?.customName}
+                    </div>
                   </div>
                 );
               })}
