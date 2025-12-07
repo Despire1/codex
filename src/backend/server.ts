@@ -308,7 +308,7 @@ const createRecurringLessons = async (body: any) => {
 };
 
 const updateLesson = async (lessonId: number, body: any) => {
-  const { studentId, startAt, durationMinutes, applyToSeries, repeatWeekdays, repeatUntil } = body ?? {};
+  const { studentId, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
   const teacher = await ensureTeacher();
   const existing = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!existing || existing.teacherId !== teacher.chatId) throw new Error('Урок не найден');
@@ -326,6 +326,21 @@ const updateLesson = async (lessonId: number, body: any) => {
   const existingLesson = existing as any;
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+
+  if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
+    return prisma.lesson.update({
+      where: { id: lessonId },
+      data: {
+        studentId: Number(nextStudentId),
+        startAt: targetStart,
+        durationMinutes: nextDuration,
+        isRecurring: false,
+        recurrenceUntil: null,
+        recurrenceGroupId: null,
+        recurrenceWeekdays: null,
+      },
+    });
+  }
 
   if (applyToSeries && existingLesson.isRecurring && existingLesson.recurrenceGroupId) {
     if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
@@ -394,6 +409,22 @@ const updateLesson = async (lessonId: number, body: any) => {
       durationMinutes: nextDuration,
     },
   });
+};
+
+const deleteLesson = async (lessonId: number, applyToSeries?: boolean) => {
+  const teacher = await ensureTeacher();
+  const lesson = (await prisma.lesson.findUnique({ where: { id: lessonId } })) as any;
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  if (applyToSeries && lesson.isRecurring && lesson.recurrenceGroupId) {
+    const deleted = await (prisma.lesson as any).deleteMany({
+      where: { teacherId: teacher.chatId, recurrenceGroupId: lesson.recurrenceGroupId },
+    });
+    return { deletedIds: [], deletedCount: deleted?.count ?? 0 };
+  }
+
+  await (prisma.lesson as any).delete({ where: { id: lessonId } });
+  return { deletedIds: [lessonId], deletedCount: 1 };
 };
 
 const markLessonCompleted = async (lessonId: number) => {
@@ -526,6 +557,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         return sendJson(res, 200, { lessons: (result as any).lessons });
       }
       return sendJson(res, 200, { lesson: result });
+    }
+
+    if (req.method === 'DELETE' && lessonUpdateMatch) {
+      const lessonId = Number(lessonUpdateMatch[1]);
+      const body = await readBody(req);
+      const result = await deleteLesson(lessonId, Boolean(body.applyToSeries));
+      return sendJson(res, 200, result);
     }
 
     const lessonCompleteMatch = pathname.match(/^\/api\/lessons\/(\d+)\/complete$/);

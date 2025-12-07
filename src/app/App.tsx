@@ -4,6 +4,10 @@ import { AppProviders } from './providers';
 import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
+import { DialogModal } from '../shared/ui/Modal/DialogModal';
+import { Modal } from '../shared/ui/Modal/Modal';
+import modalStyles from '../shared/ui/Modal/Modal.module.css';
+import controls from '../shared/styles/controls.module.css';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
@@ -54,6 +58,37 @@ export const App = () => {
   const [weekLabelKey, setWeekLabelKey] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
+  const [dialogState, setDialogState] = useState<
+    | {
+        type: 'info';
+        title: string;
+        message: string;
+        confirmText?: string;
+      }
+    | {
+        type: 'confirm';
+        title: string;
+        message: string;
+        confirmText?: string;
+        cancelText?: string;
+        onConfirm: () => void;
+        onCancel: () => void;
+      }
+    | {
+        type: 'recurring-delete';
+        title: string;
+        message: string;
+        applyToSeries: boolean;
+        onConfirm: (applyToSeries: boolean) => void;
+        onCancel: () => void;
+      }
+    | null
+  >(null);
+
+  const closeDialog = () => setDialogState(null);
+
+  const showInfoDialog = (title: string, message: string, confirmText?: string) =>
+    setDialogState({ type: 'info', title, message, confirmText });
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -218,13 +253,67 @@ export const App = () => {
     setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   };
 
-  const saveLesson = async () => {
+  const performDeleteLesson = async (applyToSeries: boolean) => {
+    if (!editingLessonId) return;
+    const recurrenceGroupId = editingLessonOriginal?.recurrenceGroupId;
+
+    try {
+      await api.deleteLesson(editingLessonId, { applyToSeries });
+      setLessons((prev) => {
+        if (applyToSeries && recurrenceGroupId) {
+          return prev.filter((lesson) => lesson.recurrenceGroupId !== recurrenceGroupId);
+        }
+        return prev.filter((lesson) => lesson.id !== editingLessonId);
+      });
+      closeLessonModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
+      showInfoDialog('Ошибка', message);
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete lesson', error);
+    }
+  };
+
+  const requestDeleteLesson = () => {
+    if (!editingLessonId) return;
+    const original = editingLessonOriginal;
+
+    if (original?.isRecurring && original.recurrenceGroupId) {
+      setDialogState({
+        type: 'recurring-delete',
+        title: 'Удалить урок?',
+        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
+        applyToSeries: false,
+        onConfirm: (applyToSeries) => {
+          closeDialog();
+          performDeleteLesson(applyToSeries);
+        },
+        onCancel: closeDialog,
+      });
+      return;
+    }
+
+    setDialogState({
+      type: 'confirm',
+      title: 'Удалить урок?',
+      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      onConfirm: () => {
+        closeDialog();
+        performDeleteLesson(false);
+      },
+      onCancel: closeDialog,
+    });
+  };
+
+  const saveLesson = async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
     if (!newLessonDraft.studentId || !newLessonDraft.date || !newLessonDraft.time) return;
     const durationMinutes = Number(newLessonDraft.durationMinutes);
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
 
     if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
-      alert('Дата окончания повторов должна быть не раньше даты начала');
+      showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
       return;
     }
 
@@ -241,19 +330,47 @@ export const App = () => {
           newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
           newLessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
 
+        if (original?.isRecurring && !repeatChanged && options?.applyToSeriesOverride === undefined) {
+          setDialogState({
+            type: 'confirm',
+            title: 'Изменить только этот урок или всю серию?',
+            message:
+              'Это повторяющийся урок. Вы можете отредактировать только выбранное занятие или сразу всю серию.',
+            confirmText: 'Изменить серию',
+            cancelText: 'Только этот урок',
+            onConfirm: () => {
+              closeDialog();
+              saveLesson({ applyToSeriesOverride: true });
+            },
+            onCancel: () => {
+              closeDialog();
+              saveLesson({ applyToSeriesOverride: false, detachFromSeries: true });
+            },
+          });
+          return;
+        }
+
         const applyToSeries =
-          original?.isRecurring && !repeatChanged
-            ? window.confirm('Изменить все повторяющиеся уроки? Нажмите ОК для всех или Отмена только для этого урока.')
-            : Boolean(original?.isRecurring && repeatChanged);
+          options?.applyToSeriesOverride ?? Boolean(original?.isRecurring && (repeatChanged || newLessonDraft.isRecurring));
+        const shouldDetach = options?.detachFromSeries ?? (!applyToSeries && Boolean(original?.isRecurring));
 
         const data = await api.updateLesson(editingLessonId, {
           studentId: newLessonDraft.studentId,
           startAt,
           durationMinutes,
           applyToSeries,
-          repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
-          repeatUntil: newLessonDraft.isRecurring && newLessonDraft.repeatUntil ? `${newLessonDraft.repeatUntil}T23:59:59.999Z` : undefined,
+          detachFromSeries: shouldDetach,
+          repeatWeekdays:
+            newLessonDraft.isRecurring && applyToSeries ? newLessonDraft.repeatWeekdays : undefined,
+          repeatUntil:
+            newLessonDraft.isRecurring && applyToSeries && newLessonDraft.repeatUntil
+              ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
+              : undefined,
         });
+
+        if (shouldDetach) {
+          setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
+        }
 
         if (data.lessons && data.lessons.length > 0) {
           const normalized = data.lessons.map(normalizeLesson);
@@ -263,11 +380,13 @@ export const App = () => {
             return [...filtered, ...normalized];
           });
         } else if (data.lesson) {
-          setLessons(lessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)));
+          setLessons((prevLessons) =>
+            prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)),
+          );
         }
       } else if (newLessonDraft.isRecurring) {
         if (newLessonDraft.repeatWeekdays.length === 0) {
-          alert('Выберите хотя бы один день недели для повтора');
+          showInfoDialog('Нужно выбрать дни недели', 'Выберите хотя бы один день недели для повтора');
           return;
         }
         const resolvedRepeatUntil = newLessonDraft.repeatUntil
@@ -311,7 +430,7 @@ export const App = () => {
       setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось создать урок';
-      alert(message);
+      showInfoDialog('Ошибка', message);
       // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
@@ -386,9 +505,9 @@ export const App = () => {
   const remindHomework = async (studentId: number) => {
     try {
       await api.remindHomework(studentId);
-      alert('Напоминание отправлено ученику #' + studentId);
+      showInfoDialog('Напоминание отправлено', `Напоминание отправлено ученику #${studentId}`);
     } catch (error) {
-      alert('Не удалось отправить напоминание');
+      showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
       // eslint-disable-next-line no-console
       console.error('Failed to send reminder', error);
     }
@@ -514,9 +633,65 @@ export const App = () => {
           defaultDuration={teacher.defaultLessonDuration}
           linkedStudents={linkedStudents}
           draft={newLessonDraft}
+          recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
           onDraftChange={setNewLessonDraft}
+          onDelete={editingLessonId ? requestDeleteLesson : undefined}
           onSubmit={saveLesson}
         />
+        {dialogState && dialogState.type !== 'recurring-delete' && (
+          <DialogModal
+            open
+            title={dialogState.title}
+            description={dialogState.message}
+            confirmText={dialogState.confirmText}
+            cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
+            onClose={closeDialog}
+            onConfirm={() => {
+              if (dialogState.type === 'confirm') {
+                dialogState.onConfirm();
+              } else {
+                closeDialog();
+              }
+            }}
+            onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
+          />
+        )}
+        {dialogState?.type === 'recurring-delete' && (
+          <Modal open title={dialogState.title} onClose={closeDialog}>
+            <p className={modalStyles.message}>{dialogState.message}</p>
+            <div className={modalStyles.toggleRow}>
+              <label className={controls.switch}>
+                <input
+                  type="checkbox"
+                  checked={dialogState.applyToSeries}
+                  onChange={(e) =>
+                    setDialogState((state) =>
+                      state?.type === 'recurring-delete'
+                        ? { ...state, applyToSeries: e.target.checked }
+                        : state,
+                    )
+                  }
+                />
+                <span className={controls.slider} />
+              </label>
+              <span className={modalStyles.toggleLabel}>
+                {dialogState.applyToSeries ? 'Удалить все уроки серии' : 'Удалить только выбранный урок'}
+              </span>
+            </div>
+            <div className={modalStyles.actions}>
+              <button type="button" className={controls.secondaryButton} onClick={dialogState.onCancel}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={controls.dangerButton}
+                onClick={() => dialogState.onConfirm(dialogState.applyToSeries)}
+              >
+                Удалить
+              </button>
+            </div>
+          </Modal>
+        )}
       </AppProviders>
     </div>
   );
