@@ -56,6 +56,18 @@
   line-height: 1.5;
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.toggleLabel {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

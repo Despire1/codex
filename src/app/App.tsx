@@ -5,6 +5,9 @@ import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } fro
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DialogModal } from '../shared/ui/Modal/DialogModal';
+import { Modal } from '../shared/ui/Modal/Modal';
+import modalStyles from '../shared/ui/Modal/Modal.module.css';
+import controls from '../shared/styles/controls.module.css';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
@@ -69,6 +72,14 @@ export const App = () => {
         confirmText?: string;
         cancelText?: string;
         onConfirm: () => void;
+        onCancel: () => void;
+      }
+    | {
+        type: 'recurring-delete';
+        title: string;
+        message: string;
+        applyToSeries: boolean;
+        onConfirm: (applyToSeries: boolean) => void;
         onCancel: () => void;
       }
     | null
@@ -269,19 +280,15 @@ export const App = () => {
 
     if (original?.isRecurring && original.recurrenceGroupId) {
       setDialogState({
-        type: 'confirm',
-        title: 'Удалить этот урок или всю серию?',
-        message: 'Это повторяющийся урок. Можно удалить только выбранное занятие или всю серию.',
-        confirmText: 'Удалить серию',
-        cancelText: 'Только этот урок',
-        onConfirm: () => {
+        type: 'recurring-delete',
+        title: 'Удалить урок?',
+        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
+        applyToSeries: false,
+        onConfirm: (applyToSeries) => {
           closeDialog();
-          performDeleteLesson(true);
+          performDeleteLesson(applyToSeries);
         },
-        onCancel: () => {
-          closeDialog();
-          performDeleteLesson(false);
-        },
+        onCancel: closeDialog,
       });
       return;
     }
@@ -631,7 +638,7 @@ export const App = () => {
           onDelete={editingLessonId ? requestDeleteLesson : undefined}
           onSubmit={saveLesson}
         />
-        {dialogState && (
+        {dialogState && dialogState.type !== 'recurring-delete' && (
           <DialogModal
             open
             title={dialogState.title}
@@ -648,6 +655,42 @@ export const App = () => {
             }}
             onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
           />
+        )}
+        {dialogState?.type === 'recurring-delete' && (
+          <Modal open title={dialogState.title} onClose={closeDialog}>
+            <p className={modalStyles.message}>{dialogState.message}</p>
+            <div className={modalStyles.toggleRow}>
+              <label className={controls.switch}>
+                <input
+                  type="checkbox"
+                  checked={dialogState.applyToSeries}
+                  onChange={(e) =>
+                    setDialogState((state) =>
+                      state?.type === 'recurring-delete'
+                        ? { ...state, applyToSeries: e.target.checked }
+                        : state,
+                    )
+                  }
+                />
+                <span className={controls.slider} />
+              </label>
+              <span className={modalStyles.toggleLabel}>
+                {dialogState.applyToSeries ? 'Удалить все уроки серии' : 'Удалить только выбранный урок'}
+              </span>
+            </div>
+            <div className={modalStyles.actions}>
+              <button type="button" className={controls.secondaryButton} onClick={dialogState.onCancel}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={controls.dangerButton}
+                onClick={() => dialogState.onConfirm(dialogState.applyToSeries)}
+              >
+                Удалить
+              </button>
+            </div>
+          </Modal>
         )}
       </AppProviders>
     </div>
