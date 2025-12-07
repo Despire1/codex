@@ -49,3 +49,16 @@
 .body {
   padding: 16px;
 }
+
+.message {
+  margin: 0 0 16px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
