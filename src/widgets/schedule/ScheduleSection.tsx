@@ -10,7 +10,7 @@ import {
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useMemo, useState, type FC, type MouseEvent } from 'react';
-import { CalendarMonthIcon, CurrencyRubleIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
+import { CalendarMonthIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
@@ -146,6 +146,59 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     );
   };
 
+  const buildParticipants = (lesson: Lesson) =>
+    lesson.participants && lesson.participants.length > 0
+      ? lesson.participants
+      : [
+          {
+            studentId: lesson.studentId,
+            isPaid: lesson.isPaid,
+            student: linkedStudents.find((s) => s.id === lesson.studentId),
+          },
+        ];
+
+  const renderPaymentBadges = (lessonId: number, participants: any[], isGroupLesson: boolean) => {
+    const paidCount = participants.filter((participant: any) => participant.isPaid).length;
+    const unpaidCount = participants.length - paidCount;
+
+    if (isGroupLesson) {
+      const badges = [] as Array<{ label: string; variant: 'groupPaid' | 'groupUnpaid' }>;
+      if (paidCount > 0) badges.push({ label: `${paidCount} оплачено`, variant: 'groupPaid' });
+      if (unpaidCount > 0) badges.push({ label: `${unpaidCount} не оплачено`, variant: 'groupUnpaid' });
+
+      return (
+        <div className={styles.statusBadges}>
+          {badges.map((badge) => (
+            <span key={`${badge.variant}-${badge.label}`} className={`${styles.statusBadge} ${styles[badge.variant]}`}>
+              <span className={styles.badgeDot} />
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    const participant = participants[0];
+    const isPaid = !!participant?.isPaid;
+
+    return (
+      <div className={styles.statusBadges}>
+        <button
+          type="button"
+          className={`${styles.statusBadge} ${isPaid ? styles.paidBadge : styles.unpaidBadge}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTogglePaid(lessonId, participant?.studentId);
+          }}
+          title={isPaid ? 'Оплачено' : 'Не оплачено'}
+        >
+          <span className={styles.badgeDot} />
+          {isPaid ? 'Оплачено' : 'Не оплачено'}
+        </button>
+      </div>
+    );
+  };
+
   const handleTimeHover = (event: MouseEvent<HTMLDivElement>, dayIso: string) => {
     const target = event.target as HTMLElement;
     if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.dayLesson}`)) {
@@ -163,7 +216,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const handleWeekSlotClick = (dayIso: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.paymentBadge}`)) return;
+    if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.statusBadge}`)) return;
 
     const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
@@ -224,9 +277,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     {dayLessons.map((lesson) => {
                       const position = lessonPosition(lesson);
                       const startTime = format(parseISO(lesson.startAt), 'HH:mm');
-                      const participants = lesson.participants && lesson.participants.length > 0
-                        ? lesson.participants
-                        : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                      const participants = buildParticipants(lesson);
                       const isGroupLesson = participants.length > 1;
 
                       return (
@@ -245,22 +296,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             {startTime} · {lesson.durationMinutes} мин
                             {isGroupLesson && ` · ${participants.length} уч.`}
                           </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                            {participants.map((participant: any) => (
-                              <button
-                                key={participant.studentId}
-                                className={`${styles.paymentBadge} ${participant.isPaid ? styles.paid : styles.unpaid}`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onTogglePaid(lesson.id, participant.studentId);
-                                }}
-                                title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
-                                aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
-                              >
-                                <CurrencyRubleIcon width={16} height={16} />
-                              </button>
-                            ))}
-                          </div>
+                          {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
                         </div>
                       );
                     })}
@@ -306,9 +342,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
               {dayLessons.map((lesson) => {
                 const position = lessonPosition(lesson);
-                const participants = lesson.participants && lesson.participants.length > 0
-                  ? lesson.participants
-                  : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
 
                 return (
@@ -329,22 +363,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       {format(parseISO(lesson.startAt), 'HH:mm')} · {lesson.durationMinutes} мин
                       {isGroupLesson && ` · ${participants.length} уч.`}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                      {participants.map((participant: any) => (
-                        <button
-                          key={participant.studentId}
-                          className={`${styles.paymentBadge} ${participant.isPaid ? styles.paid : styles.unpaid}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onTogglePaid(lesson.id, participant.studentId);
-                          }}
-                          title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
-                          aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
-                        >
-                          <CurrencyRubleIcon width={16} height={16} />
-                        </button>
-                      ))}
-                    </div>
+                    {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
                   </div>
                 );
               })}
@@ -438,9 +457,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <div className={styles.dayPanelList}>
                   {selectedDayLessons.map((lesson) => {
                     const date = parseISO(lesson.startAt);
-                    const participants = lesson.participants && lesson.participants.length > 0
-                      ? lesson.participants
-                      : [{ studentId: lesson.studentId, isPaid: lesson.isPaid, student: linkedStudents.find((s) => s.id === lesson.studentId) }];
+                    const participants = buildParticipants(lesson);
                     const isGroupLesson = participants.length > 1;
 
                     return (
@@ -459,24 +476,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             {isGroupLesson ? `Групповой (${participants.length})` : (participants[0]?.student?.link?.customName ?? 'Урок')}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: '2px' }}>
-                          {participants.map((participant: any) => (
-                            <button
-                              key={participant.studentId}
-                              className={`${styles.paymentBadge} ${styles.compactBadge} ${
-                                participant.isPaid ? styles.paid : styles.unpaid
-                              }`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onTogglePaid(lesson.id, participant.studentId);
-                              }}
-                              title={`${participant.student?.link?.customName ?? 'Ученик'}: ${participant.isPaid ? 'Оплачено' : 'Не оплачено'}`}
-                              aria-label={`${participant.student?.link?.customName}: ${participant.isPaid ? 'Отметить как неоплаченное' : 'Отметить как оплаченное'}`}
-                            >
-                              <CurrencyRubleIcon width={14} height={14} />
-                            </button>
-                          ))}
-                        </div>
+                        {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
                       </div>
                     );
                   })}

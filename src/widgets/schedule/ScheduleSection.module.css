@@ -282,10 +282,10 @@
 
 .monthLesson {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  padding: 8px 7px 8px 12px;
+  padding: 10px 10px 10px 12px;
   border-radius: 10px;
   background: #e0f2fe;
   color: #0f172a;
@@ -534,13 +534,16 @@
   left: 8px;
   right: 8px;
   border-radius: 12px;
-  padding: 8px 12px 26px 12px;
+  padding: 10px 12px;
   background: #e0f2fe;
   border: 1px solid #2563eb;
   color: #0f172a;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
   overflow: hidden;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .recurringBadge {
@@ -652,38 +655,63 @@
   color: #0f172a;
 }
 
-.paymentBadge {
-  position: absolute;
-  right: 7px;
-  bottom: 6px;
+.statusBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.statusBadge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: #eff6ff;
-  border: none;
-  color: #94a3b8;
-  border-radius: 4px;
-  padding: 2px 2px;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: default;
+}
+
+.statusBadge:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.badgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.paidBadge {
+  background: #e3f8e6;
+  color: #188542;
+  border-color: #b9e6c0;
   cursor: pointer;
 }
 
-/* Suggested gentle red for payment badge accents: #ffccd5 */
-
-.compactBadge {
-  align-self: end;
-  position: static;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
+.unpaidBadge {
+  background: #fcecec;
+  color: #c73939;
+  border-color: #f3c4c4;
+  cursor: pointer;
 }
 
-.paid {
-  color: #94a3b8;
+.groupPaid {
+  background: #e9f5ff;
+  color: #0f4f8f;
+  border-color: #bfdcff;
 }
 
-.unpaid {
-  color: #334155;
-  background: #ffc3cf;
+.groupUnpaid {
+  background: #fff4e5;
+  color: #b15e09;
+  border-color: #f5d9b0;
 }
 
 .viewGrid {
