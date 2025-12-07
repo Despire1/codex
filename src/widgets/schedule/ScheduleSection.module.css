@@ -552,6 +552,8 @@
   border-radius: 9999px;
 }
 
+/* Suggested gentle red for payment badge accents: #ffccd5 */
+
 .compactBadge {
   align-self: end;
   position: static;
