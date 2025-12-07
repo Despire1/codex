@@ -33,8 +33,10 @@ interface LessonModalProps {
   defaultDuration: number;
   linkedStudents: LinkedStudent[];
   draft: LessonDraft;
+  recurrenceLocked?: boolean;
   onDraftChange: (draft: LessonDraft) => void;
   onClose: () => void;
+  onDelete?: () => void;
   onSubmit: () => void;
 }
 
@@ -54,8 +56,10 @@ export const LessonModal: FC<LessonModalProps> = ({
   defaultDuration,
   linkedStudents,
   draft,
+  recurrenceLocked = false,
   onDraftChange,
   onClose,
+  onDelete,
   onSubmit,
 }) => {
   if (!open) return null;
@@ -67,6 +71,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   );
 
   const handleRecurringToggle = (checked: boolean) => {
+    if (recurrenceLocked && !checked) return;
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getUTCDay();
     const defaultUntil = Number.isNaN(startAt.getTime())
       ? ''
@@ -138,7 +143,13 @@ export const LessonModal: FC<LessonModalProps> = ({
             />
           </div>
           <FormControlLabel
-            control={<Checkbox checked={draft.isRecurring} onChange={(e) => handleRecurringToggle(e.target.checked)} />}
+            control={
+              <Checkbox
+                checked={draft.isRecurring}
+                disabled={recurrenceLocked}
+                onChange={(e) => handleRecurringToggle(e.target.checked)}
+              />
+            }
             label={'Сделать урок повторяющимся'}
           />
           {draft.isRecurring && (
@@ -188,6 +199,11 @@ export const LessonModal: FC<LessonModalProps> = ({
           )}
         </div>
         <div className={modalStyles.modalActions}>
+          {isEditing && onDelete && (
+            <button className={controls.dangerButton} onClick={onDelete}>
+              Удалить урок
+            </button>
+          )}
           <button className={controls.secondaryButton} onClick={onClose}>
             Отмена
           </button>
