@@ -153,7 +153,6 @@
   gap: 18px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   padding-right: 4px;
 }
 
@@ -185,6 +184,23 @@
   font-size: 13px;
 }
 
+.monthLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  gap: 12px;
+  align-items: stretch;
+  transition: grid-template-columns 0.25s ease;
+  min-height: 0;
+}
+
+.panelOpen {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.monthCalendar {
+  transition: transform 0.25s ease;
+}
+
 .monthGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(46px, 1fr));
@@ -208,12 +224,17 @@
   transition: all 0.15s ease;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
 .monthCell:hover {
   border-color: #2563eb;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.14);
+}
+
+.activeDay {
+  border-color: #2563eb;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16);
 }
 
 .mutedDay {
@@ -235,6 +256,21 @@
   font-weight: 800;
 }
 
+.lessonCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 4px 8px;
+  background: #e0f2fe;
+  color: #0f172a;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  border: 1px solid #bae6fd;
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.18);
+}
+
 .todayPill {
   background: #2563eb;
   color: #fff;
@@ -244,18 +280,12 @@
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.2);
 }
 
-.monthLessonList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .monthLesson {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  padding: 8px 7px 8px 12px;
+  padding: 10px 10px 10px 12px;
   border-radius: 10px;
   background: #e0f2fe;
   color: #0f172a;
@@ -304,6 +334,98 @@
   height: 10px;
   border-radius: 50%;
   background: #2563eb;
+}
+
+.dayPanel {
+  width: 100%;
+  max-width: 360px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(14px);
+  transition: transform 0.24s ease, opacity 0.18s ease;
+  pointer-events: none;
+  display: flex;
+  min-height: 0;
+}
+
+.dayPanelOpen {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.dayPanelContent {
+  height: 100%;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.dayPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dayPanelTitle {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.dayPanelSubtitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.closeButton {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+}
+
+.dayPanelList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.emptyDayState {
+  padding: 16px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.panelAction {
+  align-self: stretch;
+  justify-content: center;
 }
 
 .dayCard {
@@ -419,13 +541,16 @@
   left: 8px;
   right: 8px;
   border-radius: 12px;
-  padding: 8px 12px 26px 12px;
+  padding: 10px 12px;
   background: #e0f2fe;
   border: 1px solid #2563eb;
   color: #0f172a;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
   overflow: hidden;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .recurringBadge {
@@ -527,48 +652,33 @@
   opacity: 0.6;
 }
 
-.weekLessonTitle {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
 .weekLessonMeta {
   font-size: 12px;
   color: #0f172a;
+  line-height: 1.4;
 }
 
-.paymentBadge {
-  position: absolute;
-  right: 7px;
-  bottom: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #eff6ff;
-  border: none;
-  color: #94a3b8;
-  border-radius: 4px;
-  padding: 2px 2px;
-  cursor: pointer;
+.lessonHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-/* Suggested gentle red for payment badge accents: #ffccd5 */
-
-.compactBadge {
-  align-self: end;
-  position: static;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
+.lessonLabel {
+  font-weight: 800;
+  color: #0f172a;
 }
 
-.paid {
-  color: #94a3b8;
-}
-
-.unpaid {
+.lessonDate {
+  font-size: 12px;
   color: #334155;
-  background: #ffc3cf;
+  font-weight: 600;
+}
+
+.statusBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .viewGrid {
