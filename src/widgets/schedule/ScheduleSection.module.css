@@ -661,59 +661,6 @@
   gap: 6px;
 }
 
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-weight: 700;
-  font-size: 12px;
-  border: 1px solid transparent;
-  background: #f8fafc;
-  color: #0f172a;
-  cursor: default;
-}
-
-.statusBadge:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-.badgeDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.7;
-}
-
-.paidBadge {
-  background: #e3f8e6;
-  color: #188542;
-  border-color: #b9e6c0;
-  cursor: pointer;
-}
-
-.unpaidBadge {
-  background: #fcecec;
-  color: #c73939;
-  border-color: #f3c4c4;
-  cursor: pointer;
-}
-
-.groupPaid {
-  background: #e9f5ff;
-  color: #0f4f8f;
-  border-color: #bfdcff;
-}
-
-.groupUnpaid {
-  background: #fff4e5;
-  color: #b15e09;
-  border-color: #f5d9b0;
-}
-
 .viewGrid {
   display: flex;
   flex-direction: column;

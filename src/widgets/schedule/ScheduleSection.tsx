@@ -12,6 +12,7 @@ import { ru } from 'date-fns/locale';
 import { useMemo, useState, type FC, type MouseEvent } from 'react';
 import { CalendarMonthIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
 import { Lesson, LinkedStudent } from '../../entities/types';
+import { Badge } from '../../shared/ui/Badge/Badge';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
 
@@ -169,10 +170,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       return (
         <div className={styles.statusBadges}>
           {badges.map((badge) => (
-            <span key={`${badge.variant}-${badge.label}`} className={`${styles.statusBadge} ${styles[badge.variant]}`}>
-              <span className={styles.badgeDot} />
-              {badge.label}
-            </span>
+            <Badge key={`${badge.variant}-${badge.label}`} label={badge.label} variant={badge.variant} withDot />
           ))}
         </div>
       );
@@ -183,18 +181,15 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
     return (
       <div className={styles.statusBadges}>
-        <button
-          type="button"
-          className={`${styles.statusBadge} ${isPaid ? styles.paidBadge : styles.unpaidBadge}`}
+        <Badge
+          label={isPaid ? 'Оплачено' : 'Не оплачено'}
+          variant={isPaid ? 'paid' : 'unpaid'}
           onClick={(event) => {
             event.stopPropagation();
             onTogglePaid(lessonId, participant?.studentId);
           }}
           title={isPaid ? 'Оплачено' : 'Не оплачено'}
-        >
-          <span className={styles.badgeDot} />
-          {isPaid ? 'Оплачено' : 'Не оплачено'}
-        </button>
+        />
       </div>
     );
   };
@@ -216,7 +211,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const handleWeekSlotClick = (dayIso: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.statusBadge}`)) return;
+    if (target.closest(`.${styles.weekLesson}`)) return;
 
     const container = event.currentTarget;
     const rect = container.getBoundingClientRect();
