@@ -1,6 +1,7 @@
 import {
   addDays,
   addMonths,
+  addYears,
   endOfMonth,
   format,
   isSameDay,
@@ -22,6 +23,10 @@ type ClassNames = {
   weekdays: string;
   weekday: string;
   grid: string;
+  months_grid: string;
+  month: string;
+  years_grid: string;
+  year: string;
   day: string;
   day_selected: string;
   day_outside: string;
@@ -49,7 +54,8 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   classNames,
 }) => {
   const [month, setMonth] = useState<Date>(() => selected ?? new Date());
-  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
+  const [yearPage, setYearPage] = useState(0);
 
   useEffect(() => {
     if (selected && !isSameMonth(selected, month)) {
@@ -63,10 +69,16 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     return rotated;
   }, [weekStartsOn]);
 
-  const years = useMemo(() => {
-    const currentYear = month.getFullYear();
-    return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
-  }, [month]);
+  const monthNames = useMemo(() => {
+    return Array.from({ length: 12 }, (_, index) =>
+      format(new Date(2020, index, 1), 'LLL', { locale }),
+    );
+  }, [locale]);
+
+  const yearRangeStart = useMemo(() => {
+    const baseYear = Math.floor(month.getFullYear() / 12) * 12;
+    return baseYear + yearPage * 12;
+  }, [month, yearPage]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn });
@@ -79,27 +91,80 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     return list;
   }, [month, weekStartsOn]);
 
-  const captionLabel = useMemo(
-    () => format(month, 'LLLL yyyy', { locale }),
-    [locale, month],
-  );
+  const captionLabel = useMemo(() => {
+    if (viewMode === 'days') return format(month, 'LLLL yyyy', { locale });
+    if (viewMode === 'months') return format(month, 'yyyy', { locale });
+    return `${yearRangeStart} – ${yearRangeStart + 11}`;
+  }, [locale, month, viewMode, yearRangeStart]);
 
   const handleSelect = (date: Date) => {
     onSelect?.(date);
     setMonth(date);
-    setYearPickerOpen(false);
+    setViewMode('days');
   };
 
   const handleMonthShift = (delta: number) => {
     setMonth((prev) => addMonths(prev, delta));
-    setYearPickerOpen(false);
+    setViewMode('days');
+    setYearPage(0);
   };
 
   const handleYearSelect = (year: number) => {
     const next = new Date(month);
     next.setFullYear(year);
     setMonth(startOfMonth(next));
-    setYearPickerOpen(false);
+    setViewMode('months');
+    setYearPage(0);
+  };
+
+  const handleMonthSelect = (monthIndex: number) => {
+    const next = new Date(month);
+    next.setMonth(monthIndex);
+    setMonth(startOfMonth(next));
+    setViewMode('days');
+    setYearPage(0);
+  };
+
+  const handleCaptionClick = () => {
+    if (viewMode === 'days') {
+      setViewMode('months');
+      setYearPage(0);
+      return;
+    }
+
+    if (viewMode === 'months') {
+      setViewMode('years');
+    }
+  };
+
+  const handlePrev = () => {
+    if (viewMode === 'days') {
+      handleMonthShift(-1);
+      return;
+    }
+
+    if (viewMode === 'months') {
+      setMonth((prev) => startOfMonth(addYears(prev, -1)));
+      setYearPage(0);
+      return;
+    }
+
+    setYearPage((prev) => prev - 1);
+  };
+
+  const handleNext = () => {
+    if (viewMode === 'days') {
+      handleMonthShift(1);
+      return;
+    }
+
+    if (viewMode === 'months') {
+      setMonth((prev) => startOfMonth(addYears(prev, 1)));
+      setYearPage(0);
+      return;
+    }
+
+    setYearPage((prev) => prev + 1);
   };
 
   return (
@@ -108,72 +173,92 @@ export const DayPicker: React.FC<DayPickerProps> = ({
         <button
           type="button"
           className={mergeClassName(styles.navButton, classNames?.nav_button)}
-          onClick={() => handleMonthShift(-1)}
-          aria-label="Предыдущий месяц"
+          onClick={handlePrev}
+          aria-label="Назад"
         >
           ←
         </button>
         <button
           type="button"
           className={mergeClassName(styles.captionLabel, classNames?.caption_label)}
-          onClick={() => setYearPickerOpen((open) => !open)}
-          aria-label="Выбор года"
+          onClick={handleCaptionClick}
+          aria-label="Выбор периода"
         >
           {captionLabel}
         </button>
-        {yearPickerOpen && (
-          <div className={styles.yearDropdown}>
-            {years.map((year) => (
-              <button
-                key={year}
-                type="button"
-                className={styles.yearOption}
-                onClick={() => handleYearSelect(year)}
-              >
-                {year}
-              </button>
-            ))}
-          </div>
-        )}
         <button
           type="button"
           className={mergeClassName(styles.navButton, classNames?.nav_button)}
-          onClick={() => handleMonthShift(1)}
-          aria-label="Следующий месяц"
+          onClick={handleNext}
+          aria-label="Вперёд"
         >
           →
         </button>
       </div>
 
-      <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
-        {weekdays.map((weekday) => (
-          <div key={weekday} className={mergeClassName('', classNames?.weekday)}>
-            {weekday}
+      {viewMode === 'days' && (
+        <>
+          <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
+            {weekdays.map((weekday) => (
+              <div key={weekday} className={mergeClassName('', classNames?.weekday)}>
+                {weekday}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className={mergeClassName(styles.grid, classNames?.grid)}>
-        {days.map(({ date, outside }) => {
-          const isSelected = selected ? isSameDay(selected, date) : false;
-          const today = isToday(date);
-          const classes = [styles.dayButton, classNames?.day];
-          if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
-          if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
-          if (today) classes.push(styles.dayToday, classNames?.day_today);
+          <div className={mergeClassName(styles.grid, classNames?.grid)}>
+            {days.map(({ date, outside }) => {
+              const isSelected = selected ? isSameDay(selected, date) : false;
+              const today = isToday(date);
+              const classes = [styles.dayButton, classNames?.day];
+              if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
+              if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
+              if (today) classes.push(styles.dayToday, classNames?.day_today);
 
-          return (
+              return (
+                <button
+                  key={date.toISOString()}
+                  type="button"
+                  className={classes.filter(Boolean).join(' ')}
+                  onClick={() => handleSelect(date)}
+                >
+                  {format(date, 'd')}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {viewMode === 'months' && (
+        <div className={mergeClassName(styles.monthsGrid, classNames?.months_grid)}>
+          {monthNames.map((label, index) => (
             <button
-              key={date.toISOString()}
+              key={label}
               type="button"
-              className={classes.filter(Boolean).join(' ')}
-              onClick={() => handleSelect(date)}
+              className={mergeClassName(styles.monthButton, classNames?.month)}
+              onClick={() => handleMonthSelect(index)}
             >
-              {format(date, 'd')}
+              {label.charAt(0).toUpperCase() + label.slice(1)}
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {viewMode === 'years' && (
+        <div className={mergeClassName(styles.yearsGrid, classNames?.years_grid)}>
+          {Array.from({ length: 12 }, (_, index) => yearRangeStart + index).map((year) => (
+            <button
+              key={year}
+              type="button"
+              className={mergeClassName(styles.yearButton, classNames?.year)}
+              onClick={() => handleYearSelect(year)}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

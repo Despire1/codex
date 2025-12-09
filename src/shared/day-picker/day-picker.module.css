@@ -53,38 +53,6 @@
   box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
 }
 
-.yearDropdown {
-  position: absolute;
-  top: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(60px, 1fr));
-  gap: 6px;
-  background: #fff;
-  padding: 10px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-  z-index: 2;
-  border: 1px solid #e2e8f0;
-}
-
-.yearOption {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 8px 6px;
-  background: #f8fafc;
-  font-weight: 700;
-  color: #0f172a;
-  transition: all 0.2s ease;
-}
-
-.yearOption:hover {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
-}
-
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -133,4 +101,38 @@
 
 .dayToday {
   border-color: #94a3b8;
+}
+
+.monthsGrid,
+.yearsGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.monthsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.yearsGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.monthButton,
+.yearButton {
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  text-transform: capitalize;
+}
+
+.monthButton:hover,
+.yearButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.18);
 }
