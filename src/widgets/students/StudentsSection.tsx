@@ -4,6 +4,7 @@ import { EditIcon } from '../../icons/MaterialIcons';
 import { LinkedStudent, Student } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './StudentsSection.module.css';
+import { DatePickerField } from '../../shared/ui/DatePickerField';
 
 interface StudentsSectionProps {
   linkedStudents: LinkedStudent[];
@@ -167,11 +168,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   value={newHomeworkDraft.text}
                   onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, text: e.target.value })}
                 />
-                <input
-                  className={controls.input}
-                  type="date"
+                <DatePickerField
+                  label="Дедлайн"
                   value={newHomeworkDraft.deadline}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, deadline: e.target.value })}
+                  onChange={(nextDate) => onHomeworkDraftChange({ ...newHomeworkDraft, deadline: nextDate ?? '' })}
+                  allowClear
                 />
               </div>
               <button className={controls.primaryButton} onClick={onAddHomework}>

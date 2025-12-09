@@ -1,5 +1,4 @@
-import { format, parseISO } from 'date-fns';
-import { useMemo } from 'react';
+import { DayPicker } from 'react-day-picker';
 import styles from './x-date-pickers.module.css';
 
 type DateCalendarProps = {
@@ -9,19 +8,9 @@ type DateCalendarProps = {
 };
 
 export const DateCalendar: React.FC<DateCalendarProps> = ({ value, onChange, className }) => {
-  const inputValue = useMemo(() => (value ? format(value, 'yyyy-MM-dd') : ''), [value]);
-
   return (
     <div className={`${styles.calendarWrapper} ${className ?? ''}`}>
-      <input
-        type="date"
-        className={styles.dateInput}
-        value={inputValue}
-        onChange={(event) => {
-          const nextValue = event.target.value ? parseISO(event.target.value) : null;
-          onChange(nextValue);
-        }}
-      />
+      <DayPicker selected={value ?? undefined} onSelect={(date) => onChange(date ?? null)} weekStartsOn={1} />
     </div>
   );
 };

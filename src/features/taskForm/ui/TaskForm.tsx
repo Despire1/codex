@@ -2,10 +2,11 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addTask } from '@/entities/task/model/taskSlice';
 import { Button } from '@/shared/ui/Button/Button';
-import { Input } from '@/shared/ui/Input/Input';
 import { Select } from '@/shared/ui/Select/Select';
 import { formatISO } from 'date-fns';
 import styles from './TaskForm.module.css';
+import { Input } from '@/shared/ui/Input/Input';
+import { DatePickerField } from '@/shared/ui/DatePickerField';
 
 const durationOptions = [30, 45, 60, 90, 120];
 
@@ -51,7 +52,7 @@ export const TaskForm = ({ initialDate, initialStartTime, onSuccess }: TaskFormP
     <form className={styles.form} onSubmit={handleSubmit}>
       <p className={styles.heading}>Новая задача</p>
       <Input label="Название" value={title} onChange={(e) => setTitle(e.target.value)} required />
-      <Input label="Дата" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <DatePickerField label="Дата" value={date} onChange={(nextDate) => setDate(nextDate ?? today)} />
       <Input
         label="Начало"
         type="time"
