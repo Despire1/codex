@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import controls from '../../../shared/styles/controls.module.css';
 import modalStyles from '../modal.module.css';
+import { DatePickerField } from '../../../shared/ui/DatePickerField';
 
 interface LessonDraft {
   studentId: number | undefined;
@@ -121,12 +122,10 @@ export const LessonModal: FC<LessonModalProps> = ({
             />
           </div>
           <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <TextField
+            <DatePickerField
               label="Дата"
-              type="date"
               value={draft.date}
-              onChange={(e) => onDraftChange({ ...draft, date: e.target.value })}
-              fullWidth
+              onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
             />
             <TextField
               label="Время"
@@ -183,14 +182,16 @@ export const LessonModal: FC<LessonModalProps> = ({
                   gap: '12px',
                 }}
               >
-                <TextField
+                <DatePickerField
                   label="Повторять до"
-                  type="date"
                   value={draft.repeatUntil ?? ''}
-                  onChange={(e) => onDraftChange({ ...draft, repeatUntil: e.target.value || undefined })}
                   min={draft.date}
-                  helperText="Если не выбрано, уроки будут запланированы на год вперёд"
+                  onChange={(nextDate) => onDraftChange({ ...draft, repeatUntil: nextDate || undefined })}
+                  allowClear
                 />
+                <Typography variant="caption" color="textSecondary">
+                  Если не выбрано, уроки будут запланированы на год вперёд
+                </Typography>
               </Box>
               {draft.repeatWeekdays.length === 0 && (
                 <Typography variant="caption" className={controls.error}>

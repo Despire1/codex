@@ -1,0 +1,81 @@
+.field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.control {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--primary-weak);
+  border-color: var(--primary);
+}
+
+.value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon {
+  opacity: 0.7;
+  font-size: 14px;
+}
+
+.filled {
+  color: var(--text);
+}
+
+.clear {
+  min-width: 30px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+  padding: 10px;
+}
