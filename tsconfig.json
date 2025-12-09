@@ -15,7 +15,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@mui/material": ["src/shared/mui"]
+      "@mui/material": ["src/shared/mui"],
+      "@mui/x-date-pickers/*": ["src/shared/mui/x-date-pickers/*"],
+      "react-router-dom": ["src/shared/lib/router"]
     }
   },
   "include": ["src"],
