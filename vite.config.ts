@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@mui/material': path.resolve(__dirname, 'src/shared/mui'),
+      'react-router-dom': path.resolve(__dirname, 'src/shared/lib/router.tsx'),
     },
   },
   server: {

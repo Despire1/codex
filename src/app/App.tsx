@@ -1,5 +1,6 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AppProviders } from './providers';
 import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
@@ -17,7 +18,7 @@ import { ScheduleSection } from '../widgets/schedule/ScheduleSection';
 import { SettingsSection } from '../widgets/settings/SettingsSection';
 import { StudentModal } from '../features/modals/StudentModal/StudentModal';
 import { LessonModal } from '../features/modals/LessonModal/LessonModal';
-import type { TabId } from './tabs';
+import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -27,8 +28,12 @@ const initialTeacher: Teacher = {
   reminderMinutesBefore: 30,
 };
 
+const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
+type TabPath = (typeof tabs)[number]['path'];
+
 export const App = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
@@ -52,7 +57,7 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
-  const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('week');
+  const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
   const [monthAnchor] = useState<Date>(startOfMonth(new Date()));
   const [monthOffset, setMonthOffset] = useState(0);
   const [monthLabelKey, setMonthLabelKey] = useState(0);
@@ -128,6 +133,25 @@ export const App = () => {
     }
   }, [selectedStudentId]);
 
+  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
+
+  const activeTab = useMemo<TabId>(() => tabIdByPath[location.pathname] ?? 'dashboard', [location.pathname]);
+
+  const resolveLastVisitedPath = useCallback(() => {
+    const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;
+    if (stored && knownPaths.has(stored)) {
+      return stored;
+    }
+    return tabPathById.dashboard;
+  }, [knownPaths]);
+
+  useEffect(() => {
+    const currentPath = location.pathname as TabPath;
+    if (knownPaths.has(currentPath)) {
+      localStorage.setItem(LAST_VISITED_ROUTE_KEY, currentPath);
+    }
+  }, [knownPaths, location.pathname]);
+
   const linkedStudents: LinkedStudent[] = useMemo(
     () =>
       links.map((link) => ({
@@ -146,8 +170,8 @@ export const App = () => {
 
   const unpaidLessons = lessons.filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid).length;
 
-  const handleAddStudent = async () => {
-    if (!newStudentDraft.customName.trim()) return;
+    const handleAddStudent = async () => {
+      if (!newStudentDraft.customName.trim()) return;
 
     try {
       const data = await api.addStudent({
@@ -162,22 +186,22 @@ export const App = () => {
         return [...prev, student];
       });
 
-      setLinks((prev) => {
-        const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
-        if (exists) {
-          return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
-        }
-        return [...prev, link];
-      });
+        setLinks((prev) => {
+          const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
+          if (exists) {
+            return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
+          }
+          return [...prev, link];
+        });
 
-      setNewStudentDraft({ customName: '', username: '' });
-      setSelectedStudentId(student.id);
-      setActiveTab('students');
-      setStudentModalOpen(false);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to add student', error);
-    }
+        setNewStudentDraft({ customName: '', username: '' });
+        setSelectedStudentId(student.id);
+        navigate(tabPathById.students);
+        setStudentModalOpen(false);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to add student', error);
+      }
   };
 
   const toggleAutoReminder = async (studentId: number) => {
@@ -251,7 +275,7 @@ export const App = () => {
     setEditingLessonId(existing?.id ?? null);
     setEditingLessonOriginal(existing ?? null);
     setLessonModalOpen(true);
-    setActiveTab('schedule');
+    navigate(tabPathById.schedule);
     setDayViewDate(new Date(dateISO));
   };
 
@@ -435,16 +459,16 @@ export const App = () => {
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);
-      }
+        }
 
-      setLessonModalOpen(false);
-      setEditingLessonId(null);
-      setActiveTab('schedule');
-      setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Не удалось создать урок';
-      showInfoDialog('Ошибка', message);
-      // eslint-disable-next-line no-console
+        setLessonModalOpen(false);
+        setEditingLessonId(null);
+        navigate(tabPathById.schedule);
+        setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Не удалось создать урок';
+        showInfoDialog('Ошибка', message);
+        // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
   };
@@ -562,79 +586,92 @@ export const App = () => {
         <Topbar
           teacher={teacher}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => navigate(tabPathById[tab])}
           onOpenLessonModal={() => setLessonModalOpen(true)}
           onOpenStudentModal={() => setStudentModalOpen(true)}
         />
 
         <main className={layoutStyles.content}>
-          {activeTab === 'dashboard' && (
-            <DashboardSection
-              upcomingLessons={upcomingLessons}
-              linkedStudents={linkedStudents}
-              unpaidLessons={unpaidLessons}
-              pendingHomeworks={homeworks}
-              onAddStudent={() => {
-                setActiveTab('students');
-                setStudentModalOpen(true);
-              }}
-              onCreateLesson={() => {
-                setActiveTab('schedule');
-                setLessonModalOpen(true);
-              }}
-              onRemindHomework={() => selectedStudentId && remindHomework(selectedStudentId)}
-              onCompleteLesson={markLessonCompleted}
-              onTogglePaid={togglePaid}
+          <Routes>
+            <Route path="/" element={<Navigate to={resolveLastVisitedPath()} replace />} />
+            <Route
+              path={tabPathById.dashboard}
+              element={
+                <DashboardSection
+                  upcomingLessons={upcomingLessons}
+                  linkedStudents={linkedStudents}
+                  unpaidLessons={unpaidLessons}
+                  pendingHomeworks={homeworks}
+                  onAddStudent={() => {
+                    navigate(tabPathById.students);
+                    setStudentModalOpen(true);
+                  }}
+                  onCreateLesson={() => {
+                    navigate(tabPathById.schedule);
+                    setLessonModalOpen(true);
+                  }}
+                  onRemindHomework={() => selectedStudentId && remindHomework(selectedStudentId)}
+                  onCompleteLesson={markLessonCompleted}
+                  onTogglePaid={togglePaid}
+                />
+              }
             />
-          )}
-
-          {activeTab === 'students' && (
-            <StudentsSection
-              linkedStudents={linkedStudents}
-              selectedStudentId={selectedStudentId}
-              priceEditState={priceEditState}
-              newHomeworkDraft={newHomeworkDraft}
-              onSelectStudent={setSelectedStudentId}
-              onToggleAutoReminder={toggleAutoReminder}
-              onAdjustBalance={adjustBalance}
-              onStartEditPrice={startEditPrice}
-              onPriceChange={(value) => setPriceEditState((prev) => ({ ...prev, value }))}
-              onSavePrice={savePrice}
-              onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
-              onRemindHomework={remindHomework}
-              onAddHomework={addHomework}
-              onHomeworkDraftChange={setNewHomeworkDraft}
-              onToggleHomework={toggleHomeworkDone}
-              onOpenStudentModal={() => setStudentModalOpen(true)}
+            <Route
+              path={tabPathById.students}
+              element={
+                <StudentsSection
+                  linkedStudents={linkedStudents}
+                  selectedStudentId={selectedStudentId}
+                  priceEditState={priceEditState}
+                  newHomeworkDraft={newHomeworkDraft}
+                  onSelectStudent={setSelectedStudentId}
+                  onToggleAutoReminder={toggleAutoReminder}
+                  onAdjustBalance={adjustBalance}
+                  onStartEditPrice={startEditPrice}
+                  onPriceChange={(value) => setPriceEditState((prev) => ({ ...prev, value }))}
+                  onSavePrice={savePrice}
+                  onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
+                  onRemindHomework={remindHomework}
+                  onAddHomework={addHomework}
+                  onHomeworkDraftChange={setNewHomeworkDraft}
+                  onToggleHomework={toggleHomeworkDone}
+                  onOpenStudentModal={() => setStudentModalOpen(true)}
+                />
+              }
             />
-          )}
-
-          {activeTab === 'schedule' && (
-            <ScheduleSection
-              scheduleView={scheduleView}
-              onScheduleViewChange={setScheduleView}
-              dayViewDate={dayViewDate}
-              onDayShift={handleDayShift}
-              onWeekShift={handleWeekShift}
-              onMonthShift={handleMonthShift}
-              dayLabelKey={dayLabelKey}
-              weekLabelKey={weekLabelKey}
-              monthLabelKey={monthLabelKey}
-              lessons={lessons}
-              linkedStudents={linkedStudents}
-              monthAnchor={monthAnchor}
-              monthOffset={monthOffset}
-              onOpenLessonModal={openLessonModal}
-              onStartEditLesson={startEditLesson}
-              onTogglePaid={togglePaid}
-              onDayViewDateChange={setDayViewDate}
+            <Route
+              path={tabPathById.schedule}
+              element={
+                <ScheduleSection
+                  scheduleView={scheduleView}
+                  onScheduleViewChange={setScheduleView}
+                  dayViewDate={dayViewDate}
+                  onDayShift={handleDayShift}
+                  onWeekShift={handleWeekShift}
+                  onMonthShift={handleMonthShift}
+                  dayLabelKey={dayLabelKey}
+                  weekLabelKey={weekLabelKey}
+                  monthLabelKey={monthLabelKey}
+                  lessons={lessons}
+                  linkedStudents={linkedStudents}
+                  monthAnchor={monthAnchor}
+                  monthOffset={monthOffset}
+                  onOpenLessonModal={openLessonModal}
+                  onStartEditLesson={startEditLesson}
+                  onTogglePaid={togglePaid}
+                  onDayViewDateChange={setDayViewDate}
+                />
+              }
             />
-          )}
-
-          {activeTab === 'settings' && <SettingsSection teacher={teacher} onTeacherChange={setTeacher} />}
+            <Route
+              path={tabPathById.settings}
+              element={<SettingsSection teacher={teacher} onTeacherChange={setTeacher} />}
+            />
+            <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
+          </Routes>
         </main>
 
-        <Tabbar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
         <StudentModal
           open={studentModalOpen}
