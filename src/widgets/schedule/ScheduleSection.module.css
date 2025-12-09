@@ -139,6 +139,53 @@
   min-width: 260px;
 }
 
+.dayPickerSurface {
+  min-width: 100%;
+}
+
+.dayPickerNav {
+  margin-bottom: 10px;
+}
+
+.dayPickerCaption {
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.dayPickerWeekdays {
+  margin-bottom: 4px;
+  color: #475569;
+}
+
+.dayPickerWeekday {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.dayPickerNavButton {
+  border-color: #e2e8f0;
+}
+
+.dayPickerGrid {
+  justify-items: center;
+}
+
+.dayPickerDay {
+  font-weight: 700;
+}
+
+.dayPickerSelected {
+  border-color: #2563eb;
+}
+
+.dayPickerOutside {
+  color: #cbd5e1;
+}
+
+.dayPickerToday {
+  border-color: #cbd5e1;
+}
+
 .dateInput {
   border: 1px solid #e2e8f0;
   border-radius: 12px;

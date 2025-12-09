@@ -11,7 +11,7 @@ import {
 import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from 'react';
 import { CalendarMonthIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
-import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import controls from '../../shared/styles/controls.module.css';
@@ -597,14 +597,30 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 {dayPickerOpen && (
                   <div className={styles.dayPickerPopover}>
                     <div className={styles.dayPickerCard}>
-                      <DateCalendar
-                        value={dayViewDate}
-                        onChange={(date) => {
+                      <DayPicker
+                        mode="single"
+                        selected={dayViewDate}
+                        weekStartsOn={WEEK_STARTS_ON as 0 | 1}
+                        locale={ru}
+                        onSelect={(date) => {
                           if (date) {
                             onDayViewDateChange(date);
                             onScheduleViewChange('day');
                           }
                           setDayPickerOpen(false);
+                        }}
+                        classNames={{
+                          root: styles.dayPickerSurface,
+                          nav: styles.dayPickerNav,
+                          nav_button: styles.dayPickerNavButton,
+                          caption_label: styles.dayPickerCaption,
+                          weekdays: styles.dayPickerWeekdays,
+                          weekday: styles.dayPickerWeekday,
+                          grid: styles.dayPickerGrid,
+                          day: styles.dayPickerDay,
+                          day_selected: styles.dayPickerSelected,
+                          day_outside: styles.dayPickerOutside,
+                          day_today: styles.dayPickerToday,
                         }}
                       />
                     </div>

@@ -17,6 +17,7 @@
       "@/*": ["src/*"],
       "@mui/material": ["src/shared/mui"],
       "@mui/x-date-pickers/*": ["src/shared/mui/x-date-pickers/*"],
+      "react-day-picker": ["src/shared/day-picker"],
       "react-router-dom": ["src/shared/lib/router"]
     }
   },
