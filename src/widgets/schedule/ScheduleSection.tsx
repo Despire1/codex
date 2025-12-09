@@ -9,8 +9,9 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useMemo, useState, type FC, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from 'react';
 import { CalendarMonthIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import controls from '../../shared/styles/controls.module.css';
@@ -63,6 +64,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   onDayViewDateChange,
 }) => {
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const dayPickerRef = useRef<HTMLDivElement>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -97,7 +100,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`;
   }, [dayViewDate]);
 
-  const dayLabel = useMemo(() => format(dayViewDate, 'EEEE, d MMMM', { locale: ru }), [dayViewDate]);
+  const dayLabel = useMemo(() => format(dayViewDate, 'EE, d MMMM', { locale: ru }), [dayViewDate]);
 
   const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
 
@@ -105,6 +108,24 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     () => format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru }),
     [monthAnchor, monthOffset],
   );
+
+  const capitalizedDayLabel = useMemo(
+    () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
+    [dayLabel],
+  );
+
+  useEffect(() => {
+    if (!dayPickerOpen) return undefined;
+
+    const handleClickOutside = (event: MouseEvent | globalThis.MouseEvent) => {
+      if (dayPickerRef.current && !dayPickerRef.current.contains(event.target as Node)) {
+        setDayPickerOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [dayPickerOpen]);
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -556,17 +577,40 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             )}
 
             {scheduleView === 'day' && (
-                <div className={styles.daySwitcher}>
+              <div className={styles.daySwitcherWrapper} ref={dayPickerRef}>
+                <div className={styles.monthSwitcher}>
                   <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
                     ←
                   </button>
-                  <div key={dayLabelKey} className={styles.monthName}>
-                    {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
-                  </div>
+                  <button
+                    key={dayLabelKey}
+                    className={`${styles.monthName} ${styles.dayLabelButton}`}
+                    onClick={() => setDayPickerOpen((open) => !open)}
+                    type="button"
+                  >
+                    {capitalizedDayLabel}
+                  </button>
                   <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
                     →
                   </button>
                 </div>
+                {dayPickerOpen && (
+                  <div className={styles.dayPickerPopover}>
+                    <div className={styles.dayPickerCard}>
+                      <DateCalendar
+                        value={dayViewDate}
+                        onChange={(date) => {
+                          if (date) {
+                            onDayViewDateChange(date);
+                            onScheduleViewChange('day');
+                          }
+                          setDayPickerOpen(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {scheduleView === 'month' && (
