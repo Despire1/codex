@@ -1,7 +1,6 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { AppProviders } from './providers';
 import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
@@ -582,8 +581,7 @@ export const App = () => {
 
   return (
     <div className={layoutStyles.page}>
-      <AppProviders>
-        <Topbar
+      <Topbar
           teacher={teacher}
           activeTab={activeTab}
           onTabChange={(tab) => navigate(tabPathById[tab])}
@@ -747,7 +745,6 @@ export const App = () => {
             </div>
           </Modal>
         )}
-      </AppProviders>
     </div>
   );
 };
