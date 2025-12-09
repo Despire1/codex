@@ -1,4 +1,14 @@
-import { addDays, addMonths, endOfMonth, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  format,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
 import type { Locale } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
@@ -39,21 +49,24 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   classNames,
 }) => {
   const [month, setMonth] = useState<Date>(() => selected ?? new Date());
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
 
   useEffect(() => {
     if (selected && !isSameMonth(selected, month)) {
       setMonth(startOfMonth(selected));
     }
-  }, [month, selected]);
+  }, [selected]);
 
   const weekdays = useMemo(() => {
-    const start = startOfWeek(new Date(), { weekStartsOn });
-    return Array.from({ length: 7 }, (_, i) =>
-      format(addDays(start, i), 'EE', {
-        locale,
-      }),
-    );
-  }, [locale, weekStartsOn]);
+    const base = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const rotated = base.slice(weekStartsOn).concat(base.slice(0, weekStartsOn));
+    return rotated;
+  }, [weekStartsOn]);
+
+  const years = useMemo(() => {
+    const currentYear = month.getFullYear();
+    return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
+  }, [month]);
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn });
@@ -74,6 +87,19 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   const handleSelect = (date: Date) => {
     onSelect?.(date);
     setMonth(date);
+    setYearPickerOpen(false);
+  };
+
+  const handleMonthShift = (delta: number) => {
+    setMonth((prev) => addMonths(prev, delta));
+    setYearPickerOpen(false);
+  };
+
+  const handleYearSelect = (year: number) => {
+    const next = new Date(month);
+    next.setFullYear(year);
+    setMonth(startOfMonth(next));
+    setYearPickerOpen(false);
   };
 
   return (
@@ -82,16 +108,37 @@ export const DayPicker: React.FC<DayPickerProps> = ({
         <button
           type="button"
           className={mergeClassName(styles.navButton, classNames?.nav_button)}
-          onClick={() => setMonth((prev) => addMonths(prev, -1))}
+          onClick={() => handleMonthShift(-1)}
           aria-label="Предыдущий месяц"
         >
           ←
         </button>
-        <div className={mergeClassName(styles.captionLabel, classNames?.caption_label)}>{captionLabel}</div>
+        <button
+          type="button"
+          className={mergeClassName(styles.captionLabel, classNames?.caption_label)}
+          onClick={() => setYearPickerOpen((open) => !open)}
+          aria-label="Выбор года"
+        >
+          {captionLabel}
+        </button>
+        {yearPickerOpen && (
+          <div className={styles.yearDropdown}>
+            {years.map((year) => (
+              <button
+                key={year}
+                type="button"
+                className={styles.yearOption}
+                onClick={() => handleYearSelect(year)}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           type="button"
           className={mergeClassName(styles.navButton, classNames?.nav_button)}
-          onClick={() => setMonth((prev) => addMonths(prev, 1))}
+          onClick={() => handleMonthShift(1)}
           aria-label="Следующий месяц"
         >
           →
