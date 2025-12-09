@@ -15,7 +15,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@mui/material": ["src/shared/mui"]
+      "@mui/material": ["src/shared/mui"],
+      "react-router-dom": ["src/shared/lib/router"]
     }
   },
   "include": ["src"],
