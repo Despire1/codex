@@ -12,7 +12,7 @@ import {
 } from 'date-fns';
 import type { Locale } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
 
 type ClassNames = {
@@ -42,6 +42,8 @@ type DayPickerProps = {
   locale?: Locale;
   className?: string;
   classNames?: Partial<ClassNames>;
+  numberOfMonths?: number;
+  defaultMonth?: Date;
 };
 
 const mergeClassName = (base: string, override?: string) => `${base}${override ? ` ${override}` : ''}`;
@@ -53,8 +55,16 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   locale = ru,
   className,
   classNames,
+  numberOfMonths = 1,
+  defaultMonth,
 }) => {
-  const [month, setMonth] = useState<Date>(() => selected ?? new Date());
+  const initialMonth = useMemo(() => {
+    if (selected) return startOfMonth(selected);
+    if (defaultMonth) return startOfMonth(defaultMonth);
+    return startOfMonth(new Date());
+  }, [defaultMonth, selected]);
+
+  const [month, setMonth] = useState<Date>(() => initialMonth);
   const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
   const [yearPage, setYearPage] = useState(0);
 
@@ -81,16 +91,29 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     return baseYear + yearPage * 12;
   }, [month, yearPage]);
 
-  const days = useMemo(() => {
-    const start = startOfWeek(startOfMonth(month), { weekStartsOn });
-    const end = startOfWeek(addDays(endOfMonth(month), 7), { weekStartsOn });
+  const monthsToRender = useMemo(() => {
+    const count = Math.max(1, Math.round(numberOfMonths));
+    return Array.from({ length: count }, (_, index) => startOfMonth(addMonths(month, index)));
+  }, [month, numberOfMonths]);
 
-    const list: { date: Date; outside: boolean }[] = [];
-    for (let cursor = start; cursor < end; cursor = addDays(cursor, 1)) {
-      list.push({ date: cursor, outside: !isSameMonth(cursor, month) });
-    }
-    return list;
-  }, [month, weekStartsOn]);
+  const buildDays = useCallback(
+    (monthDate: Date) => {
+      const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn });
+      const end = startOfWeek(addDays(endOfMonth(monthDate), 7), { weekStartsOn });
+
+      const list: { date: Date; outside: boolean }[] = [];
+      for (let cursor = start; cursor < end; cursor = addDays(cursor, 1)) {
+        list.push({ date: cursor, outside: !isSameMonth(cursor, monthDate) });
+      }
+      return list;
+    },
+    [weekStartsOn],
+  );
+
+  const monthDays = useMemo(
+    () => monthsToRender.map((monthDate) => ({ month: monthDate, days: buildDays(monthDate) })),
+    [buildDays, monthsToRender],
+  );
 
   const captionLabel = useMemo(() => {
     if (viewMode === 'days') return format(month, 'LLLL yyyy', { locale });
@@ -168,8 +191,14 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     setYearPage((prev) => prev + 1);
   };
 
+  const monthsCount = monthsToRender.length;
+  const showMonthTitles = monthsCount > 1;
+
   return (
-    <div className={mergeClassName(styles.root, mergeClassName(className ?? '', classNames?.root))}>
+    <div
+      className={mergeClassName(styles.root, mergeClassName(className ?? '', classNames?.root))}
+      style={{ ['--months-count' as string]: monthsCount }}
+    >
       <div className={mergeClassName(styles.nav, classNames?.nav)}>
         <button
           type="button"
@@ -198,37 +227,44 @@ export const DayPicker: React.FC<DayPickerProps> = ({
       </div>
 
       {viewMode === 'days' && (
-        <>
-          <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
-            {weekdays.map((weekday) => (
-              <div key={weekday} className={mergeClassName('', classNames?.weekday)}>
-                {weekday}
+        <div className={styles.months}>
+          {monthDays.map(({ month: monthDate, days }) => (
+            <div key={monthDate.toISOString()} className={styles.month}>
+              {showMonthTitles && (
+                <div className={styles.monthTitle}>{format(monthDate, 'LLLL yyyy', { locale })}</div>
+              )}
+              <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
+                {weekdays.map((weekday) => (
+                  <div key={weekday} className={mergeClassName('', classNames?.weekday)}>
+                    {weekday}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className={mergeClassName(styles.grid, classNames?.grid)}>
-            {days.map(({ date, outside }) => {
-              const isSelected = selected ? isSameDay(selected, date) : false;
-              const today = isToday(date);
-              const classes = [styles.dayButton, classNames?.day];
-              if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
-              if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
-              if (today) classes.push(styles.dayToday, classNames?.day_today);
+              <div className={mergeClassName(styles.grid, classNames?.grid)}>
+                {days.map(({ date, outside }) => {
+                  const isSelected = selected ? isSameDay(selected, date) : false;
+                  const today = isToday(date);
+                  const classes = [styles.dayButton, classNames?.day];
+                  if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
+                  if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
+                  if (today) classes.push(styles.dayToday, classNames?.day_today);
 
-              return (
-                <button
-                  key={date.toISOString()}
-                  type="button"
-                  className={classes.filter(Boolean).join(' ')}
-                  onClick={() => handleSelect(date)}
-                >
-                  {format(date, 'd')}
-                </button>
-              );
-            })}
-          </div>
-        </>
+                  return (
+                    <button
+                      key={date.toISOString()}
+                      type="button"
+                      className={classes.filter(Boolean).join(' ')}
+                      onClick={() => handleSelect(date)}
+                    >
+                      {format(date, 'd')}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {viewMode === 'months' && (
