@@ -21,6 +21,8 @@ const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
 const HOURS_IN_DAY = 24;
 const HOUR_BLOCK_HEIGHT = 52;
+const DEFAULT_SCROLL_HOUR = 9;
+const DEFAULT_SCROLL_TOP = DEFAULT_SCROLL_HOUR * HOUR_BLOCK_HEIGHT;
 const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
 
@@ -66,6 +68,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const dayPickerRef = useRef<HTMLDivElement>(null);
+  const weekScrollRef = useRef<HTMLDivElement>(null);
+  const dayScrollRef = useRef<HTMLDivElement>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -126,6 +130,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     window.addEventListener('mousedown', handleClickOutside);
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [dayPickerOpen]);
+
+  useEffect(() => {
+    if (scheduleView === 'week' && weekScrollRef.current) {
+      weekScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
+    }
+
+    if (scheduleView === 'day' && dayScrollRef.current) {
+      dayScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
+    }
+  }, [scheduleView, dayViewDate]);
 
   useEffect(() => {
     if (scheduleView !== 'month' || selectedMonthDay) return;
@@ -278,7 +292,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         ))}
       </div>
 
-      <div className={styles.weekGridScroll}>
+      <div className={styles.weekGridScroll} ref={weekScrollRef}>
         <div className={styles.weekGrid}>
           <div className={styles.timeColumn}>
             {hours.map((hour) => (
@@ -362,7 +376,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM', { locale: ru })}</div>
           <div className={styles.weekDayDate}>{format(dayViewDate, 'yyyy-MM-dd')}</div>
         </div>
-        <div className={styles.dayGridScroll}>
+        <div className={styles.dayGridScroll} ref={dayScrollRef}>
           <div className={styles.dayGrid}>
             <div className={styles.timeColumn}>
               {hours.map((hour) => (
