@@ -42,6 +42,12 @@ export const DatePickerField = ({
 
   const selectedDate = useMemo(() => parseDate(value), [value]);
   const minDate = useMemo(() => parseDate(min), [min]);
+  const today = useMemo(() => new Date(), []);
+  const initialMonth = useMemo(() => {
+    if (selectedDate) return selectedDate;
+    if (minDate && minDate > today) return minDate;
+    return today;
+  }, [minDate, selectedDate, today]);
   const displayValue = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : placeholder;
 
   useEffect(() => {
@@ -137,6 +143,8 @@ export const DatePickerField = ({
             onSelect={handleSelect}
             weekStartsOn={1}
             locale={ru}
+            numberOfMonths={2}
+            defaultMonth={initialMonth}
           />
         </div>
       )}
