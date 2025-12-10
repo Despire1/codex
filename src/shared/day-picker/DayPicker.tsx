@@ -192,6 +192,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   };
 
   const monthsCount = monthsToRender.length;
+  const showMonthTitles = monthsCount > 1;
 
   return (
     <div
@@ -229,7 +230,9 @@ export const DayPicker: React.FC<DayPickerProps> = ({
         <div className={styles.months}>
           {monthDays.map(({ month: monthDate, days }) => (
             <div key={monthDate.toISOString()} className={styles.month}>
-              <div className={styles.monthTitle}>{format(monthDate, 'LLLL yyyy', { locale })}</div>
+              {showMonthTitles && (
+                <div className={styles.monthTitle}>{format(monthDate, 'LLLL yyyy', { locale })}</div>
+              )}
               <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
                 {weekdays.map((weekday) => (
                   <div key={weekday} className={mergeClassName('', classNames?.weekday)}>

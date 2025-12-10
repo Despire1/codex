@@ -143,7 +143,6 @@ export const DatePickerField = ({
             onSelect={handleSelect}
             weekStartsOn={1}
             locale={ru}
-            numberOfMonths={2}
             defaultMonth={initialMonth}
           />
         </div>
