@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { App } from './App';
+import { AppProviders } from './providers';
 import { store } from './providers/StoreProvider/config/store';
 import './styles/global.css';
 
@@ -12,7 +13,9 @@ if (container) {
   root.render(
     <React.StrictMode>
       <Provider store={store}>
-        <App />
+        <AppProviders>
+          <App />
+        </AppProviders>
       </Provider>
     </React.StrictMode>,
   );

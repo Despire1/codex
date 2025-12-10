@@ -155,6 +155,10 @@ export const Autocomplete = <T,>({
   id,
   ...rest
 }: AutocompleteProps<T>) => {
+  const inputNode = renderInput({} as any);
+  const inputProps = isValidElement(inputNode) ? inputNode.props || {} : {};
+  const { label, placeholder, helperText, error, fullWidth } = inputProps as any;
+
   const selectOptions = options.map((option, index) => ({
     value: index,
     label: getOptionLabel(option),
@@ -182,51 +186,104 @@ export const Autocomplete = <T,>({
   const customStyles: StylesConfig<{ value: number; label: string; data: T }, boolean> = {
     control: (provided, state) => ({
       ...provided,
-      minHeight: '40px',
-      borderColor: state.isFocused ? '#2563eb' : '#d1d5db',
-      boxShadow: state.isFocused ? '0 0 0 3px rgba(37, 99, 235, 0.1)' : 'none',
+      minHeight: '44px',
+      borderColor: state.isFocused ? '#2563eb' : '#e2e8f0',
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      boxShadow: state.isFocused ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none',
       '&:hover': {
-        borderColor: '#2563eb',
+        borderColor: state.isFocused ? '#2563eb' : '#cbd5e1',
       },
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      padding: '2px 8px',
+      gap: '6px',
+      color: '#0f172a',
+      fontSize: '14px',
+    }),
+    input: (provided) => ({
+      ...provided,
+      color: '#0f172a',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: '#94a3b8',
+      fontSize: '14px',
     }),
     multiValue: (provided) => ({
       ...provided,
-      backgroundColor: '#e0e7ff',
-      borderRadius: '4px',
+      backgroundColor: '#e0ebff',
+      borderRadius: '8px',
+      padding: '2px 4px',
     }),
     multiValueLabel: (provided) => ({
       ...provided,
-      color: '#3730a3',
-      fontSize: '14px',
+      color: '#1d4ed8',
+      fontSize: '13px',
+      fontWeight: 600,
     }),
     multiValueRemove: (provided) => ({
       ...provided,
-      color: '#6366f1',
+      color: '#1d4ed8',
+      borderRadius: '6px',
       '&:hover': {
-        backgroundColor: '#c7d2fe',
-        color: '#4338ca',
+        backgroundColor: '#bfdbfe',
+        color: '#1e40af',
+      },
+    }),
+    indicatorsContainer: (provided) => ({
+      ...provided,
+      paddingRight: '8px',
+      color: '#64748b',
+    }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      color: state.isFocused ? '#2563eb' : '#94a3b8',
+      padding: '6px',
+      '&:hover': {
+        color: '#2563eb',
+      },
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      color: '#94a3b8',
+      padding: '6px',
+      '&:hover': {
+        color: '#dc2626',
       },
     }),
     menu: (provided) => ({
       ...provided,
-      zIndex: 9999,
+      zIndex: 20,
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.16)',
+      overflow: 'hidden',
+      marginTop: '8px',
     }),
     option: (provided, state) => ({
       ...provided,
       backgroundColor: state.isSelected
-        ? '#4f46e5'
+        ? '#2563eb'
         : state.isFocused
-          ? '#e0e7ff'
-          : 'white',
-      color: state.isSelected ? 'white' : '#1f2937',
+          ? '#e0ebff'
+          : '#fff',
+      color: state.isSelected ? '#fff' : '#0f172a',
+      paddingTop: '10px',
+      paddingBottom: '10px',
+      fontSize: '14px',
+      fontWeight: state.isSelected ? 700 : 500,
       '&:active': {
-        backgroundColor: '#6366f1',
+        backgroundColor: '#1d4ed8',
+        color: '#fff',
       },
     }),
   };
 
   return (
-    <div className={styles.formControl}>
+    <div className={cx(styles.formControl, fullWidth && styles.fullWidth, error && styles.error)}>
+      {label ? <span className={styles.label}>{label}</span> : null}
       <ReactSelect
         id={id}
         isMulti={multiple}
@@ -235,10 +292,13 @@ export const Autocomplete = <T,>({
         onChange={handleChange}
         closeMenuOnSelect={!disableCloseOnSelect}
         styles={customStyles}
-        placeholder="Выберите..."
+        placeholder={placeholder || 'Выберите...'}
         noOptionsMessage={() => 'Нет доступных вариантов'}
         {...rest}
       />
+      {helperText ? (
+        <span className={cx(styles.helperText, error && styles.errorText)}>{helperText}</span>
+      ) : null}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-import { addYears } from 'date-fns';
 import { type FC, useMemo } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import {
@@ -17,6 +16,7 @@ import {
 } from '@mui/material';
 import controls from '../../../shared/styles/controls.module.css';
 import modalStyles from '../modal.module.css';
+import { DatePickerField } from '../../../shared/ui/DatePickerField';
 
 interface LessonDraft {
   studentId: number | undefined;
@@ -75,9 +75,6 @@ export const LessonModal: FC<LessonModalProps> = ({
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceLocked && !checked) return;
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getUTCDay();
-    const defaultUntil = Number.isNaN(startAt.getTime())
-      ? ''
-      : addYears(startAt, 1).toISOString().slice(0, 10);
     onDraftChange({
       ...draft,
       isRecurring: checked,
@@ -86,7 +83,7 @@ export const LessonModal: FC<LessonModalProps> = ({
         : checked
           ? draft.repeatWeekdays
           : [],
-      repeatUntil: checked ? draft.repeatUntil || defaultUntil : undefined,
+      repeatUntil: checked ? draft.repeatUntil : undefined,
     });
   };
 
@@ -121,12 +118,10 @@ export const LessonModal: FC<LessonModalProps> = ({
             />
           </div>
           <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <TextField
+            <DatePickerField
               label="Дата"
-              type="date"
               value={draft.date}
-              onChange={(e) => onDraftChange({ ...draft, date: e.target.value })}
-              fullWidth
+              onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
             />
             <TextField
               label="Время"
@@ -183,13 +178,12 @@ export const LessonModal: FC<LessonModalProps> = ({
                   gap: '12px',
                 }}
               >
-                <TextField
+                <DatePickerField
                   label="Повторять до"
-                  type="date"
                   value={draft.repeatUntil ?? ''}
-                  onChange={(e) => onDraftChange({ ...draft, repeatUntil: e.target.value || undefined })}
                   min={draft.date}
-                  helperText="Если не выбрано, уроки будут запланированы на год вперёд"
+                  onChange={(nextDate) => onDraftChange({ ...draft, repeatUntil: nextDate || undefined })}
+                  allowClear
                 />
               </Box>
               {draft.repeatWeekdays.length === 0 && (

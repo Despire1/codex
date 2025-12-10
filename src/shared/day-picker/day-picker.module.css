@@ -1,0 +1,138 @@
+.root {
+  padding: 12px;
+  background: #fff;
+  border-radius: 14px;
+  min-width: 280px;
+  color: #0f172a;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.captionLabel {
+  font-weight: 800;
+  font-size: 15px;
+  text-transform: capitalize;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 10px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.captionLabel:hover {
+  background: #e0f2fe;
+  color: #0ea5e9;
+}
+
+.navButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.navButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #475569;
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.dayButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.dayButton:hover {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0ea5e9;
+}
+
+.dayOutside {
+  color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.daySelected {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.2);
+}
+
+.dayToday {
+  border-color: #94a3b8;
+}
+
+.monthsGrid,
+.yearsGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.monthsGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.yearsGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.monthButton,
+.yearButton {
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  text-transform: capitalize;
+}
+
+.monthButton:hover,
+.yearButton:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.18);
+}
