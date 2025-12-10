@@ -1,5 +1,7 @@
 import { format, parseISO } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import styles from './DatePickerField.module.css';
 
@@ -54,7 +56,7 @@ export const DatePickerField = ({
   const handleSelect = (date?: Date) => {
     if (!date) return;
     if (minDate && date < minDate) return;
-    onChange(date.toISOString().slice(0, 10));
+    onChange(format(date, 'yyyy-MM-dd'));
     setOpen(false);
   };
 
@@ -76,7 +78,9 @@ export const DatePickerField = ({
           disabled={disabled}
         >
           <span className={styles.value}>{displayValue}</span>
-          <span aria-hidden className={styles.icon}>📅</span>
+          <span aria-hidden className={styles.icon}>
+            <CalendarMonthIcon width={18} height={18} />
+          </span>
         </button>
         {allowClear && value && !disabled && (
           <button type="button" className={styles.clear} onClick={handleClear} aria-label="Очистить дату">
@@ -86,7 +90,12 @@ export const DatePickerField = ({
       </div>
       {open && !disabled && (
         <div className={styles.popover}>
-          <DayPicker selected={selectedDate ?? undefined} onSelect={handleSelect} weekStartsOn={1} />
+          <DayPicker
+            selected={selectedDate ?? undefined}
+            onSelect={handleSelect}
+            weekStartsOn={1}
+            locale={ru}
+          />
         </div>
       )}
     </div>

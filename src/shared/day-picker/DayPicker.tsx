@@ -11,6 +11,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import type { Locale } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
 
@@ -49,7 +50,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   selected,
   onSelect,
   weekStartsOn = 1,
-  locale,
+  locale = ru,
   className,
   classNames,
 }) => {
