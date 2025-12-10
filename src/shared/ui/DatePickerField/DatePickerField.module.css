@@ -73,7 +73,6 @@
 
 .popover {
   position: absolute;
-  top: calc(100% + 6px);
   left: 0;
   z-index: 20;
   background: #fff;
@@ -82,3 +81,17 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
   padding: 10px;
 }
+
+.popoverBottom {
+  top: calc(100% + 6px);
+}
+
+.popoverTop {
+  bottom: calc(100% + 6px);
+}
+
+.popoverRight {
+  left: auto;
+  right: 0;
+}
+
