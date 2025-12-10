@@ -127,6 +127,23 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [dayPickerOpen]);
 
+  useEffect(() => {
+    if (scheduleView !== 'month' || selectedMonthDay) return;
+
+    const daysInMonth = buildMonthDays(selectedMonth).filter((day) => day.inMonth);
+    const todayIso = format(new Date(), 'yyyy-MM-dd');
+
+    const defaultDay =
+      daysInMonth.find((day) => day.iso === todayIso) ||
+      daysInMonth.find((day) => (lessonsByDay[day.iso] ?? []).length > 0) ||
+      daysInMonth[0];
+
+    if (defaultDay) {
+      setSelectedMonthDay(defaultDay.iso);
+      onDayViewDateChange(defaultDay.date);
+    }
+  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange]);
+
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
     const end = startOfWeek(addDays(endOfMonth(monthDate), 7), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -439,22 +456,26 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     setSelectedMonthDay(day.iso);
                     onDayViewDateChange(day.date);
                   };
+                  const isTodayCell = isToday(day.date);
 
                   return (
                     <div
                       key={`${monthLabel}-${day.iso}`}
                       className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
-                        isToday(day.date) ? styles.todayCell : ''
+                        isTodayCell ? styles.todayCell : ''
                       } ${selectedMonthDay === day.iso ? styles.activeDay : ''}`}
                       onClick={handleDayClick}
                     >
                       <div className={styles.monthDateRow}>
-                        <span className={styles.monthDateNumber}>{day.date.getDate()}</span>
+                        <span
+                          className={`${styles.monthDateNumber} ${isTodayCell ? styles.todayDateNumber : ''}`}
+                        >
+                          {day.date.getDate()}
+                        </span>
                         {dayLessons.length > 0 && (
                           <span className={styles.lessonCountBadge}>{dayLessons.length}</span>
                         )}
                       </div>
-                      {isToday(day.date) && <span className={styles.todayPill}>Сегодня</span>}
                     </div>
                   );
                 })}

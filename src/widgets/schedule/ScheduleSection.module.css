@@ -325,6 +325,15 @@
   font-weight: 800;
 }
 
+.todayDateNumber {
+  color: #0b172f;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+
 .lessonCountBadge {
   display: inline-flex;
   align-items: center;
@@ -338,15 +347,6 @@
   font-size: 12px;
   border: 1px solid #bae6fd;
   box-shadow: 0 6px 16px rgba(14, 165, 233, 0.18);
-}
-
-.todayPill {
-  background: #2563eb;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.2);
 }
 
 .monthLesson {
