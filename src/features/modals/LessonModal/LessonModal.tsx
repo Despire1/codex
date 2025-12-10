@@ -1,4 +1,3 @@
-import { addYears } from 'date-fns';
 import { type FC, useMemo } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import {
@@ -76,9 +75,6 @@ export const LessonModal: FC<LessonModalProps> = ({
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceLocked && !checked) return;
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getUTCDay();
-    const defaultUntil = Number.isNaN(startAt.getTime())
-      ? ''
-      : addYears(startAt, 1).toISOString().slice(0, 10);
     onDraftChange({
       ...draft,
       isRecurring: checked,
@@ -87,7 +83,7 @@ export const LessonModal: FC<LessonModalProps> = ({
         : checked
           ? draft.repeatWeekdays
           : [],
-      repeatUntil: checked ? draft.repeatUntil || defaultUntil : undefined,
+      repeatUntil: checked ? draft.repeatUntil : undefined,
     });
   };
 
