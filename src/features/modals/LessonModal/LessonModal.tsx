@@ -185,9 +185,6 @@ export const LessonModal: FC<LessonModalProps> = ({
                   onChange={(nextDate) => onDraftChange({ ...draft, repeatUntil: nextDate || undefined })}
                   allowClear
                 />
-                <Typography variant="caption" color="textSecondary">
-                  Если не выбрано, уроки будут запланированы на год вперёд
-                </Typography>
               </Box>
               {draft.repeatWeekdays.length === 0 && (
                 <Typography variant="caption" className={controls.error}>
