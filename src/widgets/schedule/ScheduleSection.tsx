@@ -96,7 +96,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
-  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
+  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
 
   const weekRangeLabel = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -153,7 +153,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       daysInMonth[0];
 
     if (defaultDay) {
-      setSelectedMonthDay(defaultDay.iso);
+      // setSelectedMonthDay(defaultDay.iso);
       onDayViewDateChange(defaultDay.date);
     }
   }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange]);
@@ -515,7 +515,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 </div>
 
                 {selectedDayLessons.length === 0 && (
-                  <div className={styles.emptyDayState}>Выберите день, чтобы увидеть занятия</div>
+                  <div className={styles.emptyDayState}>Создайте первый урок</div>
                 )}
 
                 <div className={styles.dayPanelList}>

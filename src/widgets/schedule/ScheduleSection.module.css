@@ -492,6 +492,7 @@
 .panelAction {
   align-self: stretch;
   justify-content: center;
+  margin-top: auto;
 }
 
 .dayCard {

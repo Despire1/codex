@@ -238,7 +238,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </div>
                     ) : null}
 
-                    {priceEditState.id !== selectedStudent.id && (
+                    {priceEditState.id !== selectedStudent.id ? (
                       <div className={styles.priceValueRow}>
                         <span className={styles.priceValue}>
                           {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
@@ -268,7 +268,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           <EditIcon width={18} height={18} />
                         </button>
                       </div>
-                    ))}
+                    )}
                     {!selectedStudent.homeworks.length && (
                       <div className={styles.emptyState}>Пока нет заданий для этого ученика</div>
                     )}
@@ -344,9 +344,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             <div className={styles.placeholder}>Выберите ученика в списке, чтобы увидеть детали</div>
           )}
         </div>
-      </div>
+        </div>
 
-      {isHomeworkModalOpen && (
+      {isHomeworkModalOpen &&
         <div className={styles.modalOverlay}>
           <div className={styles.modalCard}>
             <div className={styles.modalHeader}>
@@ -394,11 +394,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 Создать
               </button>
             </div>
-          ) : (
-            <div className={styles.placeholder}>Выберите ученика в списке, чтобы увидеть детали</div>
-          )}
         </div>
-      </div>
+      </div>}
     </section>
   );
 };
