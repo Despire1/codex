@@ -1,7 +1,8 @@
 import { format } from 'date-fns';
-import { type FC, useMemo, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { EditIcon } from '../../icons/MaterialIcons';
 import { LinkedStudent, Student } from '../../entities/types';
+import { api } from '../../shared/api/client';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './StudentsSection.module.css';
 
@@ -47,25 +48,43 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'pendingHomework' | 'noReminder'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
+  const [visibleStudents, setVisibleStudents] = useState<LinkedStudent[]>(linkedStudents);
 
-  const filteredStudents = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+  useEffect(() => {
+    let cancelled = false;
 
-    return linkedStudents.filter((student) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        student.link.customName.toLowerCase().includes(normalizedQuery) ||
-        (student.username ?? '').toLowerCase().includes(normalizedQuery);
+    const fetchFiltered = async () => {
+      try {
+        const { students, links, homeworks } = await api.searchStudents({ query: searchQuery, filter: activeFilter });
+        if (cancelled) return;
 
-      if (!matchesQuery) return false;
+        const mapped = links
+          .map((link) => {
+            const student = students.find((s) => s.id === link.studentId);
+            if (!student) return null;
+            return {
+              ...student,
+              link,
+              homeworks: homeworks.filter((hw) => hw.studentId === link.studentId),
+            } as LinkedStudent;
+          })
+          .filter(Boolean) as LinkedStudent[];
 
-      const hasPendingHomework = student.homeworks.some((hw) => !hw.isDone);
-      const remindersDisabled = !student.link.autoRemindHomework;
+        setVisibleStudents(mapped);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to search students', error);
+        if (!cancelled) {
+          setVisibleStudents(linkedStudents);
+        }
+      }
+    };
 
-      if (activeFilter === 'pendingHomework') return hasPendingHomework;
-      if (activeFilter === 'noReminder') return remindersDisabled;
-      return true;
-    });
+    fetchFiltered();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeFilter, linkedStudents, searchQuery]);
 
   const renderHomeworkStatus = (student: LinkedStudent) => {
@@ -88,9 +107,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 </div>
                 <p className={styles.subtitle}>Просматривайте списки и редактируйте карточки</p>
               </div>
-              <button className={controls.primaryGhost} onClick={onOpenStudentModal}>
-                + Добавить ученика
-              </button>
             </div>
 
             <div className={styles.searchBlock}>
@@ -123,7 +139,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             </div>
 
             <div className={styles.studentList}>
-              {filteredStudents.map((student) => (
+              {visibleStudents.map((student) => (
                 <button
                   key={student.id}
                   className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
@@ -144,9 +160,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   </div>
                 </button>
               ))}
-              {!filteredStudents.length && (
+              {!visibleStudents.length && (
                 <div className={styles.emptyState}>Не найдено учеников по вашему запросу</div>
               )}
+            </div>
+
+            <div className={styles.addStudentFooter}>
+              <button className={`${controls.primaryButton} ${styles.addStudentButton}`} onClick={onOpenStudentModal}>
+                + Добавить ученика
+              </button>
             </div>
           </div>
         </div>
@@ -213,6 +235,21 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                             Отмена
                           </button>
                         </div>
+                      </div>
+                    ) : (
+                      <div className={styles.priceValueRow}>
+                        <span className={styles.priceValue}>
+                          {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                            ? `${selectedStudent.pricePerLesson} ₽`
+                            : '—'}
+                        </span>
+                        <button
+                          className={controls.iconButton}
+                          aria-label="Изменить цену"
+                          onClick={() => onStartEditPrice(selectedStudent)}
+                        >
+                          <EditIcon width={18} height={18} />
+                        </button>
                       </div>
                     ) : (
                       <div className={styles.priceValueRow}>
