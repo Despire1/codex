@@ -89,6 +89,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ studentId }),
     }),
+  searchStudents: (params: { query?: string; filter?: 'all' | 'pendingHomework' | 'noReminder' }) => {
+    const query = new URLSearchParams();
+    if (params.query) query.set('query', params.query);
+    if (params.filter) query.set('filter', params.filter);
+
+    const suffix = query.toString();
+    const path = suffix ? `/api/students/search?${suffix}` : '/api/students/search';
+
+    return apiFetch<{ students: Student[]; links: TeacherStudent[]; homeworks: Homework[] }>(path);
+  },
 };
 
 export type ApiClient = typeof api;
