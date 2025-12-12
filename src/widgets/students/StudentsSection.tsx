@@ -229,6 +229,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           <EditIcon width={18} height={18} />
                         </button>
                       </div>
+                    ))}
+                    {!selectedStudent.homeworks.length && (
+                      <div className={styles.emptyState}>Пока нет заданий для этого ученика</div>
                     )}
                   </div>
                   <div className={styles.statBlock}>
@@ -352,9 +355,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 Создать
               </button>
             </div>
-          </div>
+          ) : (
+            <div className={styles.placeholder}>Выберите ученика в списке, чтобы увидеть детали</div>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 };
