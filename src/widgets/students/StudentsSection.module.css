@@ -7,15 +7,14 @@
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 16px;
-  align-items: stretch;
-  min-height: calc(100vh - 32px);
+  align-items: start;
+  min-height: calc(100vh - 24px);
 }
 
 .sidebar {
   position: sticky;
   top: 12px;
   align-self: start;
-  height: calc(100vh - 24px);
 }
 
 .sidebarCard {
@@ -24,11 +23,11 @@
   border-radius: 20px;
   padding: 16px;
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  height: 100%;
-  max-height: 100%;
+  min-height: calc(100vh - 24px);
+  max-height: calc(100vh - 24px);
   overflow: hidden;
 }
 
@@ -194,7 +193,8 @@
 }
 
 .addStudentFooter {
-  margin-top: 4px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 .addStudentButton {
@@ -506,16 +506,18 @@
   margin-top: 14px;
 }
 
-@media (max-width: 1100px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
+  @media (max-width: 1100px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
 
-  .sidebarCard {
-    position: relative;
-  }
+    .sidebarCard {
+      position: relative;
+      min-height: auto;
+      max-height: none;
+    }
 
-  .studentList {
-    max-height: 100%;
-  }
+    .studentList {
+      max-height: 100%;
+    }
 }
