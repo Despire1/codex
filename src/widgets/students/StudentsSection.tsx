@@ -46,16 +46,28 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const selectedStudent = linkedStudents.find((s) => s.id === selectedStudentId);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'pendingHomework' | 'noReminder'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [visibleStudents, setVisibleStudents] = useState<LinkedStudent[]>(linkedStudents);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   useEffect(() => {
     let cancelled = false;
 
+    setIsLoading(true);
+
     const fetchFiltered = async () => {
       try {
-        const { students, links, homeworks } = await api.searchStudents({ query: searchQuery, filter: activeFilter });
+        const { students, links, homeworks } = await api.searchStudents({ query: debouncedQuery, filter: activeFilter });
         if (cancelled) return;
 
         const mapped = links
@@ -77,6 +89,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         if (!cancelled) {
           setVisibleStudents(linkedStudents);
         }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -85,7 +101,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [activeFilter, linkedStudents, searchQuery]);
+  }, [activeFilter, debouncedQuery, linkedStudents]);
 
   const renderHomeworkStatus = (student: LinkedStudent) => {
     const hasPending = student.homeworks.some((hw) => !hw.isDone);
@@ -139,29 +155,38 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             </div>
 
             <div className={styles.studentList}>
-              {visibleStudents.map((student) => (
-                <button
-                  key={student.id}
-                  className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
-                  onClick={() => onSelectStudent(student.id)}
-                >
-                  <div className={styles.studentCardHeader}>
-                    <div>
-                      <div className={styles.studentName}>{student.link.customName}</div>
-                      <div className={styles.studentMeta}>@{student.username || 'нет'} </div>
-                    </div>
-                    <div className={styles.balanceBadge}>Баланс: {student.link.balanceLessons}</div>
-                  </div>
-                  <div className={styles.studentFooter}>
-                    <span className={styles.reminderLabel}>
-                      Напоминания {student.link.autoRemindHomework ? 'включены' : 'выключены'}
-                    </span>
-                    {renderHomeworkStatus(student)}
-                  </div>
-                </button>
-              ))}
-              {!visibleStudents.length && (
-                <div className={styles.emptyState}>Не найдено учеников по вашему запросу</div>
+              {isLoading ? (
+                <div className={styles.loadingState} role="status" aria-live="polite">
+                  <div className={styles.loader} aria-hidden />
+                  <div className={styles.loadingText}>Загружаем список...</div>
+                </div>
+              ) : (
+                <>
+                  {visibleStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
+                      onClick={() => onSelectStudent(student.id)}
+                    >
+                      <div className={styles.studentCardHeader}>
+                        <div>
+                          <div className={styles.studentName}>{student.link.customName}</div>
+                          <div className={styles.studentMeta}>@{student.username || 'нет'} </div>
+                        </div>
+                        <div className={styles.balanceBadge}>Баланс: {student.link.balanceLessons}</div>
+                      </div>
+                      <div className={styles.studentFooter}>
+                        <span className={styles.reminderLabel}>
+                          Напоминания {student.link.autoRemindHomework ? 'включены' : 'выключены'}
+                        </span>
+                        {renderHomeworkStatus(student)}
+                      </div>
+                    </button>
+                  ))}
+                  {!visibleStudents.length && (
+                    <div className={styles.emptyState}>Не найдено учеников по вашему запросу</div>
+                  )}
+                </>
               )}
             </div>
 
