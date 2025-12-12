@@ -1,6 +1,7 @@
 .section {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .grid {
@@ -8,7 +9,8 @@
   grid-template-columns: 360px 1fr;
   gap: 16px;
   align-items: start;
-  min-height: calc(100vh - 24px);
+  height: calc(100vh - 24px);
+  max-height: calc(100vh - 24px);
 }
 
 .sidebar {
@@ -26,7 +28,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: calc(100vh - 24px);
+  height: calc(100vh - 24px);
   max-height: calc(100vh - 24px);
   overflow: hidden;
 }
@@ -202,15 +204,52 @@
   justify-content: center;
 }
 
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: #64748b;
+}
+
+.loader {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 4px solid #e2e8f0;
+  border-top-color: #2563eb;
+  animation: spin 0.9s linear infinite;
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.12);
+}
+
+.loadingText {
+  font-weight: 600;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .content {
   display: flex;
   flex-direction: column;
+  height: calc(100vh - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
   gap: 12px;
 }
 
 .contentGrid {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
   gap: 12px;
 }
 
@@ -506,18 +545,35 @@
   margin-top: 14px;
 }
 
-  @media (max-width: 1100px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
+@media (max-width: 1100px) {
+  .section {
+    height: auto;
+    min-height: 100vh;
+  }
 
-    .sidebarCard {
-      position: relative;
-      min-height: auto;
-      max-height: none;
-    }
+  .grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
+  }
 
-    .studentList {
-      max-height: 100%;
-    }
+  .sidebarCard {
+    position: relative;
+    height: auto;
+    max-height: none;
+  }
+
+  .studentList {
+    max-height: 100%;
+  }
+
+  .content {
+    height: auto;
+    max-height: none;
+  }
+
+  .contentGrid {
+    overflow: visible;
+    padding-right: 0;
+  }
 }
