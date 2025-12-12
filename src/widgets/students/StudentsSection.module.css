@@ -1,17 +1,21 @@
 .section {
   width: 100%;
+  min-height: 100vh;
 }
 
 .grid {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: calc(100vh - 32px);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
+  align-self: stretch;
+  height: 100%;
 }
 
 .sidebarCard {
@@ -23,6 +27,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
 }
 
 .headerRow {
@@ -87,7 +92,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: calc(100vh - 260px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -214,8 +220,29 @@
 .heroHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.heroNameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inlineTags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.infoChip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #0f172a;
 }
 
 .heroActions {
@@ -233,26 +260,67 @@
   margin: 0;
 }
 
-.splitColumns {
+.quickActions {
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: 1.3fr 0.9fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
-.cardHeader {
+.statBlock {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statLabel {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.statValue {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tab {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.tabActive {
+  background: #e0ebff;
+  color: #1d4ed8;
+  border-color: #2563eb;
+}
+
+.homeworkHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
-}
-
-.inlineToggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #0f172a;
-  font-weight: 600;
 }
 
 .homeworkList {
@@ -265,10 +333,11 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #f8fafc;
+  align-items: center;
 }
 
 .homeworkContent {
@@ -285,45 +354,49 @@
 .homeworkMeta {
   color: #94a3b8;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metaDivider {
+  color: #cbd5e1;
 }
 
 .statusPill {
-  width: fit-content;
-  padding: 6px 10px;
-  border-radius: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
   font-weight: 700;
   font-size: 12px;
-  background: #f1f5f9;
-  color: #0f172a;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
 }
 
-.statusPill[data-state='done'] {
+.statusDone {
   background: #ecfdf3;
   color: #15803d;
-  border: 1px solid #bbf7d0;
+  border-color: #bbf7d0;
 }
 
-.statusPill[data-state='pending'] {
+.statusPending {
   background: #fff7ed;
   color: #c2410c;
-  border: 1px solid #fed7aa;
+  border-color: #fed7aa;
 }
 
-.formCard {
+.statusPill:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.helperNote {
   margin-top: 12px;
-  padding: 14px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 14px;
+  padding: 12px;
   background: #f8fafc;
-}
-
-.priceRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-radius: 12px;
+  color: #475569;
+  border: 1px dashed #cbd5e1;
 }
 
 .priceLabel {
@@ -358,57 +431,82 @@
   font-size: 18px;
 }
 
-.balanceRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0 4px;
-}
-
-.balanceLabel {
-  color: #64748b;
-}
-
-.balanceCount {
-  font-weight: 700;
-  font-size: 16px;
-}
-
 .balanceActions {
   display: flex;
   gap: 8px;
 }
 
-.stack {
+.placeholder {
+  padding: 20px;
+  background: #fff;
+  border: 1px dashed #e2e8f0;
+  border-radius: 16px;
+  text-align: center;
+  color: #94a3b8;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.05);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.modalCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  width: min(520px, 100%);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
+  border: 1px solid #e2e8f0;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modalBody {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.deadlineList {
+.inputLabel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+  font-weight: 600;
+  color: #0f172a;
 }
 
-.deadlineItem {
+.modalFooter {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  margin-top: 14px;
 }
 
-.deadlineTitle {
-  font-weight: 700;
-}
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 
-.deadlineMeta {
-  color: #94a3b8;
-  font-size: 13px;
+  .sidebarCard {
+    position: relative;
+  }
+
+  .studentList {
+    max-height: 100%;
+  }
 }
 
 .placeholder {
