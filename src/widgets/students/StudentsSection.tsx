@@ -236,7 +236,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : null}
+
+                    {priceEditState.id !== selectedStudent.id && (
                       <div className={styles.priceValueRow}>
                         <span className={styles.priceValue}>
                           {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
