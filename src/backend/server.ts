@@ -51,6 +51,63 @@ const ensureTeacher = async () =>
     },
   });
 
+const searchStudents = async (query?: string, filter?: 'all' | 'pendingHomework' | 'noReminder') => {
+  const teacher = await ensureTeacher();
+  const normalizedQuery = query?.trim().toLowerCase();
+
+  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
+  const students = await prisma.student.findMany({
+    where: {
+      teacherLinks: {
+        some: {
+          teacherId: teacher.chatId,
+        },
+      },
+    },
+  });
+
+  const filteredLinks = links.filter((link) => {
+    const student = students.find((s) => s.id === link.studentId);
+    if (!student) return false;
+
+    const matchesQuery = !normalizedQuery
+      ? true
+      : link.customName.toLowerCase().includes(normalizedQuery) ||
+        (student.username ?? '').toLowerCase().includes(normalizedQuery);
+
+    if (!matchesQuery) return false;
+
+    if (filter === 'noReminder') return !link.autoRemindHomework;
+
+    if (filter === 'pendingHomework') {
+      // Homeworks will be filtered below; preliminary include all to evaluate after fetch.
+      return true;
+    }
+
+    return true;
+  });
+
+  const studentIds = filteredLinks.map((link) => link.studentId);
+
+  const homeworks = await prisma.homework.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: studentIds.length ? { in: studentIds } : { in: [-1] },
+    },
+  });
+
+  const withPending = filteredLinks.filter((link) => {
+    if (filter !== 'pendingHomework') return true;
+    return homeworks.some((hw) => hw.studentId === link.studentId && !hw.isDone);
+  });
+
+  return {
+    students: students.filter((s) => withPending.some((link) => link.studentId === s.id)),
+    links: withPending,
+    homeworks,
+  };
+};
+
 const bootstrap = async () => {
   const teacher = await ensureTeacher();
   const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
@@ -721,6 +778,14 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   try {
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
       const data = await bootstrap();
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/students/search') {
+      const { searchParams } = url;
+      const query = searchParams.get('query') ?? undefined;
+      const filter = (searchParams.get('filter') as 'all' | 'pendingHomework' | 'noReminder' | null) ?? 'all';
+      const data = await searchStudents(query, filter);
       return sendJson(res, 200, data);
     }
 
