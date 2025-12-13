@@ -341,20 +341,26 @@
 }
 
 .summaryRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
   background: #f8fafc;
   border-radius: 14px;
-  padding: 12px;
+  padding: 12px 16px;
   border: 1px solid #e5e7eb;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.summaryItem {
+.summaryInline {
+  gap: 12px;
+}
+
+.summaryLine {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  position: relative;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .summaryLabel {
@@ -362,11 +368,12 @@
   font-size: 13px;
 }
 
-.summaryValue {
+.summaryValue,
+.summaryValueInline {
   font-weight: 800;
-  font-size: 18px;
-  display: flex;
-  gap: 8px;
+  font-size: 16px;
+  display: inline-flex;
+  gap: 6px;
   align-items: center;
 }
 
@@ -376,6 +383,18 @@
   padding: 0;
   text-align: left;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summaryDivider {
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.inlinePopover {
+  position: relative;
 }
 
 .popover {
@@ -398,6 +417,19 @@
   gap: 8px;
 }
 
+.priceEditorInline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.priceInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .priceButtons {
   display: flex;
   gap: 8px;
@@ -413,6 +445,27 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.toggleButton {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 64px;
+}
+
+.toggleOn {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+
+.toggleOff {
+  background: #f8fafc;
 }
 
 .summaryHint {
@@ -491,7 +544,7 @@
 .homeworkContent {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .homeworkTitle {
@@ -502,7 +555,14 @@
   text-overflow: ellipsis;
 }
 
-.homeworkPreview {
+.homeworkTitleRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.homeworkPreviewLine {
   font-size: 13px;
   color: #475569;
   white-space: nowrap;
@@ -516,6 +576,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.homeworkMetaRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .toggleGroup {
@@ -539,6 +605,36 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.moreActionsWrapper {
+  position: relative;
+}
+
+.moreMenu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  z-index: 4;
+}
+
+.moreMenu button {
+  background: transparent;
+  border: none;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.moreMenu button:hover {
+  background: #f3f4f6;
 }
 
 .statusPill {
