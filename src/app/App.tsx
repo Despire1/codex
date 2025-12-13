@@ -53,7 +53,13 @@ export const App = () => {
     repeatWeekdays: [] as number[],
     repeatUntil: undefined as string | undefined,
   });
-  const [newHomeworkDraft, setNewHomeworkDraft] = useState({ text: '', deadline: '' });
+  const [newHomeworkDraft, setNewHomeworkDraft] = useState({
+    text: '',
+    deadline: '',
+    status: 'assigned' as 'assigned' | 'in_progress' | 'draft',
+    sendToTelegram: true,
+    remindBefore: true,
+  });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
@@ -526,7 +532,13 @@ export const App = () => {
       });
 
       setHomeworks([...homeworks, normalizeHomework(data.homework)]);
-      setNewHomeworkDraft({ text: '', deadline: '' });
+      setNewHomeworkDraft({
+        text: '',
+        deadline: '',
+        status: 'assigned',
+        sendToTelegram: true,
+        remindBefore: true,
+      });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add homework', error);

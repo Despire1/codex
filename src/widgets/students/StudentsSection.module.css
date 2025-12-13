@@ -5,6 +5,7 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+  padding: 8px 0 12px;
 }
 
 .grid {
@@ -19,21 +20,19 @@
 
 .sidebar {
   position: sticky;
-  top: 12px;
+  top: 8px;
   align-self: start;
 }
 
 .sidebarCard {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 100%;
-  max-height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -55,14 +54,15 @@
   background: #2563eb;
   color: #fff;
   font-weight: 700;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 6px 10px;
   font-size: 13px;
 }
 
 .subtitle {
-  color: #64748b;
+  color: #6b7280;
   margin: 4px 0 0;
+  font-size: 13px;
 }
 
 .searchBlock {
@@ -80,10 +80,11 @@
 .filterChip {
   padding: 8px 12px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
   cursor: pointer;
-  color: #0f172a;
+  color: #111827;
+  font-weight: 600;
 }
 
 .filterChip:hover {
@@ -107,13 +108,29 @@
 }
 
 .studentCard {
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  background: #fff;
   border-radius: 14px;
-  padding: 12px;
+  padding: 0;
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  overflow: hidden;
+  position: relative;
+}
+
+.studentStripe {
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.studentCardBody {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .studentCard:hover,
@@ -123,71 +140,73 @@
   box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12);
 }
 
+.activeStudent .studentStripe {
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+}
+
 .studentCardHeader {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .studentName {
-  font-weight: 700;
+  font-weight: 800;
   font-size: 15px;
 }
 
-.studentMeta {
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.balanceBadge {
-  background: #ecfeff;
-  color: #0ea5e9;
-  padding: 6px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.studentFooter {
-  margin-top: 8px;
+.badgeRow {
   display: flex;
-  justify-content: space-between;
+  gap: 6px;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.reminderLabel {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.badgeWarning,
-.badgeSuccess,
-.badgeMuted {
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-weight: 600;
+.lozenge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
   font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.badgeDanger {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecdd3;
 }
 
 .badgeWarning {
   background: #fff7ed;
   color: #c2410c;
-  border: 1px solid #fdba74;
+  border-color: #fed7aa;
 }
 
 .badgeSuccess {
   background: #ecfdf3;
   color: #15803d;
-  border: 1px solid #bbf7d0;
+  border-color: #bbf7d0;
 }
 
 .badgeMuted {
-  background: #f8fafc;
-  color: #94a3b8;
-  border: 1px solid #e2e8f0;
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.studentSecondaryRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.studentMeta {
+  color: #6b7280;
 }
 
 .emptyState {
@@ -197,46 +216,6 @@
   border: 1px dashed #e2e8f0;
   border-radius: 14px;
   background: #f8fafc;
-}
-
-.addStudentFooter {
-  margin-top: auto;
-  padding-top: 8px;
-}
-
-.addStudentButton {
-  width: 100%;
-  justify-content: center;
-}
-
-.loadingState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 20px;
-  color: #64748b;
-}
-
-.loader {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 4px solid #e2e8f0;
-  border-top-color: #2563eb;
-  animation: spin 0.9s linear infinite;
-  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.12);
-}
-
-.loadingText {
-  font-weight: 600;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .content {
@@ -262,16 +241,16 @@
 
 .card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e7eb;
   border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
 }
 
-.heroCard {
+.headerCard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .heroHeader {
@@ -287,83 +266,157 @@
   gap: 6px;
 }
 
-.inlineTags {
+.profileName {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.studentMetaRow {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  color: #6b7280;
 }
 
-.infoChip {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 6px 10px;
-  font-size: 13px;
-  color: #0f172a;
+.metaDivider {
+  color: #cbd5e1;
 }
 
 .heroActions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
-.profileName {
-  font-size: 20px;
-  font-weight: 800;
+.actionsMenuWrapper {
+  position: relative;
 }
 
-.helperText {
-  color: #64748b;
-  margin: 0;
+.actionsMenu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  overflow: hidden;
+  z-index: 3;
 }
 
-.quickActions {
-  margin-top: 12px;
+.actionsMenu button {
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.actionsMenu button:hover {
+  background: #f3f4f6;
+}
+
+.dangerButton {
+  color: #b91c1c;
+}
+
+.summaryRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
-}
-
-.statBlock {
-  border: 1px solid #e2e8f0;
   background: #f8fafc;
   border-radius: 14px;
   padding: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.summaryLabel {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.summaryValue {
+  font-weight: 800;
+  font-size: 18px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.summaryButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.popover {
+  position: absolute;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+
+.priceEditor {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.statLabel {
-  color: #64748b;
-  font-size: 13px;
+.priceButtons {
+  display: flex;
+  gap: 8px;
 }
 
-.statValue {
-  font-weight: 800;
-  font-size: 18px;
+.priceValueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .toggleRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  font-weight: 600;
+}
+
+.summaryHint {
+  color: #6b7280;
+  font-size: 12px;
 }
 
 .tabs {
-  display: flex;
+  display: inline-flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 .tab {
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #111827;
+  cursor: pointer;
 }
 
 .tabActive {
@@ -389,9 +442,9 @@
 .homeworkItem {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding: 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e5e7eb;
   border-radius: 14px;
   background: #f8fafc;
   align-items: center;
@@ -425,7 +478,7 @@
 }
 
 .homeworkMeta {
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -436,14 +489,18 @@
   color: #cbd5e1;
 }
 
+.homeworkActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .statusPill {
   padding: 8px 12px;
   border-radius: 12px;
   font-weight: 700;
   font-size: 12px;
-  cursor: pointer;
   border: 1px solid transparent;
-  background: transparent;
 }
 
 .statusDone {
@@ -452,61 +509,45 @@
   border-color: #bbf7d0;
 }
 
+.statusOverdue {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecdd3;
+}
+
 .statusPending {
   background: #fff7ed;
   color: #c2410c;
   border-color: #fed7aa;
 }
 
-.statusPill:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
+.iconActions {
+  display: flex;
+  gap: 6px;
 }
 
-.helperNote {
-  margin-top: 12px;
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.statCard {
   padding: 12px;
-  background: #f8fafc;
   border-radius: 12px;
-  color: #475569;
-  border: 1px dashed #cbd5e1;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
 }
 
-.priceLabel {
-  font-weight: 700;
-  font-size: 15px;
+.statLabel {
+  color: #6b7280;
+  margin: 0 0 6px;
 }
 
-.subtleLabel {
-  color: #94a3b8;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.priceEditor {
-  width: 60%;
-}
-
-.priceButtons {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.priceValueRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.priceValue {
-  font-weight: 800;
+.statValueLarge {
   font-size: 18px;
-}
-
-.balanceActions {
-  display: flex;
-  gap: 8px;
+  font-weight: 800;
+  margin: 0;
 }
 
 .placeholder {
@@ -603,44 +644,34 @@
 }
 
 .drawerTextBlock {
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  border-radius: 14px;
-  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .drawerText {
   margin: 0;
   color: #0f172a;
-  line-height: 1.5;
 }
 
 .drawerDetailsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
 }
 
 .drawerDetail {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 600;
-  color: #0f172a;
+  color: #475569;
 }
 
 .drawerActions {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .drawerActionButton {
-  width: 100%;
+  flex: 1;
   justify-content: center;
 }
 
@@ -680,7 +711,7 @@
   background: #ffffff;
   border-radius: 16px;
   padding: 16px;
-  width: min(520px, 100%);
+  width: min(560px, 100%);
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
   border: 1px solid #e2e8f0;
 }
@@ -707,6 +738,13 @@
   color: #0f172a;
 }
 
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+}
+
 .modalFooter {
   display: flex;
   justify-content: flex-end;
@@ -714,31 +752,25 @@
   margin-top: 14px;
 }
 
-@media (max-width: 1100px) {
-  .section {
-    height: auto;
-    min-height: 100vh;
-  }
+.priceLabel {
+  font-weight: 700;
+  font-size: 15px;
+  margin: 0;
+}
 
+.subtleLabel {
+  color: #94a3b8;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+@media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
-    height: auto;
-    max-height: none;
   }
 
-  .sidebarCard {
+  .sidebar {
     position: relative;
-    height: auto;
-    max-height: none;
-  }
-
-  .studentList {
-    max-height: 100%;
-  }
-
-  .content {
-    height: auto;
-    max-height: none;
   }
 
   .contentGrid {
