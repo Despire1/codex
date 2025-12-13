@@ -4,6 +4,7 @@
   max-height: 100%;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .grid {
@@ -246,6 +247,7 @@
   min-height: 0;
   overflow: hidden;
   gap: 12px;
+  position: relative;
 }
 
 .contentGrid {
@@ -393,6 +395,22 @@
   border-radius: 14px;
   background: #f8fafc;
   align-items: center;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.homeworkItem:hover,
+.homeworkItem[aria-pressed='true'] {
+  border-color: #2563eb;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+  background: #eef4ff;
+}
+
+.homeworkItem:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
 }
 
 .homeworkContent {
@@ -501,6 +519,152 @@
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.05);
 }
 
+.drawerScrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.22);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  opacity: 1;
+  z-index: 6;
+}
+
+.homeworkDrawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 360px;
+  max-width: calc(100% - 24px);
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -10px 0 36px rgba(15, 23, 42, 0.14);
+  border-radius: 18px 0 0 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  z-index: 7;
+}
+
+.drawerOpen {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.drawerEyebrow {
+  color: #94a3b8;
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.drawerTitle {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.drawerBadgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drawerBadge {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-weight: 700;
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.drawerTextBlock {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawerText {
+  margin: 0;
+  color: #0f172a;
+  line-height: 1.5;
+}
+
+.drawerDetailsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.drawerDetail {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.drawerActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.drawerActionButton {
+  width: 100%;
+  justify-content: center;
+}
+
+.drawerHelper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.drawerHelperTitle {
+  margin: 0;
+  font-weight: 800;
+}
+
+.drawerHelperText {
+  margin: 4px 0 0;
+  color: #475569;
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -580,5 +744,26 @@
   .contentGrid {
     overflow: visible;
     padding-right: 0;
+  }
+
+  .homeworkDrawer {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    border-left: none;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.18);
+  }
+
+  .drawerOpen {
+    transform: translateY(0);
+  }
+
+  .drawerScrim {
+    position: fixed;
   }
 }

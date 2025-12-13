@@ -51,6 +51,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [visibleStudents, setVisibleStudents] = useState<LinkedStudent[]>(linkedStudents);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -109,6 +110,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     if (!student.homeworks.length) return <span className={styles.badgeMuted}>Нет ДЗ</span>;
     return <span className={styles.badgeSuccess}>ДЗ выполнено</span>;
   };
+
+  const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
+  const closeHomeworkDrawer = () => setActiveHomeworkId(null);
 
   return (
     <section className={styles.section}>
@@ -335,7 +339,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
                 <div className={styles.homeworkList}>
                   {selectedStudent.homeworks.map((hw) => (
-                    <div key={hw.id} className={styles.homeworkItem}>
+                    <div
+                      key={hw.id}
+                      className={styles.homeworkItem}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveHomeworkId(hw.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setActiveHomeworkId(hw.id);
+                        }
+                      }}
+                      aria-pressed={activeHomeworkId === hw.id}
+                    >
                       <div className={styles.homeworkContent}>
                         <div className={styles.homeworkText}>{hw.text}</div>
                         <div className={styles.homeworkMeta}>
@@ -349,7 +366,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <button
                         type="button"
                         className={`${styles.statusPill} ${hw.isDone ? styles.statusDone : styles.statusPending}`}
-                        onClick={() => onToggleHomework(hw.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleHomework(hw.id);
+                        }}
                       >
                         {hw.isDone ? 'выполнено' : 'в работе'}
                       </button>
@@ -370,6 +390,80 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           )}
         </div>
         </div>
+
+      {activeHomework && (
+        <>
+          <button className={styles.drawerScrim} aria-label="Закрыть карточку ДЗ" onClick={closeHomeworkDrawer} />
+          <aside className={`${styles.homeworkDrawer} ${styles.drawerOpen}`} aria-live="polite">
+            <div className={styles.drawerHeader}>
+              <div>
+                <p className={styles.drawerEyebrow}>Домашнее задание</p>
+                <div className={styles.drawerTitle}>{selectedStudent?.link.customName}</div>
+              </div>
+              <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
+                ✕
+              </button>
+            </div>
+
+            <div className={styles.drawerBadgeRow}>
+              <span className={`${styles.drawerBadge} ${activeHomework.isDone ? styles.badgeSuccess : styles.badgeWarning}`}>
+                {activeHomework.isDone ? 'выполнено' : 'в работе'}
+              </span>
+              <span className={styles.drawerBadge}>
+                {activeHomework.deadline
+                  ? `Дедлайн: ${format(new Date(activeHomework.deadline), 'd MMM', { locale: undefined })}`
+                  : 'Без дедлайна'}
+              </span>
+            </div>
+
+            <div className={styles.drawerBody}>
+              <div className={styles.drawerTextBlock}>
+                <p className={styles.priceLabel}>Описание</p>
+                <p className={styles.drawerText}>{activeHomework.text}</p>
+              </div>
+
+              <div className={styles.drawerDetailsGrid}>
+                <div className={styles.drawerDetail}>Учитель: вы</div>
+                <div className={styles.drawerDetail}>Студент: @{selectedStudent?.username || 'нет'}</div>
+                <div className={styles.drawerDetail}>Баланс: {selectedStudent?.link.balanceLessons} уроков</div>
+                <div className={styles.drawerDetail}>
+                  Напоминания: {selectedStudent?.link.autoRemindHomework ? 'включены' : 'выключены'}
+                </div>
+              </div>
+
+              <div className={styles.drawerActions}>
+                <button
+                  className={`${controls.primaryButton} ${styles.drawerActionButton}`}
+                  onClick={() => {
+                    onToggleHomework(activeHomework.id);
+                    setActiveHomeworkId(activeHomework.id);
+                  }}
+                >
+                  {activeHomework.isDone ? 'Вернуть в работу' : 'Отметить выполненным'}
+                </button>
+                <button
+                  className={`${controls.secondaryButton} ${styles.drawerActionButton}`}
+                  onClick={() => selectedStudent && onRemindHomework(selectedStudent.id)}
+                >
+                  Отправить напоминание
+                </button>
+              </div>
+
+              <div className={styles.drawerHelper}>
+                <div>
+                  <p className={styles.drawerHelperTitle}>Совет</p>
+                  <p className={styles.drawerHelperText}>
+                    Скопируйте текст задания и отправьте его ученику сразу после урока, чтобы зафиксировать договоренности.
+                  </p>
+                </div>
+                <button className={controls.smallButton} onClick={() => navigator.clipboard?.writeText(activeHomework.text)}>
+                  Скопировать текст
+                </button>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
 
       {isHomeworkModalOpen &&
         <div className={styles.modalOverlay}>
