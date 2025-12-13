@@ -21,15 +21,16 @@ model Teacher {
 }
 
 model Student {
-  id                  Int                 @id @default(autoincrement())
-  username            String?
-  telegramId          BigInt?
-  pricePerLesson      Int                 @default(0)
-  teacherLinks        TeacherStudent[]
-  homeworks           Homework[]
-  lessons             Lesson[]
+  id                   Int                  @id @default(autoincrement())
+  username             String?
+  telegramId           BigInt?
+  pricePerLesson       Int                  @default(0)
+  teacherLinks         TeacherStudent[]
+  homeworks            Homework[]           @relation("HomeworkStudent")
+  takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
+  lessons              Lesson[]
   lessonParticipations LessonParticipant[]
-  createdAt           DateTime            @default(now())
+  createdAt            DateTime             @default(now())
 }
 
 model TeacherStudent {
@@ -57,9 +58,9 @@ model Homework {
   takenByStudentId Int?
   studentId Int
   teacherId BigInt
-  student   Student  @relation(fields: [studentId], references: [id])
+  student   Student  @relation("HomeworkStudent", fields: [studentId], references: [id])
   teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
-  takenByStudent Student? @relation(fields: [takenByStudentId], references: [id])
+  takenByStudent Student? @relation("HomeworkTakenBy", fields: [takenByStudentId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   lastReminderAt DateTime?
