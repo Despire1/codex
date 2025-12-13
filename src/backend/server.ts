@@ -954,6 +954,7 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
 
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+    include: { student: true },
   });
 
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
@@ -986,7 +987,10 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
       data: { isPaid: false },
     });
   } else {
-    const amount = participant.price ?? lesson.price ?? 0;
+    const amount =
+      [participant.price, lesson.price, link.student?.pricePerLesson].find(
+        (value) => typeof value === 'number' && value > 0,
+      ) ?? 0;
     await prisma.payment.create({
       data: {
         lessonId,
