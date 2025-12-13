@@ -1,4 +1,4 @@
-import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, Student, Teacher, TeacherStudent } from '../../entities/types';
+import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, Payment, Student, Teacher, TeacherStudent } from '../../entities/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -75,11 +75,18 @@ export const api = {
       method: 'POST',
     }),
   togglePaid: (lessonId: number) =>
-    apiFetch<{ lesson: Lesson }>(`/api/lessons/${lessonId}/toggle-paid`, { method: 'POST' }),
-  toggleParticipantPaid: (lessonId: number, studentId: number) =>
-    apiFetch<{ participant: any; lesson: Lesson }>(`/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`, {
+    apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/toggle-paid`, {
       method: 'POST',
     }),
+  toggleParticipantPaid: (lessonId: number, studentId: number) =>
+    apiFetch<{ participant: any; lesson: Lesson; link?: TeacherStudent }>(
+      `/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`,
+      {
+        method: 'POST',
+      },
+    ),
+  getPayments: (studentId: number) =>
+    apiFetch<{ payments: Payment[] }>(`/api/students/${studentId}/payments`),
   createHomework: (payload: {
     studentId: number;
     text: string;

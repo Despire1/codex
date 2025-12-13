@@ -78,6 +78,16 @@ export interface Lesson {
   participants?: LessonParticipant[];
 }
 
+export interface Payment {
+  id: number;
+  teacherStudentId: number;
+  lessonId?: number | null;
+  amount: number;
+  paidAt: string;
+  comment?: string | null;
+  lesson?: Lesson | null;
+}
+
 export interface LinkedStudent extends Student {
   link: TeacherStudent;
   homeworks: Homework[];
