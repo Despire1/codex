@@ -42,6 +42,8 @@ interface StudentsSectionProps {
   onRemindHomework: (studentId: number) => void;
   onRemindHomeworkById?: (homeworkId: number) => void;
   onSendHomework?: (homeworkId: number) => void;
+  onDuplicateHomework?: (homeworkId: number) => void;
+  onDeleteHomework?: (homeworkId: number) => void;
   onAddHomework: () => void;
   onHomeworkDraftChange: (draft: {
     text: string;
@@ -57,6 +59,9 @@ interface StudentsSectionProps {
   lessons: Lesson[];
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
+  onCreateLesson: (studentId?: number) => void;
+  onEditLesson: (lesson: Lesson) => void;
+  onDeleteLesson: (lessonId: number) => void;
   newHomeworkDraft: {
     text: string;
     deadline: string;
@@ -86,6 +91,12 @@ const getStatusLabel = (status: HomeworkStatus) => {
   return 'Черновик';
 };
 
+const getLessonStatusLabel = (status: Lesson['status']) => {
+  if (status === 'COMPLETED') return 'Проведён';
+  if (status === 'CANCELLED') return 'Отменён';
+  return 'Запланирован';
+};
+
 const truncate = (text: string, maxLength: number) => {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trimEnd()}…`;
@@ -96,23 +107,6 @@ const getHomeworkTitle = (text: string) => {
   const firstLine = normalized.split('\n').find((line) => line.trim().length > 0) ?? '';
   const baseTitle = firstLine || 'Домашнее задание';
   return truncate(baseTitle, 80) || 'Домашнее задание';
-};
-
-const getHomeworkPreview = (text: string) => {
-  const normalized = (text ?? '').trim().replace(/\s+\n/g, '\n');
-  if (!normalized) return null;
-
-  const firstLine = normalized.split('\n').find((line) => line.trim().length > 0) ?? '';
-  const title = truncate(firstLine || 'Домашнее задание', 80);
-  const flattened = normalized.replace(/\s+/g, ' ').trim();
-
-  const shouldShowPreview = normalized.length > 80 || normalized.includes('\n');
-  if (!shouldShowPreview) return null;
-
-  const preview = truncate(flattened, 160);
-  if (preview === title) return null;
-
-  return preview;
 };
 
 export const StudentsSection: FC<StudentsSectionProps> = ({
@@ -143,7 +137,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'debt' | 'overdue' | 'autoOff'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'debt' | 'overdue'>('all');
   const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons'>('homework');
   const [homeworkFilter, setHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
@@ -162,6 +156,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [openHomeworkMenuId, setOpenHomeworkMenuId] = useState<number | null>(null);
+  const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
   const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
 
   useEffect(() => {
@@ -182,11 +178,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
       const hasDebt = student.link.balanceLessons < 0;
       const hasOverdue = student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue);
-      const autoOff = !student.link.autoRemindHomework;
-
       if (activeFilter === 'debt') return hasDebt;
       if (activeFilter === 'overdue') return hasOverdue;
-      if (activeFilter === 'autoOff') return autoOff;
 
       return true;
     });
@@ -197,9 +190,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     const overdue = linkedStudents.filter((student) =>
       student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue),
     ).length;
-    const autoOff = linkedStudents.filter((student) => !student.link.autoRemindHomework).length;
-
-    return { withDebt, overdue, autoOff };
+    return { withDebt, overdue };
   }, [linkedStudents]);
 
   const studentLessons = useMemo(() => {
@@ -231,7 +222,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const shouldShowDescriptionToggle = useMemo(() => {
     if (!activeHomework?.text) return false;
     const linesCount = activeHomework.text.split('\n').length;
-    return activeHomework.text.length > 320 || linesCount > 6;
+    return activeHomework.text.length > 480 || linesCount > 8;
   }, [activeHomework?.text]);
 
   const hasUnsavedChanges = useMemo(() => {
@@ -257,6 +248,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setShowUnsavedConfirm(true);
       return;
     }
+    setIsDrawerMenuOpen(false);
+    setOpenHomeworkMenuId(null);
     setActiveHomeworkId(null);
     setDrawerMode('view');
   };
@@ -275,6 +268,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [activeHomework?.id]);
 
   const handleOpenHomework = (homeworkId: number) => {
+    setIsDrawerMenuOpen(false);
     if (drawerMode === 'edit' && hasUnsavedChanges && activeHomeworkId !== homeworkId) {
       setPendingHomeworkId(homeworkId);
       setShowUnsavedConfirm(true);
@@ -308,6 +302,16 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleKeepEditing = () => {
     setShowUnsavedConfirm(false);
+  };
+
+  const handleOpenCreateHomework = () => {
+    onHomeworkDraftChange({
+      ...newHomeworkDraft,
+      status: 'DRAFT',
+      baseStatus: 'DRAFT',
+      sendNow: false,
+    });
+    setIsHomeworkModalOpen(true);
   };
 
   const handleConfirmSaveAndClose = async () => {
@@ -423,14 +427,46 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             ? styles.statusAssigned
             : styles.statusDraft;
 
-    return (
-      <div className={styles.statusStack}>
-        <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(statusInfo.status)}</span>
-        {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-          <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
-        )}
-      </div>
-    );
+    return <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(statusInfo.status)}</span>;
+  };
+
+  const handleHomeworkReminder = (homeworkId: number) => {
+    if (onRemindHomeworkById) {
+      onRemindHomeworkById(homeworkId);
+    } else if (selectedStudent) {
+      onRemindHomework(selectedStudent.id);
+    }
+  };
+
+  const handleCopyHomework = (text: string) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+  };
+
+  const handleMoveToDraft = (homeworkId: number) => {
+    if (!onUpdateHomework) return;
+    const homework = selectedStudent?.homeworks.find((item) => item.id === homeworkId);
+    if (!homework) return;
+    const info = getHomeworkStatusInfo(homework);
+    if (info.status === 'DRAFT') {
+      setOpenHomeworkMenuId(null);
+      return;
+    }
+
+    const confirmed = window.confirm('Перевести задание в черновик? Ученик перестанет его видеть.');
+    if (!confirmed) return;
+
+    onUpdateHomework(homeworkId, { status: 'DRAFT' });
+    setIsDrawerMenuOpen(false);
+    setOpenHomeworkMenuId(null);
+  };
+
+  const handleDeleteHomework = (homeworkId: number) => {
+    if (!onDeleteHomework) return;
+    const confirmed = window.confirm('Удалить домашнее задание? Его нельзя будет вернуть.');
+    if (!confirmed) return;
+    onDeleteHomework(homeworkId);
+    setOpenHomeworkMenuId(null);
   };
 
   const handleCreateStatusChange = (status: HomeworkStatus) => {
@@ -450,7 +486,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     });
   };
 
-  const primaryActionLabel = activeTab === 'homework' ? '+ Новое ДЗ' : activeTab === 'lessons' ? 'Напомнить' : 'Напомнить';
+  const primaryActionLabel = 'Напомнить';
 
   return (
     <section className={styles.section}>
@@ -477,32 +513,26 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <div className={styles.filters}>
-                <button
-                  className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
-                  onClick={() => setActiveFilter('all')}
-                >
-                  Все
-                </button>
-                <button
-                  className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
-                  onClick={() => setActiveFilter('debt')}
-                >
-                  С долгом ({counts.withDebt})
-                </button>
-                <button
-                  className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
-                  onClick={() => setActiveFilter('overdue')}
-                >
-                  Просрочено ДЗ ({counts.overdue})
-                </button>
-                <button
-                  className={`${styles.filterChip} ${activeFilter === 'autoOff' ? styles.activeChip : ''}`}
-                  onClick={() => setActiveFilter('autoOff')}
-                >
-                  Авто выкл ({counts.autoOff})
-                </button>
-              </div>
+            <div className={styles.filters}>
+              <button
+                className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
+                onClick={() => setActiveFilter('all')}
+              >
+                Все
+              </button>
+              <button
+                className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
+                onClick={() => setActiveFilter('debt')}
+              >
+                С долгом ({counts.withDebt})
+              </button>
+              <button
+                className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
+                onClick={() => setActiveFilter('overdue')}
+              >
+                Просрочено ДЗ ({counts.overdue})
+              </button>
+            </div>
             </div>
 
             <div className={styles.studentList}>
@@ -533,10 +563,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </div>
                       <div className={styles.studentSecondaryRow}>
                         <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
-                        <span className={styles.studentMeta}>авто: {student.link.autoRemindHomework ? 'вкл' : 'выкл'}</span>
-                        <span className={`${styles.lozenge} ${styles.badgeMuted}`}>
-                          Баланс: {student.link.balanceLessons}
+                        <span className={styles.metaDivider}>•</span>
+                        <span className={styles.studentMeta}>
+                          автонапоминания: {student.link.autoRemindHomework ? 'вкл' : 'выкл'}
                         </span>
+                        <span className={styles.metaDivider}>•</span>
+                        <span className={styles.studentMeta}>баланс: {student.link.balanceLessons}</span>
                       </div>
                     </div>
                   </button>
@@ -560,17 +592,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     <div className={styles.studentMetaRow}>
                       <span>Telegram: @{selectedStudent.username || 'нет'}</span>
                       <span className={styles.metaDivider}>•</span>
-                      <span>Напоминания: {selectedStudent.link.autoRemindHomework ? 'Вкл' : 'Выкл'}</span>
+                      <span>Автонапоминания: {selectedStudent.link.autoRemindHomework ? 'Вкл' : 'Выкл'}</span>
                     </div>
                   </div>
                   <div className={styles.heroActions}>
                     <button
                       className={controls.primaryButton}
                       onClick={() => {
-                        if (activeTab === 'homework') {
-                          setIsHomeworkModalOpen(true);
-                          return;
-                        }
                         onRemindHomework(selectedStudent.id);
                       }}
                     >
@@ -597,10 +625,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   </div>
                 </div>
 
-                <div className={styles.summaryRow}>
-                  <div className={styles.summaryItem}>
-                    <div className={styles.summaryLabel}>Баланс</div>
-                    <div className={styles.summaryValue}>
+                <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
+                  <div className={styles.summaryLine}>
+                    <span className={styles.summaryLabel}>Баланс:</span>
+                    <span className={styles.summaryValueInline}>
                       {selectedStudent.link.balanceLessons}
                       {selectedStudent.link.balanceLessons < 0 && (
                         <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
@@ -608,78 +636,73 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       {selectedStudent.link.balanceLessons > 0 && (
                         <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
                       )}
-                    </div>
-                  </div>
-                  <div className={styles.summaryItem}>
-                    <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
-                      <div className={styles.summaryLabel}>Предоплата</div>
-                      <div className={styles.summaryValue}>{selectedStudent.link.balanceLessons} уроков</div>
-                    </button>
-                    {isPrepaidOpen && (
-                      <div className={styles.popover}>
-                        <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
-                        <button
-                          onClick={() => onAdjustBalance(selectedStudent.id, -1)}
-                          disabled={selectedStudent.link.balanceLessons <= 0}
-                        >
-                          -1 занятие
-                        </button>
-                        <button onClick={() => onAdjustBalance(selectedStudent.id, -selectedStudent.link.balanceLessons)}>
-                          Сбросить в 0
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.summaryItem}>
-                    <div className={styles.summaryLabel}>Цена занятия</div>
-                    {priceEditState.id === selectedStudent.id ? (
-                      <div className={styles.priceEditor}>
-                        <input
-                          className={controls.input}
-                          type="number"
-                          value={priceEditState.value}
-                          onChange={(e) => onPriceChange(e.target.value)}
-                        />
-                        <div className={styles.priceButtons}>
-                          <button className={controls.primaryButton} onClick={onSavePrice}>
-                            Сохранить
+                    </span>
+                    <span className={styles.summaryDivider}>|</span>
+                    <div className={styles.inlinePopover}>
+                      <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
+                        <span className={styles.summaryLabel}>Предоплачено:</span>
+                        <span className={styles.summaryValueInline}>{selectedStudent.link.balanceLessons} уроков</span>
+                      </button>
+                      {isPrepaidOpen && (
+                        <div className={styles.popover}>
+                          <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
+                          <button
+                            onClick={() => onAdjustBalance(selectedStudent.id, -1)}
+                            disabled={selectedStudent.link.balanceLessons <= 0}
+                          >
+                            -1 занятие
                           </button>
-                          <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>
-                            Отмена
+                          <button onClick={() => onAdjustBalance(selectedStudent.id, -selectedStudent.link.balanceLessons)}>
+                            Сбросить в 0
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className={styles.priceValueRow}>
-                        <span className={styles.summaryValue}>
-                          {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                            ? `${selectedStudent.pricePerLesson} ₽`
-                            : '—'}
-                        </span>
-                        <button
-                          className={controls.iconButton}
-                          aria-label="Изменить цену"
-                          onClick={() => onStartEditPrice(selectedStudent)}
-                        >
-                          <EditIcon width={18} height={18} />
+                      )}
+                    </div>
+                    <span className={styles.summaryDivider}>|</span>
+                    <div className={styles.priceInline}>
+                      <span className={styles.summaryLabel}>Цена:</span>
+                      {priceEditState.id === selectedStudent.id ? (
+                        <div className={styles.priceEditorInline}>
+                          <input
+                            className={controls.input}
+                            type="number"
+                            value={priceEditState.value}
+                            onChange={(e) => onPriceChange(e.target.value)}
+                          />
+                          <div className={styles.priceButtons}>
+                            <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
+                            <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
+                          <span className={styles.summaryValueInline}>
+                            {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                              ? `${selectedStudent.pricePerLesson} ₽`
+                              : 'Не задана'}
+                          </span>
+                          <EditOutlinedIcon width={16} height={16} />
                         </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.summaryItem}>
-                    <div className={styles.summaryLabel}>Напоминания о ДЗ</div>
+                      )}
+                    </div>
+                    <span className={styles.summaryDivider}>|</span>
                     <div className={styles.toggleRow}>
-                      <label className={controls.switch}>
-                        <input
-                          type="checkbox"
-                          checked={selectedStudent.link.autoRemindHomework}
-                          onChange={() => onToggleAutoReminder(selectedStudent.id)}
-                        />
-                        <span className={controls.slider} />
-                      </label>
-                      <span className={styles.summaryHint}>за 24 часа</span>
+                      <span className={styles.summaryLabel}>Автонапоминания:</span>
+                      <button
+                        className={`${styles.toggleButton} ${selectedStudent.link.autoRemindHomework ? styles.toggleOn : styles.toggleOff}`}
+                        onClick={() => onToggleAutoReminder(selectedStudent.id)}
+                        type="button"
+                      >
+                        {selectedStudent.link.autoRemindHomework ? 'Вкл' : 'Выкл'}
+                      </button>
                     </div>
                   </div>
+                  <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
+                    <span className={styles.iconLeading} aria-hidden>
+                      <AddOutlinedIcon width={16} height={16} />
+                    </span>
+                    Новое ДЗ
+                  </button>
                 </div>
 
                 <div className={styles.tabs}>
@@ -711,12 +734,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <div className={styles.priceLabel}>Домашка</div>
                       <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
                     </div>
-                    <button className={controls.primaryButton} onClick={() => setIsHomeworkModalOpen(true)}>
-                      <span className={styles.iconLeading} aria-hidden>
-                        <AddOutlinedIcon width={16} height={16} />
-                      </span>
-                      Новое ДЗ
-                    </button>
                   </div>
 
                   <div className={styles.filters}>
@@ -742,14 +759,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     {filteredHomeworks.map((hw) => {
                       const statusInfo = getHomeworkStatusInfo(hw);
                       const title = getHomeworkTitle(hw.text);
-                      const preview = getHomeworkPreview(hw.text);
+                      const preview = truncate(hw.text.replace(/\s+/g, ' ').trim(), 160) || 'Домашнее задание';
+                      const deadlineLabel = hw.deadline
+                        ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
+                        : 'Без дедлайна';
                       return (
                         <div
                           key={hw.id}
                           className={styles.homeworkItem}
                           role="button"
                           tabIndex={0}
-                          onClick={() => handleOpenHomework(hw.id)}
+                          onClick={() => {
+                            setOpenHomeworkMenuId(null);
+                            handleOpenHomework(hw.id);
+                          }}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
@@ -759,26 +782,26 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           aria-pressed={activeHomeworkId === hw.id}
                         >
                           <div className={styles.homeworkContent}>
-                            <div className={styles.homeworkTitle}>{title}</div>
-                            {preview && <div className={styles.homeworkPreview}>{preview}</div>}
-                            <div className={styles.homeworkMeta}>
-                              {hw.deadline
-                                ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
-                                : 'Без дедлайна'}
-                              <span className={styles.metaDivider}>•</span>
-                              Статус: {getStatusLabel(statusInfo.status)}
-                              {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-                                <span className={`${styles.inlineChip} ${styles.badgeDanger}`}>Просрочено</span>
-                              )}
+                            <div className={styles.homeworkTitleRow}>
+                              <div className={styles.homeworkTitle}>{title}</div>
+                              <div className={styles.statusStack}>
+                                {renderStatusPill(statusInfo)}
+                                {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+                                  <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className={styles.homeworkPreviewLine}>{preview}</div>
+                            <div className={styles.homeworkMetaRow}>
+                              <span className={styles.homeworkMeta}>{deadlineLabel}</span>
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
-                            {renderStatusPill(statusInfo)}
                             <div className={styles.iconActions}>
                               <button
                                 className={controls.iconButton}
                                 aria-label="Отметить выполненным"
-                                title="Отметить выполненным"
+                                title="Переключить выполнено"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   onToggleHomework(hw.id);
@@ -792,7 +815,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                 title="Отправить напоминание"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  onRemindHomework(selectedStudent.id);
+                                  handleHomeworkReminder(hw.id);
                                 }}
                               >
                                 <NotificationsNoneOutlinedIcon width={18} height={18} />
@@ -809,9 +832,60 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                               >
                                 <EditOutlinedIcon width={18} height={18} />
                               </button>
-                              <button className={controls.iconButton} aria-label="Ещё" title="Ещё действия">
-                                <MoreHorizIcon width={18} height={18} />
+                              <button
+                                className={controls.iconButton}
+                                aria-label="Скопировать текст"
+                                title="Скопировать текст"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleCopyHomework(hw.text);
+                                }}
+                              >
+                                <ContentCopyOutlinedIcon width={18} height={18} />
                               </button>
+                              <div className={styles.moreActionsWrapper}>
+                                <button
+                                  className={controls.iconButton}
+                                  aria-label="Ещё"
+                                  title="Ещё действия"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenHomeworkMenuId((prev) => (prev === hw.id ? null : hw.id));
+                                  }}
+                                >
+                                  <MoreHorizIcon width={18} height={18} />
+                                </button>
+                                {openHomeworkMenuId === hw.id && (
+                                  <div className={styles.moreMenu}>
+                                    <button
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        onDuplicateHomework?.(hw.id);
+                                        setOpenHomeworkMenuId(null);
+                                      }}
+                                    >
+                                      Дублировать
+                                    </button>
+                                    <button
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleMoveToDraft(hw.id);
+                                      }}
+                                    >
+                                      В черновик
+                                    </button>
+                                    <button
+                                      className={styles.dangerButton}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleDeleteHomework(hw.id);
+                                      }}
+                                    >
+                                      Удалить
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -819,7 +893,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     })}
 
                     {!filteredHomeworks.length && (
-                      <div className={styles.emptyState}>Пока нет ДЗ — создайте первое</div>
+                      <div className={styles.emptyState}>
+                        <p>Пока нет домашек. Добавьте новое задание.</p>
+                        <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
+                          + Новое ДЗ
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -830,6 +909,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <div className={styles.priceLabel}>Занятия</div>
                       <div className={styles.subtleLabel}>Список уроков для ученика</div>
                     </div>
+                    <button
+                      className={controls.secondaryButton}
+                      onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
+                    >
+                      + Урок
+                    </button>
                   </div>
 
                   <div className={styles.lessonList}>
@@ -841,7 +926,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                               {format(parseISO(lesson.startAt), 'd MMM, HH:mm')}
                             </div>
                             <div className={styles.lessonMeta}>
-                              Статус: {lesson.status} • Оплата: {lesson.isPaid ? 'Оплачено' : 'Не оплачено'}
+                              Статус: {getLessonStatusLabel(lesson.status)} • Оплата:{' '}
+                              {lesson.isPaid ? 'Оплачено' : 'Не оплачено'} • Цена:{' '}
+                              {(
+                                lesson.participants?.find((p) => p.studentId === selectedStudentId)?.price ??
+                                selectedStudent.pricePerLesson ??
+                                0
+                              )}{' '}
+                              ₽
                             </div>
                           </div>
                           <div className={styles.iconActions}>
@@ -861,17 +953,35 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                             >
                               <PaidOutlinedIcon width={18} height={18} />
                             </button>
-                            <button className={controls.iconButton} aria-label="Перенести" title="Перенести">
+                            <button
+                              className={controls.iconButton}
+                              aria-label="Перенести"
+                              title="Перенести"
+                              onClick={() => onEditLesson(lesson)}
+                            >
                               <EventRepeatOutlinedIcon width={18} height={18} />
                             </button>
-                            <button className={controls.iconButton} aria-label="Удалить" title="Удалить">
+                            <button
+                              className={controls.iconButton}
+                              aria-label="Удалить"
+                              title="Удалить"
+                              onClick={() => onDeleteLesson(lesson.id)}
+                            >
                               <DeleteOutlineIcon width={18} height={18} />
                             </button>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className={styles.emptyState}>Пока нет занятий</div>
+                      <div className={styles.emptyState}>
+                        <p>Пока нет занятий. Добавьте урок.</p>
+                        <button
+                          className={controls.secondaryButton}
+                          onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
+                        >
+                          + Урок
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -934,9 +1044,32 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   </button>
                 )}
                 {drawerMode === 'view' && (
-                  <button className={controls.iconButton} aria-label="Редактировать" onClick={() => setDrawerMode('edit')}>
+                  <button
+                    className={controls.iconButton}
+                    aria-label="Редактировать"
+                    onClick={() => {
+                      setIsDrawerMenuOpen(false);
+                      setDrawerMode('edit');
+                    }}
+                  >
                     <EditIcon width={18} height={18} />
                   </button>
+                )}
+                {drawerMode === 'view' && (
+                  <div className={styles.moreActionsWrapper}>
+                    <button
+                      className={controls.iconButton}
+                      aria-label="Дополнительные действия"
+                      onClick={() => setIsDrawerMenuOpen((prev) => !prev)}
+                    >
+                      <MoreHorizIcon width={18} height={18} />
+                    </button>
+                    {isDrawerMenuOpen && (
+                      <div className={styles.moreMenu}>
+                        <button onClick={() => handleMoveToDraft(activeHomework.id)}>В черновик</button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
                   <CloseIcon width={18} height={18} />
