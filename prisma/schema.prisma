@@ -54,6 +54,7 @@ model Homework {
   status    String   @default("DRAFT") // values: DRAFT, ASSIGNED, IN_PROGRESS, DONE
   isDone    Boolean  @default(false)
   attachments String @default("[]")
+  timeSpentMinutes Int?
   takenAt   DateTime?
   takenByStudentId Int?
   studentId Int

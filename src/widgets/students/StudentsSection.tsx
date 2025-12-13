@@ -52,6 +52,7 @@ interface StudentsSectionProps {
     baseStatus: HomeworkStatus;
     sendNow: boolean;
     remindBefore: boolean;
+    timeSpentMinutes: string;
   }) => void;
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
@@ -69,6 +70,7 @@ interface StudentsSectionProps {
     baseStatus: HomeworkStatus;
     sendNow: boolean;
     remindBefore: boolean;
+    timeSpentMinutes: string;
   };
 }
 type HomeworkStatusInfo = { status: HomeworkStatus; isOverdue: boolean };
@@ -107,6 +109,22 @@ const getHomeworkTitle = (text: string) => {
   const firstLine = normalized.split('\n').find((line) => line.trim().length > 0) ?? '';
   const baseTitle = firstLine || 'Домашнее задание';
   return truncate(baseTitle, 80) || 'Домашнее задание';
+};
+
+const parseTimeSpentInput = (value: string): number | null => {
+  if (value.trim() === '') return null;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+  return Math.round(numericValue);
+};
+
+const formatTimeSpentMinutes = (minutes?: number | null) => {
+  if (minutes === null || minutes === undefined) return '';
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  if (restMinutes === 0) return `${hours} ч`;
+  return `${hours} ч ${restMinutes} мин`;
 };
 
 export const StudentsSection: FC<StudentsSectionProps> = ({
@@ -153,7 +171,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     deadline: string;
     status: HomeworkStatus;
     attachments: HomeworkAttachment[];
-  }>({ text: '', deadline: '', status: 'ASSIGNED', attachments: [] });
+    timeSpentMinutes: string;
+  }>({ text: '', deadline: '', status: 'ASSIGNED', attachments: [], timeSpentMinutes: '' });
   const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
@@ -215,6 +234,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [homeworkFilter, selectedStudent]);
 
   const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
+  const draftTimeSpentMinutes = parseTimeSpentInput(homeworkDraft.timeSpentMinutes);
+  const resolvedTimeSpentMinutes =
+    draftTimeSpentMinutes ?? (typeof activeHomework?.timeSpentMinutes === 'number' ? activeHomework.timeSpentMinutes : null);
 
   const activeStatusInfo = useMemo(() => {
     if (!activeHomework) return null;
@@ -234,6 +256,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     if (!activeHomework) return false;
     const originalAttachments = activeHomework.attachments ?? [];
     const draftAttachments = homeworkDraft.attachments ?? [];
+    const originalTimeSpent =
+      typeof activeHomework.timeSpentMinutes === 'number' ? activeHomework.timeSpentMinutes : null;
+    const draftTimeSpent = parseTimeSpentInput(homeworkDraft.timeSpentMinutes);
 
     const sameAttachments =
       originalAttachments.length === draftAttachments.length &&
@@ -243,6 +268,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       activeHomework.text !== homeworkDraft.text ||
       (activeHomework.deadline ?? '') !== homeworkDraft.deadline ||
       (activeHomework.status ?? 'ASSIGNED') !== homeworkDraft.status ||
+      originalTimeSpent !== draftTimeSpent ||
       !sameAttachments
     );
   }, [activeHomework, homeworkDraft]);
@@ -266,6 +292,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         deadline: activeHomework.deadline ?? '',
         status: (activeHomework.status as HomeworkStatus) ?? 'ASSIGNED',
         attachments: activeHomework.attachments ?? [],
+        timeSpentMinutes:
+          typeof activeHomework.timeSpentMinutes === 'number'
+            ? String(activeHomework.timeSpentMinutes)
+            : '',
       });
       setDrawerMode('view');
       setIsDescriptionExpanded(false);
@@ -290,6 +320,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       deadline: activeHomework.deadline ?? '',
       status: (activeHomework.status as HomeworkStatus) ?? 'ASSIGNED',
       attachments: activeHomework.attachments ?? [],
+      timeSpentMinutes:
+        typeof activeHomework.timeSpentMinutes === 'number'
+          ? String(activeHomework.timeSpentMinutes)
+          : '',
     });
   };
 
@@ -315,6 +349,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       status: 'DRAFT',
       baseStatus: 'DRAFT',
       sendNow: false,
+      timeSpentMinutes: '',
     });
     setIsHomeworkModalOpen(true);
   };
@@ -344,6 +379,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         text: homeworkDraft.text,
         deadline: homeworkDraft.deadline || null,
         attachments: homeworkDraft.attachments,
+        timeSpentMinutes: parseTimeSpentInput(homeworkDraft.timeSpentMinutes),
       };
 
       payload.status = homeworkDraft.status;
@@ -775,6 +811,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       const deadlineLabel = hw.deadline
                         ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
                         : 'Без дедлайна';
+                      const timeSpentLabel =
+                        hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined
+                          ? `Время: ${formatTimeSpentMinutes(hw.timeSpentMinutes)}`
+                          : 'Время: не указано';
                       return (
                         <div
                           key={hw.id}
@@ -799,6 +839,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                             </div>
                             <div className={styles.homeworkMetaRow}>
                               <span className={styles.homeworkMeta}>{deadlineLabel}</span>
+                              <span className={styles.metaDivider}>•</span>
+                              <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
@@ -1097,6 +1139,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM')}`
                     : 'Без дедлайна'}
                 </span>
+                <span className={styles.drawerBadge}>
+                  {resolvedTimeSpentMinutes !== null
+                    ? `Время: ${formatTimeSpentMinutes(resolvedTimeSpentMinutes)}`
+                    : 'Время не указано'}
+                </span>
                 {hasUnsavedChanges && drawerMode === 'edit' && (
                   <span className={`${styles.drawerBadge} ${styles.badgeMuted}`}>Есть несохранённые изменения</span>
                 )}
@@ -1145,6 +1192,21 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           <option value="DONE">Выполнено</option>
                         </select>
                       </label>
+                      <label className={styles.inputLabel}>
+                        Время выполнения (мин)
+                        <input
+                          className={controls.input}
+                          type="number"
+                          min={0}
+                          step={5}
+                          value={homeworkDraft.timeSpentMinutes}
+                          onChange={(e) =>
+                            setHomeworkDraft({ ...homeworkDraft, timeSpentMinutes: e.target.value })
+                          }
+                          placeholder="Например, 45"
+                        />
+                        <span className={styles.subtleLabel}>Сколько минут заняло выполнение</span>
+                      </label>
                     </div>
                     {saveError && <div className={styles.errorText}>{saveError}</div>}
                   </>
@@ -1175,6 +1237,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         )}
                       </button>
                     )}
+                    <div className={styles.homeworkMetaRow}>
+                      <span className={styles.homeworkMeta}>Время выполнения:</span>
+                      <span className={styles.homeworkMeta}>
+                        {resolvedTimeSpentMinutes !== null
+                          ? formatTimeSpentMinutes(resolvedTimeSpentMinutes)
+                          : 'Не указано'}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1352,6 +1422,19 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   value={newHomeworkDraft.deadline}
                   onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, deadline: e.target.value })}
                 />
+              </label>
+              <label className={styles.inputLabel}>
+                Время выполнения (мин)
+                <input
+                  className={controls.input}
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={newHomeworkDraft.timeSpentMinutes}
+                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, timeSpentMinutes: e.target.value })}
+                  placeholder="Например, 30"
+                />
+                <span className={styles.subtleLabel}>Можно оставить пустым, если ученик ещё не сделал работу</span>
               </label>
               <div className={styles.inputLabel}>
                 <div className={styles.sectionHeader}>

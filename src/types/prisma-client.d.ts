@@ -31,10 +31,17 @@ declare module '@prisma/client' {
     id: number;
     text: string;
     deadline: Date | null;
+    status: string;
     isDone: boolean;
+    attachments: string;
+    timeSpentMinutes: number | null;
+    takenAt: Date | null;
+    takenByStudentId: number | null;
     studentId: number;
     teacherId: bigint;
     createdAt: Date;
+    updatedAt: Date;
+    lastReminderAt: Date | null;
   };
 
   export type Lesson = {
