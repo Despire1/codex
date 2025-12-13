@@ -29,6 +29,7 @@ import {
 import controls from '../../shared/styles/controls.module.css';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
+import {ru} from "date-fns/locale";
 
 interface StudentsSectionProps {
   linkedStudents: LinkedStudent[];
@@ -133,7 +134,7 @@ const formatTimeSpentMinutes = (minutes?: number | null) => {
 const formatCompletionMoment = (completedAt?: string | null) => {
   if (!completedAt) return '';
   try {
-    return format(parseISO(completedAt), 'd MMM, HH:mm');
+    return format(parseISO(completedAt), 'd MMM, HH:mm', {locale: ru});
   } catch (error) {
     return '';
   }
@@ -979,7 +980,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         <div key={lesson.id} className={styles.lessonItem}>
                           <div>
                             <div className={styles.lessonTitle}>
-                              {format(parseISO(lesson.startAt), 'd MMM, HH:mm')}
+                              {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', {locale: ru})}
                             </div>
                             <div className={styles.lessonMeta}>
                               Статус: {getLessonStatusLabel(lesson.status)} • Оплата:{' '}
@@ -1095,7 +1096,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           <aside className={`${styles.homeworkDrawer} ${styles.drawerOpen}`} aria-live="polite">
             <div className={styles.drawerHeaderSticky}>
               <div>
-                <p className={styles.drawerEyebrow}>Домашнее задание</p>
                 <div className={styles.drawerTitle}>{selectedStudent?.link.customName}</div>
                 <div className={styles.drawerSubtitle}>@{selectedStudent?.username || 'нет'} • #{activeHomework.id}</div>
               </div>
@@ -1169,7 +1169,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 )}
                 <span className={styles.drawerBadge}>
                   {homeworkDraft.deadline
-                    ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM')}`
+                    ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM', {locale: ru})}`
                     : 'Без дедлайна'}
                 </span>
                 <span className={styles.drawerBadge}>

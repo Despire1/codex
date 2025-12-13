@@ -1,4 +1,5 @@
 import { SVGProps } from 'react';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
 // Minimal inline Material Design icons to avoid external downloads in sandboxed envs.
 // Paths taken from the official Material icon set used by MUI's icon package.
@@ -157,10 +158,7 @@ export const DoneOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 export const PaidOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
-    <path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 19.93c-3.93-1.25-7-5.21-7-9.93V6.3l7-3.11 7 3.11v4.7c0 4.72-3.07 8.68-7 9.93z" />
-    <path d="m11.99 6.5-4.2 7.3h8.4zm0 2.38L14.07 13h-4.16z" />
-  </svg>
+    <AttachMoneyIcon width={props.width} height={props.height}/>
 );
 
 export const AttachMoneyOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (

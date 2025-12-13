@@ -16,13 +16,17 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.6",
+    "@mui/material": "^7.3.6",
     "@prisma/client": "^5.20.0",
     "@reduxjs/toolkit": "^1.9.5",
     "date-fns": "^2.30.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.2",
     "react-redux": "^8.1.2",
+    "react-router-dom": "^6.26.2",
     "react-select": "^5.10.2"
   },
   "devDependencies": {
