@@ -93,7 +93,7 @@ const getStatusLabel = (status: HomeworkStatus) => {
 
 const getLessonStatusLabel = (status: Lesson['status']) => {
   if (status === 'COMPLETED') return 'Проведён';
-  if (status === 'CANCELLED') return 'Отменён';
+  if (status === 'CANCELED') return 'Отменён';
   return 'Запланирован';
 };
 
@@ -460,6 +460,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
     const confirmed = window.confirm('Перевести задание в черновик? Ученик перестанет его видеть.');
     if (!confirmed) return;
+
+    if (activeHomeworkId === homeworkId) {
+      setHomeworkDraft((prev) => ({
+        ...prev,
+        status: 'DRAFT',
+        baseStatus: 'DRAFT',
+      }));
+    }
 
     onUpdateHomework(homeworkId, { status: 'DRAFT' });
     setIsDrawerMenuOpen(false);
@@ -835,14 +843,16 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                       >
                                         Редактировать
                                       </button>
-                                      <button
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleMoveToDraft(hw.id);
-                                          }}
-                                      >
-                                        В черновик
-                                      </button>
+                                      {statusInfo.status !== 'DRAFT' && (
+                                        <button
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleMoveToDraft(hw.id);
+                                            }}
+                                        >
+                                          В черновик
+                                        </button>
+                                      )}
                                       <button
                                           className={styles.dangerButton}
                                           onClick={(event) => {
@@ -1003,7 +1013,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <div className={styles.drawerSubtitle}>@{selectedStudent?.username || 'нет'} • #{activeHomework.id}</div>
               </div>
               <div className={styles.drawerHeaderActions}>
-                {onSendHomework && activeHomework && (
+                {onSendHomework && activeHomework && activeStatusInfo?.status === 'DRAFT' && (
                   <button
                     className={controls.secondaryButton}
                     onClick={() => onSendHomework(activeHomework.id)}
@@ -1032,12 +1042,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           >
                             Редактировать
                           </button>
-                          <button
-                              aria-label="В черновик"
-                              onClick={() => handleMoveToDraft(activeHomework.id)}
-                          >
-                            В черновик
-                          </button>
+                          {activeStatusInfo?.status !== 'DRAFT' && (
+                            <button
+                                aria-label="В черновик"
+                                onClick={() => handleMoveToDraft(activeHomework.id)}
+                            >
+                              В черновик
+                            </button>
+                          )}
                         </div>
                     )}
                   </div>
