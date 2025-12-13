@@ -50,12 +50,15 @@ model Homework {
   id        Int      @id @default(autoincrement())
   text      String
   deadline  DateTime?
+  status    String   @default("IN_PROGRESS")
   isDone    Boolean  @default(false)
   studentId Int
   teacherId BigInt
   student   Student  @relation(fields: [studentId], references: [id])
   teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastReminderAt DateTime?
 }
 
 model Lesson {

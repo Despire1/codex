@@ -1,4 +1,4 @@
-import { Homework, Lesson, Student, Teacher, TeacherStudent } from '../../entities/types';
+import { Homework, HomeworkStatus, Lesson, Student, Teacher, TeacherStudent } from '../../entities/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -80,10 +80,15 @@ export const api = {
     apiFetch<{ participant: any; lesson: Lesson }>(`/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`, {
       method: 'POST',
     }),
-  createHomework: (payload: { studentId: number; text: string; deadline?: string }) =>
+  createHomework: (payload: { studentId: number; text: string; deadline?: string; status?: HomeworkStatus }) =>
     apiFetch<{ homework: Homework }>('/api/homeworks', { method: 'POST', body: JSON.stringify(payload) }),
   toggleHomework: (homeworkId: number) =>
     apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}/toggle`, { method: 'PATCH' }),
+  updateHomework: (homeworkId: number, payload: Partial<Homework>) =>
+    apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteHomework: (homeworkId: number) => apiFetch<{ id: number }>(`/api/homeworks/${homeworkId}`, { method: 'DELETE' }),
+  remindHomeworkById: (homeworkId: number) =>
+    apiFetch<{ status: string; homework: Homework }>(`/api/homeworks/${homeworkId}/remind`, { method: 'POST' }),
   remindHomework: (studentId: number) =>
     apiFetch<{ status: string; studentId: number; teacherId: number }>('/api/reminders/homework', {
       method: 'POST',
