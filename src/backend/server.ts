@@ -243,6 +243,7 @@ const createHomework = async (body: any) => {
       deadline: deadline ? new Date(deadline) : null,
       status: normalizedStatus,
       isDone: normalizedStatus === 'DONE',
+      attachments: JSON.stringify([]),
     },
   });
 };
@@ -267,6 +268,9 @@ const updateHomework = async (homeworkId: number, body: any) => {
   if (typeof body.text === 'string') payload.text = body.text;
   if ('deadline' in body) {
     payload.deadline = body.deadline ? new Date(body.deadline) : null;
+  }
+  if (Array.isArray(body.attachments)) {
+    payload.attachments = JSON.stringify(body.attachments);
   }
   if (body.status) {
     const normalizedStatus = normalizeStatus(body.status);
