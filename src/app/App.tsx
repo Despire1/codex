@@ -56,8 +56,9 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({
     text: '',
     deadline: '',
-    status: 'SENT' as HomeworkStatus,
-    sendToTelegram: true,
+    status: 'DRAFT' as HomeworkStatus,
+    baseStatus: 'DRAFT' as HomeworkStatus,
+    sendNow: false,
     remindBefore: true,
   });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
@@ -521,23 +522,56 @@ export const App = () => {
     }
   };
 
+  const sendHomeworkToStudent = async (homeworkId: number) => {
+    try {
+      const result = await api.sendHomework(homeworkId);
+      setHomeworks((prev) => prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework) : hw)));
+      showInfoDialog('Отправлено ученику', 'Задание опубликовано и отправлено ученику.');
+    } catch (error) {
+      setDialogState({
+        type: 'confirm',
+        title: 'Не удалось отправить. Задание опубликовано.',
+        message: 'Повторить отправку?',
+        confirmText: 'Повторить',
+        cancelText: 'Отмена',
+        onConfirm: () => {
+          closeDialog();
+          sendHomeworkToStudent(homeworkId);
+        },
+        onCancel: closeDialog,
+      });
+      // eslint-disable-next-line no-console
+      console.error('Failed to send homework to student', error);
+    }
+  };
+
   const addHomework = async () => {
     if (!selectedStudentId || !newHomeworkDraft.text.trim()) return;
+
+    const targetStatus = newHomeworkDraft.sendNow ? 'ASSIGNED' : newHomeworkDraft.status;
 
     try {
       const data = await api.createHomework({
         studentId: selectedStudentId,
         text: newHomeworkDraft.text,
         deadline: newHomeworkDraft.deadline || undefined,
-        status: newHomeworkDraft.status,
+        status: targetStatus,
       });
 
-      setHomeworks([...homeworks, normalizeHomework(data.homework)]);
+      const normalized = normalizeHomework(data.homework);
+      setHomeworks([...homeworks, normalized]);
+
+      if (newHomeworkDraft.sendNow) {
+        await sendHomeworkToStudent(normalized.id);
+      } else {
+        showInfoDialog('Домашнее задание создано', 'Черновик сохранён.');
+      }
       setNewHomeworkDraft({
         text: '',
         deadline: '',
-        status: 'SENT',
-        sendToTelegram: true,
+        status: 'DRAFT',
+        baseStatus: 'DRAFT',
+        sendNow: false,
         remindBefore: true,
       });
     } catch (error) {
@@ -676,8 +710,14 @@ export const App = () => {
                   onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
                   onRemindHomework={remindHomework}
                   onRemindHomeworkById={remindHomeworkById}
+                  onSendHomework={sendHomeworkToStudent}
                   onAddHomework={addHomework}
-                  onHomeworkDraftChange={setNewHomeworkDraft}
+                  onHomeworkDraftChange={(draft) =>
+                    setNewHomeworkDraft({
+                      ...draft,
+                      baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
+                    })
+                  }
                   onToggleHomework={toggleHomeworkDone}
                   onUpdateHomework={updateHomework}
                   onOpenStudentModal={() => setStudentModalOpen(true)}

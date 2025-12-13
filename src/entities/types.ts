@@ -24,7 +24,7 @@ export interface TeacherStudent {
   balanceLessons: number;
 }
 
-export type HomeworkStatus = 'DRAFT' | 'IN_PROGRESS' | 'SENT' | 'DONE';
+export type HomeworkStatus = 'DRAFT' | 'ASSIGNED' | 'IN_PROGRESS' | 'DONE';
 
 export interface HomeworkAttachment {
   id: string;

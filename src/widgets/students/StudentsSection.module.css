@@ -196,6 +196,22 @@
   border-color: #e5e7eb;
 }
 
+.badgeInfo {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.inlineChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  gap: 6px;
+}
+
 .studentSecondaryRow {
   display: flex;
   gap: 8px;
@@ -502,6 +518,19 @@
   gap: 6px;
 }
 
+.toggleGroup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.helperText {
+  color: #b91c1c;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
 .metaDivider {
   color: #cbd5e1;
 }
@@ -520,6 +549,31 @@
   border: 1px solid transparent;
 }
 
+.statusStack {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.statusDraft {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.statusAssigned {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.statusInProgress {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
 .statusDone {
   background: #ecfdf3;
   color: #15803d;
@@ -530,12 +584,6 @@
   background: #fef2f2;
   color: #b91c1c;
   border-color: #fecdd3;
-}
-
-.statusPending {
-  background: #fff7ed;
-  color: #c2410c;
-  border-color: #fed7aa;
 }
 
 .iconActions {

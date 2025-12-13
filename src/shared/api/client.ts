@@ -87,6 +87,8 @@ export const api = {
   updateHomework: (homeworkId: number, payload: Partial<Homework>) =>
     apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteHomework: (homeworkId: number) => apiFetch<{ id: number }>(`/api/homeworks/${homeworkId}`, { method: 'DELETE' }),
+  sendHomework: (homeworkId: number) =>
+    apiFetch<{ status: string; homework: Homework }>(`/api/homeworks/${homeworkId}/send`, { method: 'POST' }),
   remindHomeworkById: (homeworkId: number) =>
     apiFetch<{ status: string; homework: Homework }>(`/api/homeworks/${homeworkId}/remind`, { method: 'POST' }),
   remindHomework: (studentId: number) =>

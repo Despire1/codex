@@ -29,11 +29,12 @@ export const normalizeLesson = (lesson: any): Lesson => ({
 
 const resolveStatus = (homework: any): HomeworkStatus => {
   const status = typeof homework.status === 'string' ? homework.status.toUpperCase() : null;
-  if (status === 'ACTIVE') return 'SENT';
-  if (status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(status)) {
+  if (status === 'ACTIVE' || status === 'SENT') return 'ASSIGNED';
+  if (status === 'NEW') return 'DRAFT';
+  if (status && ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'DONE'].includes(status)) {
     return status as HomeworkStatus;
   }
-  return homework.isDone ? 'DONE' : 'SENT';
+  return homework.isDone ? 'DONE' : 'ASSIGNED';
 };
 
 export const normalizeHomework = (homework: any): Homework => {
