@@ -424,11 +424,14 @@ const createLesson = async (body: any) => {
   const students = await prisma.student.findMany({
     where: { id: { in: studentIds } },
   });
+  const basePrice = students[0]?.pricePerLesson ?? 0;
+  const markPaid = Boolean(body?.isPaid || body?.markPaid);
 
   const lesson = await prisma.lesson.create({
     data: {
       teacherId: teacher.chatId,
       studentId: studentIds[0],
+      price: basePrice,
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
@@ -449,6 +452,34 @@ const createLesson = async (body: any) => {
       },
     },
   });
+
+  if (markPaid) {
+    await prisma.payment.createMany({
+      data: lesson.participants.map((participant: any) => ({
+        lessonId: lesson.id,
+        studentId: participant.studentId,
+        amount: participant.price ?? basePrice,
+        teacherId: teacher.chatId,
+        paidAt: new Date(),
+        comment: null,
+      })),
+      skipDuplicates: true,
+    });
+
+    await prisma.lessonParticipant.updateMany({ where: { lessonId: lesson.id }, data: { isPaid: true } });
+
+    const updated = await prisma.lesson.update({
+      where: { id: lesson.id },
+      data: { isPaid: true },
+      include: {
+        participants: {
+          include: { student: true },
+        },
+      },
+    });
+
+    return updated;
+  }
 
   return lesson;
 };
@@ -486,6 +517,9 @@ const createRecurringLessons = async (body: any) => {
   const students = await prisma.student.findMany({
     where: { id: { in: studentIds } },
   });
+
+  const basePrice = students[0]?.pricePerLesson ?? 0;
+  const markPaid = Boolean(body?.isPaid || body?.markPaid);
 
   const maxEndDate = addYears(startDate, 1);
   const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
@@ -538,6 +572,7 @@ const createRecurringLessons = async (body: any) => {
       data: {
         teacherId: teacher.chatId,
         studentId: studentIds[0],
+        price: basePrice,
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -562,7 +597,33 @@ const createRecurringLessons = async (body: any) => {
         },
       },
     });
-    created.push(lesson);
+    if (markPaid) {
+      await prisma.payment.createMany({
+        data: lesson.participants.map((participant: any) => ({
+          lessonId: lesson.id,
+          studentId: participant.studentId,
+          amount: participant.price ?? basePrice,
+          teacherId: teacher.chatId,
+          paidAt: new Date(),
+          comment: null,
+        })),
+        skipDuplicates: true,
+      });
+
+      await prisma.lessonParticipant.updateMany({ where: { lessonId: lesson.id }, data: { isPaid: true } });
+
+      const updatedLesson = await prisma.lesson.update({
+        where: { id: lesson.id },
+        data: { isPaid: true },
+        include: {
+          participants: { include: { student: true } },
+        },
+      });
+
+      created.push(updatedLesson);
+    } else {
+      created.push(lesson);
+    }
   }
 
   return created;
@@ -604,6 +665,8 @@ const updateLesson = async (lessonId: number, body: any) => {
     where: { id: { in: ids } },
   });
 
+  const basePrice = students[0]?.pricePerLesson ?? (existing as any).price ?? 0;
+
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   const existingLesson = existing as any;
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
@@ -618,6 +681,7 @@ const updateLesson = async (lessonId: number, body: any) => {
       where: { id: lessonId },
       data: {
         studentId: ids[0],
+        price: basePrice,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -672,6 +736,7 @@ const updateLesson = async (lessonId: number, body: any) => {
           data: {
             teacherId: teacher.chatId,
             studentId: ids[0],
+            price: basePrice,
             startAt: start,
             durationMinutes: nextDuration,
             status: 'SCHEDULED',
@@ -745,6 +810,7 @@ const updateLesson = async (lessonId: number, body: any) => {
           data: {
             teacherId: teacher.chatId,
             studentId: ids[0],
+            price: basePrice,
             startAt: start,
             durationMinutes: nextDuration,
             status: 'SCHEDULED',
@@ -789,6 +855,7 @@ const updateLesson = async (lessonId: number, body: any) => {
     where: { id: lessonId },
     data: {
       studentId: ids[0],
+      price: basePrice,
       startAt: targetStart,
       durationMinutes: nextDuration,
       participants: {
@@ -849,45 +916,78 @@ const markLessonCompleted = async (lessonId: number) => {
   return { lesson: updatedLesson, link: updatedLink };
 };
 
-const toggleLessonPaid = async (lessonId: number) => {
+const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
   const teacher = await ensureTeacher();
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
-  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
-
-  return prisma.lesson.update({
+  const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    data: { isPaid: !lesson.isPaid },
+    include: { participants: true },
   });
-};
 
-const toggleParticipantPaid = async (lessonId: number, studentId: number) => {
-  const teacher = await ensureTeacher();
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
-  const participant = await prisma.lessonParticipant.findUnique({
-    where: { lessonId_studentId: { lessonId, studentId } },
-  });
-
+  const participant = lesson.participants.find((entry: any) => entry.studentId === studentId);
   if (!participant) throw new Error('Участник урока не найден');
 
-  return prisma.lessonParticipant.update({
+  const existingPayment = await prisma.payment.findUnique({
     where: { lessonId_studentId: { lessonId, studentId } },
-    data: { isPaid: !participant.isPaid },
+  });
+
+  if (existingPayment) {
+    await prisma.payment.delete({ where: { id: existingPayment.id } });
+    await prisma.lessonParticipant.update({
+      where: { lessonId_studentId: { lessonId, studentId } },
+      data: { isPaid: false },
+    });
+  } else {
+    const amount = participant.price ?? lesson.price ?? 0;
+    await prisma.payment.create({
+      data: {
+        lessonId,
+        studentId,
+        amount,
+        teacherId: teacher.chatId,
+        paidAt: new Date(),
+        comment: null,
+      },
+    });
+
+    await prisma.lessonParticipant.update({
+      where: { lessonId_studentId: { lessonId, studentId } },
+      data: { isPaid: true },
+    });
+  }
+
+  const participants = await prisma.lessonParticipant.findMany({
+    where: { lessonId },
+    include: { student: true },
+  });
+
+  const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
+
+  const normalizedLesson = await prisma.lesson.update({
+    where: { id: lessonId },
+    data: { isPaid: participantsPaid },
     include: {
-      student: true,
-      lesson: {
-        include: {
-          participants: {
-            include: {
-              student: true,
-            },
-          },
-        },
+      participants: {
+        include: { student: true },
       },
     },
   });
+
+  const updatedParticipant = normalizedLesson.participants.find((item: any) => item.studentId === studentId);
+  return { lesson: normalizedLesson, participant: updatedParticipant };
 };
+
+const toggleLessonPaid = async (lessonId: number) => {
+  const baseLesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!baseLesson) throw new Error('Урок не найден');
+
+  const { lesson } = await togglePaymentForStudent(lessonId, baseLesson.studentId);
+  return lesson;
+};
+
+const toggleParticipantPaid = async (lessonId: number, studentId: number) =>
+  togglePaymentForStudent(lessonId, studentId);
 
 const remindHomework = async (studentId: number) => {
   const teacher = await ensureTeacher();

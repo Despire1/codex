@@ -3,6 +3,7 @@ import { Homework, HomeworkStatus, Lesson } from '../../entities/types';
 
 export const normalizeLesson = (lesson: any): Lesson => ({
   ...lesson,
+  price: typeof lesson.price === 'number' ? lesson.price : Number(lesson.price ?? 0),
   startAt: typeof lesson.startAt === 'string' ? lesson.startAt : new Date(lesson.startAt).toISOString(),
   recurrenceUntil: lesson.recurrenceUntil
     ? typeof lesson.recurrenceUntil === 'string'

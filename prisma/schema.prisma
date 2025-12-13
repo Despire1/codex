@@ -16,6 +16,7 @@ model Teacher {
   students              TeacherStudent[]
   homeworks             Homework[]
   lessons               Lesson[]
+  payments              Payment[]
   createdAt             DateTime        @default(now())
   authUser              TeacherAuth?
 }
@@ -30,6 +31,7 @@ model Student {
   takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
+  payments             Payment[]
   createdAt            DateTime             @default(now())
 }
 
@@ -72,6 +74,7 @@ model Lesson {
   id                  Int                 @id @default(autoincrement())
   teacherId           BigInt
   studentId           Int
+  price               Int                 @default(0)
   startAt             DateTime
   durationMinutes     Int
   status              String              @default("SCHEDULED") // values: SCHEDULED, COMPLETED, CANCELED
@@ -83,9 +86,29 @@ model Lesson {
   teacher             Teacher             @relation(fields: [teacherId], references: [chatId])
   student             Student             @relation(fields: [studentId], references: [id])
   participants        LessonParticipant[]
+  payments            Payment[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int
+  studentId Int
+  amount    Int
+  paidAt    DateTime @default(now())
+  teacherId BigInt
+  comment   String?
+
+  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [chatId])
+
+  @@unique([lessonId, studentId])
+  @@index([lessonId])
+  @@index([studentId])
+  @@index([teacherId])
 }
 
 model LessonParticipant {
