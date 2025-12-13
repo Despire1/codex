@@ -56,7 +56,7 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({
     text: '',
     deadline: '',
-    status: 'IN_PROGRESS' as HomeworkStatus,
+    status: 'SENT' as HomeworkStatus,
     sendToTelegram: true,
     remindBefore: true,
   });
@@ -536,7 +536,7 @@ export const App = () => {
       setNewHomeworkDraft({
         text: '',
         deadline: '',
-        status: 'IN_PROGRESS',
+        status: 'SENT',
         sendToTelegram: true,
         remindBefore: true,
       });
@@ -675,9 +675,11 @@ export const App = () => {
                   onSavePrice={savePrice}
                   onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
                   onRemindHomework={remindHomework}
+                  onRemindHomeworkById={remindHomeworkById}
                   onAddHomework={addHomework}
                   onHomeworkDraftChange={setNewHomeworkDraft}
                   onToggleHomework={toggleHomeworkDone}
+                  onUpdateHomework={updateHomework}
                   onOpenStudentModal={() => setStudentModalOpen(true)}
                   lessons={lessons}
                   onCompleteLesson={markLessonCompleted}

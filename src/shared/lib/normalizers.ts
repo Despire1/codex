@@ -28,28 +28,50 @@ export const normalizeLesson = (lesson: any): Lesson => ({
 });
 
 const resolveStatus = (homework: any): HomeworkStatus => {
-  if (homework.status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(homework.status)) {
-    return homework.status as HomeworkStatus;
+  const status = typeof homework.status === 'string' ? homework.status.toUpperCase() : null;
+  if (status === 'ACTIVE') return 'SENT';
+  if (status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(status)) {
+    return status as HomeworkStatus;
   }
-  return homework.isDone ? 'DONE' : 'IN_PROGRESS';
+  return homework.isDone ? 'DONE' : 'SENT';
 };
 
-export const normalizeHomework = (homework: any): Homework => ({
-  ...homework,
-  status: resolveStatus(homework),
-  isDone: homework.isDone ?? homework.status === 'DONE',
-  deadline: homework.deadline
-    ? typeof homework.deadline === 'string'
-      ? homework.deadline.slice(0, 10)
-      : new Date(homework.deadline).toISOString().slice(0, 10)
+export const normalizeHomework = (homework: any): Homework => {
+  let attachments: any[] = [];
+  if (Array.isArray(homework.attachments)) {
+    attachments = homework.attachments;
+  } else if (typeof homework.attachments === 'string') {
+    try {
+      attachments = JSON.parse(homework.attachments) ?? [];
+    } catch (error) {
+      attachments = [];
+    }
+  }
+
+  return {
+    ...homework,
+    status: resolveStatus(homework),
+    isDone: homework.isDone ?? homework.status === 'DONE',
+    attachments,
+    deadline: homework.deadline
+      ? typeof homework.deadline === 'string'
+        ? homework.deadline.slice(0, 10)
+        : new Date(homework.deadline).toISOString().slice(0, 10)
     : null,
-  createdAt: typeof homework.createdAt === 'string' ? homework.createdAt : new Date(homework.createdAt).toISOString(),
-  updatedAt: typeof homework.updatedAt === 'string' ? homework.updatedAt : new Date(homework.updatedAt).toISOString(),
-  lastReminderAt: homework.lastReminderAt
-    ? typeof homework.lastReminderAt === 'string'
-      ? homework.lastReminderAt
-      : new Date(homework.lastReminderAt).toISOString()
-    : null,
-});
+    createdAt: typeof homework.createdAt === 'string' ? homework.createdAt : new Date(homework.createdAt).toISOString(),
+    updatedAt: typeof homework.updatedAt === 'string' ? homework.updatedAt : new Date(homework.updatedAt).toISOString(),
+    lastReminderAt: homework.lastReminderAt
+      ? typeof homework.lastReminderAt === 'string'
+        ? homework.lastReminderAt
+        : new Date(homework.lastReminderAt).toISOString()
+      : null,
+    takenAt: homework.takenAt
+      ? typeof homework.takenAt === 'string'
+        ? homework.takenAt
+        : new Date(homework.takenAt).toISOString()
+      : null,
+    takenByStudentId: typeof homework.takenByStudentId === 'number' ? homework.takenByStudentId : null,
+  };
+};
 
 export const todayISO = () => format(new Date(), 'yyyy-MM-dd');

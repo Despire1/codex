@@ -218,10 +218,26 @@ const adjustBalance = async (studentId: number, delta: number) => {
   });
 };
 
+type RequestRole = 'TEACHER' | 'STUDENT';
+
+const getRequestRole = (req: IncomingMessage): RequestRole => {
+  const roleHeader = (req.headers['x-user-role'] as string | undefined) ?? '';
+  return roleHeader.toUpperCase() === 'STUDENT' ? 'STUDENT' : 'TEACHER';
+};
+
 const normalizeStatus = (status: any) => {
-  if (typeof status !== 'string') return 'IN_PROGRESS';
+  if (typeof status !== 'string') return 'SENT';
   const upper = status.toUpperCase();
-  return ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(upper) ? upper : 'IN_PROGRESS';
+  if (upper === 'ACTIVE') return 'SENT';
+  return ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(upper) ? upper : 'SENT';
+};
+
+const normalizeTeacherStatus = (status: any) => {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'IN_PROGRESS') {
+    throw new Error('Учитель не может поставить статус "В работе"');
+  }
+  return normalized;
 };
 
 const createHomework = async (body: any) => {
@@ -233,7 +249,7 @@ const createHomework = async (body: any) => {
   });
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
-  const normalizedStatus = normalizeStatus(status);
+  const normalizedStatus = normalizeTeacherStatus(status ?? 'SENT');
 
   return prisma.homework.create({
     data: {
@@ -243,6 +259,7 @@ const createHomework = async (body: any) => {
       deadline: deadline ? new Date(deadline) : null,
       status: normalizedStatus,
       isDone: normalizedStatus === 'DONE',
+      attachments: JSON.stringify([]),
     },
   });
 };
@@ -254,7 +271,7 @@ const toggleHomework = async (homeworkId: number) => {
 
   return prisma.homework.update({
     where: { id: homeworkId },
-    data: { isDone: !homework.isDone, status: homework.isDone ? 'IN_PROGRESS' : 'DONE' },
+    data: { isDone: !homework.isDone, status: homework.isDone ? 'SENT' : 'DONE' },
   });
 };
 
@@ -268,13 +285,56 @@ const updateHomework = async (homeworkId: number, body: any) => {
   if ('deadline' in body) {
     payload.deadline = body.deadline ? new Date(body.deadline) : null;
   }
+  if (Array.isArray(body.attachments)) {
+    payload.attachments = JSON.stringify(body.attachments);
+  }
   if (body.status) {
-    const normalizedStatus = normalizeStatus(body.status);
+    const normalizedStatus = normalizeTeacherStatus(body.status);
     payload.status = normalizedStatus;
     payload.isDone = normalizedStatus === 'DONE';
   }
 
   return prisma.homework.update({ where: { id: homeworkId }, data: payload });
+};
+
+const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
+  const role = getRequestRole(req);
+  if (role !== 'STUDENT') {
+    const error: any = new Error('Недостаточно прав для изменения статуса');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const studentIdHeader = req.headers['x-student-id'];
+  const requesterStudentId = typeof studentIdHeader === 'string' ? Number(studentIdHeader) : NaN;
+  if (!Number.isFinite(requesterStudentId)) {
+    const error: any = new Error('studentId обязателен для взятия в работу');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!homework) throw new Error('Домашнее задание не найдено');
+  if (homework.studentId !== requesterStudentId) {
+    const error: any = new Error('Домашнее задание недоступно этому ученику');
+    error.statusCode = 403;
+    throw error;
+  }
+  if (homework.status !== 'SENT' && homework.status !== 'IN_PROGRESS') {
+    const error: any = new Error('Неверный статус для перевода в работу');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return prisma.homework.update({
+    where: { id: homeworkId },
+    data: {
+      status: 'IN_PROGRESS',
+      isDone: false,
+      takenAt: new Date(),
+      takenByStudentId: requesterStudentId,
+    },
+  });
 };
 
 const deleteHomework = async (homeworkId: number) => {
@@ -820,7 +880,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     res.statusCode = 200;
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Role, X-Student-Id');
     return res.end();
   }
 
@@ -881,6 +941,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const homeworkId = Number(homeworkUpdateMatch[1]);
       const body = await readBody(req);
       const homework = await updateHomework(homeworkId, body);
+      return sendJson(res, 200, { homework });
+    }
+
+    const takeInWorkMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/take-in-work$/);
+    if (req.method === 'POST' && takeInWorkMatch) {
+      const homeworkId = Number(takeInWorkMatch[1]);
+      const homework = await takeHomeworkInWork(homeworkId, req);
       return sendJson(res, 200, { homework });
     }
 
