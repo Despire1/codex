@@ -675,9 +675,11 @@ export const App = () => {
                   onSavePrice={savePrice}
                   onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
                   onRemindHomework={remindHomework}
+                  onRemindHomeworkById={remindHomeworkById}
                   onAddHomework={addHomework}
                   onHomeworkDraftChange={setNewHomeworkDraft}
                   onToggleHomework={toggleHomeworkDone}
+                  onUpdateHomework={updateHomework}
                   onOpenStudentModal={() => setStudentModalOpen(true)}
                   lessons={lessons}
                   onCompleteLesson={markLessonCompleted}

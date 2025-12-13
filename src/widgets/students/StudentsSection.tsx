@@ -1,5 +1,5 @@
 import { format, isBefore, parseISO } from 'date-fns';
-import { type FC, useEffect, useMemo, useState } from 'react';
+import { type ClipboardEvent as ReactClipboardEvent, type DragEvent, type FC, useEffect, useMemo, useState } from 'react';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
@@ -13,8 +13,16 @@ import {
   MoreHorizIcon,
   NotificationsNoneOutlinedIcon,
   PaidOutlinedIcon,
+  ReplayOutlinedIcon,
 } from '../../icons/MaterialIcons';
-import { HomeworkStatus, Lesson, LinkedStudent, Student } from '../../entities/types';
+import {
+  Homework,
+  HomeworkAttachment,
+  HomeworkStatus,
+  Lesson,
+  LinkedStudent,
+  Student,
+} from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './StudentsSection.module.css';
 
@@ -30,6 +38,7 @@ interface StudentsSectionProps {
   onSavePrice: () => void;
   onCancelPriceEdit: () => void;
   onRemindHomework: (studentId: number) => void;
+  onRemindHomeworkById?: (homeworkId: number) => void;
   onAddHomework: () => void;
   onHomeworkDraftChange: (draft: {
     text: string;
@@ -39,6 +48,7 @@ interface StudentsSectionProps {
     remindBefore: boolean;
   }) => void;
   onToggleHomework: (homeworkId: number) => void;
+  onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
   lessons: Lesson[];
   onCompleteLesson: (lessonId: number) => void;
@@ -85,9 +95,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onSavePrice,
   onCancelPriceEdit,
   onRemindHomework,
+  onRemindHomeworkById,
   onAddHomework,
   onHomeworkDraftChange,
   onToggleHomework,
+  onUpdateHomework,
   onOpenStudentModal,
   lessons,
   onCompleteLesson,
@@ -102,6 +114,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons'>('homework');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view');
+  const [homeworkDraft, setHomeworkDraft] = useState<{
+    text: string;
+    deadline: string;
+    status: HomeworkStatus;
+    attachments: HomeworkAttachment[];
+  }>({ text: '', deadline: '', status: 'IN_PROGRESS', attachments: [] });
+  const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
+  const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
 
@@ -150,7 +174,181 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [lessons, selectedStudentId]);
 
   const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
-  const closeHomeworkDrawer = () => setActiveHomeworkId(null);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!activeHomework) return false;
+    const originalAttachments = activeHomework.attachments ?? [];
+    const draftAttachments = homeworkDraft.attachments ?? [];
+
+    const sameAttachments =
+      originalAttachments.length === draftAttachments.length &&
+      JSON.stringify(originalAttachments) === JSON.stringify(draftAttachments);
+
+    return (
+      activeHomework.text !== homeworkDraft.text ||
+      (activeHomework.deadline ?? '') !== homeworkDraft.deadline ||
+      (activeHomework.status ?? 'IN_PROGRESS') !== homeworkDraft.status ||
+      !sameAttachments
+    );
+  }, [activeHomework, homeworkDraft]);
+
+  const closeHomeworkDrawer = () => {
+    if (drawerMode === 'edit' && hasUnsavedChanges) {
+      setPendingHomeworkId(null);
+      setShowUnsavedConfirm(true);
+      return;
+    }
+    setActiveHomeworkId(null);
+    setDrawerMode('view');
+  };
+
+  useEffect(() => {
+    if (activeHomework) {
+      setHomeworkDraft({
+        text: activeHomework.text,
+        deadline: activeHomework.deadline ?? '',
+        status: (activeHomework.status as HomeworkStatus) ?? 'IN_PROGRESS',
+        attachments: activeHomework.attachments ?? [],
+      });
+      setDrawerMode('view');
+    }
+  }, [activeHomework?.id]);
+
+  const handleOpenHomework = (homeworkId: number) => {
+    if (drawerMode === 'edit' && hasUnsavedChanges && activeHomeworkId !== homeworkId) {
+      setPendingHomeworkId(homeworkId);
+      setShowUnsavedConfirm(true);
+      return;
+    }
+    setActiveHomeworkId(homeworkId);
+    setDrawerMode('view');
+  };
+
+  const resetDraftToOriginal = () => {
+    if (!activeHomework) return;
+    setHomeworkDraft({
+      text: activeHomework.text,
+      deadline: activeHomework.deadline ?? '',
+      status: (activeHomework.status as HomeworkStatus) ?? 'IN_PROGRESS',
+      attachments: activeHomework.attachments ?? [],
+    });
+  };
+
+  const handleDiscardChanges = () => {
+    resetDraftToOriginal();
+    setShowUnsavedConfirm(false);
+    setDrawerMode('view');
+    if (pendingHomeworkId) {
+      setActiveHomeworkId(pendingHomeworkId);
+      setPendingHomeworkId(null);
+    } else if (!pendingHomeworkId) {
+      setActiveHomeworkId(null);
+    }
+  };
+
+  const handleKeepEditing = () => {
+    setShowUnsavedConfirm(false);
+  };
+
+  const handleConfirmSaveAndClose = async () => {
+    const saved = await handleSaveDraft();
+    if (!saved) return;
+    setShowUnsavedConfirm(false);
+    if (pendingHomeworkId) {
+      setActiveHomeworkId(pendingHomeworkId);
+      setPendingHomeworkId(null);
+    } else {
+      setActiveHomeworkId(null);
+    }
+  };
+
+  const handleSaveDraft = async (): Promise<boolean> => {
+    if (!activeHomework || !onUpdateHomework) return false;
+    if (!homeworkDraft.text.trim()) {
+      setSaveError('Введите текст задания');
+      return false;
+    }
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onUpdateHomework(activeHomework.id, {
+        text: homeworkDraft.text,
+        deadline: homeworkDraft.deadline || null,
+        status: homeworkDraft.status,
+        attachments: homeworkDraft.attachments,
+      });
+      setDrawerMode('view');
+      return true;
+    } catch (error) {
+      setSaveError('Ошибка сохранения, попробуйте ещё раз');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const MAX_ATTACHMENTS = 5;
+  const MAX_SIZE_MB = 10;
+
+  const addAttachments = (files: File[]) => {
+    const availableSlots = MAX_ATTACHMENTS - (homeworkDraft.attachments?.length ?? 0);
+    if (availableSlots <= 0) return;
+    const nextFiles = files.slice(0, availableSlots);
+
+    nextFiles.forEach((file) => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return;
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) return;
+
+      const tempId = `${Date.now()}-${file.name}`;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setHomeworkDraft((prev) => ({
+          ...prev,
+          attachments: [
+            ...(prev.attachments ?? []),
+            {
+              id: tempId,
+              url: reader.result as string,
+              fileName: file.name,
+              size: file.size,
+              status: 'ready',
+            },
+          ],
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeAttachment = (attachmentId: string) => {
+    setHomeworkDraft((prev) => ({
+      ...prev,
+      attachments: (prev.attachments ?? []).filter((item) => item.id !== attachmentId),
+    }));
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (drawerMode !== 'edit') return;
+    const files = Array.from(event.dataTransfer.files || []);
+    addAttachments(files);
+  };
+
+  const handlePaste = (event: ClipboardEvent | ReactClipboardEvent) => {
+    if (drawerMode !== 'edit') return;
+    const files = Array.from(event.clipboardData?.files || []);
+    if (files.length) {
+      addAttachments(files as File[]);
+    }
+  };
+
+  useEffect(() => {
+    const handler = (event: ClipboardEvent) => handlePaste(event);
+    if (activeHomeworkId) {
+      window.addEventListener('paste', handler);
+    }
+    return () => window.removeEventListener('paste', handler);
+  }, [activeHomeworkId, drawerMode]);
 
   const renderStatusPill = (status: HomeworkUiStatus) => {
     const statusClass =
@@ -441,11 +639,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           className={styles.homeworkItem}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setActiveHomeworkId(hw.id)}
+                          onClick={() => handleOpenHomework(hw.id)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
-                              setActiveHomeworkId(hw.id);
+                              handleOpenHomework(hw.id);
                             }
                           }}
                           aria-pressed={activeHomeworkId === hw.id}
@@ -491,7 +689,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                 title="Редактировать"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setActiveHomeworkId(hw.id);
+                                  handleOpenHomework(hw.id);
+                                  setDrawerMode('edit');
                                 }}
                               >
                                 <EditOutlinedIcon width={18} height={18} />
@@ -604,73 +803,237 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         <>
           <button className={styles.drawerScrim} aria-label="Закрыть карточку ДЗ" onClick={closeHomeworkDrawer} />
           <aside className={`${styles.homeworkDrawer} ${styles.drawerOpen}`} aria-live="polite">
-            <div className={styles.drawerHeader}>
+            <div className={styles.drawerHeaderSticky}>
               <div>
                 <p className={styles.drawerEyebrow}>Домашнее задание</p>
                 <div className={styles.drawerTitle}>{selectedStudent?.link.customName}</div>
+                <div className={styles.drawerSubtitle}>@{selectedStudent?.username || 'нет'} • #{activeHomework.id}</div>
               </div>
-              <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
-                <CloseIcon width={18} height={18} />
-              </button>
+              <div className={styles.drawerHeaderActions}>
+                {drawerMode === 'view' && (
+                  <button className={controls.iconButton} aria-label="Редактировать" onClick={() => setDrawerMode('edit')}>
+                    <EditIcon width={18} height={18} />
+                  </button>
+                )}
+                <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
+                  <CloseIcon width={18} height={18} />
+                </button>
+              </div>
             </div>
 
-            <div className={styles.drawerBadgeRow}>
-              <span className={`${styles.drawerBadge} ${activeHomework.isDone ? styles.badgeSuccess : styles.badgeWarning}`}>
-                {activeHomework.isDone ? 'выполнено' : 'в работе'}
-              </span>
-              <span className={styles.drawerBadge}>
-                {activeHomework.deadline
-                  ? `Дедлайн: ${format(new Date(activeHomework.deadline), 'd MMM', { locale: undefined })}`
-                  : 'Без дедлайна'}
-              </span>
+            <div className={styles.drawerScroll} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+              <div className={styles.drawerBadgeRow}>
+                <span
+                  className={`${styles.drawerBadge} ${
+                    activeHomework.isDone || homeworkDraft.status === 'DONE' ? styles.badgeSuccess : styles.badgeWarning
+                  }`}
+                >
+                  {getStatusLabel(activeHomework.status as HomeworkUiStatus)}
+                </span>
+                <span className={styles.drawerBadge}>
+                  {homeworkDraft.deadline
+                    ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM')}`
+                    : 'Без дедлайна'}
+                </span>
+                {hasUnsavedChanges && drawerMode === 'edit' && (
+                  <span className={`${styles.drawerBadge} ${styles.badgeMuted}`}>Есть несохранённые изменения</span>
+                )}
+              </div>
+
+              <div className={styles.drawerSection}>
+                <div className={styles.sectionHeader}>
+                  <p className={styles.priceLabel}>Описание</p>
+                  {drawerMode === 'view' && (
+                    <button className={styles.linkButton} onClick={() => setDrawerMode('edit')}>
+                      <EditOutlinedIcon width={16} height={16} /> Редактировать
+                    </button>
+                  )}
+                </div>
+                {drawerMode === 'edit' ? (
+                  <>
+                    <textarea
+                      className={controls.input}
+                      value={homeworkDraft.text}
+                      onChange={(e) => setHomeworkDraft({ ...homeworkDraft, text: e.target.value })}
+                      placeholder="Введите текст домашнего задания..."
+                      rows={8}
+                    />
+                    <div className={styles.inlineFields}>
+                      <label className={styles.inputLabel}>
+                        Дедлайн
+                        <input
+                          className={controls.input}
+                          type="date"
+                          value={homeworkDraft.deadline}
+                          onChange={(e) => setHomeworkDraft({ ...homeworkDraft, deadline: e.target.value })}
+                        />
+                      </label>
+                      <label className={styles.inputLabel}>
+                        Статус
+                        <select
+                          className={controls.input}
+                          value={homeworkDraft.status}
+                          onChange={(e) =>
+                            setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
+                          }
+                        >
+                          <option value="DRAFT">Черновик</option>
+                          <option value="IN_PROGRESS">В работе</option>
+                          <option value="SENT">Отправлено</option>
+                          <option value="DONE">Выполнено</option>
+                        </select>
+                      </label>
+                    </div>
+                    {saveError && <div className={styles.errorText}>{saveError}</div>}
+                  </>
+                ) : (
+                  <p className={styles.drawerText}>{activeHomework.text}</p>
+                )}
+              </div>
+
+              <div className={styles.drawerSection}>
+                <div className={styles.sectionHeader}>
+                  <p className={styles.priceLabel}>Фото</p>
+                  <span className={styles.subtleLabel}>PNG/JPG/WebP, до 10MB, до 5 фото</span>
+                </div>
+                {drawerMode === 'edit' && (
+                  <div className={styles.attachmentControls}>
+                    <label className={controls.secondaryButton}>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        multiple
+                        className={styles.hiddenInput}
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files || []);
+                          addAttachments(files as File[]);
+                          event.target.value = '';
+                        }}
+                      />
+                      <span className={styles.iconLeading} aria-hidden>
+                        <AddOutlinedIcon width={16} height={16} />
+                      </span>
+                      Добавить фото
+                    </label>
+                    <div className={styles.dropHint}>Перетащите или вставьте фото сюда</div>
+                  </div>
+                )}
+
+                <div className={styles.attachmentsGrid}>
+                  {(homeworkDraft.attachments ?? []).map((attachment) => (
+                    <div key={attachment.id} className={styles.attachmentCard}>
+                      {drawerMode === 'edit' && (
+                        <button
+                          className={styles.attachmentRemove}
+                          aria-label="Удалить"
+                          onClick={() => removeAttachment(attachment.id)}
+                        >
+                          ×
+                        </button>
+                      )}
+                      <button className={styles.attachmentThumb} onClick={() => setAttachmentPreview(attachment)}>
+                        <img src={attachment.url} alt={attachment.fileName} />
+                      </button>
+                      <div className={styles.attachmentMeta}>
+                        <span className={styles.attachmentName}>{attachment.fileName}</span>
+                        <span className={styles.attachmentSize}>{Math.round(attachment.size / 1024)} кб</span>
+                      </div>
+                    </div>
+                  ))}
+                  {!(homeworkDraft.attachments ?? []).length && (
+                    <div className={styles.emptyState}>Пока нет вложений</div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className={styles.drawerBody}>
-              <div className={styles.drawerTextBlock}>
-                <p className={styles.priceLabel}>Описание</p>
-                <p className={styles.drawerText}>{activeHomework.text}</p>
-              </div>
-
-              <div className={styles.drawerDetailsGrid}>
-                <div className={styles.drawerDetail}>Учитель: вы</div>
-                <div className={styles.drawerDetail}>Студент: @{selectedStudent?.username || 'нет'}</div>
-                <div className={styles.drawerDetail}>Баланс: {selectedStudent?.link.balanceLessons} уроков</div>
-                <div className={styles.drawerDetail}>
-                  Напоминания: {selectedStudent?.link.autoRemindHomework ? 'включены' : 'выключены'}
-                </div>
-              </div>
-
-              <div className={styles.drawerActions}>
-                <button
-                  className={`${controls.primaryButton} ${styles.drawerActionButton}`}
-                  onClick={() => {
-                    onToggleHomework(activeHomework.id);
-                    setActiveHomeworkId(activeHomework.id);
-                  }}
-                >
-                  {activeHomework.isDone ? 'Вернуть в работу' : 'Отметить выполненным'}
-                </button>
-                <button
-                  className={`${controls.secondaryButton} ${styles.drawerActionButton}`}
-                  onClick={() => selectedStudent && onRemindHomework(selectedStudent.id)}
-                >
-                  Отправить напоминание
-                </button>
-              </div>
-
-              <div className={styles.drawerHelper}>
-                <div>
-                  <p className={styles.drawerHelperTitle}>Совет</p>
-                  <p className={styles.drawerHelperText}>
-                    Скопируйте текст задания и отправьте его ученику сразу после урока.
-                  </p>
-                </div>
-                <button className={controls.smallButton} onClick={() => navigator.clipboard?.writeText(activeHomework.text)}>
-                  Скопировать текст
-                </button>
-              </div>
+            <div className={styles.drawerFooter}>
+              {drawerMode === 'view' ? (
+                <>
+                  <button
+                    className={controls.primaryButton}
+                    onClick={() => {
+                      onToggleHomework(activeHomework.id);
+                    }}
+                  >
+                    {activeHomework.isDone ? 'Вернуть в работу' : 'Отметить выполненным'}
+                  </button>
+                  <button
+                    className={controls.secondaryButton}
+                    onClick={() => onRemindHomeworkById?.(activeHomework.id) ?? onRemindHomework(selectedStudent!.id)}
+                  >
+                    Напомнить
+                  </button>
+                  <button
+                    className={controls.secondaryButton}
+                    onClick={() => navigator.clipboard?.writeText(activeHomework.text)}
+                  >
+                    Скопировать
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className={controls.primaryButton} onClick={handleSaveDraft} disabled={isSaving}>
+                    {isSaving ? 'Сохранение…' : 'Сохранить'}
+                  </button>
+                  <button className={controls.secondaryButton} onClick={handleDiscardChanges} disabled={isSaving}>
+                    Отмена
+                  </button>
+                  <button
+                    className={controls.secondaryButton}
+                    onClick={() => {
+                      resetDraftToOriginal();
+                    }}
+                    disabled={isSaving}
+                  >
+                    <ReplayOutlinedIcon width={16} height={16} /> Сбросить
+                  </button>
+                </>
+              )}
             </div>
           </aside>
+
+          {attachmentPreview && (
+            <div className={styles.modalOverlay} onClick={() => setAttachmentPreview(null)}>
+              <div className={styles.previewDialog} onClick={(e) => e.stopPropagation()}>
+                <img src={attachmentPreview.url} alt={attachmentPreview.fileName} />
+                <div className={styles.previewFooter}>
+                  <span>{attachmentPreview.fileName}</span>
+                  <button className={controls.secondaryButton} onClick={() => setAttachmentPreview(null)}>
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showUnsavedConfirm && (
+            <div className={styles.modalOverlay}>
+              <div className={styles.modalCard}>
+                <div className={styles.modalHeader}>
+                  <div>
+                    <div className={styles.priceLabel}>Несохранённые изменения</div>
+                    <div className={styles.subtleLabel}>Сохранить перед закрытием?</div>
+                  </div>
+                  <button className={controls.iconButton} aria-label="Закрыть" onClick={handleKeepEditing}>
+                    <CloseIcon width={18} height={18} />
+                  </button>
+                </div>
+                <div className={styles.modalBody}>У вас есть несохранённые изменения. Сохранить их?</div>
+                <div className={styles.modalFooter}>
+                  <button className={controls.secondaryButton} onClick={handleDiscardChanges}>
+                    Не сохранять
+                  </button>
+                  <button className={controls.secondaryButton} onClick={handleKeepEditing}>
+                    Отмена
+                  </button>
+                  <button className={controls.primaryButton} onClick={handleConfirmSaveAndClose} disabled={isSaving}>
+                    Сохранить
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
