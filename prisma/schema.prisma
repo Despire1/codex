@@ -52,10 +52,14 @@ model Homework {
   deadline  DateTime?
   status    String   @default("IN_PROGRESS")
   isDone    Boolean  @default(false)
+  attachments String @default("[]")
+  takenAt   DateTime?
+  takenByStudentId Int?
   studentId Int
   teacherId BigInt
   student   Student  @relation(fields: [studentId], references: [id])
   teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
+  takenByStudent Student? @relation(fields: [takenByStudentId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   lastReminderAt DateTime?
