@@ -211,11 +211,28 @@ const adjustBalance = async (studentId: number, delta: number) => {
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
   if (!link) throw new Error('Student link not found');
-  const nextBalance = Math.max(0, link.balanceLessons + delta);
+  const nextBalance = link.balanceLessons + delta;
   return prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { balanceLessons: nextBalance },
   });
+};
+
+const listPaymentsForStudent = async (studentId: number) => {
+  const teacher = await ensureTeacher();
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  const payments = await prisma.payment.findMany({
+    where: { teacherStudentId: link.id },
+    include: { lesson: true },
+    orderBy: { paidAt: 'desc' },
+  });
+
+  return payments;
 };
 
 type RequestRole = 'TEACHER' | 'STUDENT';
@@ -897,7 +914,7 @@ const markLessonCompleted = async (lessonId: number) => {
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
-  const updatedLesson = await prisma.lesson.update({
+  let updatedLesson = await prisma.lesson.update({
     where: { id: lessonId },
     data: { status: 'COMPLETED' },
   });
@@ -910,6 +927,16 @@ const markLessonCompleted = async (lessonId: number) => {
     updatedLink = await prisma.teacherStudent.update({
       where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: lesson.studentId } },
       data: { balanceLessons: updatedLink.balanceLessons - 1 },
+    });
+
+    await prisma.lessonParticipant.updateMany({
+      where: { lessonId, studentId: lesson.studentId },
+      data: { isPaid: true },
+    });
+
+    updatedLesson = await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { isPaid: true },
     });
   }
 
@@ -925,31 +952,61 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
 
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+    include: { student: true },
+  });
+
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
   const participant = lesson.participants.find((entry: any) => entry.studentId === studentId);
   if (!participant) throw new Error('Участник урока не найден');
 
   const existingPayment = await prisma.payment.findUnique({
-    where: { lessonId_studentId: { lessonId, studentId } },
+    where: { teacherStudentId_lessonId: { teacherStudentId: link.id, lessonId } },
   });
 
-  if (existingPayment) {
-    await prisma.payment.delete({ where: { id: existingPayment.id } });
+  let updatedLink = link;
+
+  if (participant.isPaid || lesson.isPaid) {
+    if (existingPayment) {
+      await prisma.payment.delete({ where: { id: existingPayment.id } });
+      updatedLink = await prisma.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: link.balanceLessons - 1 },
+      });
+    } else {
+      updatedLink = await prisma.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: link.balanceLessons + 1 },
+      });
+    }
+
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
       data: { isPaid: false },
     });
   } else {
-    const amount = participant.price ?? lesson.price ?? 0;
+    const amount =
+      [participant.price, lesson.price, link.student?.pricePerLesson].find(
+        (value) => typeof value === 'number' && value > 0,
+      ) ?? 0;
     await prisma.payment.create({
       data: {
         lessonId,
-        studentId,
+        teacherStudentId: link.id,
         amount,
-        teacherId: teacher.chatId,
         paidAt: new Date(),
         comment: null,
       },
     });
+
+    if (link.balanceLessons < 0) {
+      updatedLink = await prisma.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: Math.min(link.balanceLessons + 1, 0) },
+      });
+    }
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
@@ -966,7 +1023,7 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
 
   const normalizedLesson = await prisma.lesson.update({
     where: { id: lessonId },
-    data: { isPaid: participantsPaid },
+    data: { isPaid: participantsPaid, status: lesson.status === 'SCHEDULED' ? 'COMPLETED' : lesson.status },
     include: {
       participants: {
         include: { student: true },
@@ -975,15 +1032,15 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
   });
 
   const updatedParticipant = normalizedLesson.participants.find((item: any) => item.studentId === studentId);
-  return { lesson: normalizedLesson, participant: updatedParticipant };
+  return { lesson: normalizedLesson, participant: updatedParticipant, link: updatedLink };
 };
 
 const toggleLessonPaid = async (lessonId: number) => {
   const baseLesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!baseLesson) throw new Error('Урок не найден');
 
-  const { lesson } = await togglePaymentForStudent(lessonId, baseLesson.studentId);
-  return lesson;
+  const { lesson, link } = await togglePaymentForStudent(lessonId, baseLesson.studentId);
+  return { lesson, link };
 };
 
 const toggleParticipantPaid = async (lessonId: number, studentId: number) =>
@@ -1122,6 +1179,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 200, { link });
     }
 
+    const paymentsMatch = pathname.match(/^\/api\/students\/(\d+)\/payments$/);
+    if (req.method === 'GET' && paymentsMatch) {
+      const studentId = Number(paymentsMatch[1]);
+      const payments = await listPaymentsForStudent(studentId);
+      return sendJson(res, 200, { payments });
+    }
+
     if (req.method === 'POST' && pathname === '/api/homeworks') {
       const body = await readBody(req);
       const homework = await createHomework(body);
@@ -1210,8 +1274,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const lessonPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/toggle-paid$/);
     if (req.method === 'POST' && lessonPaidMatch) {
       const lessonId = Number(lessonPaidMatch[1]);
-      const lesson = await toggleLessonPaid(lessonId);
-      return sendJson(res, 200, { lesson });
+      const result = await toggleLessonPaid(lessonId);
+      return sendJson(res, 200, { lesson: result.lesson, link: result.link });
     }
 
     const participantPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/participants\/(\d+)\/toggle-paid$/);
@@ -1219,7 +1283,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const lessonId = Number(participantPaidMatch[1]);
       const studentId = Number(participantPaidMatch[2]);
       const result = await toggleParticipantPaid(lessonId, studentId);
-      return sendJson(res, 200, { participant: result, lesson: result.lesson });
+      return sendJson(res, 200, { participant: result.participant, lesson: result.lesson, link: result.link });
     }
 
     const remindMatch = pathname.match(/^\/api\/reminders\/homework$/);

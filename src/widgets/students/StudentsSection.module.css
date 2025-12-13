@@ -1177,6 +1177,45 @@
   margin-top: 4px;
 }
 
+.paymentList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paymentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.paymentDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paymentTitle {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.paymentMeta {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.paymentAmount {
+  font-weight: 800;
+  font-size: 16px;
+  color: #111827;
+}
+
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
