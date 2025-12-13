@@ -74,6 +74,11 @@ export const normalizeHomework = (homework: any): Homework => {
         ? homework.lastReminderAt
         : new Date(homework.lastReminderAt).toISOString()
       : null,
+    completedAt: homework.completedAt
+      ? typeof homework.completedAt === 'string'
+        ? homework.completedAt
+        : new Date(homework.completedAt).toISOString()
+      : null,
     takenAt: homework.takenAt
       ? typeof homework.takenAt === 'string'
         ? homework.takenAt

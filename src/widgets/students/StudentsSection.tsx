@@ -127,6 +127,15 @@ const formatTimeSpentMinutes = (minutes?: number | null) => {
   return `${hours} ч ${restMinutes} мин`;
 };
 
+const formatCompletionMoment = (completedAt?: string | null) => {
+  if (!completedAt) return '';
+  try {
+    return format(parseISO(completedAt), 'd MMM, HH:mm');
+  } catch (error) {
+    return '';
+  }
+};
+
 export const StudentsSection: FC<StudentsSectionProps> = ({
   linkedStudents,
   selectedStudentId,
@@ -815,6 +824,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined
                           ? `Время: ${formatTimeSpentMinutes(hw.timeSpentMinutes)}`
                           : 'Время: не указано';
+                      const completedLabel = hw.completedAt
+                        ? `Выполнено: ${formatCompletionMoment(hw.completedAt)}`
+                        : 'Выполнено: нет';
                       return (
                         <div
                           key={hw.id}
@@ -841,6 +853,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                               <span className={styles.homeworkMeta}>{deadlineLabel}</span>
                               <span className={styles.metaDivider}>•</span>
                               <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
+                              <span className={styles.metaDivider}>•</span>
+                              <span className={styles.homeworkMeta}>{completedLabel}</span>
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
@@ -1144,6 +1158,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     ? `Время: ${formatTimeSpentMinutes(resolvedTimeSpentMinutes)}`
                     : 'Время не указано'}
                 </span>
+                <span className={styles.drawerBadge}>
+                  {activeHomework?.completedAt
+                    ? `Выполнено: ${formatCompletionMoment(activeHomework.completedAt)}`
+                    : 'Не выполнено'}
+                </span>
                 {hasUnsavedChanges && drawerMode === 'edit' && (
                   <span className={`${styles.drawerBadge} ${styles.badgeMuted}`}>Есть несохранённые изменения</span>
                 )}
@@ -1237,16 +1256,24 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         )}
                       </button>
                     )}
-                    <div className={styles.homeworkMetaRow}>
-                      <span className={styles.homeworkMeta}>Время выполнения:</span>
-                      <span className={styles.homeworkMeta}>
-                        {resolvedTimeSpentMinutes !== null
-                          ? formatTimeSpentMinutes(resolvedTimeSpentMinutes)
-                          : 'Не указано'}
-                      </span>
-                    </div>
+                  <div className={styles.homeworkMetaRow}>
+                    <span className={styles.homeworkMeta}>Время выполнения:</span>
+                    <span className={styles.homeworkMeta}>
+                      {resolvedTimeSpentMinutes !== null
+                        ? formatTimeSpentMinutes(resolvedTimeSpentMinutes)
+                        : 'Не указано'}
+                    </span>
                   </div>
-                )}
+                  <div className={styles.homeworkMetaRow}>
+                    <span className={styles.homeworkMeta}>Когда завершено:</span>
+                    <span className={styles.homeworkMeta}>
+                      {activeHomework.completedAt
+                        ? formatCompletionMoment(activeHomework.completedAt)
+                        : 'Не выполнено'}
+                    </span>
+                  </div>
+                </div>
+              )}
               </div>
 
               <div className={styles.drawerSection}>

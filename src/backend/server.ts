@@ -273,6 +273,7 @@ const createHomework = async (body: any) => {
   const normalizedStatus = normalizeTeacherStatus(status ?? 'DRAFT');
   const normalizedAttachments = Array.isArray(attachments) ? attachments : [];
   const parsedTimeSpent = parseTimeSpentMinutes(timeSpentMinutes);
+  const completedAt = normalizedStatus === 'DONE' ? new Date() : null;
 
   return prisma.homework.create({
     data: {
@@ -284,6 +285,7 @@ const createHomework = async (body: any) => {
       isDone: normalizedStatus === 'DONE',
       attachments: JSON.stringify(normalizedAttachments),
       timeSpentMinutes: parsedTimeSpent,
+      completedAt,
     },
   });
 };
@@ -293,9 +295,16 @@ const toggleHomework = async (homeworkId: number) => {
   const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
   if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
 
+  const nextIsDone = !homework.isDone;
+  const nextStatus = nextIsDone ? 'DONE' : 'ASSIGNED';
+
   return prisma.homework.update({
     where: { id: homeworkId },
-    data: { isDone: !homework.isDone, status: homework.isDone ? 'ASSIGNED' : 'DONE' },
+    data: {
+      isDone: nextIsDone,
+      status: nextStatus,
+      completedAt: nextIsDone ? new Date() : null,
+    },
   });
 };
 
@@ -319,6 +328,12 @@ const updateHomework = async (homeworkId: number, body: any) => {
     const normalizedStatus = normalizeTeacherStatus(body.status);
     payload.status = normalizedStatus;
     payload.isDone = normalizedStatus === 'DONE';
+    if (normalizedStatus === 'DONE' && homework.status !== 'DONE' && !homework.isDone) {
+      payload.completedAt = new Date();
+    }
+    if (normalizedStatus !== 'DONE') {
+      payload.completedAt = null;
+    }
   }
 
   return prisma.homework.update({ where: { id: homeworkId }, data: payload });

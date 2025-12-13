@@ -55,6 +55,7 @@ model Homework {
   isDone    Boolean  @default(false)
   attachments String @default("[]")
   timeSpentMinutes Int?
+  completedAt DateTime?
   takenAt   DateTime?
   takenByStudentId Int?
   studentId Int

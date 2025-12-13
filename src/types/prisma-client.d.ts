@@ -35,6 +35,7 @@ declare module '@prisma/client' {
     isDone: boolean;
     attachments: string;
     timeSpentMinutes: number | null;
+    completedAt: Date | null;
     takenAt: Date | null;
     takenByStudentId: number | null;
     studentId: number;
