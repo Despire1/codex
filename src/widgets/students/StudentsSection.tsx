@@ -467,10 +467,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   };
 
   const handleDeleteHomework = (homeworkId: number) => {
-    if (!onDeleteHomework) return;
+    if (!handleDeleteHomework) return;
     const confirmed = window.confirm('Удалить домашнее задание? Его нельзя будет вернуть.');
     if (!confirmed) return;
-    onDeleteHomework(homeworkId);
+    handleDeleteHomework(homeworkId);
     setOpenHomeworkMenuId(null);
   };
 
@@ -491,8 +491,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     });
   };
 
-  const primaryActionLabel = 'Напомнить';
-
   return (
     <section className={styles.section}>
       <div className={styles.grid}>
@@ -501,10 +499,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             <div className={styles.headerRow}>
               <div>
                 <div className={styles.titleRow}>
-                  <h2>Ученики</h2>
+                  <div>Ученики</div>
                   <span className={styles.counter}>{linkedStudents.length}</span>
                 </div>
-                <p className={styles.subtitle}>Управляйте списком и карточками</p>
               </div>
               <button className={controls.secondaryButton} onClick={onOpenStudentModal}>
                 + Добавить
@@ -514,11 +511,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             <div className={styles.searchBlock}>
               <input
                 className={controls.input}
-                placeholder="Поиск ученика..."
+                placeholder="Поиск"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-            <div className={styles.filters}>
+            <div className={`${styles.filters} ${styles.listFilters}`}>
               <button
                 className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
                 onClick={() => setActiveFilter('all')}
@@ -601,14 +598,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     </div>
                   </div>
                   <div className={styles.heroActions}>
-                    <button
-                      className={controls.primaryButton}
-                      onClick={() => {
-                        onRemindHomework(selectedStudent.id);
-                      }}
-                    >
-                      {primaryActionLabel}
-                    </button>
                     <div className={styles.actionsMenuWrapper}>
                       <button
                         className={controls.iconButton}
@@ -620,7 +609,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       {isActionsMenuOpen && (
                         <div className={styles.actionsMenu}>
                           <button onClick={onOpenStudentModal}>Редактировать ученика</button>
-                          <button onClick={() => onRemindHomework(selectedStudent.id)}>Напомнить про ДЗ</button>
                           <button onClick={() => onAdjustBalance(selectedStudent.id, -1)}>Напомнить про оплату</button>
                           <button onClick={() => navigator.clipboard?.writeText('Правила и памятка')}>Скопировать памятку</button>
                           <button className={styles.dangerButton}>Удалить ученика</button>
@@ -702,12 +690,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </button>
                     </div>
                   </div>
-                  <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                    <span className={styles.iconLeading} aria-hidden>
-                      <AddOutlinedIcon width={16} height={16} />
-                    </span>
-                    Новое ДЗ
-                  </button>
                 </div>
 
                 <div className={styles.tabs}>
@@ -739,14 +721,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <div className={styles.priceLabel}>Домашка</div>
                       <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
                     </div>
+                    <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
+                    <span className={styles.iconLeading} aria-hidden>
+                      <AddOutlinedIcon width={16} height={16}/>
+                    </span>
+                      Новое ДЗ
+                    </button>
                   </div>
 
                   <div className={styles.filters}>
                     {[
-                      { id: 'all', label: 'Все' },
-                      { id: 'DRAFT', label: 'Черновики' },
-                      { id: 'ASSIGNED', label: 'Назначено' },
-                      { id: 'IN_PROGRESS', label: 'В работе' },
+                      {id: 'all', label: 'Все'},
+                      {id: 'DRAFT', label: 'Черновики'},
+                      {id: 'ASSIGNED', label: 'Назначено'},
+                      {id: 'IN_PROGRESS', label: 'В работе' },
                       { id: 'DONE', label: 'Выполнено' },
                       { id: 'overdue', label: 'Просрочено' },
                     ].map((filter) => (
@@ -764,7 +752,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     {filteredHomeworks.map((hw) => {
                       const statusInfo = getHomeworkStatusInfo(hw);
                       const title = getHomeworkTitle(hw.text);
-                      const preview = truncate(hw.text.replace(/\s+/g, ' ').trim(), 160) || 'Домашнее задание';
                       const deadlineLabel = hw.deadline
                         ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
                         : 'Без дедлайна';
@@ -789,106 +776,83 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           <div className={styles.homeworkContent}>
                             <div className={styles.homeworkTitleRow}>
                               <div className={styles.homeworkTitle}>{title}</div>
-                              <div className={styles.statusStack}>
-                                {renderStatusPill(statusInfo)}
-                                {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-                                  <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
-                                )}
-                              </div>
                             </div>
-                            <div className={styles.homeworkPreviewLine}>{preview}</div>
                             <div className={styles.homeworkMetaRow}>
                               <span className={styles.homeworkMeta}>{deadlineLabel}</span>
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
+                            <div className={styles.statusStack}>
+                              {renderStatusPill(statusInfo)}
+                              {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+                                  <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
+                              )}
+                            </div>
                             <div className={styles.iconActions}>
                               <button
-                                className={controls.iconButton}
-                                aria-label="Отметить выполненным"
-                                title="Переключить выполнено"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onToggleHomework(hw.id);
-                                }}
+                                  className={controls.iconButton}
+                                  aria-label="Отметить выполненным"
+                                  title="Переключить выполнено"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onToggleHomework(hw.id);
+                                  }}
                               >
-                                <CheckCircleOutlineIcon width={18} height={18} />
-                              </button>
-                              <button
-                                className={controls.iconButton}
-                                aria-label="Напомнить"
-                                title="Отправить напоминание"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleHomeworkReminder(hw.id);
-                                }}
-                              >
-                                <NotificationsNoneOutlinedIcon width={18} height={18} />
-                              </button>
-                              <button
-                                className={controls.iconButton}
-                                aria-label="Редактировать"
-                                title="Редактировать"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleOpenHomework(hw.id);
-                                  setDrawerMode('edit');
-                                }}
-                              >
-                                <EditOutlinedIcon width={18} height={18} />
-                              </button>
-                              <button
-                                className={controls.iconButton}
-                                aria-label="Скопировать текст"
-                                title="Скопировать текст"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleCopyHomework(hw.text);
-                                }}
-                              >
-                                <ContentCopyOutlinedIcon width={18} height={18} />
+                                <CheckCircleOutlineIcon width={18} height={18}/>
                               </button>
                               <div className={styles.moreActionsWrapper}>
                                 <button
-                                  className={controls.iconButton}
-                                  aria-label="Ещё"
-                                  title="Ещё действия"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setOpenHomeworkMenuId((prev) => (prev === hw.id ? null : hw.id));
-                                  }}
+                                    className={controls.iconButton}
+                                    aria-label="Ещё"
+                                    title="Ещё действия"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setOpenHomeworkMenuId((prev) => (prev === hw.id ? null : hw.id));
+                                    }}
                                 >
-                                  <MoreHorizIcon width={18} height={18} />
+                                  <MoreHorizIcon width={18} height={18}/>
                                 </button>
                                 {openHomeworkMenuId === hw.id && (
-                                  <div className={styles.moreMenu}>
-                                    <button
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        onDuplicateHomework?.(hw.id);
-                                        setOpenHomeworkMenuId(null);
-                                      }}
-                                    >
-                                      Дублировать
-                                    </button>
-                                    <button
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleMoveToDraft(hw.id);
-                                      }}
-                                    >
-                                      В черновик
-                                    </button>
-                                    <button
-                                      className={styles.dangerButton}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleDeleteHomework(hw.id);
-                                      }}
-                                    >
-                                      Удалить
-                                    </button>
-                                  </div>
+                                    <div className={styles.moreMenu}>
+                                      <button
+                                          aria-label="Напомнить"
+                                          title="Отправить напоминание"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleHomeworkReminder(hw.id);
+                                          }}
+                                      >
+                                        Напомнить
+                                      </button>
+                                      <button
+                                          aria-label="Редактировать"
+                                          title="Редактировать"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleOpenHomework(hw.id);
+                                            setDrawerMode('edit');
+                                          }}
+                                      >
+                                        Редактировать
+                                      </button>
+                                      <button
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleMoveToDraft(hw.id);
+                                          }}
+                                      >
+                                        В черновик
+                                      </button>
+                                      <button
+                                          className={styles.dangerButton}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleDeleteHomework(hw.id);
+                                          }}
+                                      >
+                                        Удалить
+                                      </button>
+                                    </div>
                                 )}
                               </div>
                             </div>
@@ -898,12 +862,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     })}
 
                     {!filteredHomeworks.length && (
-                      <div className={styles.emptyState}>
-                        <p>Пока нет домашек. Добавьте новое задание.</p>
-                        <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                          + Новое ДЗ
-                        </button>
-                      </div>
+                        <div className={styles.emptyState}>
+                          <p>Пока нет домашек. Добавьте новое задание.</p>
+                          <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
+                            + Новое ДЗ
+                          </button>
+                        </div>
                     )}
                   </div>
                 </div>
@@ -1049,18 +1013,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   </button>
                 )}
                 {drawerMode === 'view' && (
-                  <button
-                    className={controls.iconButton}
-                    aria-label="Редактировать"
-                    onClick={() => {
-                      setIsDrawerMenuOpen(false);
-                      setDrawerMode('edit');
-                    }}
-                  >
-                    <EditIcon width={18} height={18} />
-                  </button>
-                )}
-                {drawerMode === 'view' && (
                   <div className={styles.moreActionsWrapper}>
                     <button
                       className={controls.iconButton}
@@ -1070,14 +1022,28 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <MoreHorizIcon width={18} height={18} />
                     </button>
                     {isDrawerMenuOpen && (
-                      <div className={styles.moreMenu}>
-                        <button onClick={() => handleMoveToDraft(activeHomework.id)}>В черновик</button>
-                      </div>
+                        <div className={styles.moreMenu}>
+                          <button
+                              aria-label="Редактировать"
+                              onClick={() => {
+                                setIsDrawerMenuOpen(false);
+                                setDrawerMode('edit');
+                              }}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                              aria-label="В черновик"
+                              onClick={() => handleMoveToDraft(activeHomework.id)}
+                          >
+                            В черновик
+                          </button>
+                        </div>
                     )}
                   </div>
                 )}
                 <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
-                  <CloseIcon width={18} height={18} />
+                  <CloseIcon width={18} height={18}/>
                 </button>
               </div>
             </div>
@@ -1117,7 +1083,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <p className={styles.priceLabel}>Описание</p>
                   {drawerMode === 'view' && (
                     <button className={styles.linkButton} onClick={() => setDrawerMode('edit')}>
-                      <EditOutlinedIcon width={16} height={16} /> Редактировать
+                      <EditOutlinedIcon width={16} height={16} />
                     </button>
                   )}
                 </div>
@@ -1262,12 +1228,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   >
                     Напомнить
                   </button>
-                  <button
-                    className={controls.secondaryButton}
-                    onClick={() => navigator.clipboard?.writeText(activeHomework.text)}
-                  >
-                    Скопировать
-                  </button>
                 </>
               ) : (
                 <>
@@ -1277,15 +1237,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <button className={controls.secondaryButton} onClick={handleDiscardChanges} disabled={isSaving}>
                     Отмена
                   </button>
-                  <button
-                    className={controls.secondaryButton}
-                    onClick={() => {
-                      resetDraftToOriginal();
-                    }}
-                    disabled={isSaving}
+                  {hasUnsavedChanges && <button
+                      className={controls.secondaryButton}
+                      onClick={() => {
+                        resetDraftToOriginal();
+                      }}
+                      disabled={isSaving}
                   >
-                    <ReplayOutlinedIcon width={16} height={16} /> Сбросить
-                  </button>
+                    <ReplayOutlinedIcon width={16} height={16}/> Сбросить
+                  </button>}
                 </>
               )}
             </div>
