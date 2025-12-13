@@ -52,6 +52,7 @@ model Homework {
   deadline  DateTime?
   status    String   @default("IN_PROGRESS")
   isDone    Boolean  @default(false)
+  attachments String @default("[]")
   studentId Int
   teacherId BigInt
   student   Student  @relation(fields: [studentId], references: [id])

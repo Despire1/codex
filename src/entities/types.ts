@@ -26,6 +26,14 @@ export interface TeacherStudent {
 
 export type HomeworkStatus = 'DRAFT' | 'IN_PROGRESS' | 'SENT' | 'DONE';
 
+export interface HomeworkAttachment {
+  id: string;
+  url: string;
+  fileName: string;
+  size: number;
+  status?: 'ready' | 'uploading' | 'error';
+}
+
 export interface Homework {
   id: number;
   text: string;
@@ -37,6 +45,7 @@ export interface Homework {
   createdAt: string;
   updatedAt: string;
   lastReminderAt?: string | null;
+  attachments?: HomeworkAttachment[];
 }
 
 export interface LessonParticipant {
