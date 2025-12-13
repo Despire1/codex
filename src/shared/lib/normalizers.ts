@@ -37,6 +37,13 @@ const resolveStatus = (homework: any): HomeworkStatus => {
   return homework.isDone ? 'DONE' : 'ASSIGNED';
 };
 
+const normalizeTimeSpent = (value: any): number | null => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return null;
+  if (numericValue < 0) return null;
+  return Math.round(numericValue);
+};
+
 export const normalizeHomework = (homework: any): Homework => {
   let attachments: any[] = [];
   if (Array.isArray(homework.attachments)) {
@@ -54,6 +61,7 @@ export const normalizeHomework = (homework: any): Homework => {
     status: resolveStatus(homework),
     isDone: homework.isDone ?? homework.status === 'DONE',
     attachments,
+    timeSpentMinutes: normalizeTimeSpent(homework.timeSpentMinutes),
     deadline: homework.deadline
       ? typeof homework.deadline === 'string'
         ? homework.deadline.slice(0, 10)
@@ -65,6 +73,11 @@ export const normalizeHomework = (homework: any): Homework => {
       ? typeof homework.lastReminderAt === 'string'
         ? homework.lastReminderAt
         : new Date(homework.lastReminderAt).toISOString()
+      : null,
+    completedAt: homework.completedAt
+      ? typeof homework.completedAt === 'string'
+        ? homework.completedAt
+        : new Date(homework.completedAt).toISOString()
       : null,
     takenAt: homework.takenAt
       ? typeof homework.takenAt === 'string'
