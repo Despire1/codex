@@ -10,6 +10,8 @@ import {
   DoneOutlinedIcon,
   EventRepeatOutlinedIcon,
   EditOutlinedIcon,
+  ExpandLessOutlinedIcon,
+  ExpandMoreOutlinedIcon,
   MoreHorizIcon,
   NotificationsNoneOutlinedIcon,
   PaidOutlinedIcon,
@@ -83,6 +85,35 @@ const getStatusLabel = (status: HomeworkUiStatus) => {
   return 'Черновик';
 };
 
+const truncate = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}…`;
+};
+
+const getHomeworkTitle = (text: string) => {
+  const normalized = (text ?? '').trim().replace(/\s+\n/g, '\n');
+  const firstLine = normalized.split('\n').find((line) => line.trim().length > 0) ?? '';
+  const baseTitle = firstLine || 'Домашнее задание';
+  return truncate(baseTitle, 80) || 'Домашнее задание';
+};
+
+const getHomeworkPreview = (text: string) => {
+  const normalized = (text ?? '').trim().replace(/\s+\n/g, '\n');
+  if (!normalized) return null;
+
+  const firstLine = normalized.split('\n').find((line) => line.trim().length > 0) ?? '';
+  const title = truncate(firstLine || 'Домашнее задание', 80);
+  const flattened = normalized.replace(/\s+/g, ' ').trim();
+
+  const shouldShowPreview = normalized.length > 80 || normalized.includes('\n');
+  if (!shouldShowPreview) return null;
+
+  const preview = truncate(flattened, 160);
+  if (preview === title) return null;
+
+  return preview;
+};
+
 export const StudentsSection: FC<StudentsSectionProps> = ({
   linkedStudents,
   selectedStudentId,
@@ -124,6 +155,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -175,6 +207,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
 
+  const shouldShowDescriptionToggle = useMemo(() => {
+    if (!activeHomework?.text) return false;
+    const linesCount = activeHomework.text.split('\n').length;
+    return activeHomework.text.length > 320 || linesCount > 6;
+  }, [activeHomework?.text]);
+
   const hasUnsavedChanges = useMemo(() => {
     if (!activeHomework) return false;
     const originalAttachments = activeHomework.attachments ?? [];
@@ -211,6 +249,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         attachments: activeHomework.attachments ?? [],
       });
       setDrawerMode('view');
+      setIsDescriptionExpanded(false);
     }
   }, [activeHomework?.id]);
 
@@ -633,6 +672,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <div className={styles.homeworkList}>
                     {selectedStudent.homeworks.map((hw) => {
                       const status = getHomeworkStatus(hw);
+                      const title = getHomeworkTitle(hw.text);
+                      const preview = getHomeworkPreview(hw.text);
                       return (
                         <div
                           key={hw.id}
@@ -649,7 +690,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                           aria-pressed={activeHomeworkId === hw.id}
                         >
                           <div className={styles.homeworkContent}>
-                            <div className={styles.homeworkText}>{hw.text}</div>
+                            <div className={styles.homeworkTitle}>{title}</div>
+                            {preview && <div className={styles.homeworkPreview}>{preview}</div>}
                             <div className={styles.homeworkMeta}>
                               {hw.deadline
                                 ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
@@ -887,7 +929,33 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     {saveError && <div className={styles.errorText}>{saveError}</div>}
                   </>
                 ) : (
-                  <p className={styles.drawerText}>{activeHomework.text}</p>
+                  <div className={styles.descriptionBlock}>
+                    <p
+                      className={`${styles.drawerText} ${
+                        !isDescriptionExpanded && shouldShowDescriptionToggle ? styles.clampedText : ''
+                      }`}
+                    >
+                      {activeHomework.text}
+                    </p>
+                    {shouldShowDescriptionToggle && (
+                      <button
+                        className={styles.expandButton}
+                        onClick={() => setIsDescriptionExpanded((prev) => !prev)}
+                        aria-expanded={isDescriptionExpanded}
+                        type="button"
+                      >
+                        {isDescriptionExpanded ? (
+                          <>
+                            <ExpandLessOutlinedIcon width={16} height={16} /> Свернуть
+                          </>
+                        ) : (
+                          <>
+                            <ExpandMoreOutlinedIcon width={16} height={16} /> Развернуть
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 

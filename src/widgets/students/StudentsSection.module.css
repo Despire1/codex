@@ -478,9 +478,20 @@
   gap: 6px;
 }
 
-.homeworkText {
-  font-weight: 700;
-  font-size: 15px;
+.homeworkTitle {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.homeworkPreview {
+  font-size: 13px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .homeworkMeta {
@@ -707,6 +718,26 @@
   white-space: pre-wrap;
 }
 
+.clampedText {
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.expandButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
 .inlineFields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -718,9 +749,9 @@
   font-size: 14px;
 }
 
-.drawerText {
-  margin: 0;
-  color: #0f172a;
+.descriptionBlock {
+  display: flex;
+  flex-direction: column;
 }
 
 .drawerDetailsGrid {

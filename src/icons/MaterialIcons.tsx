@@ -119,6 +119,18 @@ export const SaveOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const ExpandMoreOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z" />
+  </svg>
+);
+
+export const ExpandLessOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="m12 8 6 6-1.41 1.41L12 10.83l-4.59 4.58L6 14z" />
+  </svg>
+);
+
 export const AddOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" />
