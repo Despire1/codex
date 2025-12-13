@@ -30,6 +30,13 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 type TabPath = (typeof tabs)[number]['path'];
 
+const parseTimeSpentMinutes = (value: string): number | null => {
+  if (!value.trim()) return null;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+  return Math.round(numericValue);
+};
+
 export const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,6 +67,7 @@ export const App = () => {
     baseStatus: 'DRAFT' as HomeworkStatus,
     sendNow: false,
     remindBefore: true,
+    timeSpentMinutes: '',
   });
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
@@ -572,6 +580,7 @@ export const App = () => {
     if (!selectedStudentId || !newHomeworkDraft.text.trim()) return;
 
     const targetStatus = newHomeworkDraft.sendNow ? 'ASSIGNED' : newHomeworkDraft.status;
+    const parsedTimeSpent = parseTimeSpentMinutes(newHomeworkDraft.timeSpentMinutes);
 
     try {
       const data = await api.createHomework({
@@ -579,6 +588,7 @@ export const App = () => {
         text: newHomeworkDraft.text,
         deadline: newHomeworkDraft.deadline || undefined,
         status: targetStatus,
+        timeSpentMinutes: parsedTimeSpent,
       });
 
       const normalized = normalizeHomework(data.homework);
@@ -596,6 +606,7 @@ export const App = () => {
         baseStatus: 'DRAFT',
         sendNow: false,
         remindBefore: true,
+        timeSpentMinutes: '',
       });
     } catch (error) {
       // eslint-disable-next-line no-console
