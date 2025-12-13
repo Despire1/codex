@@ -57,7 +57,7 @@ model Homework {
   student   Student  @relation(fields: [studentId], references: [id])
   teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
   lastReminderAt DateTime?
 }
 

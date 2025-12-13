@@ -16,12 +16,13 @@ CREATE TABLE "new_Homework" (
     "studentId" INTEGER NOT NULL,
     "teacherId" BIGINT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastReminderAt" DATETIME,
     CONSTRAINT "Homework_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Homework_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("chatId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-INSERT INTO "new_Homework" ("createdAt", "deadline", "id", "isDone", "studentId", "teacherId", "text") SELECT "createdAt", "deadline", "id", "isDone", "studentId", "teacherId", "text" FROM "Homework";
+INSERT INTO "new_Homework" ("createdAt", "deadline", "id", "isDone", "studentId", "teacherId", "text", "updatedAt")
+SELECT "createdAt", "deadline", "id", "isDone", "studentId", "teacherId", "text", COALESCE("updatedAt", "createdAt", CURRENT_TIMESTAMP) FROM "Homework";
 DROP TABLE "Homework";
 ALTER TABLE "new_Homework" RENAME TO "Homework";
 PRAGMA foreign_keys=ON;
