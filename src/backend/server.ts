@@ -254,7 +254,7 @@ const normalizeStatus = (status: any) => {
 const normalizeTeacherStatus = (status: any) => normalizeStatus(status);
 
 const createHomework = async (body: any) => {
-  const { studentId, text, deadline, status } = body ?? {};
+  const { studentId, text, deadline, status, attachments } = body ?? {};
   if (!studentId || !text) throw new Error('studentId и текст обязательны');
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
@@ -263,6 +263,7 @@ const createHomework = async (body: any) => {
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
   const normalizedStatus = normalizeTeacherStatus(status ?? 'DRAFT');
+  const normalizedAttachments = Array.isArray(attachments) ? attachments : [];
 
   return prisma.homework.create({
     data: {
@@ -272,7 +273,7 @@ const createHomework = async (body: any) => {
       deadline: deadline ? new Date(deadline) : null,
       status: normalizedStatus,
       isDone: normalizedStatus === 'DONE',
-      attachments: JSON.stringify([]),
+      attachments: JSON.stringify(normalizedAttachments),
     },
   });
 };

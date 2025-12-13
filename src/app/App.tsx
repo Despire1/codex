@@ -522,6 +522,29 @@ export const App = () => {
     }
   };
 
+  const openCreateLessonForStudent = (studentId?: number) => {
+    const targetDate = newLessonDraft.date || todayISO();
+    if (studentId) {
+      setSelectedStudentId((prev) => prev ?? studentId);
+      setNewLessonDraft((draft) => ({
+        ...draft,
+        studentId,
+        studentIds: [studentId],
+      }));
+    }
+    openLessonModal(targetDate, newLessonDraft.time);
+  };
+
+  const deleteLessonById = async (lessonId: number) => {
+    try {
+      await api.deleteLesson(lessonId);
+      setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete lesson', error);
+    }
+  };
+
   const sendHomeworkToStudent = async (homeworkId: number) => {
     try {
       const result = await api.sendHomework(homeworkId);
@@ -577,6 +600,26 @@ export const App = () => {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add homework', error);
+    }
+  };
+
+  const duplicateHomework = async (homeworkId: number) => {
+    const original = homeworks.find((hw) => hw.id === homeworkId);
+    if (!original) return;
+    try {
+      const data = await api.createHomework({
+        studentId: original.studentId,
+        text: original.text,
+        deadline: original.deadline || undefined,
+        status: 'DRAFT',
+        attachments: original.attachments ?? [],
+      });
+      const normalized = normalizeHomework(data.homework);
+      setHomeworks([...homeworks, normalized]);
+      showInfoDialog('Черновик создан', 'Копия задания сохранена в черновики.');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to duplicate homework', error);
     }
   };
 
@@ -711,6 +754,8 @@ export const App = () => {
                   onRemindHomework={remindHomework}
                   onRemindHomeworkById={remindHomeworkById}
                   onSendHomework={sendHomeworkToStudent}
+                  onDuplicateHomework={duplicateHomework}
+                  onDeleteHomework={deleteHomework}
                   onAddHomework={addHomework}
                   onHomeworkDraftChange={(draft) =>
                     setNewHomeworkDraft({
@@ -724,6 +769,9 @@ export const App = () => {
                   lessons={lessons}
                   onCompleteLesson={markLessonCompleted}
                   onTogglePaid={togglePaid}
+                  onCreateLesson={openCreateLessonForStudent}
+                  onEditLesson={startEditLesson}
+                  onDeleteLesson={deleteLessonById}
                 />
               }
             />
