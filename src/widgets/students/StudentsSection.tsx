@@ -123,6 +123,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onRemindHomework,
   onRemindHomeworkById,
   onSendHomework,
+  onDuplicateHomework,
+  onDeleteHomework,
   onAddHomework,
   onHomeworkDraftChange,
   onToggleHomework,
@@ -131,6 +133,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   lessons,
   onCompleteLesson,
   onTogglePaid,
+  onCreateLesson,
+  onEditLesson,
+  onDeleteLesson,
   newHomeworkDraft,
 }) => {
   const selectedStudent = linkedStudents.find((s) => s.id === selectedStudentId);
