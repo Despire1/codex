@@ -66,6 +66,7 @@ export interface Lesson {
   id: number;
   teacherId: number;
   studentId: number;
+  price?: number;
   startAt: string; // ISO string
   durationMinutes: number;
   status: LessonStatus;
