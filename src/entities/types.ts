@@ -46,6 +46,8 @@ export interface Homework {
   updatedAt: string;
   lastReminderAt?: string | null;
   attachments?: HomeworkAttachment[];
+  takenAt?: string | null;
+  takenByStudentId?: number | null;
 }
 
 export interface LessonParticipant {

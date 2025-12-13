@@ -983,6 +983,15 @@
   color: #0f172a;
 }
 
+.inputMuted {
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 500;
+}
+
 .checkboxRow {
   display: flex;
   align-items: center;

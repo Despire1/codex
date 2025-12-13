@@ -67,7 +67,7 @@ interface StudentsSectionProps {
 type HomeworkUiStatus = HomeworkStatus | 'OVERDUE';
 
 const getHomeworkStatus = (homework: LinkedStudent['homeworks'][number]): HomeworkUiStatus => {
-  const baseStatus = homework.status ?? (homework.isDone ? 'DONE' : 'IN_PROGRESS');
+  const baseStatus = homework.status ?? (homework.isDone ? 'DONE' : 'SENT');
   if (homework.deadline) {
     const deadlineDate = parseISO(`${homework.deadline}T00:00:00`);
     if (isBefore(deadlineDate, new Date()) && baseStatus !== 'DONE') {
@@ -81,7 +81,7 @@ const getStatusLabel = (status: HomeworkUiStatus) => {
   if (status === 'DONE') return 'Выполнено';
   if (status === 'OVERDUE') return 'Просрочено';
   if (status === 'IN_PROGRESS') return 'В работе';
-  if (status === 'SENT') return 'Отправлено';
+  if (status === 'SENT') return 'Активно';
   return 'Черновик';
 };
 
@@ -151,7 +151,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     deadline: string;
     status: HomeworkStatus;
     attachments: HomeworkAttachment[];
-  }>({ text: '', deadline: '', status: 'IN_PROGRESS', attachments: [] });
+  }>({ text: '', deadline: '', status: 'SENT', attachments: [] });
   const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
@@ -206,6 +206,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [lessons, selectedStudentId]);
 
   const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
+  const isStatusLocked = activeHomework?.status === 'IN_PROGRESS';
 
   const shouldShowDescriptionToggle = useMemo(() => {
     if (!activeHomework?.text) return false;
@@ -225,7 +226,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return (
       activeHomework.text !== homeworkDraft.text ||
       (activeHomework.deadline ?? '') !== homeworkDraft.deadline ||
-      (activeHomework.status ?? 'IN_PROGRESS') !== homeworkDraft.status ||
+      (activeHomework.status ?? 'SENT') !== homeworkDraft.status ||
       !sameAttachments
     );
   }, [activeHomework, homeworkDraft]);
@@ -245,7 +246,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setHomeworkDraft({
         text: activeHomework.text,
         deadline: activeHomework.deadline ?? '',
-        status: (activeHomework.status as HomeworkStatus) ?? 'IN_PROGRESS',
+        status: (activeHomework.status as HomeworkStatus) ?? 'SENT',
         attachments: activeHomework.attachments ?? [],
       });
       setDrawerMode('view');
@@ -268,7 +269,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setHomeworkDraft({
       text: activeHomework.text,
       deadline: activeHomework.deadline ?? '',
-      status: (activeHomework.status as HomeworkStatus) ?? 'IN_PROGRESS',
+      status: (activeHomework.status as HomeworkStatus) ?? 'SENT',
       attachments: activeHomework.attachments ?? [],
     });
   };
@@ -310,12 +311,17 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setIsSaving(true);
     setSaveError(null);
     try {
-      await onUpdateHomework(activeHomework.id, {
+      const payload: Partial<Homework> = {
         text: homeworkDraft.text,
         deadline: homeworkDraft.deadline || null,
-        status: homeworkDraft.status,
         attachments: homeworkDraft.attachments,
-      });
+      };
+
+      if (activeHomework.status !== 'IN_PROGRESS') {
+        payload.status = homeworkDraft.status;
+      }
+
+      await onUpdateHomework(activeHomework.id, payload);
       setDrawerMode('view');
       return true;
     } catch (error) {
@@ -912,18 +918,21 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </label>
                       <label className={styles.inputLabel}>
                         Статус
-                        <select
-                          className={controls.input}
-                          value={homeworkDraft.status}
-                          onChange={(e) =>
-                            setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
-                          }
-                        >
-                          <option value="DRAFT">Черновик</option>
-                          <option value="IN_PROGRESS">В работе</option>
-                          <option value="SENT">Отправлено</option>
-                          <option value="DONE">Выполнено</option>
-                        </select>
+                        {isStatusLocked ? (
+                          <div className={styles.inputMuted}>В работе (может поставить только ученик)</div>
+                        ) : (
+                          <select
+                            className={controls.input}
+                            value={homeworkDraft.status}
+                            onChange={(e) =>
+                              setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
+                            }
+                          >
+                            <option value="DRAFT">Черновик</option>
+                            <option value="SENT">Активно</option>
+                            <option value="DONE">Выполнено</option>
+                          </select>
+                        )}
                       </label>
                     </div>
                     {saveError && <div className={styles.errorText}>{saveError}</div>}
@@ -1024,7 +1033,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       onToggleHomework(activeHomework.id);
                     }}
                   >
-                    {activeHomework.isDone ? 'Вернуть в работу' : 'Отметить выполненным'}
+                    {activeHomework.isDone ? 'Вернуть в активные' : 'Отметить выполненным'}
                   </button>
                   <button
                     className={controls.secondaryButton}
@@ -1146,8 +1155,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   }
                 >
                   <option value="DRAFT">Черновик</option>
-                  <option value="IN_PROGRESS">В работе</option>
-                  <option value="SENT">Отправлено</option>
+                  <option value="SENT">Активно</option>
                   <option value="DONE">Выполнено</option>
                 </select>
               </label>

@@ -28,10 +28,12 @@ export const normalizeLesson = (lesson: any): Lesson => ({
 });
 
 const resolveStatus = (homework: any): HomeworkStatus => {
-  if (homework.status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(homework.status)) {
-    return homework.status as HomeworkStatus;
+  const status = typeof homework.status === 'string' ? homework.status.toUpperCase() : null;
+  if (status === 'ACTIVE') return 'SENT';
+  if (status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(status)) {
+    return status as HomeworkStatus;
   }
-  return homework.isDone ? 'DONE' : 'IN_PROGRESS';
+  return homework.isDone ? 'DONE' : 'SENT';
 };
 
 export const normalizeHomework = (homework: any): Homework => {
@@ -63,6 +65,12 @@ export const normalizeHomework = (homework: any): Homework => {
         ? homework.lastReminderAt
         : new Date(homework.lastReminderAt).toISOString()
       : null,
+    takenAt: homework.takenAt
+      ? typeof homework.takenAt === 'string'
+        ? homework.takenAt
+        : new Date(homework.takenAt).toISOString()
+      : null,
+    takenByStudentId: typeof homework.takenByStudentId === 'number' ? homework.takenByStudentId : null,
   };
 };
 
