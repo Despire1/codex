@@ -225,20 +225,33 @@ const getRequestRole = (req: IncomingMessage): RequestRole => {
   return roleHeader.toUpperCase() === 'STUDENT' ? 'STUDENT' : 'TEACHER';
 };
 
-const normalizeStatus = (status: any) => {
-  if (typeof status !== 'string') return 'SENT';
-  const upper = status.toUpperCase();
-  if (upper === 'ACTIVE') return 'SENT';
-  return ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(upper) ? upper : 'SENT';
+const VISIBLE_STUDENT_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'DONE'];
+
+const getRequestedStudentId = (req: IncomingMessage): number | null => {
+  const studentIdHeader = req.headers['x-student-id'];
+  const requesterStudentId = typeof studentIdHeader === 'string' ? Number(studentIdHeader) : NaN;
+  return Number.isFinite(requesterStudentId) ? requesterStudentId : null;
 };
 
-const normalizeTeacherStatus = (status: any) => {
-  const normalized = normalizeStatus(status);
-  if (normalized === 'IN_PROGRESS') {
-    throw new Error('Учитель не может поставить статус "В работе"');
-  }
-  return normalized;
+const filterHomeworksForRole = (homeworks: any[], role: RequestRole, studentId?: number | null) => {
+  if (role !== 'STUDENT') return homeworks;
+
+  return homeworks.filter((hw) => {
+    const normalizedStatus = normalizeStatus(hw.status);
+    const matchesStudent = studentId ? hw.studentId === studentId : true;
+    return matchesStudent && VISIBLE_STUDENT_STATUSES.includes(normalizedStatus as any);
+  });
 };
+
+const normalizeStatus = (status: any) => {
+  if (typeof status !== 'string') return 'ASSIGNED';
+  const upper = status.toUpperCase();
+  if (upper === 'ACTIVE' || upper === 'SENT') return 'ASSIGNED';
+  if (upper === 'NEW') return 'DRAFT';
+  return ['DRAFT', 'ASSIGNED', 'IN_PROGRESS', 'DONE'].includes(upper) ? upper : 'ASSIGNED';
+};
+
+const normalizeTeacherStatus = (status: any) => normalizeStatus(status);
 
 const createHomework = async (body: any) => {
   const { studentId, text, deadline, status } = body ?? {};
@@ -249,7 +262,7 @@ const createHomework = async (body: any) => {
   });
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
-  const normalizedStatus = normalizeTeacherStatus(status ?? 'SENT');
+  const normalizedStatus = normalizeTeacherStatus(status ?? 'DRAFT');
 
   return prisma.homework.create({
     data: {
@@ -271,7 +284,7 @@ const toggleHomework = async (homeworkId: number) => {
 
   return prisma.homework.update({
     where: { id: homeworkId },
-    data: { isDone: !homework.isDone, status: homework.isDone ? 'SENT' : 'DONE' },
+    data: { isDone: !homework.isDone, status: homework.isDone ? 'ASSIGNED' : 'DONE' },
   });
 };
 
@@ -305,9 +318,8 @@ const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
     throw error;
   }
 
-  const studentIdHeader = req.headers['x-student-id'];
-  const requesterStudentId = typeof studentIdHeader === 'string' ? Number(studentIdHeader) : NaN;
-  if (!Number.isFinite(requesterStudentId)) {
+  const requesterStudentId = getRequestedStudentId(req);
+  if (requesterStudentId === null) {
     const error: any = new Error('studentId обязателен для взятия в работу');
     error.statusCode = 400;
     throw error;
@@ -320,7 +332,7 @@ const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
     error.statusCode = 403;
     throw error;
   }
-  if (homework.status !== 'SENT' && homework.status !== 'IN_PROGRESS') {
+  if (homework.status !== 'ASSIGNED' && homework.status !== 'IN_PROGRESS') {
     const error: any = new Error('Неверный статус для перевода в работу');
     error.statusCode = 400;
     throw error;
@@ -857,6 +869,23 @@ const remindHomework = async (studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
+const sendHomeworkToStudent = async (homeworkId: number) => {
+  const teacher = await ensureTeacher();
+  const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
+
+  if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+
+  const normalizedStatus = normalizeTeacherStatus(homework.status);
+  const nextStatus = normalizedStatus === 'DRAFT' ? 'ASSIGNED' : normalizedStatus;
+
+  const updated = await prisma.homework.update({
+    where: { id: homeworkId },
+    data: { status: nextStatus, isDone: nextStatus === 'DONE' ? true : homework.isDone },
+  });
+
+  return { status: 'queued', homework: updated };
+};
+
 const remindHomeworkById = async (homeworkId: number) => {
   const teacher = await ensureTeacher();
   const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
@@ -864,7 +893,7 @@ const remindHomeworkById = async (homeworkId: number) => {
 
   const result = await prisma.homework.update({
     where: { id: homeworkId },
-    data: { lastReminderAt: new Date(), status: homework.status === 'DRAFT' ? 'SENT' : homework.status },
+    data: { lastReminderAt: new Date(), status: homework.status === 'DRAFT' ? 'ASSIGNED' : homework.status },
   });
 
   return { status: 'queued', homework: result };
@@ -875,6 +904,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
   const url = new URL(req.url, 'http://localhost');
   const { pathname } = url;
+  const role = getRequestRole(req);
+  const requestedStudentId = getRequestedStudentId(req);
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
@@ -889,7 +920,30 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   try {
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
       const data = await bootstrap();
-      return sendJson(res, 200, data);
+      const filteredStudents =
+        role === 'STUDENT' && requestedStudentId
+          ? data.students.filter((student) => student.id === requestedStudentId)
+          : data.students;
+      const filteredLinks =
+        role === 'STUDENT' && requestedStudentId
+          ? data.links.filter((link) => link.studentId === requestedStudentId)
+          : data.links;
+      const filteredLessons =
+        role === 'STUDENT' && requestedStudentId
+          ? data.lessons.filter(
+              (lesson) =>
+                lesson.studentId === requestedStudentId ||
+                lesson.participants?.some((participant) => participant.studentId === requestedStudentId),
+            )
+          : data.lessons;
+      const filteredHomeworks = filterHomeworksForRole(data.homeworks, role, requestedStudentId);
+      return sendJson(res, 200, {
+        ...data,
+        students: filteredStudents,
+        links: filteredLinks,
+        lessons: filteredLessons,
+        homeworks: filteredHomeworks,
+      });
     }
 
     if (req.method === 'GET' && pathname === '/api/students/search') {
@@ -897,7 +951,16 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const query = searchParams.get('query') ?? undefined;
       const filter = (searchParams.get('filter') as 'all' | 'pendingHomework' | 'noReminder' | null) ?? 'all';
       const data = await searchStudents(query, filter);
-      return sendJson(res, 200, data);
+      const filteredHomeworks = filterHomeworksForRole(data.homeworks, role, requestedStudentId);
+      const filteredLinks =
+        role === 'STUDENT' && requestedStudentId
+          ? data.links.filter((link) => link.studentId === requestedStudentId)
+          : data.links;
+      const filteredStudents =
+        role === 'STUDENT' && requestedStudentId
+          ? data.students.filter((student) => student.id === requestedStudentId)
+          : data.students;
+      return sendJson(res, 200, { ...data, homeworks: filteredHomeworks, links: filteredLinks, students: filteredStudents });
     }
 
     if (req.method === 'POST' && pathname === '/api/students') {
@@ -949,6 +1012,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const homeworkId = Number(takeInWorkMatch[1]);
       const homework = await takeHomeworkInWork(homeworkId, req);
       return sendJson(res, 200, { homework });
+    }
+
+    const homeworkSendMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/send$/);
+    if (req.method === 'POST' && homeworkSendMatch) {
+      const homeworkId = Number(homeworkSendMatch[1]);
+      const result = await sendHomeworkToStudent(homeworkId);
+      return sendJson(res, 200, result);
     }
 
     if (req.method === 'DELETE' && homeworkUpdateMatch) {

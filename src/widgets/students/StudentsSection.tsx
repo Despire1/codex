@@ -41,12 +41,14 @@ interface StudentsSectionProps {
   onCancelPriceEdit: () => void;
   onRemindHomework: (studentId: number) => void;
   onRemindHomeworkById?: (homeworkId: number) => void;
+  onSendHomework?: (homeworkId: number) => void;
   onAddHomework: () => void;
   onHomeworkDraftChange: (draft: {
     text: string;
     deadline: string;
     status: HomeworkStatus;
-    sendToTelegram: boolean;
+    baseStatus: HomeworkStatus;
+    sendNow: boolean;
     remindBefore: boolean;
   }) => void;
   onToggleHomework: (homeworkId: number) => void;
@@ -59,29 +61,28 @@ interface StudentsSectionProps {
     text: string;
     deadline: string;
     status: HomeworkStatus;
-    sendToTelegram: boolean;
+    baseStatus: HomeworkStatus;
+    sendNow: boolean;
     remindBefore: boolean;
   };
 }
+type HomeworkStatusInfo = { status: HomeworkStatus; isOverdue: boolean };
 
-type HomeworkUiStatus = HomeworkStatus | 'OVERDUE';
-
-const getHomeworkStatus = (homework: LinkedStudent['homeworks'][number]): HomeworkUiStatus => {
-  const baseStatus = homework.status ?? (homework.isDone ? 'DONE' : 'SENT');
+const getHomeworkStatusInfo = (homework: LinkedStudent['homeworks'][number]): HomeworkStatusInfo => {
+  const baseStatus = (homework.status as HomeworkStatus) ?? (homework.isDone ? 'DONE' : 'ASSIGNED');
   if (homework.deadline) {
     const deadlineDate = parseISO(`${homework.deadline}T00:00:00`);
     if (isBefore(deadlineDate, new Date()) && baseStatus !== 'DONE') {
-      return 'OVERDUE';
+      return { status: baseStatus, isOverdue: true };
     }
   }
-  return baseStatus;
+  return { status: baseStatus, isOverdue: false };
 };
 
-const getStatusLabel = (status: HomeworkUiStatus) => {
+const getStatusLabel = (status: HomeworkStatus) => {
   if (status === 'DONE') return 'Выполнено';
-  if (status === 'OVERDUE') return 'Просрочено';
   if (status === 'IN_PROGRESS') return 'В работе';
-  if (status === 'SENT') return 'Активно';
+  if (status === 'ASSIGNED') return 'Назначено';
   return 'Черновик';
 };
 
@@ -127,6 +128,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onCancelPriceEdit,
   onRemindHomework,
   onRemindHomeworkById,
+  onSendHomework,
   onAddHomework,
   onHomeworkDraftChange,
   onToggleHomework,
@@ -143,6 +145,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'debt' | 'overdue' | 'autoOff'>('all');
   const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons'>('homework');
+  const [homeworkFilter, setHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view');
@@ -151,7 +154,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     deadline: string;
     status: HomeworkStatus;
     attachments: HomeworkAttachment[];
-  }>({ text: '', deadline: '', status: 'SENT', attachments: [] });
+  }>({ text: '', deadline: '', status: 'ASSIGNED', attachments: [] });
   const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
@@ -178,7 +181,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       if (!matchesQuery) return false;
 
       const hasDebt = student.link.balanceLessons < 0;
-      const hasOverdue = student.homeworks.some((hw) => getHomeworkStatus(hw) === 'OVERDUE');
+      const hasOverdue = student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue);
       const autoOff = !student.link.autoRemindHomework;
 
       if (activeFilter === 'debt') return hasDebt;
@@ -192,7 +195,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const counts = useMemo(() => {
     const withDebt = linkedStudents.filter((student) => student.link.balanceLessons < 0).length;
     const overdue = linkedStudents.filter((student) =>
-      student.homeworks.some((hw) => getHomeworkStatus(hw) === 'OVERDUE'),
+      student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue),
     ).length;
     const autoOff = linkedStudents.filter((student) => !student.link.autoRemindHomework).length;
 
@@ -205,9 +208,26 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
   }, [lessons, selectedStudentId]);
 
-  const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
-  const isStatusLocked = activeHomework?.status === 'IN_PROGRESS';
+  const filteredHomeworks = useMemo(() => {
+    const homeworks = selectedStudent?.homeworks ?? [];
+    return homeworks.filter((hw) => {
+      const info = getHomeworkStatusInfo(hw);
+      if (homeworkFilter === 'all') return true;
+      if (homeworkFilter === 'overdue') return info.isOverdue;
+      return info.status === homeworkFilter;
+    });
+  }, [homeworkFilter, selectedStudent]);
 
+  const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
+
+  const activeStatusInfo = useMemo(() => {
+    if (!activeHomework) return null;
+    return getHomeworkStatusInfo({
+      ...activeHomework,
+      status: homeworkDraft.status,
+      deadline: homeworkDraft.deadline || activeHomework.deadline,
+    } as LinkedStudent['homeworks'][number]);
+  }, [activeHomework, homeworkDraft.deadline, homeworkDraft.status]);
   const shouldShowDescriptionToggle = useMemo(() => {
     if (!activeHomework?.text) return false;
     const linesCount = activeHomework.text.split('\n').length;
@@ -226,7 +246,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return (
       activeHomework.text !== homeworkDraft.text ||
       (activeHomework.deadline ?? '') !== homeworkDraft.deadline ||
-      (activeHomework.status ?? 'SENT') !== homeworkDraft.status ||
+      (activeHomework.status ?? 'ASSIGNED') !== homeworkDraft.status ||
       !sameAttachments
     );
   }, [activeHomework, homeworkDraft]);
@@ -246,7 +266,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setHomeworkDraft({
         text: activeHomework.text,
         deadline: activeHomework.deadline ?? '',
-        status: (activeHomework.status as HomeworkStatus) ?? 'SENT',
+        status: (activeHomework.status as HomeworkStatus) ?? 'ASSIGNED',
         attachments: activeHomework.attachments ?? [],
       });
       setDrawerMode('view');
@@ -269,7 +289,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setHomeworkDraft({
       text: activeHomework.text,
       deadline: activeHomework.deadline ?? '',
-      status: (activeHomework.status as HomeworkStatus) ?? 'SENT',
+      status: (activeHomework.status as HomeworkStatus) ?? 'ASSIGNED',
       attachments: activeHomework.attachments ?? [],
     });
   };
@@ -317,9 +337,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         attachments: homeworkDraft.attachments,
       };
 
-      if (activeHomework.status !== 'IN_PROGRESS') {
-        payload.status = homeworkDraft.status;
-      }
+      payload.status = homeworkDraft.status;
 
       await onUpdateHomework(activeHomework.id, payload);
       setDrawerMode('view');
@@ -395,15 +413,41 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return () => window.removeEventListener('paste', handler);
   }, [activeHomeworkId, drawerMode]);
 
-  const renderStatusPill = (status: HomeworkUiStatus) => {
+  const renderStatusPill = (statusInfo: HomeworkStatusInfo) => {
     const statusClass =
-      status === 'DONE'
+      statusInfo.status === 'DONE'
         ? styles.statusDone
-        : status === 'OVERDUE'
-          ? styles.statusOverdue
-          : styles.statusPending;
+        : statusInfo.status === 'IN_PROGRESS'
+          ? styles.statusInProgress
+          : statusInfo.status === 'ASSIGNED'
+            ? styles.statusAssigned
+            : styles.statusDraft;
 
-    return <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(status)}</span>;
+    return (
+      <div className={styles.statusStack}>
+        <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(statusInfo.status)}</span>
+        {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+          <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
+        )}
+      </div>
+    );
+  };
+
+  const handleCreateStatusChange = (status: HomeworkStatus) => {
+    const nextBaseStatus = status === 'IN_PROGRESS' || status === 'DONE' ? 'ASSIGNED' : status;
+    onHomeworkDraftChange({
+      ...newHomeworkDraft,
+      baseStatus: nextBaseStatus,
+      status: newHomeworkDraft.sendNow ? 'ASSIGNED' : nextBaseStatus,
+    });
+  };
+
+  const handleSendNowToggle = (value: boolean) => {
+    onHomeworkDraftChange({
+      ...newHomeworkDraft,
+      sendNow: value,
+      status: value ? 'ASSIGNED' : newHomeworkDraft.baseStatus ?? 'DRAFT',
+    });
   };
 
   const primaryActionLabel = activeTab === 'homework' ? '+ Новое ДЗ' : activeTab === 'lessons' ? 'Напомнить' : 'Напомнить';
@@ -464,7 +508,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             <div className={styles.studentList}>
               {visibleStudents.map((student) => {
                 const status = student.link.balanceLessons < 0 ? 'debt' : student.link.balanceLessons > 0 ? 'prepaid' : 'neutral';
-                const overdueCount = student.homeworks.filter((hw) => getHomeworkStatus(hw) === 'OVERDUE').length;
+                const overdueCount = student.homeworks.filter((hw) => getHomeworkStatusInfo(hw).isOverdue).length;
                 const pendingCount = student.homeworks.filter((hw) => !hw.isDone).length;
 
                 return (
@@ -675,9 +719,28 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     </button>
                   </div>
 
+                  <div className={styles.filters}>
+                    {[
+                      { id: 'all', label: 'Все' },
+                      { id: 'DRAFT', label: 'Черновики' },
+                      { id: 'ASSIGNED', label: 'Назначено' },
+                      { id: 'IN_PROGRESS', label: 'В работе' },
+                      { id: 'DONE', label: 'Выполнено' },
+                      { id: 'overdue', label: 'Просрочено' },
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        className={`${styles.filterChip} ${homeworkFilter === filter.id ? styles.activeChip : ''}`}
+                        onClick={() => setHomeworkFilter(filter.id as typeof homeworkFilter)}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className={styles.homeworkList}>
-                    {selectedStudent.homeworks.map((hw) => {
-                      const status = getHomeworkStatus(hw);
+                    {filteredHomeworks.map((hw) => {
+                      const statusInfo = getHomeworkStatusInfo(hw);
                       const title = getHomeworkTitle(hw.text);
                       const preview = getHomeworkPreview(hw.text);
                       return (
@@ -703,11 +766,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                 ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
                                 : 'Без дедлайна'}
                               <span className={styles.metaDivider}>•</span>
-                              Статус: {getStatusLabel(status)}
+                              Статус: {getStatusLabel(statusInfo.status)}
+                              {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+                                <span className={`${styles.inlineChip} ${styles.badgeDanger}`}>Просрочено</span>
+                              )}
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
-                            {renderStatusPill(status)}
+                            {renderStatusPill(statusInfo)}
                             <div className={styles.iconActions}>
                               <button
                                 className={controls.iconButton}
@@ -752,7 +818,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       );
                     })}
 
-                    {!selectedStudent.homeworks.length && (
+                    {!filteredHomeworks.length && (
                       <div className={styles.emptyState}>Пока нет ДЗ — создайте первое</div>
                     )}
                   </div>
@@ -858,6 +924,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <div className={styles.drawerSubtitle}>@{selectedStudent?.username || 'нет'} • #{activeHomework.id}</div>
               </div>
               <div className={styles.drawerHeaderActions}>
+                {onSendHomework && activeHomework && (
+                  <button
+                    className={controls.secondaryButton}
+                    onClick={() => onSendHomework(activeHomework.id)}
+                    disabled={isSaving}
+                  >
+                    Отправить ученику
+                  </button>
+                )}
                 {drawerMode === 'view' && (
                   <button className={controls.iconButton} aria-label="Редактировать" onClick={() => setDrawerMode('edit')}>
                     <EditIcon width={18} height={18} />
@@ -871,13 +946,24 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
             <div className={styles.drawerScroll} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
               <div className={styles.drawerBadgeRow}>
-                <span
-                  className={`${styles.drawerBadge} ${
-                    activeHomework.isDone || homeworkDraft.status === 'DONE' ? styles.badgeSuccess : styles.badgeWarning
-                  }`}
-                >
-                  {getStatusLabel(activeHomework.status as HomeworkUiStatus)}
-                </span>
+                {activeStatusInfo && (
+                  <span
+                    className={`${styles.drawerBadge} ${
+                      activeStatusInfo.status === 'DONE'
+                        ? styles.badgeSuccess
+                        : activeStatusInfo.status === 'IN_PROGRESS'
+                          ? styles.badgeWarning
+                          : activeStatusInfo.status === 'ASSIGNED'
+                            ? styles.badgeInfo
+                            : styles.badgeMuted
+                    }`}
+                  >
+                    {getStatusLabel(activeStatusInfo.status)}
+                  </span>
+                )}
+                {activeStatusInfo?.isOverdue && activeStatusInfo.status !== 'DONE' && (
+                  <span className={`${styles.drawerBadge} ${styles.badgeDanger}`}>Просрочено</span>
+                )}
                 <span className={styles.drawerBadge}>
                   {homeworkDraft.deadline
                     ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM')}`
@@ -918,21 +1004,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </label>
                       <label className={styles.inputLabel}>
                         Статус
-                        {isStatusLocked ? (
-                          <div className={styles.inputMuted}>В работе (может поставить только ученик)</div>
-                        ) : (
-                          <select
-                            className={controls.input}
-                            value={homeworkDraft.status}
-                            onChange={(e) =>
-                              setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
-                            }
-                          >
-                            <option value="DRAFT">Черновик</option>
-                            <option value="SENT">Активно</option>
-                            <option value="DONE">Выполнено</option>
-                          </select>
-                        )}
+                        <select
+                          className={controls.input}
+                          value={homeworkDraft.status}
+                          onChange={(e) =>
+                            setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
+                          }
+                        >
+                          <option value="DRAFT">Черновик</option>
+                          <option value="ASSIGNED">Назначено</option>
+                          <option value="IN_PROGRESS">В работе</option>
+                          <option value="DONE">Выполнено</option>
+                        </select>
                       </label>
                     </div>
                     {saveError && <div className={styles.errorText}>{saveError}</div>}
@@ -1145,28 +1228,43 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, deadline: e.target.value })}
                 />
               </label>
-              <label className={styles.inputLabel}>
-                Статус
-                <select
-                  className={controls.input}
-                  value={newHomeworkDraft.status}
-                  onChange={(e) =>
-                    onHomeworkDraftChange({ ...newHomeworkDraft, status: e.target.value as StudentsSectionProps['newHomeworkDraft']['status'] })
-                  }
-                >
-                  <option value="DRAFT">Черновик</option>
-                  <option value="SENT">Активно</option>
-                  <option value="DONE">Выполнено</option>
-                </select>
-              </label>
+              <div className={styles.inputLabel}>
+                <div className={styles.sectionHeader}>
+                  <p className={styles.priceLabel}>Статус</p>
+                  <span className={styles.subtleLabel}>Выберите, когда покажем ДЗ ученику</span>
+                </div>
+                <div className={styles.toggleGroup}>
+                  <button
+                    className={`${controls.secondaryButton} ${
+                      (newHomeworkDraft.baseStatus ?? 'DRAFT') === 'DRAFT' ? styles.activeChip : ''
+                    }`}
+                    onClick={() => handleCreateStatusChange('DRAFT')}
+                    disabled={newHomeworkDraft.sendNow}
+                  >
+                    Черновик
+                  </button>
+                  <button
+                    className={`${controls.secondaryButton} ${
+                      (newHomeworkDraft.baseStatus ?? 'DRAFT') === 'ASSIGNED' ? styles.activeChip : ''
+                    }`}
+                    onClick={() => handleCreateStatusChange('ASSIGNED')}
+                    disabled={newHomeworkDraft.sendNow}
+                  >
+                    Назначено
+                  </button>
+                </div>
+              </div>
               <label className={styles.checkboxRow}>
                 <input
                   type="checkbox"
-                  checked={newHomeworkDraft.sendToTelegram}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, sendToTelegram: e.target.checked })}
+                  checked={newHomeworkDraft.sendNow}
+                  onChange={(e) => handleSendNowToggle(e.target.checked)}
                 />
-                <span>Отправить ученику в Telegram сразу</span>
+                <span>Сразу отправить ученику</span>
               </label>
+              {newHomeworkDraft.sendNow && (
+                <div className={styles.helperText}>Задание будет опубликовано и станет доступно ученику</div>
+              )}
               <label className={styles.checkboxRow}>
                 <input
                   type="checkbox"

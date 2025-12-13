@@ -51,7 +51,7 @@ model Homework {
   id        Int      @id @default(autoincrement())
   text      String
   deadline  DateTime?
-  status    String   @default("IN_PROGRESS")
+  status    String   @default("DRAFT") // values: DRAFT, ASSIGNED, IN_PROGRESS, DONE
   isDone    Boolean  @default(false)
   attachments String @default("[]")
   takenAt   DateTime?
