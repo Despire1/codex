@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma =
+export const prisma: any =
   globalForPrisma.prisma ||
   new PrismaClient({
     log: ['warn', 'error'],

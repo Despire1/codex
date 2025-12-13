@@ -348,7 +348,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                           <div className={styles.weekLessonMeta}>
                             {isGroupLesson
                               ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                              : participants[0]?.student?.link?.customName}
+                              : (participants[0]?.student as any)?.link?.customName}
                           </div>
                         </div>
                       );
@@ -422,7 +422,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     <div className={styles.weekLessonMeta}>
                       {isGroupLesson
                         ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                        : participants[0]?.student?.link?.customName}
+                        : (participants[0]?.student as any)?.link?.customName}
                     </div>
                   </div>
                 );
@@ -537,7 +537,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         <div className={styles.monthLessonInfo}>
                           <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
                           <span className={styles.monthLessonName}>
-                            {isGroupLesson ? `Групповой (${participants.length})` : (participants[0]?.student?.link?.customName ?? 'Урок')}
+                            {isGroupLesson
+                              ? `Групповой (${participants.length})`
+                              : ((participants[0]?.student as any)?.link?.customName ?? 'Урок')}
                           </span>
                         </div>
                         {renderPaymentBadges(lesson.id, participants, isGroupLesson)}

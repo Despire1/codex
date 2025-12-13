@@ -218,8 +218,14 @@ const adjustBalance = async (studentId: number, delta: number) => {
   });
 };
 
+const normalizeStatus = (status: any) => {
+  if (typeof status !== 'string') return 'IN_PROGRESS';
+  const upper = status.toUpperCase();
+  return ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(upper) ? upper : 'IN_PROGRESS';
+};
+
 const createHomework = async (body: any) => {
-  const { studentId, text, deadline } = body ?? {};
+  const { studentId, text, deadline, status } = body ?? {};
   if (!studentId || !text) throw new Error('studentId и текст обязательны');
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
@@ -227,12 +233,16 @@ const createHomework = async (body: any) => {
   });
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
+  const normalizedStatus = normalizeStatus(status);
+
   return prisma.homework.create({
     data: {
       studentId: Number(studentId),
       teacherId: teacher.chatId,
       text,
       deadline: deadline ? new Date(deadline) : null,
+      status: normalizedStatus,
+      isDone: normalizedStatus === 'DONE',
     },
   });
 };
@@ -244,8 +254,36 @@ const toggleHomework = async (homeworkId: number) => {
 
   return prisma.homework.update({
     where: { id: homeworkId },
-    data: { isDone: !homework.isDone },
+    data: { isDone: !homework.isDone, status: homework.isDone ? 'IN_PROGRESS' : 'DONE' },
   });
+};
+
+const updateHomework = async (homeworkId: number, body: any) => {
+  const teacher = await ensureTeacher();
+  const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+
+  const payload: any = {};
+  if (typeof body.text === 'string') payload.text = body.text;
+  if ('deadline' in body) {
+    payload.deadline = body.deadline ? new Date(body.deadline) : null;
+  }
+  if (body.status) {
+    const normalizedStatus = normalizeStatus(body.status);
+    payload.status = normalizedStatus;
+    payload.isDone = normalizedStatus === 'DONE';
+  }
+
+  return prisma.homework.update({ where: { id: homeworkId }, data: payload });
+};
+
+const deleteHomework = async (homeworkId: number) => {
+  const teacher = await ensureTeacher();
+  const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+
+  await prisma.homework.delete({ where: { id: homeworkId } });
+  return { id: homeworkId };
 };
 
 const validateLessonPayload = async (body: any) => {
@@ -759,6 +797,19 @@ const remindHomework = async (studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
+const remindHomeworkById = async (homeworkId: number) => {
+  const teacher = await ensureTeacher();
+  const homework = await prisma.homework.findUnique({ where: { id: homeworkId } });
+  if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+
+  const result = await prisma.homework.update({
+    where: { id: homeworkId },
+    data: { lastReminderAt: new Date(), status: homework.status === 'DRAFT' ? 'SENT' : homework.status },
+  });
+
+  return { status: 'queued', homework: result };
+};
+
 const handle = async (req: IncomingMessage, res: ServerResponse) => {
   if (!req.url) return notFound(res);
 
@@ -768,7 +819,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.end();
   }
@@ -825,11 +876,32 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 201, { homework });
     }
 
+    const homeworkUpdateMatch = pathname.match(/^\/api\/homeworks\/(\d+)$/);
+    if (req.method === 'PATCH' && homeworkUpdateMatch) {
+      const homeworkId = Number(homeworkUpdateMatch[1]);
+      const body = await readBody(req);
+      const homework = await updateHomework(homeworkId, body);
+      return sendJson(res, 200, { homework });
+    }
+
+    if (req.method === 'DELETE' && homeworkUpdateMatch) {
+      const homeworkId = Number(homeworkUpdateMatch[1]);
+      const result = await deleteHomework(homeworkId);
+      return sendJson(res, 200, result);
+    }
+
     const homeworkToggleMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/toggle$/);
     if (req.method === 'PATCH' && homeworkToggleMatch) {
       const homeworkId = Number(homeworkToggleMatch[1]);
       const homework = await toggleHomework(homeworkId);
       return sendJson(res, 200, { homework });
+    }
+
+    const homeworkRemindMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/remind$/);
+    if (req.method === 'POST' && homeworkRemindMatch) {
+      const homeworkId = Number(homeworkRemindMatch[1]);
+      const result = await remindHomeworkById(homeworkId);
+      return sendJson(res, 200, result);
     }
 
     if (req.method === 'POST' && pathname === '/api/lessons/recurring') {

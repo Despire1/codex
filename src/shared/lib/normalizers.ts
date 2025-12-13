@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Homework, Lesson } from '../../entities/types';
+import { Homework, HomeworkStatus, Lesson } from '../../entities/types';
 
 export const normalizeLesson = (lesson: any): Lesson => ({
   ...lesson,
@@ -27,13 +27,29 @@ export const normalizeLesson = (lesson: any): Lesson => ({
     : null,
 });
 
+const resolveStatus = (homework: any): HomeworkStatus => {
+  if (homework.status && ['DRAFT', 'IN_PROGRESS', 'SENT', 'DONE'].includes(homework.status)) {
+    return homework.status as HomeworkStatus;
+  }
+  return homework.isDone ? 'DONE' : 'IN_PROGRESS';
+};
+
 export const normalizeHomework = (homework: any): Homework => ({
   ...homework,
+  status: resolveStatus(homework),
+  isDone: homework.isDone ?? homework.status === 'DONE',
   deadline: homework.deadline
-    ? (typeof homework.deadline === 'string'
-        ? homework.deadline.slice(0, 10)
-        : new Date(homework.deadline).toISOString().slice(0, 10))
-    : undefined,
+    ? typeof homework.deadline === 'string'
+      ? homework.deadline.slice(0, 10)
+      : new Date(homework.deadline).toISOString().slice(0, 10)
+    : null,
+  createdAt: typeof homework.createdAt === 'string' ? homework.createdAt : new Date(homework.createdAt).toISOString(),
+  updatedAt: typeof homework.updatedAt === 'string' ? homework.updatedAt : new Date(homework.updatedAt).toISOString(),
+  lastReminderAt: homework.lastReminderAt
+    ? typeof homework.lastReminderAt === 'string'
+      ? homework.lastReminderAt
+      : new Date(homework.lastReminderAt).toISOString()
+    : null,
 });
 
 export const todayISO = () => format(new Date(), 'yyyy-MM-dd');

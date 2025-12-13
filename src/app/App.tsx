@@ -1,7 +1,7 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Homework, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
+import { Homework, HomeworkStatus, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DialogModal } from '../shared/ui/Modal/DialogModal';
@@ -56,7 +56,7 @@ export const App = () => {
   const [newHomeworkDraft, setNewHomeworkDraft] = useState({
     text: '',
     deadline: '',
-    status: 'assigned' as 'assigned' | 'in_progress' | 'draft',
+    status: 'IN_PROGRESS' as HomeworkStatus,
     sendToTelegram: true,
     remindBefore: true,
   });
@@ -529,13 +529,14 @@ export const App = () => {
         studentId: selectedStudentId,
         text: newHomeworkDraft.text,
         deadline: newHomeworkDraft.deadline || undefined,
+        status: newHomeworkDraft.status,
       });
 
       setHomeworks([...homeworks, normalizeHomework(data.homework)]);
       setNewHomeworkDraft({
         text: '',
         deadline: '',
-        status: 'assigned',
+        status: 'IN_PROGRESS',
         sendToTelegram: true,
         remindBefore: true,
       });
@@ -555,6 +556,26 @@ export const App = () => {
     }
   };
 
+  const updateHomework = async (homeworkId: number, payload: Partial<Homework>) => {
+    try {
+      const data = await api.updateHomework(homeworkId, payload);
+      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update homework', error);
+    }
+  };
+
+  const deleteHomework = async (homeworkId: number) => {
+    try {
+      await api.deleteHomework(homeworkId);
+      setHomeworks(homeworks.filter((hw) => hw.id !== homeworkId));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete homework', error);
+    }
+  };
+
   const remindHomework = async (studentId: number) => {
     try {
       await api.remindHomework(studentId);
@@ -563,6 +584,18 @@ export const App = () => {
       showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
       // eslint-disable-next-line no-console
       console.error('Failed to send reminder', error);
+    }
+  };
+
+  const remindHomeworkById = async (homeworkId: number) => {
+    try {
+      const result = await api.remindHomeworkById(homeworkId);
+      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework) : hw)));
+      showInfoDialog('Напоминание отправлено', 'Мы отправим ученику напоминание.');
+    } catch (error) {
+      showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
+      // eslint-disable-next-line no-console
+      console.error('Failed to send homework reminder', error);
     }
   };
 
@@ -646,6 +679,9 @@ export const App = () => {
                   onHomeworkDraftChange={setNewHomeworkDraft}
                   onToggleHomework={toggleHomeworkDone}
                   onOpenStudentModal={() => setStudentModalOpen(true)}
+                  lessons={lessons}
+                  onCompleteLesson={markLessonCompleted}
+                  onTogglePaid={togglePaid}
                 />
               }
             />
