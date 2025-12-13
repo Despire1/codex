@@ -48,6 +48,7 @@ export interface Homework {
   attachments?: HomeworkAttachment[];
   takenAt?: string | null;
   takenByStudentId?: number | null;
+  timeSpentMinutes?: number | null;
 }
 
 export interface LessonParticipant {

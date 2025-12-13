@@ -86,6 +86,7 @@ export const api = {
     deadline?: string;
     status?: HomeworkStatus;
     attachments?: HomeworkAttachment[];
+    timeSpentMinutes?: number | null;
   }) =>
     apiFetch<{ homework: Homework }>('/api/homeworks', { method: 'POST', body: JSON.stringify(payload) }),
   toggleHomework: (homeworkId: number) =>

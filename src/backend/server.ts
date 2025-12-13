@@ -253,8 +253,16 @@ const normalizeStatus = (status: any) => {
 
 const normalizeTeacherStatus = (status: any) => normalizeStatus(status);
 
+const parseTimeSpentMinutes = (value: any): number | null => {
+  if (value === '' || value === undefined || value === null) return null;
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return null;
+  if (numericValue < 0) return null;
+  return Math.round(numericValue);
+};
+
 const createHomework = async (body: any) => {
-  const { studentId, text, deadline, status, attachments } = body ?? {};
+  const { studentId, text, deadline, status, attachments, timeSpentMinutes } = body ?? {};
   if (!studentId || !text) throw new Error('studentId и текст обязательны');
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
@@ -264,6 +272,7 @@ const createHomework = async (body: any) => {
 
   const normalizedStatus = normalizeTeacherStatus(status ?? 'DRAFT');
   const normalizedAttachments = Array.isArray(attachments) ? attachments : [];
+  const parsedTimeSpent = parseTimeSpentMinutes(timeSpentMinutes);
 
   return prisma.homework.create({
     data: {
@@ -274,6 +283,7 @@ const createHomework = async (body: any) => {
       status: normalizedStatus,
       isDone: normalizedStatus === 'DONE',
       attachments: JSON.stringify(normalizedAttachments),
+      timeSpentMinutes: parsedTimeSpent,
     },
   });
 };
@@ -301,6 +311,9 @@ const updateHomework = async (homeworkId: number, body: any) => {
   }
   if (Array.isArray(body.attachments)) {
     payload.attachments = JSON.stringify(body.attachments);
+  }
+  if ('timeSpentMinutes' in body) {
+    payload.timeSpentMinutes = parseTimeSpentMinutes(body.timeSpentMinutes);
   }
   if (body.status) {
     const normalizedStatus = normalizeTeacherStatus(body.status);
