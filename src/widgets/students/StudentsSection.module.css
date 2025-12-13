@@ -288,8 +288,8 @@
 
 .heroNameBlock {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 12px;
 }
 
 .profileName {
@@ -462,6 +462,7 @@
   background: #fff;
   padding: 6px 10px;
   border-radius: 10px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;

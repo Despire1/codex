@@ -658,8 +658,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
                     <div className={styles.studentMetaRow}>
                       <span>Telegram: @{selectedStudent.username || 'нет'}</span>
-                      <span className={styles.metaDivider}>•</span>
-                      <span>Автонапоминания: {selectedStudent.link.autoRemindHomework ? 'Вкл' : 'Выкл'}</span>
                     </div>
                   </div>
                   <div className={styles.heroActions}>
@@ -751,7 +749,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         onClick={() => onToggleAutoReminder(selectedStudent.id)}
                         type="button"
                       >
-                        {selectedStudent.link.autoRemindHomework ? 'Вкл' : 'Выкл'}
+                        {selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены'}
                       </button>
                     </div>
                   </div>
@@ -824,9 +822,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined
                           ? `Время: ${formatTimeSpentMinutes(hw.timeSpentMinutes)}`
                           : 'Время: не указано';
-                      const completedLabel = hw.completedAt
-                        ? `Выполнено: ${formatCompletionMoment(hw.completedAt)}`
-                        : 'Выполнено: нет';
+                      const completedLabel = `Выполнено: ${formatCompletionMoment(hw.completedAt)}`
                       return (
                         <div
                           key={hw.id}
@@ -853,8 +849,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                               <span className={styles.homeworkMeta}>{deadlineLabel}</span>
                               <span className={styles.metaDivider}>•</span>
                               <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
-                              <span className={styles.metaDivider}>•</span>
-                              <span className={styles.homeworkMeta}>{completedLabel}</span>
+                              {hw.completedAt && <>
+                                <span className={styles.metaDivider}>•</span>
+                                <span className={styles.homeworkMeta}>{completedLabel}</span>
+                              </>
+                            }
                             </div>
                           </div>
                           <div className={styles.homeworkActions}>
@@ -1256,22 +1255,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                         )}
                       </button>
                     )}
-                  <div className={styles.homeworkMetaRow}>
-                    <span className={styles.homeworkMeta}>Время выполнения:</span>
-                    <span className={styles.homeworkMeta}>
-                      {resolvedTimeSpentMinutes !== null
-                        ? formatTimeSpentMinutes(resolvedTimeSpentMinutes)
-                        : 'Не указано'}
-                    </span>
-                  </div>
-                  <div className={styles.homeworkMetaRow}>
-                    <span className={styles.homeworkMeta}>Когда завершено:</span>
-                    <span className={styles.homeworkMeta}>
-                      {activeHomework.completedAt
-                        ? formatCompletionMoment(activeHomework.completedAt)
-                        : 'Не выполнено'}
-                    </span>
-                  </div>
                 </div>
               )}
               </div>
