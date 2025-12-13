@@ -433,6 +433,12 @@
   margin-bottom: 12px;
 }
 
+.iconLeading {
+  display: inline-flex;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 .homeworkList {
   display: flex;
   flex-direction: column;
@@ -694,6 +700,33 @@
 .drawerHelperText {
   margin: 4px 0 0;
   color: #475569;
+}
+
+.lessonList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lessonItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.lessonTitle {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.lessonMeta {
+  color: #6b7280;
+  font-size: 14px;
+  margin-top: 4px;
 }
 
 .modalOverlay {

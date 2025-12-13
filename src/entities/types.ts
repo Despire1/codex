@@ -24,13 +24,19 @@ export interface TeacherStudent {
   balanceLessons: number;
 }
 
+export type HomeworkStatus = 'DRAFT' | 'IN_PROGRESS' | 'SENT' | 'DONE';
+
 export interface Homework {
   id: number;
   text: string;
-  deadline?: string;
+  deadline: string | null;
+  status: HomeworkStatus;
   isDone: boolean;
   studentId: number;
   teacherId: number;
+  createdAt: string;
+  updatedAt: string;
+  lastReminderAt?: string | null;
 }
 
 export interface LessonParticipant {

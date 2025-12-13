@@ -61,3 +61,118 @@ export const ViewDayIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M2 5v14h20V5H2zm6 12H4V7h4v10zm6 0h-4V7h4v10zm6 0h-4V7h4v10z" />
   </svg>
 );
+
+export const CheckCircleOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+    <path d="m10 16.17-3.88-3.88L5.7 13.71 10 18l8.3-8.29-1.41-1.42z" />
+  </svg>
+);
+
+export const TaskAltIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M22 5.18 10.59 16.6 6 12l1.41-1.41 3.18 3.18L20.59 3.77z" />
+    <path d="M19.62 9.16a7.5 7.5 0 1 1-3.77-3.77l1.46-1.46A9.5 9.5 0 1 0 22 12c0-.97-.15-1.9-.43-2.78z" />
+  </svg>
+);
+
+export const NotificationsNoneOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 .99H8V11c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v5.99z" />
+  </svg>
+);
+
+export const EditOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
+    <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L14.13 5.1l3.75 3.75 2.83-2.83z" />
+  </svg>
+);
+
+export const ContentCopyOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+  </svg>
+);
+
+export const MoreHorizIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+  </svg>
+);
+
+export const CloseIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+  </svg>
+);
+
+export const ReplayOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 5V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 1 1-5-5v2l4-4-4-4v2c-3.86 0-7 3.14-7 7s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7z" />
+  </svg>
+);
+
+export const SaveOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zM12 19c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+  </svg>
+);
+
+export const AddOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+  </svg>
+);
+
+export const BackspaceOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7L2.38 12 7 5h15v14z" />
+    <path d="m12.41 12 3.29-3.29-1.41-1.42L11 10.59 7.71 7.29 6.29 8.71 9.59 12l-3.3 3.29 1.42 1.42L11 13.41l3.29 3.3 1.42-1.42z" />
+  </svg>
+);
+
+export const ClearIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+  </svg>
+);
+
+export const DoneOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+  </svg>
+);
+
+export const PaidOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 19.93c-3.93-1.25-7-5.21-7-9.93V6.3l7-3.11 7 3.11v4.7c0 4.72-3.07 8.68-7 9.93z" />
+    <path d="m11.99 6.5-4.2 7.3h8.4zm0 2.38L14.07 13h-4.16z" />
+  </svg>
+);
+
+export const AttachMoneyOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.19 0 2.06.39 2.83 1.24l1.54-1.54C14.9 5.69 13.76 5.2 12.5 5.06V3h-2v2.06C8.09 5.32 6.8 6.97 6.8 8.89c0 2.38 1.96 3.46 4.7 4.13 2.32.58 2.9 1.21 2.9 2.13 0 1.01-.9 1.72-2.16 1.72-1.34 0-2.31-.54-3.11-1.49l-1.56 1.56c1.02 1.26 2.34 2.03 3.93 2.24V21h2v-1.97c2.28-.27 3.8-1.86 3.8-4.03 0-2.79-2.3-3.75-4.7-4.2z" />
+  </svg>
+);
+
+export const EventRepeatOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M17 12h-5v4H8v2h4v4l5-5-5-5z" />
+    <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.86 3.14-7 7-7a7 7 0 0 1 6.92 6h2.02A9.003 9.003 0 0 0 13 3z" />
+  </svg>
+);
+
+export const EditCalendarOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M17 12h-5v5h5v-5z" />
+    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h3.68l-1.06 1.06c-.2.2-.32.45-.38.71-.06.29-.03.6.11.86.26.5.77.79 1.31.79.25 0 .5-.06.74-.2l6.17-3.58c.3-.18.54-.45.69-.76.15-.33.2-.69.14-1.04l-.11-.6H19c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14h-6v-2H7V8h12v10z" />
+  </svg>
+);
+
+export const DeleteOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM18 4h-3.5l-1-1h-3l-1 1H4v2h16V4z" />
+  </svg>
+);

@@ -108,7 +108,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               getOptionLabel={(option) => option.link.customName}
               value={linkedStudents.filter((s) => draft.studentIds.includes(s.id))}
               onChange={(_, newValue) => {
-                const ids = newValue.map((student) => student.id);
+                const ids = (Array.isArray(newValue) ? newValue : []).map((student) => student.id);
                 onDraftChange({ ...draft, studentIds: ids, studentId: ids[0] });
               }}
               renderInput={(params) => (
