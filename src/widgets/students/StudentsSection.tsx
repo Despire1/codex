@@ -474,6 +474,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setOpenHomeworkMenuId(null);
   };
 
+  const handleSendHomework = (homeworkId: number) => {
+    if (!onSendHomework) return;
+    onSendHomework(homeworkId);
+
+    if (activeHomeworkId === homeworkId) {
+      setHomeworkDraft((prev) => ({
+        ...prev,
+        status: 'ASSIGNED',
+      }));
+    }
+  };
+
   const handleDeleteHomework = (homeworkId: number) => {
     if (!handleDeleteHomework) return;
     const confirmed = window.confirm('Удалить домашнее задание? Его нельзя будет вернуть.');
@@ -1016,7 +1028,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 {onSendHomework && activeHomework && activeStatusInfo?.status === 'DRAFT' && (
                   <button
                     className={controls.secondaryButton}
-                    onClick={() => onSendHomework(activeHomework.id)}
+                    onClick={() => handleSendHomework(activeHomework.id)}
                     disabled={isSaving}
                   >
                     Отправить ученику
