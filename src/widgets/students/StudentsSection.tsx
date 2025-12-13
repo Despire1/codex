@@ -1183,10 +1183,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <div className={styles.sectionHeader}>
                   <p className={styles.priceLabel}>Фото</p>
                   <span className={styles.subtleLabel}>PNG/JPG/WebP, до 10MB, до 5 фото</span>
+                  {drawerMode !== 'edit' && <button className={styles.linkButton} onClick={() => setDrawerMode('edit')}>
+                    <AddOutlinedIcon width={18} height={18}/>
+                  </button>}
                 </div>
                 {drawerMode === 'edit' && (
-                  <div className={styles.attachmentControls}>
-                    <label className={controls.secondaryButton}>
+                    <div className={styles.attachmentControls}>
+                      <label className={controls.secondaryButton}>
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
