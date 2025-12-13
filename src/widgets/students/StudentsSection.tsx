@@ -23,10 +23,12 @@ import {
   HomeworkStatus,
   Lesson,
   LinkedStudent,
+  Payment,
   Student,
 } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './StudentsSection.module.css';
+import { PaymentList } from './components/PaymentList';
 
 interface StudentsSectionProps {
   linkedStudents: LinkedStudent[];
@@ -58,6 +60,7 @@ interface StudentsSectionProps {
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
   lessons: Lesson[];
+  payments: Payment[];
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onCreateLesson: (studentId?: number) => void;
@@ -158,6 +161,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onUpdateHomework,
   onOpenStudentModal,
   lessons,
+  payments,
   onCompleteLesson,
   onTogglePaid,
   onCreateLesson,
@@ -170,7 +174,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'debt' | 'overdue'>('all');
-  const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons'>('homework');
+  const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons' | 'payments'>('homework');
   const [homeworkFilter, setHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
@@ -769,6 +773,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     Занятия
                   </button>
                   <button
+                    className={`${styles.tab} ${activeTab === 'payments' ? styles.tabActive : ''}`}
+                    onClick={() => setActiveTab('payments')}
+                  >
+                    Оплаты
+                  </button>
+                  <button
                     className={`${styles.tab} ${activeTab === 'overview' ? styles.tabActive : ''}`}
                     onClick={() => setActiveTab('overview')}
                   >
@@ -1030,6 +1040,16 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
+              ) : activeTab === 'payments' ? (
+                <div className={styles.card}>
+                  <div className={styles.homeworkHeader}>
+                    <div>
+                      <div className={styles.priceLabel}>Оплаты</div>
+                      <div className={styles.subtleLabel}>История платежей для ученика</div>
+                    </div>
+                  </div>
+                  <PaymentList payments={payments} />
                 </div>
               ) : (
                 <div className={styles.card}>

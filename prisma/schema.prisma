@@ -16,7 +16,6 @@ model Teacher {
   students              TeacherStudent[]
   homeworks             Homework[]
   lessons               Lesson[]
-  payments              Payment[]
   createdAt             DateTime        @default(now())
   authUser              TeacherAuth?
 }
@@ -31,7 +30,6 @@ model Student {
   takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
-  payments             Payment[]
   createdAt            DateTime             @default(now())
 }
 
@@ -42,6 +40,7 @@ model TeacherStudent {
   customName         String
   autoRemindHomework Boolean @default(false)
   balanceLessons     Int     @default(0)
+  payments           Payment[]
 
   teacher Teacher @relation(fields: [teacherId], references: [chatId])
   student Student @relation(fields: [studentId], references: [id])
@@ -93,22 +92,19 @@ model Lesson {
 }
 
 model Payment {
-  id        Int      @id @default(autoincrement())
-  lessonId  Int
-  studentId Int
-  amount    Int
-  paidAt    DateTime @default(now())
-  teacherId BigInt
-  comment   String?
+  id               Int       @id @default(autoincrement())
+  teacherStudentId Int
+  lessonId         Int?
+  amount           Int
+  paidAt           DateTime  @default(now())
+  comment          String?
 
-  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id])
-  teacher Teacher @relation(fields: [teacherId], references: [chatId])
+  lesson          Lesson?         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  teacherStudent  TeacherStudent  @relation(fields: [teacherStudentId], references: [id])
 
-  @@unique([lessonId, studentId])
+  @@unique([teacherStudentId, lessonId])
+  @@index([teacherStudentId])
   @@index([lessonId])
-  @@index([studentId])
-  @@index([teacherId])
 }
 
 model LessonParticipant {

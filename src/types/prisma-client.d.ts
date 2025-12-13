@@ -61,11 +61,10 @@ declare module '@prisma/client' {
 
   export type Payment = {
     id: number;
-    lessonId: number;
-    studentId: number;
+    teacherStudentId: number;
+    lessonId: number | null;
     amount: number;
     paidAt: Date;
-    teacherId: bigint;
     comment: string | null;
   };
 

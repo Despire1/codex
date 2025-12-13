@@ -1,7 +1,7 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Homework, HomeworkStatus, Lesson, LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
+import { Homework, HomeworkStatus, Lesson, LinkedStudent, Payment, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DialogModal } from '../shared/ui/Modal/DialogModal';
@@ -45,6 +45,7 @@ export const App = () => {
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [paymentsByStudent, setPaymentsByStudent] = useState<Record<number, Payment[]>>({});
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -147,6 +148,25 @@ export const App = () => {
     }
   }, [selectedStudentId]);
 
+  const refreshPayments = useCallback(
+    async (studentId: number) => {
+      try {
+        const data = await api.getPayments(studentId);
+        setPaymentsByStudent((prev) => ({ ...prev, [studentId]: data.payments }));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load payments', error);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (selectedStudentId) {
+      refreshPayments(selectedStudentId);
+    }
+  }, [selectedStudentId, refreshPayments]);
+
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
   const activeTab = useMemo<TabId>(() => tabIdByPath[location.pathname] ?? 'dashboard', [location.pathname]);
@@ -183,6 +203,8 @@ export const App = () => {
   }, [lessons]);
 
   const unpaidLessons = lessons.filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid).length;
+
+  const payments = selectedStudentId ? paymentsByStudent[selectedStudentId] ?? [] : [];
 
     const handleAddStudent = async () => {
       if (!newStudentDraft.customName.trim()) return;
@@ -517,12 +539,48 @@ export const App = () => {
 
   const togglePaid = async (lessonId: number, studentId?: number) => {
     try {
+      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
+      const isCurrentlyPaid = studentId !== undefined
+        ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
+        : targetLesson?.isPaid ?? false;
+
+      if (isCurrentlyPaid && !window.confirm('Снять отметку оплаты?')) return;
+
       if (studentId !== undefined) {
         const data = await api.toggleParticipantPaid(lessonId, studentId);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+
+        if (data.link) {
+          setLinks((prev) => {
+            const exists = prev.some(
+              (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+            );
+            if (!exists) return [...prev, data.link!];
+            return prev.map((link) =>
+              link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
+            );
+          });
+        }
+
+        await refreshPayments(studentId);
       } else {
         const data = await api.togglePaid(lessonId);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+
+        if (data.link) {
+          setLinks((prev) => {
+            const exists = prev.some(
+              (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+            );
+            if (!exists) return [...prev, data.link!];
+            return prev.map((link) =>
+              link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
+            );
+          });
+        }
+
+        const targetStudent = data.lesson.studentId;
+        await refreshPayments(targetStudent);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -778,6 +836,7 @@ export const App = () => {
                   onUpdateHomework={updateHomework}
                   onOpenStudentModal={() => setStudentModalOpen(true)}
                   lessons={lessons}
+                  payments={payments}
                   onCompleteLesson={markLessonCompleted}
                   onTogglePaid={togglePaid}
                   onCreateLesson={openCreateLessonForStudent}
