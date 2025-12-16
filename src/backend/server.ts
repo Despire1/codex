@@ -448,7 +448,7 @@ const createLesson = async (body: any) => {
     data: {
       teacherId: teacher.chatId,
       studentId: studentIds[0],
-      price: basePrice,
+      price: 0,
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
@@ -456,7 +456,7 @@ const createLesson = async (body: any) => {
       participants: {
         create: students.map((student) => ({
           studentId: student.id,
-          price: student.pricePerLesson ?? 0,
+          price: 0,
           isPaid: false,
         })),
       },
@@ -471,11 +471,18 @@ const createLesson = async (body: any) => {
   });
 
   if (markPaid) {
+    const confirmedPrice = basePrice;
+
+    await prisma.lessonParticipant.updateMany({
+      where: { lessonId: lesson.id },
+      data: { isPaid: true, price: confirmedPrice },
+    });
+
     await prisma.payment.createMany({
       data: lesson.participants.map((participant: any) => ({
         lessonId: lesson.id,
         studentId: participant.studentId,
-        amount: participant.price ?? basePrice,
+        amount: confirmedPrice,
         teacherId: teacher.chatId,
         paidAt: new Date(),
         comment: null,
@@ -483,11 +490,9 @@ const createLesson = async (body: any) => {
       skipDuplicates: true,
     });
 
-    await prisma.lessonParticipant.updateMany({ where: { lessonId: lesson.id }, data: { isPaid: true } });
-
     const updated = await prisma.lesson.update({
       where: { id: lesson.id },
-      data: { isPaid: true },
+      data: { isPaid: true, price: confirmedPrice },
       include: {
         participants: {
           include: { student: true },
@@ -589,7 +594,7 @@ const createRecurringLessons = async (body: any) => {
       data: {
         teacherId: teacher.chatId,
         studentId: studentIds[0],
-        price: basePrice,
+        price: 0,
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -601,7 +606,7 @@ const createRecurringLessons = async (body: any) => {
         participants: {
           create: students.map((student) => ({
             studentId: student.id,
-            price: student.pricePerLesson ?? 0,
+            price: 0,
             isPaid: false,
           })),
         },
@@ -615,11 +620,18 @@ const createRecurringLessons = async (body: any) => {
       },
     });
     if (markPaid) {
+      const confirmedPrice = basePrice;
+
+      await prisma.lessonParticipant.updateMany({
+        where: { lessonId: lesson.id },
+        data: { isPaid: true, price: confirmedPrice },
+      });
+
       await prisma.payment.createMany({
         data: lesson.participants.map((participant: any) => ({
           lessonId: lesson.id,
           studentId: participant.studentId,
-          amount: participant.price ?? basePrice,
+          amount: confirmedPrice,
           teacherId: teacher.chatId,
           paidAt: new Date(),
           comment: null,
@@ -627,11 +639,9 @@ const createRecurringLessons = async (body: any) => {
         skipDuplicates: true,
       });
 
-      await prisma.lessonParticipant.updateMany({ where: { lessonId: lesson.id }, data: { isPaid: true } });
-
       const updatedLesson = await prisma.lesson.update({
         where: { id: lesson.id },
-        data: { isPaid: true },
+        data: { isPaid: true, price: confirmedPrice },
         include: {
           participants: { include: { student: true } },
         },
@@ -682,8 +692,6 @@ const updateLesson = async (lessonId: number, body: any) => {
     where: { id: { in: ids } },
   });
 
-  const basePrice = students[0]?.pricePerLesson ?? (existing as any).price ?? 0;
-
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   const existingLesson = existing as any;
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
@@ -698,7 +706,7 @@ const updateLesson = async (lessonId: number, body: any) => {
       where: { id: lessonId },
       data: {
         studentId: ids[0],
-        price: basePrice,
+        price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -708,7 +716,7 @@ const updateLesson = async (lessonId: number, body: any) => {
         participants: {
           create: students.map((student) => ({
             studentId: student.id,
-            price: student.pricePerLesson ?? 0,
+            price: 0,
             isPaid: false,
           })),
         },
@@ -753,7 +761,7 @@ const updateLesson = async (lessonId: number, body: any) => {
           data: {
             teacherId: teacher.chatId,
             studentId: ids[0],
-            price: basePrice,
+            price: 0,
             startAt: start,
             durationMinutes: nextDuration,
             status: 'SCHEDULED',
@@ -765,7 +773,7 @@ const updateLesson = async (lessonId: number, body: any) => {
             participants: {
               create: students.map((student) => ({
                 studentId: student.id,
-                price: student.pricePerLesson ?? 0,
+                price: 0,
                 isPaid: false,
               })),
             },
@@ -827,7 +835,7 @@ const updateLesson = async (lessonId: number, body: any) => {
           data: {
             teacherId: teacher.chatId,
             studentId: ids[0],
-            price: basePrice,
+            price: 0,
             startAt: start,
             durationMinutes: nextDuration,
             status: 'SCHEDULED',
@@ -839,7 +847,7 @@ const updateLesson = async (lessonId: number, body: any) => {
             participants: {
               create: students.map((student) => ({
                 studentId: student.id,
-                price: student.pricePerLesson ?? 0,
+                price: 0,
                 isPaid: false,
               })),
             },
@@ -872,13 +880,13 @@ const updateLesson = async (lessonId: number, body: any) => {
     where: { id: lessonId },
     data: {
       studentId: ids[0],
-      price: basePrice,
+      price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
       startAt: targetStart,
       durationMinutes: nextDuration,
       participants: {
         create: students.map((student) => ({
           studentId: student.id,
-          price: student.pricePerLesson ?? 0,
+          price: 0,
           isPaid: false,
         })),
       },
@@ -924,6 +932,9 @@ const markLessonCompleted = async (lessonId: number) => {
   });
 
   if (updatedLink && updatedLink.balanceLessons > 0) {
+    const student = await prisma.student.findUnique({ where: { id: lesson.studentId } });
+    const confirmedPrice = student?.pricePerLesson ?? lesson.price ?? 0;
+
     updatedLink = await prisma.teacherStudent.update({
       where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: lesson.studentId } },
       data: { balanceLessons: updatedLink.balanceLessons - 1 },
@@ -931,12 +942,12 @@ const markLessonCompleted = async (lessonId: number) => {
 
     await prisma.lessonParticipant.updateMany({
       where: { lessonId, studentId: lesson.studentId },
-      data: { isPaid: true },
+      data: { isPaid: true, price: confirmedPrice },
     });
 
     updatedLesson = await prisma.lesson.update({
       where: { id: lessonId },
-      data: { isPaid: true },
+      data: { isPaid: true, price: confirmedPrice },
     });
   }
 
@@ -984,11 +995,15 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
-      data: { isPaid: false },
+      data: { isPaid: false, price: 0 },
     });
+
+    if (studentId === lesson.studentId) {
+      await prisma.lesson.update({ where: { id: lessonId }, data: { price: 0 } });
+    }
   } else {
     const amount =
-      [participant.price, lesson.price, link.student?.pricePerLesson].find(
+      [link.student?.pricePerLesson, participant.price, lesson.price].find(
         (value) => typeof value === 'number' && value > 0,
       ) ?? 0;
     await prisma.payment.create({
@@ -1010,8 +1025,12 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
-      data: { isPaid: true },
+      data: { isPaid: true, price: amount },
     });
+
+    if (studentId === lesson.studentId) {
+      await prisma.lesson.update({ where: { id: lessonId }, data: { price: amount } });
+    }
   }
 
   const participants = await prisma.lessonParticipant.findMany({
