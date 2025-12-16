@@ -537,6 +537,24 @@ export const App = () => {
     }
   };
 
+  const updateLessonStatus = async (lessonId: number, status: Lesson['status']) => {
+    try {
+      const data = await api.updateLessonStatus(lessonId, status);
+      setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+
+      if (data.links && data.links.length > 0) {
+        setLinks((prev) => {
+          const map = new Map(prev.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
+          data.links!.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
+          return Array.from(map.values());
+        });
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update lesson status', error);
+    }
+  };
+
   const togglePaid = async (lessonId: number, studentId?: number) => {
     try {
       const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
@@ -838,6 +856,7 @@ export const App = () => {
                   lessons={lessons}
                   payments={payments}
                   onCompleteLesson={markLessonCompleted}
+                  onChangeLessonStatus={updateLessonStatus}
                   onTogglePaid={togglePaid}
                   onCreateLesson={openCreateLessonForStudent}
                   onEditLesson={startEditLesson}

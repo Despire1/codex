@@ -68,6 +68,11 @@ export const api = {
       repeatUntil?: string;
     },
   ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[] }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  updateLessonStatus: (id: number, status: Lesson['status']) =>
+    apiFetch<{ lesson: Lesson; links?: TeacherStudent[] }>(`/api/lessons/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
   deleteLesson: (id: number, payload?: { applyToSeries?: boolean }) =>
     apiFetch<{ deletedIds?: number[] }>(`/api/lessons/${id}`, { method: 'DELETE', body: JSON.stringify(payload ?? {}) }),
   markLessonCompleted: (lessonId: number) =>
