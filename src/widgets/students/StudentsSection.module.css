@@ -1100,6 +1100,31 @@
   margin-top: 4px;
 }
 
+.lessonMetaLine {
+  margin-top: 4px;
+}
+
+.lessonStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lessonStatusSelect {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+}
+
+.metaLabel {
+  font-weight: 600;
+  color: #111827;
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;

@@ -63,6 +63,7 @@ interface StudentsSectionProps {
   lessons: Lesson[];
   payments: Payment[];
   onCompleteLesson: (lessonId: number) => void;
+  onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onCreateLesson: (studentId?: number) => void;
   onEditLesson: (lesson: Lesson) => void;
@@ -95,12 +96,6 @@ const getStatusLabel = (status: HomeworkStatus) => {
   if (status === 'IN_PROGRESS') return 'В работе';
   if (status === 'ASSIGNED') return 'Назначено';
   return 'Черновик';
-};
-
-const getLessonStatusLabel = (status: Lesson['status']) => {
-  if (status === 'COMPLETED') return 'Проведён';
-  if (status === 'CANCELED') return 'Отменён';
-  return 'Запланирован';
 };
 
 const truncate = (text: string, maxLength: number) => {
@@ -164,6 +159,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   lessons,
   payments,
   onCompleteLesson,
+  onChangeLessonStatus,
   onTogglePaid,
   onCreateLesson,
   onEditLesson,
@@ -983,14 +979,29 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                               {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', {locale: ru})}
                             </div>
                             <div className={styles.lessonMeta}>
-                              Статус: {getLessonStatusLabel(lesson.status)} • Оплата:{' '}
-                              {lesson.isPaid ? 'Оплачено' : 'Не оплачено'} • Цена:{' '}
-                              {(
-                                lesson.participants?.find((p) => p.studentId === selectedStudentId)?.price ??
-                                selectedStudent.pricePerLesson ??
-                                0
-                              )}{' '}
-                              ₽
+                              <div className={styles.lessonStatusRow}>
+                                <span className={styles.metaLabel}>Статус:</span>
+                                <select
+                                  className={styles.lessonStatusSelect}
+                                  value={lesson.status}
+                                  onChange={(event) =>
+                                    onChangeLessonStatus(lesson.id, event.target.value as Lesson['status'])
+                                  }
+                                >
+                                  <option value="SCHEDULED">Запланирован</option>
+                                  <option value="COMPLETED">Проведён</option>
+                                  <option value="CANCELED">Отменён</option>
+                                </select>
+                              </div>
+                              <div className={styles.lessonMetaLine}>
+                                Оплата: {lesson.isPaid ? 'Оплачено' : 'Не оплачено'} • Цена:{' '}
+                                {(
+                                  lesson.participants?.find((p) => p.studentId === selectedStudentId)?.price ??
+                                  selectedStudent.pricePerLesson ??
+                                  0
+                                )}{' '}
+                                ₽
+                              </div>
                             </div>
                           </div>
                           <div className={styles.iconActions}>
