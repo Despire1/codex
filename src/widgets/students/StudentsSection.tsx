@@ -1,5 +1,13 @@
 import { format, isBefore, parseISO } from 'date-fns';
-import { type ClipboardEvent as ReactClipboardEvent, type DragEvent, type FC, useEffect, useMemo, useState } from 'react';
+import {
+  type ClipboardEvent as ReactClipboardEvent,
+  type DragEvent,
+  type FC,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
@@ -193,6 +201,22 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [openHomeworkMenuId, setOpenHomeworkMenuId] = useState<number | null>(null);
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
   const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const DRAWER_TRANSITION_MS = 250;
+  const drawerAnimationTimeoutRef = useRef<number | null>(null);
+
+  const clearDrawerAnimationTimeout = () => {
+    if (drawerAnimationTimeoutRef.current) {
+      clearTimeout(drawerAnimationTimeoutRef.current);
+      drawerAnimationTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearDrawerAnimationTimeout();
+    };
+  }, []);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -289,10 +313,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setShowUnsavedConfirm(true);
       return;
     }
+    clearDrawerAnimationTimeout();
     setIsDrawerMenuOpen(false);
     setOpenHomeworkMenuId(null);
-    setActiveHomeworkId(null);
-    setDrawerMode('view');
+    setIsDrawerVisible(false);
+    drawerAnimationTimeoutRef.current = window.setTimeout(() => {
+      setActiveHomeworkId(null);
+      setDrawerMode('view');
+      drawerAnimationTimeoutRef.current = null;
+    }, DRAWER_TRANSITION_MS);
   };
 
   useEffect(() => {
@@ -309,6 +338,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       });
       setDrawerMode('view');
       setIsDescriptionExpanded(false);
+      requestAnimationFrame(() => setIsDrawerVisible(true));
+    } else {
+      setIsDrawerVisible(false);
     }
   }, [activeHomework?.id]);
 
@@ -344,8 +376,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     if (pendingHomeworkId) {
       setActiveHomeworkId(pendingHomeworkId);
       setPendingHomeworkId(null);
+      requestAnimationFrame(() => setIsDrawerVisible(true));
     } else if (!pendingHomeworkId) {
-      setActiveHomeworkId(null);
+      closeHomeworkDrawer();
     }
   };
 
@@ -371,8 +404,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     if (pendingHomeworkId) {
       setActiveHomeworkId(pendingHomeworkId);
       setPendingHomeworkId(null);
+      requestAnimationFrame(() => setIsDrawerVisible(true));
     } else {
-      setActiveHomeworkId(null);
+      closeHomeworkDrawer();
     }
   };
 
@@ -1103,8 +1137,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
       {activeHomework && (
         <>
-          <button className={styles.drawerScrim} aria-label="Закрыть карточку ДЗ" onClick={closeHomeworkDrawer} />
-          <aside className={`${styles.homeworkDrawer} ${styles.drawerOpen}`} aria-live="polite">
+          <button
+            className={`${styles.drawerScrim} ${isDrawerVisible ? styles.scrimVisible : ''}`}
+            aria-label="Закрыть карточку ДЗ"
+            onClick={closeHomeworkDrawer}
+          />
+          <aside
+            className={`${styles.homeworkDrawer} ${isDrawerVisible ? styles.drawerOpen : ''}`}
+            aria-live="polite"
+          >
             <div className={styles.drawerHeaderSticky}>
               <div>
                 <div className={styles.drawerTitle}>{selectedStudent?.link.customName}</div>
