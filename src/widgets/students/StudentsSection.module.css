@@ -740,8 +740,14 @@
   padding: 0;
   cursor: pointer;
   transition: opacity 0.2s ease;
-  opacity: 1;
+  opacity: 0;
+  pointer-events: none;
   z-index: 6;
+}
+
+.scrimVisible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .homeworkDrawer {
