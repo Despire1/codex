@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
@@ -35,6 +36,7 @@ import {
   Student,
 } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
+import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
 import {ru} from "date-fns/locale";
@@ -143,6 +145,12 @@ const formatCompletionMoment = (completedAt?: string | null) => {
   }
 };
 
+const getLessonStatusLabel = (status: Lesson['status']) => {
+  if (status === 'COMPLETED') return 'Проведён';
+  if (status === 'CANCELED') return 'Отменён';
+  return 'Запланирован';
+};
+
 export const StudentsSection: FC<StudentsSectionProps> = ({
   linkedStudents,
   selectedStudentId,
@@ -202,6 +210,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
   const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const DRAWER_TRANSITION_MS = 250;
   const drawerAnimationTimeoutRef = useRef<number | null>(null);
 
@@ -384,6 +393,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleKeepEditing = () => {
     setShowUnsavedConfirm(false);
+  };
+
+  const handleStartEditLessonStatus = (lessonId: number) => {
+    setEditableLessonStatusId(lessonId);
+  };
+
+  const handleLessonStatusChange = (lessonId: number, status: Lesson['status']) => {
+    onChangeLessonStatus(lessonId, status);
+    setEditableLessonStatusId(null);
   };
 
   const handleOpenCreateHomework = () => {
@@ -1004,76 +1022,123 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     </button>
                   </div>
 
-                  <div className={styles.lessonList}>
+                  <div className={styles.lessonTableWrapper}>
                     {studentLessons.length ? (
-                      studentLessons.map((lesson) => (
-                        <div key={lesson.id} className={styles.lessonItem}>
-                          <div>
-                            <div className={styles.lessonTitle}>
-                              {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', {locale: ru})}
-                            </div>
-                            <div className={styles.lessonMeta}>
-                              <div className={styles.lessonStatusRow}>
-                                <span className={styles.metaLabel}>Статус:</span>
-                                <select
-                                  className={styles.lessonStatusSelect}
-                                  value={lesson.status}
-                                  onChange={(event) =>
-                                    onChangeLessonStatus(lesson.id, event.target.value as Lesson['status'])
-                                  }
-                                >
-                                  <option value="SCHEDULED">Запланирован</option>
-                                  <option value="COMPLETED">Проведён</option>
-                                  <option value="CANCELED">Отменён</option>
-                                </select>
-                              </div>
-                              <div className={styles.lessonMetaLine}>
-                                Оплата: {lesson.isPaid ? 'Оплачено' : 'Не оплачено'} • Цена:{' '}
-                                {(
-                                  lesson.participants?.find((p) => p.studentId === selectedStudentId)?.price ??
-                                  selectedStudent.pricePerLesson ??
-                                  0
-                                )}{' '}
-                                ₽
-                              </div>
-                            </div>
-                          </div>
-                          <div className={styles.iconActions}>
-                            <button
-                              className={controls.iconButton}
-                              aria-label="Отметить проведённым"
-                              title="Отметить проведённым"
-                              onClick={() => onCompleteLesson(lesson.id)}
-                            >
-                              <DoneOutlinedIcon width={18} height={18} />
-                            </button>
-                            <button
-                              className={controls.iconButton}
-                              aria-label="Отметить оплату"
-                              title="Отметить оплату"
-                              onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
-                            >
-                              <PaidOutlinedIcon width={18} height={18} />
-                            </button>
-                            <button
-                              className={controls.iconButton}
-                              aria-label="Перенести"
-                              title="Перенести"
-                              onClick={() => onEditLesson(lesson)}
-                            >
-                              <EventRepeatOutlinedIcon width={18} height={18} />
-                            </button>
-                            <button
-                              className={controls.iconButton}
-                              aria-label="Удалить"
-                              title="Удалить"
-                              onClick={() => onDeleteLesson(lesson.id)}
-                            >
-                              <DeleteOutlineIcon width={18} height={18} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
+                      <TableContainer className={styles.lessonTableContainer}>
+                        <Table size="small" aria-label="Список занятий ученика">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Дата и время</TableCell>
+                              <TableCell>Длительность</TableCell>
+                              <TableCell>Статус занятия</TableCell>
+                              <TableCell>Статус оплаты</TableCell>
+                              <TableCell align="right">Цена</TableCell>
+                              <TableCell align="right">Быстрые действия</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {studentLessons.map((lesson) => {
+                              const participant = lesson.participants?.find(
+                                (p) => p.studentId === selectedStudentId,
+                              );
+                              const resolvedPrice =
+                                participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
+                              const isPaid = participant?.isPaid ?? lesson.isPaid;
+
+                              return (
+                                <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
+                                  <TableCell>
+                                    <div className={styles.lessonDateCell}>
+                                      <div className={styles.lessonTitle}>
+                                        {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                                      </div>
+                                      <div className={styles.lessonMeta}>#{lesson.id}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={styles.monoCell}>{lesson.durationMinutes} мин</TableCell>
+                                  <TableCell>
+                                    <div className={styles.lessonStatusRow}>
+                                      <span className={styles.metaLabel}>Статус:</span>
+                                      {editableLessonStatusId === lesson.id ? (
+                                        <select
+                                          className={styles.lessonStatusSelect}
+                                          value={lesson.status}
+                                          autoFocus
+                                          onChange={(event) =>
+                                            handleLessonStatusChange(
+                                              lesson.id,
+                                              event.target.value as Lesson['status'],
+                                            )
+                                          }
+                                          onBlur={() => setEditableLessonStatusId(null)}
+                                        >
+                                          <option value="SCHEDULED">Запланирован</option>
+                                          <option value="COMPLETED">Проведён</option>
+                                          <option value="CANCELED">Отменён</option>
+                                        </select>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className={styles.lessonStatusTrigger}
+                                          onClick={() => handleStartEditLessonStatus(lesson.id)}
+                                        >
+                                          {getLessonStatusLabel(lesson.status)}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      label={isPaid ? 'Оплачено' : 'Не оплачено'}
+                                      variant={isPaid ? 'paid' : 'unpaid'}
+                                      className={styles.paymentBadge}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right" className={styles.monoCell}>
+                                    {resolvedPrice} ₽
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    <div className={styles.iconActions}>
+                                      <button
+                                        className={controls.iconButton}
+                                        aria-label="Отметить проведённым"
+                                        title="Отметить проведённым"
+                                        onClick={() => onCompleteLesson(lesson.id)}
+                                      >
+                                        <DoneOutlinedIcon width={18} height={18} />
+                                      </button>
+                                      <button
+                                        className={controls.iconButton}
+                                        aria-label="Отметить оплату"
+                                        title="Отметить оплату"
+                                        onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
+                                      >
+                                        <PaidOutlinedIcon width={18} height={18} />
+                                      </button>
+                                      <button
+                                        className={controls.iconButton}
+                                        aria-label="Перенести"
+                                        title="Перенести"
+                                        onClick={() => onEditLesson(lesson)}
+                                      >
+                                        <EventRepeatOutlinedIcon width={18} height={18} />
+                                      </button>
+                                      <button
+                                        className={controls.iconButton}
+                                        aria-label="Удалить"
+                                        title="Удалить"
+                                        onClick={() => onDeleteLesson(lesson.id)}
+                                      >
+                                        <DeleteOutlineIcon width={18} height={18} />
+                                      </button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
                     ) : (
                       <div className={styles.emptyState}>
                         <p>Пока нет занятий. Добавьте урок.</p>

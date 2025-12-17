@@ -1079,20 +1079,40 @@
   color: #475569;
 }
 
-.lessonList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.lessonTableWrapper {
+  margin-top: 12px;
 }
 
-.lessonItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
+.lessonTableContainer {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.lessonTableContainer :global(.MuiTableHead-root) {
+  background: #f8fafc;
+}
+
+.lessonTableContainer :global(.MuiTableCell-head) {
+  font-weight: 800;
+  color: #0f172a;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.lessonTableContainer :global(.MuiTableCell-root) {
+  border-color: #e2e8f0;
+  font-size: 14px;
+}
+
+.lessonTableRow :global(.MuiTableCell-root) {
+  vertical-align: middle;
+}
+
+.lessonDateCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .lessonTitle {
@@ -1102,12 +1122,7 @@
 
 .lessonMeta {
   color: #6b7280;
-  font-size: 14px;
-  margin-top: 4px;
-}
-
-.lessonMetaLine {
-  margin-top: 4px;
+  font-size: 13px;
 }
 
 .lessonStatusRow {
@@ -1117,6 +1132,24 @@
   flex-wrap: wrap;
 }
 
+.lessonStatusTrigger {
+  border: 1px solid transparent;
+  background: none;
+  color: #1f2937;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.lessonStatusTrigger:hover,
+.lessonStatusTrigger:focus-visible {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  outline: none;
+}
+
 .lessonStatusSelect {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -1124,6 +1157,16 @@
   background: #fff;
   color: #111827;
   font-size: 13px;
+}
+
+.paymentBadge {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.monoCell {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  white-space: nowrap;
 }
 
 .metaLabel {
