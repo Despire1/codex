@@ -39,7 +39,10 @@ import controls from '../../shared/styles/controls.module.css';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
-import {ru} from "date-fns/locale";
+import { HomeworkTab } from './components/HomeworkTab';
+import { StudentHero } from './components/StudentHero';
+import { StudentsSidebar } from './components/StudentsSidebar';
+import { ru } from 'date-fns/locale';
 
 interface StudentsSectionProps {
   linkedStudents: LinkedStudent[];
@@ -205,10 +208,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [openHomeworkMenuId, setOpenHomeworkMenuId] = useState<number | null>(null);
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
-  const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const DRAWER_TRANSITION_MS = 250;
@@ -362,6 +363,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     }
     setActiveHomeworkId(homeworkId);
     setDrawerMode('view');
+  };
+
+  const handleOpenHomeworkCard = (homeworkId: number) => {
+    setOpenHomeworkMenuId(null);
+    handleOpenHomework(homeworkId);
+  };
+
+  const handleToggleHomeworkMenu = (homeworkId: number) => {
+    setOpenHomeworkMenuId((prev) => (prev === homeworkId ? null : homeworkId));
+  };
+
+  const handleEditHomework = (homeworkId: number) => {
+    handleOpenHomework(homeworkId);
+    setDrawerMode('edit');
   };
 
   const resetDraftToOriginal = () => {
@@ -520,19 +535,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return () => window.removeEventListener('paste', handler);
   }, [activeHomeworkId, drawerMode]);
 
-  const renderStatusPill = (statusInfo: HomeworkStatusInfo) => {
-    const statusClass =
-      statusInfo.status === 'DONE'
-        ? styles.statusDone
-        : statusInfo.status === 'IN_PROGRESS'
-          ? styles.statusInProgress
-          : statusInfo.status === 'ASSIGNED'
-            ? styles.statusAssigned
-            : styles.statusDraft;
-
-    return <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(statusInfo.status)}</span>;
-  };
-
   const handleHomeworkReminder = (homeworkId: number) => {
     if (onRemindHomeworkById) {
       onRemindHomeworkById(homeworkId);
@@ -612,401 +614,57 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   return (
     <section className={styles.section}>
       <div className={styles.grid}>
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarCard}>
-            <div className={styles.headerRow}>
-              <div>
-                <div className={styles.titleRow}>
-                  <div>Ученики</div>
-                  <span className={styles.counter}>{linkedStudents.length}</span>
-                </div>
-              </div>
-              <button className={controls.secondaryButton} onClick={onOpenStudentModal}>
-                + Добавить
-              </button>
-            </div>
-
-            <div className={styles.searchBlock}>
-              <input
-                className={controls.input}
-                placeholder="Поиск"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            <div className={`${styles.filters} ${styles.listFilters}`}>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('all')}
-              >
-                Все
-              </button>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('debt')}
-              >
-                С долгом ({counts.withDebt})
-              </button>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('overdue')}
-              >
-                Просрочено ДЗ ({counts.overdue})
-              </button>
-            </div>
-            </div>
-
-            <div className={styles.studentList}>
-              {visibleStudents.map((student) => {
-                const status = student.link.balanceLessons < 0 ? 'debt' : student.link.balanceLessons > 0 ? 'prepaid' : 'neutral';
-                const overdueCount = student.homeworks.filter((hw) => getHomeworkStatusInfo(hw).isOverdue).length;
-                const pendingCount = student.homeworks.filter((hw) => !hw.isDone).length;
-
-                return (
-                  <button
-                    key={student.id}
-                    className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
-                    onClick={() => onSelectStudent(student.id)}
-                  >
-                    <div className={styles.studentStripe} aria-hidden />
-                    <div className={styles.studentCardBody}>
-                      <div className={styles.studentCardHeader}>
-                        <div className={styles.studentName}>{student.link.customName}</div>
-                        <div className={styles.badgeRow}>
-                          {status === 'debt' && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
-                          {overdueCount > 0 && (
-                            <span className={`${styles.lozenge} ${styles.badgeWarning}`}>ДЗ: {overdueCount}</span>
-                          )}
-                          {pendingCount === 0 && student.homeworks.length > 0 && (
-                            <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>ДЗ сделано</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className={styles.studentSecondaryRow}>
-                        <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
-                        <span className={styles.metaDivider}>•</span>
-                        <span className={styles.studentMeta}>
-                          автонапоминания: {student.link.autoRemindHomework ? 'вкл' : 'выкл'}
-                        </span>
-                        <span className={styles.metaDivider}>•</span>
-                        <span className={styles.studentMeta}>баланс: {student.link.balanceLessons}</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {!visibleStudents.length && (
-                <div className={styles.emptyState}>Ничего не найдено</div>
-              )}
-            </div>
-          </div>
-        </aside>
+        <StudentsSidebar
+          linkedStudents={linkedStudents}
+          visibleStudents={visibleStudents}
+          selectedStudentId={selectedStudentId}
+          searchQuery={searchQuery}
+          activeFilter={activeFilter}
+          counts={counts}
+          onSelectStudent={onSelectStudent}
+          onSearchChange={setSearchQuery}
+          onFilterChange={setActiveFilter}
+          onOpenStudentModal={onOpenStudentModal}
+          getHomeworkStatusInfo={getHomeworkStatusInfo}
+        />
 
         <div className={styles.content}>
           {selectedStudent ? (
             <div className={styles.contentGrid}>
-              <div className={`${styles.card} ${styles.headerCard}`}>
-                <div className={styles.heroHeader}>
-                  <div className={styles.heroNameBlock}>
-                    <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
-                    <div className={styles.studentMetaRow}>
-                      <span>Telegram: @{selectedStudent.username || 'нет'}</span>
-                    </div>
-                  </div>
-                  <div className={styles.heroActions}>
-                    <div className={styles.actionsMenuWrapper}>
-                      <button
-                        className={controls.iconButton}
-                        aria-label="Дополнительные действия"
-                        onClick={() => setIsActionsMenuOpen((prev) => !prev)}
-                      >
-                        ⋯
-                      </button>
-                      {isActionsMenuOpen && (
-                        <div className={styles.actionsMenu}>
-                          <button onClick={onOpenStudentModal}>Редактировать ученика</button>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, -1)}>Напомнить про оплату</button>
-                          <button onClick={() => navigator.clipboard?.writeText('Правила и памятка')}>Скопировать памятку</button>
-                          <button className={styles.dangerButton}>Удалить ученика</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
-                  <div className={styles.summaryLine}>
-                    <span className={styles.summaryLabel}>Баланс:</span>
-                    <span className={styles.summaryValueInline}>
-                      {selectedStudent.link.balanceLessons}
-                      {selectedStudent.link.balanceLessons < 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-                      )}
-                      {selectedStudent.link.balanceLessons > 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
-                      )}
-                    </span>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.inlinePopover}>
-                      <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
-                        <span className={styles.summaryLabel}>Предоплачено:</span>
-                        <span className={styles.summaryValueInline}>{selectedStudent.link.balanceLessons} уроков</span>
-                      </button>
-                      {isPrepaidOpen && (
-                        <div className={styles.popover}>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
-                          <button
-                            onClick={() => onAdjustBalance(selectedStudent.id, -1)}
-                            disabled={selectedStudent.link.balanceLessons <= 0}
-                          >
-                            -1 занятие
-                          </button>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, -selectedStudent.link.balanceLessons)}>
-                            Сбросить в 0
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.priceInline}>
-                      <span className={styles.summaryLabel}>Цена:</span>
-                      {priceEditState.id === selectedStudent.id ? (
-                        <div className={styles.priceEditorInline}>
-                          <input
-                            className={controls.input}
-                            type="number"
-                            value={priceEditState.value}
-                            onChange={(e) => onPriceChange(e.target.value)}
-                          />
-                          <div className={styles.priceButtons}>
-                            <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
-                            <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
-                          <span className={styles.summaryValueInline}>
-                            {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                              ? `${selectedStudent.pricePerLesson} ₽`
-                              : 'Не задана'}
-                          </span>
-                          <EditOutlinedIcon width={16} height={16} />
-                        </button>
-                      )}
-                    </div>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.toggleRow}>
-                      <span className={styles.summaryLabel}>Автонапоминания:</span>
-                      <button
-                        className={`${styles.toggleButton} ${selectedStudent.link.autoRemindHomework ? styles.toggleOn : styles.toggleOff}`}
-                        onClick={() => onToggleAutoReminder(selectedStudent.id)}
-                        type="button"
-                      >
-                        {selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.tabs}>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'homework' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('homework')}
-                  >
-                    Домашка
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'lessons' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('lessons')}
-                  >
-                    Занятия
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'payments' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('payments')}
-                  >
-                    Оплаты
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'overview' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('overview')}
-                  >
-                    Обзор
-                  </button>
-                </div>
-              </div>
+              <StudentHero
+                selectedStudent={selectedStudent}
+                priceEditState={priceEditState}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onStartEditPrice={onStartEditPrice}
+                onPriceChange={onPriceChange}
+                onSavePrice={onSavePrice}
+                onCancelPriceEdit={onCancelPriceEdit}
+                onToggleAutoReminder={onToggleAutoReminder}
+                onAdjustBalance={onAdjustBalance}
+                onOpenStudentModal={onOpenStudentModal}
+              />
 
               {activeTab === 'homework' ? (
-                <div className={styles.card}>
-                  <div className={styles.homeworkHeader}>
-                    <div>
-                      <div className={styles.priceLabel}>Домашка</div>
-                      <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
-                    </div>
-                    <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                    <span className={styles.iconLeading} aria-hidden>
-                      <AddOutlinedIcon width={16} height={16}/>
-                    </span>
-                      Новое ДЗ
-                    </button>
-                  </div>
-
-                  <div className={styles.filters}>
-                    {[
-                      {id: 'all', label: 'Все'},
-                      {id: 'DRAFT', label: 'Черновики'},
-                      {id: 'ASSIGNED', label: 'Назначено'},
-                      {id: 'IN_PROGRESS', label: 'В работе' },
-                      { id: 'DONE', label: 'Выполнено' },
-                      { id: 'overdue', label: 'Просрочено' },
-                    ].map((filter) => (
-                      <button
-                        key={filter.id}
-                        className={`${styles.filterChip} ${homeworkFilter === filter.id ? styles.activeChip : ''}`}
-                        onClick={() => setHomeworkFilter(filter.id as typeof homeworkFilter)}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className={styles.homeworkList}>
-                    {filteredHomeworks.map((hw) => {
-                      const statusInfo = getHomeworkStatusInfo(hw);
-                      const title = getHomeworkTitle(hw.text);
-                      const deadlineLabel = hw.deadline
-                        ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
-                        : 'Без дедлайна';
-                      const timeSpentLabel =
-                        hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined
-                          ? `Время: ${formatTimeSpentMinutes(hw.timeSpentMinutes)}`
-                          : 'Время: не указано';
-                      const completedLabel = `Выполнено: ${formatCompletionMoment(hw.completedAt)}`
-                      return (
-                        <div
-                          key={hw.id}
-                          className={styles.homeworkItem}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setOpenHomeworkMenuId(null);
-                            handleOpenHomework(hw.id);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              handleOpenHomework(hw.id);
-                            }
-                          }}
-                          aria-pressed={activeHomeworkId === hw.id}
-                        >
-                          <div className={styles.homeworkContent}>
-                            <div className={styles.homeworkTitleRow}>
-                              <div className={styles.homeworkTitle}>{title}</div>
-                            </div>
-                            <div className={styles.homeworkMetaRow}>
-                              <span className={styles.homeworkMeta}>{deadlineLabel}</span>
-                              <span className={styles.metaDivider}>•</span>
-                              <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
-                              {hw.completedAt && <>
-                                <span className={styles.metaDivider}>•</span>
-                                <span className={styles.homeworkMeta}>{completedLabel}</span>
-                              </>
-                            }
-                            </div>
-                          </div>
-                          <div className={styles.homeworkActions}>
-                            <div className={styles.statusStack}>
-                              {renderStatusPill(statusInfo)}
-                              {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-                                  <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
-                              )}
-                            </div>
-                            <div className={styles.iconActions}>
-                              <button
-                                  className={controls.iconButton}
-                                  aria-label="Отметить выполненным"
-                                  title="Переключить выполнено"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    onToggleHomework(hw.id);
-                                  }}
-                              >
-                                <CheckCircleOutlineIcon width={18} height={18}/>
-                              </button>
-                              <div className={styles.moreActionsWrapper}>
-                                <button
-                                    className={controls.iconButton}
-                                    aria-label="Ещё"
-                                    title="Ещё действия"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setOpenHomeworkMenuId((prev) => (prev === hw.id ? null : hw.id));
-                                    }}
-                                >
-                                  <MoreHorizIcon width={18} height={18}/>
-                                </button>
-                                {openHomeworkMenuId === hw.id && (
-                                    <div className={styles.moreMenu}>
-                                      <button
-                                          aria-label="Напомнить"
-                                          title="Отправить напоминание"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleHomeworkReminder(hw.id);
-                                          }}
-                                      >
-                                        Напомнить
-                                      </button>
-                                      <button
-                                          aria-label="Редактировать"
-                                          title="Редактировать"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleOpenHomework(hw.id);
-                                            setDrawerMode('edit');
-                                          }}
-                                      >
-                                        Редактировать
-                                      </button>
-                                      {statusInfo.status !== 'DRAFT' && (
-                                        <button
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleMoveToDraft(hw.id);
-                                            }}
-                                        >
-                                          В черновик
-                                        </button>
-                                      )}
-                                      <button
-                                          className={styles.dangerButton}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleDeleteHomework(hw.id);
-                                          }}
-                                      >
-                                        Удалить
-                                      </button>
-                                    </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {!filteredHomeworks.length && (
-                        <div className={styles.emptyState}>
-                          <p>Пока нет домашек. Добавьте новое задание.</p>
-                          <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                            + Новое ДЗ
-                          </button>
-                        </div>
-                    )}
-                  </div>
-                </div>
+                <HomeworkTab
+                  homeworkFilter={homeworkFilter}
+                  filteredHomeworks={filteredHomeworks}
+                  activeHomeworkId={activeHomeworkId}
+                  openHomeworkMenuId={openHomeworkMenuId}
+                  onOpenCreateHomework={handleOpenCreateHomework}
+                  onChangeFilter={setHomeworkFilter}
+                  onOpenHomework={handleOpenHomeworkCard}
+                  onToggleHomeworkMenu={handleToggleHomeworkMenu}
+                  onToggleHomework={onToggleHomework}
+                  onHomeworkReminder={handleHomeworkReminder}
+                  onEditHomework={handleEditHomework}
+                  onMoveToDraft={handleMoveToDraft}
+                  onDeleteHomework={handleDeleteHomework}
+                  getHomeworkStatusInfo={getHomeworkStatusInfo}
+                  getHomeworkTitle={getHomeworkTitle}
+                  formatTimeSpentMinutes={formatTimeSpentMinutes}
+                  formatCompletionMoment={formatCompletionMoment}
+                />
               ) : activeTab === 'lessons' ? (
                 <div className={styles.card}>
                   <div className={styles.homeworkHeader}>
