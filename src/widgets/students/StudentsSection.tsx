@@ -39,9 +39,10 @@ import controls from '../../shared/styles/controls.module.css';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
+import { HomeworkTab } from './components/HomeworkTab';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
-import {ru} from "date-fns/locale";
+import { ru } from 'date-fns/locale';
 
 interface StudentsSectionProps {
   linkedStudents: LinkedStudent[];
@@ -364,6 +365,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setDrawerMode('view');
   };
 
+  const handleOpenHomeworkCard = (homeworkId: number) => {
+    setOpenHomeworkMenuId(null);
+    handleOpenHomework(homeworkId);
+  };
+
+  const handleToggleHomeworkMenu = (homeworkId: number) => {
+    setOpenHomeworkMenuId((prev) => (prev === homeworkId ? null : homeworkId));
+  };
+
+  const handleEditHomework = (homeworkId: number) => {
+    handleOpenHomework(homeworkId);
+    setDrawerMode('edit');
+  };
+
   const resetDraftToOriginal = () => {
     if (!activeHomework) return;
     setHomeworkDraft({
@@ -520,19 +535,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     return () => window.removeEventListener('paste', handler);
   }, [activeHomeworkId, drawerMode]);
 
-  const renderStatusPill = (statusInfo: HomeworkStatusInfo) => {
-    const statusClass =
-      statusInfo.status === 'DONE'
-        ? styles.statusDone
-        : statusInfo.status === 'IN_PROGRESS'
-          ? styles.statusInProgress
-          : statusInfo.status === 'ASSIGNED'
-            ? styles.statusAssigned
-            : styles.statusDraft;
-
-    return <span className={`${styles.statusPill} ${statusClass}`}>{getStatusLabel(statusInfo.status)}</span>;
-  };
-
   const handleHomeworkReminder = (homeworkId: number) => {
     if (onRemindHomeworkById) {
       onRemindHomeworkById(homeworkId);
@@ -644,176 +646,25 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
               />
 
               {activeTab === 'homework' ? (
-                <div className={styles.card}>
-                  <div className={styles.homeworkHeader}>
-                    <div>
-                      <div className={styles.priceLabel}>Домашка</div>
-                      <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
-                    </div>
-                    <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                    <span className={styles.iconLeading} aria-hidden>
-                      <AddOutlinedIcon width={16} height={16}/>
-                    </span>
-                      Новое ДЗ
-                    </button>
-                  </div>
-
-                  <div className={styles.filters}>
-                    {[
-                      {id: 'all', label: 'Все'},
-                      {id: 'DRAFT', label: 'Черновики'},
-                      {id: 'ASSIGNED', label: 'Назначено'},
-                      {id: 'IN_PROGRESS', label: 'В работе' },
-                      { id: 'DONE', label: 'Выполнено' },
-                      { id: 'overdue', label: 'Просрочено' },
-                    ].map((filter) => (
-                      <button
-                        key={filter.id}
-                        className={`${styles.filterChip} ${homeworkFilter === filter.id ? styles.activeChip : ''}`}
-                        onClick={() => setHomeworkFilter(filter.id as typeof homeworkFilter)}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className={styles.homeworkList}>
-                    {filteredHomeworks.map((hw) => {
-                      const statusInfo = getHomeworkStatusInfo(hw);
-                      const title = getHomeworkTitle(hw.text);
-                      const deadlineLabel = hw.deadline
-                        ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM')}`
-                        : 'Без дедлайна';
-                      const timeSpentLabel =
-                        hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined
-                          ? `Время: ${formatTimeSpentMinutes(hw.timeSpentMinutes)}`
-                          : 'Время: не указано';
-                      const completedLabel = `Выполнено: ${formatCompletionMoment(hw.completedAt)}`
-                      return (
-                        <div
-                          key={hw.id}
-                          className={styles.homeworkItem}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setOpenHomeworkMenuId(null);
-                            handleOpenHomework(hw.id);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              handleOpenHomework(hw.id);
-                            }
-                          }}
-                          aria-pressed={activeHomeworkId === hw.id}
-                        >
-                          <div className={styles.homeworkContent}>
-                            <div className={styles.homeworkTitleRow}>
-                              <div className={styles.homeworkTitle}>{title}</div>
-                            </div>
-                            <div className={styles.homeworkMetaRow}>
-                              <span className={styles.homeworkMeta}>{deadlineLabel}</span>
-                              <span className={styles.metaDivider}>•</span>
-                              <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
-                              {hw.completedAt && <>
-                                <span className={styles.metaDivider}>•</span>
-                                <span className={styles.homeworkMeta}>{completedLabel}</span>
-                              </>
-                            }
-                            </div>
-                          </div>
-                          <div className={styles.homeworkActions}>
-                            <div className={styles.statusStack}>
-                              {renderStatusPill(statusInfo)}
-                              {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-                                  <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
-                              )}
-                            </div>
-                            <div className={styles.iconActions}>
-                              <button
-                                  className={controls.iconButton}
-                                  aria-label="Отметить выполненным"
-                                  title="Переключить выполнено"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    onToggleHomework(hw.id);
-                                  }}
-                              >
-                                <CheckCircleOutlineIcon width={18} height={18}/>
-                              </button>
-                              <div className={styles.moreActionsWrapper}>
-                                <button
-                                    className={controls.iconButton}
-                                    aria-label="Ещё"
-                                    title="Ещё действия"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setOpenHomeworkMenuId((prev) => (prev === hw.id ? null : hw.id));
-                                    }}
-                                >
-                                  <MoreHorizIcon width={18} height={18}/>
-                                </button>
-                                {openHomeworkMenuId === hw.id && (
-                                    <div className={styles.moreMenu}>
-                                      <button
-                                          aria-label="Напомнить"
-                                          title="Отправить напоминание"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleHomeworkReminder(hw.id);
-                                          }}
-                                      >
-                                        Напомнить
-                                      </button>
-                                      <button
-                                          aria-label="Редактировать"
-                                          title="Редактировать"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleOpenHomework(hw.id);
-                                            setDrawerMode('edit');
-                                          }}
-                                      >
-                                        Редактировать
-                                      </button>
-                                      {statusInfo.status !== 'DRAFT' && (
-                                        <button
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleMoveToDraft(hw.id);
-                                            }}
-                                        >
-                                          В черновик
-                                        </button>
-                                      )}
-                                      <button
-                                          className={styles.dangerButton}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleDeleteHomework(hw.id);
-                                          }}
-                                      >
-                                        Удалить
-                                      </button>
-                                    </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {!filteredHomeworks.length && (
-                        <div className={styles.emptyState}>
-                          <p>Пока нет домашек. Добавьте новое задание.</p>
-                          <button className={controls.primaryButton} onClick={handleOpenCreateHomework}>
-                            + Новое ДЗ
-                          </button>
-                        </div>
-                    )}
-                  </div>
-                </div>
+                <HomeworkTab
+                  homeworkFilter={homeworkFilter}
+                  filteredHomeworks={filteredHomeworks}
+                  activeHomeworkId={activeHomeworkId}
+                  openHomeworkMenuId={openHomeworkMenuId}
+                  onOpenCreateHomework={handleOpenCreateHomework}
+                  onChangeFilter={setHomeworkFilter}
+                  onOpenHomework={handleOpenHomeworkCard}
+                  onToggleHomeworkMenu={handleToggleHomeworkMenu}
+                  onToggleHomework={onToggleHomework}
+                  onHomeworkReminder={handleHomeworkReminder}
+                  onEditHomework={handleEditHomework}
+                  onMoveToDraft={handleMoveToDraft}
+                  onDeleteHomework={handleDeleteHomework}
+                  getHomeworkStatusInfo={getHomeworkStatusInfo}
+                  getHomeworkTitle={getHomeworkTitle}
+                  formatTimeSpentMinutes={formatTimeSpentMinutes}
+                  formatCompletionMoment={formatCompletionMoment}
+                />
               ) : activeTab === 'lessons' ? (
                 <div className={styles.card}>
                   <div className={styles.homeworkHeader}>
