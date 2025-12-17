@@ -39,6 +39,8 @@ import controls from '../../shared/styles/controls.module.css';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
+import { StudentHero } from './components/StudentHero';
+import { StudentsSidebar } from './components/StudentsSidebar';
 import {ru} from "date-fns/locale";
 
 interface StudentsSectionProps {
@@ -205,10 +207,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [openHomeworkMenuId, setOpenHomeworkMenuId] = useState<number | null>(null);
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
-  const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const DRAWER_TRANSITION_MS = 250;
@@ -612,229 +612,36 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   return (
     <section className={styles.section}>
       <div className={styles.grid}>
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarCard}>
-            <div className={styles.headerRow}>
-              <div>
-                <div className={styles.titleRow}>
-                  <div>Ученики</div>
-                  <span className={styles.counter}>{linkedStudents.length}</span>
-                </div>
-              </div>
-              <button className={controls.secondaryButton} onClick={onOpenStudentModal}>
-                + Добавить
-              </button>
-            </div>
-
-            <div className={styles.searchBlock}>
-              <input
-                className={controls.input}
-                placeholder="Поиск"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            <div className={`${styles.filters} ${styles.listFilters}`}>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('all')}
-              >
-                Все
-              </button>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('debt')}
-              >
-                С долгом ({counts.withDebt})
-              </button>
-              <button
-                className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
-                onClick={() => setActiveFilter('overdue')}
-              >
-                Просрочено ДЗ ({counts.overdue})
-              </button>
-            </div>
-            </div>
-
-            <div className={styles.studentList}>
-              {visibleStudents.map((student) => {
-                const status = student.link.balanceLessons < 0 ? 'debt' : student.link.balanceLessons > 0 ? 'prepaid' : 'neutral';
-                const overdueCount = student.homeworks.filter((hw) => getHomeworkStatusInfo(hw).isOverdue).length;
-                const pendingCount = student.homeworks.filter((hw) => !hw.isDone).length;
-
-                return (
-                  <button
-                    key={student.id}
-                    className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
-                    onClick={() => onSelectStudent(student.id)}
-                  >
-                    <div className={styles.studentStripe} aria-hidden />
-                    <div className={styles.studentCardBody}>
-                      <div className={styles.studentCardHeader}>
-                        <div className={styles.studentName}>{student.link.customName}</div>
-                        <div className={styles.badgeRow}>
-                          {status === 'debt' && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
-                          {overdueCount > 0 && (
-                            <span className={`${styles.lozenge} ${styles.badgeWarning}`}>ДЗ: {overdueCount}</span>
-                          )}
-                          {pendingCount === 0 && student.homeworks.length > 0 && (
-                            <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>ДЗ сделано</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className={styles.studentSecondaryRow}>
-                        <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
-                        <span className={styles.metaDivider}>•</span>
-                        <span className={styles.studentMeta}>
-                          автонапоминания: {student.link.autoRemindHomework ? 'вкл' : 'выкл'}
-                        </span>
-                        <span className={styles.metaDivider}>•</span>
-                        <span className={styles.studentMeta}>баланс: {student.link.balanceLessons}</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-
-              {!visibleStudents.length && (
-                <div className={styles.emptyState}>Ничего не найдено</div>
-              )}
-            </div>
-          </div>
-        </aside>
+        <StudentsSidebar
+          linkedStudents={linkedStudents}
+          visibleStudents={visibleStudents}
+          selectedStudentId={selectedStudentId}
+          searchQuery={searchQuery}
+          activeFilter={activeFilter}
+          counts={counts}
+          onSelectStudent={onSelectStudent}
+          onSearchChange={setSearchQuery}
+          onFilterChange={setActiveFilter}
+          onOpenStudentModal={onOpenStudentModal}
+          getHomeworkStatusInfo={getHomeworkStatusInfo}
+        />
 
         <div className={styles.content}>
           {selectedStudent ? (
             <div className={styles.contentGrid}>
-              <div className={`${styles.card} ${styles.headerCard}`}>
-                <div className={styles.heroHeader}>
-                  <div className={styles.heroNameBlock}>
-                    <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
-                    <div className={styles.studentMetaRow}>
-                      <span>Telegram: @{selectedStudent.username || 'нет'}</span>
-                    </div>
-                  </div>
-                  <div className={styles.heroActions}>
-                    <div className={styles.actionsMenuWrapper}>
-                      <button
-                        className={controls.iconButton}
-                        aria-label="Дополнительные действия"
-                        onClick={() => setIsActionsMenuOpen((prev) => !prev)}
-                      >
-                        ⋯
-                      </button>
-                      {isActionsMenuOpen && (
-                        <div className={styles.actionsMenu}>
-                          <button onClick={onOpenStudentModal}>Редактировать ученика</button>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, -1)}>Напомнить про оплату</button>
-                          <button onClick={() => navigator.clipboard?.writeText('Правила и памятка')}>Скопировать памятку</button>
-                          <button className={styles.dangerButton}>Удалить ученика</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
-                  <div className={styles.summaryLine}>
-                    <span className={styles.summaryLabel}>Баланс:</span>
-                    <span className={styles.summaryValueInline}>
-                      {selectedStudent.link.balanceLessons}
-                      {selectedStudent.link.balanceLessons < 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-                      )}
-                      {selectedStudent.link.balanceLessons > 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
-                      )}
-                    </span>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.inlinePopover}>
-                      <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
-                        <span className={styles.summaryLabel}>Предоплачено:</span>
-                        <span className={styles.summaryValueInline}>{selectedStudent.link.balanceLessons} уроков</span>
-                      </button>
-                      {isPrepaidOpen && (
-                        <div className={styles.popover}>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
-                          <button
-                            onClick={() => onAdjustBalance(selectedStudent.id, -1)}
-                            disabled={selectedStudent.link.balanceLessons <= 0}
-                          >
-                            -1 занятие
-                          </button>
-                          <button onClick={() => onAdjustBalance(selectedStudent.id, -selectedStudent.link.balanceLessons)}>
-                            Сбросить в 0
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.priceInline}>
-                      <span className={styles.summaryLabel}>Цена:</span>
-                      {priceEditState.id === selectedStudent.id ? (
-                        <div className={styles.priceEditorInline}>
-                          <input
-                            className={controls.input}
-                            type="number"
-                            value={priceEditState.value}
-                            onChange={(e) => onPriceChange(e.target.value)}
-                          />
-                          <div className={styles.priceButtons}>
-                            <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
-                            <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
-                          <span className={styles.summaryValueInline}>
-                            {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                              ? `${selectedStudent.pricePerLesson} ₽`
-                              : 'Не задана'}
-                          </span>
-                          <EditOutlinedIcon width={16} height={16} />
-                        </button>
-                      )}
-                    </div>
-                    <span className={styles.summaryDivider}>|</span>
-                    <div className={styles.toggleRow}>
-                      <span className={styles.summaryLabel}>Автонапоминания:</span>
-                      <button
-                        className={`${styles.toggleButton} ${selectedStudent.link.autoRemindHomework ? styles.toggleOn : styles.toggleOff}`}
-                        onClick={() => onToggleAutoReminder(selectedStudent.id)}
-                        type="button"
-                      >
-                        {selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.tabs}>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'homework' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('homework')}
-                  >
-                    Домашка
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'lessons' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('lessons')}
-                  >
-                    Занятия
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'payments' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('payments')}
-                  >
-                    Оплаты
-                  </button>
-                  <button
-                    className={`${styles.tab} ${activeTab === 'overview' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('overview')}
-                  >
-                    Обзор
-                  </button>
-                </div>
-              </div>
+              <StudentHero
+                selectedStudent={selectedStudent}
+                priceEditState={priceEditState}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onStartEditPrice={onStartEditPrice}
+                onPriceChange={onPriceChange}
+                onSavePrice={onSavePrice}
+                onCancelPriceEdit={onCancelPriceEdit}
+                onToggleAutoReminder={onToggleAutoReminder}
+                onAdjustBalance={onAdjustBalance}
+                onOpenStudentModal={onOpenStudentModal}
+              />
 
               {activeTab === 'homework' ? (
                 <div className={styles.card}>
