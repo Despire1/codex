@@ -1159,18 +1159,9 @@
   font-size: 13px;
 }
 
-.paidChip {
-  background: #ecfdf3;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-  font-weight: 700;
-}
-
-.unpaidChip {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecdd3;
-  font-weight: 700;
+.paymentBadge {
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .monoCell {

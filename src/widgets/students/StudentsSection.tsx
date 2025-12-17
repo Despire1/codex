@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
@@ -36,6 +36,7 @@ import {
   Student,
 } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
+import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
 import { PaymentList } from './components/PaymentList';
 import {ru} from "date-fns/locale";
@@ -1087,10 +1088,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    <Chip
+                                    <Badge
                                       label={isPaid ? 'Оплачено' : 'Не оплачено'}
-                                      size="small"
-                                      className={isPaid ? styles.paidChip : styles.unpaidChip}
+                                      variant={isPaid ? 'paid' : 'unpaid'}
+                                      className={styles.paymentBadge}
                                     />
                                   </TableCell>
                                   <TableCell align="right" className={styles.monoCell}>
