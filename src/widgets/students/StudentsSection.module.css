@@ -1132,6 +1132,24 @@
   flex-wrap: wrap;
 }
 
+.lessonStatusTrigger {
+  border: 1px solid transparent;
+  background: none;
+  color: #1f2937;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.lessonStatusTrigger:hover,
+.lessonStatusTrigger:focus-visible {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  outline: none;
+}
+
 .lessonStatusSelect {
   border: 1px solid #e2e8f0;
   border-radius: 10px;

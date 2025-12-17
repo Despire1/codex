@@ -144,6 +144,12 @@ const formatCompletionMoment = (completedAt?: string | null) => {
   }
 };
 
+const getLessonStatusLabel = (status: Lesson['status']) => {
+  if (status === 'COMPLETED') return 'Проведён';
+  if (status === 'CANCELED') return 'Отменён';
+  return 'Запланирован';
+};
+
 export const StudentsSection: FC<StudentsSectionProps> = ({
   linkedStudents,
   selectedStudentId,
@@ -203,6 +209,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
   const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const DRAWER_TRANSITION_MS = 250;
   const drawerAnimationTimeoutRef = useRef<number | null>(null);
 
@@ -385,6 +392,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleKeepEditing = () => {
     setShowUnsavedConfirm(false);
+  };
+
+  const handleStartEditLessonStatus = (lessonId: number) => {
+    setEditableLessonStatusId(lessonId);
+  };
+
+  const handleLessonStatusChange = (lessonId: number, status: Lesson['status']) => {
+    onChangeLessonStatus(lessonId, status);
+    setEditableLessonStatusId(null);
   };
 
   const handleOpenCreateHomework = () => {
@@ -1042,17 +1058,32 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                                   <TableCell>
                                     <div className={styles.lessonStatusRow}>
                                       <span className={styles.metaLabel}>Статус:</span>
-                                      <select
-                                        className={styles.lessonStatusSelect}
-                                        value={lesson.status}
-                                        onChange={(event) =>
-                                          onChangeLessonStatus(lesson.id, event.target.value as Lesson['status'])
-                                        }
-                                      >
-                                        <option value="SCHEDULED">Запланирован</option>
-                                        <option value="COMPLETED">Проведён</option>
-                                        <option value="CANCELED">Отменён</option>
-                                      </select>
+                                      {editableLessonStatusId === lesson.id ? (
+                                        <select
+                                          className={styles.lessonStatusSelect}
+                                          value={lesson.status}
+                                          autoFocus
+                                          onChange={(event) =>
+                                            handleLessonStatusChange(
+                                              lesson.id,
+                                              event.target.value as Lesson['status'],
+                                            )
+                                          }
+                                          onBlur={() => setEditableLessonStatusId(null)}
+                                        >
+                                          <option value="SCHEDULED">Запланирован</option>
+                                          <option value="COMPLETED">Проведён</option>
+                                          <option value="CANCELED">Отменён</option>
+                                        </select>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className={styles.lessonStatusTrigger}
+                                          onClick={() => handleStartEditLessonStatus(lesson.id)}
+                                        >
+                                          {getLessonStatusLabel(lesson.status)}
+                                        </button>
+                                      )}
                                     </div>
                                   </TableCell>
                                   <TableCell>
