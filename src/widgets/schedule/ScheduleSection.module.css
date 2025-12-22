@@ -886,3 +886,27 @@
     display: none;
   }
 }
+
+@media (max-width: 480px) {
+  .monthSection {
+    padding: 10px 8px;
+  }
+
+  .monthLayout {
+    gap: 8px;
+  }
+
+  .monthGrid {
+    grid-template-columns: repeat(7, minmax(38px, 1fr));
+    gap: 4px;
+  }
+
+  .monthCell {
+    padding: 6px;
+    min-height: 80px;
+  }
+
+  .monthWeekday {
+    font-size: 11px;
+  }
+}
