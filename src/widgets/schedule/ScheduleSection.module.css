@@ -67,7 +67,15 @@
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
 }
 
-.viewToggleLabel {
+.viewToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.viewToggleText {
   display: inline-flex;
   align-items: center;
 }
@@ -802,6 +810,11 @@
     flex: 1;
     justify-content: center;
     text-align: center;
+    padding: 10px 12px;
+  }
+
+  .viewToggleText {
+    display: none;
   }
 
   .periodSwitcher {
@@ -838,57 +851,6 @@
 
   .monthTitle {
     display: none;
-  }
-
-  .monthLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .dayPanel {
-    display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .sectionHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .calendarControlsWrapper {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    margin-left: 0;
-  }
-
-  .viewToggleRow {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .viewToggleButton {
-    flex: 1;
-    justify-content: center;
-    text-align: center;
-  }
-
-  .periodSwitcher {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .monthSwitcher {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .monthName {
-    width: auto;
-    flex: 1;
-    text-align: center;
   }
 
   .monthLayout {

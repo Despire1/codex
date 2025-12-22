@@ -578,28 +578,34 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         <div className={styles.calendarControlsWrapper}>
           <div className={styles.viewToggleRow}>
             <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('month')}
+              className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange('month')}
+              aria-label="Перейти в вид месяца"
             >
-            <span className={styles.viewToggleLabel}>
-              <CalendarMonthIcon/> Месяц
-            </span>
+              <span className={styles.viewToggleIcon}>
+                <CalendarMonthIcon />
+              </span>
+              <span className={styles.viewToggleText}>Месяц</span>
             </button>
             <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('week')}
+              className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange('week')}
+              aria-label="Перейти в вид недели"
             >
-            <span className={styles.viewToggleLabel}>
-              <ViewWeekIcon/> Неделя
-            </span>
+              <span className={styles.viewToggleIcon}>
+                <ViewWeekIcon />
+              </span>
+              <span className={styles.viewToggleText}>Неделя</span>
             </button>
             <button
-                className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('day')}
+              className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange('day')}
+              aria-label="Перейти в вид дня"
             >
-            <span className={styles.viewToggleLabel}>
-              <ViewDayIcon/> День
-            </span>
+              <span className={styles.viewToggleIcon}>
+                <ViewDayIcon />
+              </span>
+              <span className={styles.viewToggleText}>День</span>
             </button>
           </div>
 
