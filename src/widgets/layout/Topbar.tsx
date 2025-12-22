@@ -1,23 +1,18 @@
 import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
 import { tabs, type TabId } from '../../app/tabs';
-import controls from '../../shared/styles/controls.module.css';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
   teacher: Teacher;
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  onOpenStudentModal: () => void;
-  onOpenLessonModal: () => void;
 }
 
 export const Topbar: FC<TopbarProps> = ({
   teacher,
   activeTab,
   onTabChange,
-  onOpenLessonModal,
-  onOpenStudentModal,
 }) => {
   return (
     <header className={styles.topbar}>
@@ -41,15 +36,6 @@ export const Topbar: FC<TopbarProps> = ({
             </button>
           ))}
         </nav>
-      </div>
-
-      <div className={styles.quickActions}>
-        <button className={controls.primaryButton} onClick={onOpenStudentModal}>
-          + Ученик
-        </button>
-        <button className={controls.primaryGhost} onClick={onOpenLessonModal}>
-          + Урок
-        </button>
       </div>
     </header>
   );

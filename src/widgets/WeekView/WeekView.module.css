@@ -5,6 +5,12 @@
   overflow: hidden;
 }
 
+.table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .header {
   display: grid;
   grid-template-columns: 90px repeat(7, 1fr);
@@ -106,5 +112,20 @@
   .hourLabel,
   .cell {
     min-height: 56px;
+  }
+}
+
+@media (max-width: 640px) {
+  .wrapper {
+    overflow: visible;
+  }
+
+  .table {
+    overflow-x: auto;
+  }
+
+  .header,
+  .grid {
+    min-width: 100%;
   }
 }

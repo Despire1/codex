@@ -85,29 +85,31 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.header}>
-        <div />
-        {days.map((day) => (
-            <div key={day.toISOString()} className={styles.dayTitle}>
-              <div>{format(day, 'EEEE', { locale: ru })}</div>
-              <div>{format(day, 'd MMM', { locale: ru })}</div>
-          </div>
-        ))}
-      </div>
-      <div className={styles.grid}>
-        {hours.map((hour) => (
-          <Fragment key={`row-${hour}`}>
-            <div className={styles.hourLabel}>{`${hour}:00`}</div>
-            {days.map((day) => {
-              const key = format(day, 'yyyy-MM-dd');
-              return (
-                <div key={`${key}-${hour}`} className={styles.cell} onClick={() => handleCellClick(day, hour)}>
-                  {renderTasks(key, hour)}
-                </div>
-              );
-            })}
-          </Fragment>
-        ))}
+      <div className={styles.table}>
+        <div className={styles.header}>
+          <div />
+          {days.map((day) => (
+              <div key={day.toISOString()} className={styles.dayTitle}>
+                <div>{format(day, 'EEEE', { locale: ru })}</div>
+                <div>{format(day, 'd MMM', { locale: ru })}</div>
+            </div>
+          ))}
+        </div>
+        <div className={styles.grid}>
+          {hours.map((hour) => (
+            <Fragment key={`row-${hour}`}>
+              <div className={styles.hourLabel}>{`${hour}:00`}</div>
+              {days.map((day) => {
+                const key = format(day, 'yyyy-MM-dd');
+                return (
+                  <div key={`${key}-${hour}`} className={styles.cell} onClick={() => handleCellClick(day, hour)}>
+                    {renderTasks(key, hour)}
+                  </div>
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
       </div>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={modalTitle}>
         <TaskForm

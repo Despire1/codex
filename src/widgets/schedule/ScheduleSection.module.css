@@ -45,6 +45,8 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .viewToggleButton {
@@ -67,7 +69,15 @@
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
 }
 
-.viewToggleLabel {
+.viewToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.viewToggleText {
   display: inline-flex;
   align-items: center;
 }
@@ -77,6 +87,22 @@
   color: #fff;
   border-color: #2563eb;
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+}
+
+.headerAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.headerActionIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.headerActionLabel {
+  line-height: 1.2;
 }
 
 .monthSwitcher {
@@ -102,6 +128,11 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+}
+
+.monthNavIcon {
+  width: 18px;
+  height: 18px;
 }
 
 .monthNavButton:hover {
@@ -754,4 +785,104 @@
   gap: 12px;
   flex: 1;
   min-height: 0;
+  min-width: 360px;
+}
+
+@media (max-width: 720px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .calendarControlsWrapper {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-left: 0;
+  }
+
+  .viewToggleRow {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .viewToggleButton {
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: 6px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .viewToggleText {
+    display: none;
+  }
+
+  .viewToggleIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .viewToggleButton:hover {
+    border: none;
+    box-shadow: none;
+  }
+
+  .toggleActive {
+    background: transparent;
+    color: #2563eb;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .periodSwitcher {
+    width: 100%;
+    justify-content: space-between;
+    row-gap: 10px;
+  }
+
+  .monthSwitcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthName {
+    width: auto;
+    flex: 1;
+    text-align: center;
+  }
+
+  .headerAction {
+    padding: 6px;
+    min-width: auto;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: #2563eb;
+  }
+
+  .headerActionLabel {
+    display: none;
+  }
+
+  .monthHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .monthTitle {
+    display: none;
+  }
+
+  .monthLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .dayPanel {
+    display: none;
+  }
 }
