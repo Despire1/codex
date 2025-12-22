@@ -586,6 +586,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       </div>
     );
 
+    const drawerStyle = { '--drawer-dy': `${drawerDragOffset}px` } as CSSProperties;
+
     return (
       <div className={styles.monthScroller}>
         <div className={styles.monthSection}>
@@ -658,6 +660,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 drawerMode === 'expanded' ? styles.dayDrawerExpanded : ''
               } ${isDraggingDrawer ? styles.dayDrawerDragging : ''}`}
               role="dialog"
+              style={drawerStyle}
             >
               <div className={styles.drawerHandleArea} onPointerDown={startDrawerDrag}>
                 <span className={styles.drawerHandle} />
