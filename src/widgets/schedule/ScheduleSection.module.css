@@ -755,3 +755,54 @@
   flex: 1;
   min-height: 0;
 }
+
+@media (max-width: 720px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .calendarControlsWrapper {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-left: 0;
+  }
+
+  .viewToggleRow {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .viewToggleButton {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .periodSwitcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthSwitcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthName {
+    width: auto;
+    flex: 1;
+    text-align: center;
+  }
+
+  .monthLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .dayPanel {
+    display: none;
+  }
+}
