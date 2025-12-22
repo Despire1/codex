@@ -4,11 +4,7 @@ import {
   Autocomplete,
   Box,
   Checkbox,
-  FormControl,
   FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -87,6 +83,38 @@ export const LessonModal: FC<LessonModalProps> = ({
     });
   };
 
+  const textFieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '10px',
+      backgroundColor: '#fff',
+      '& fieldset': {
+        borderColor: 'var(--border)',
+      },
+      '&:hover fieldset': {
+        borderColor: 'var(--border)',
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: 'var(--primary)',
+        boxShadow: '0 0 0 2px var(--primary-weak)',
+      },
+      '& .MuiOutlinedInput-input': {
+        padding: '10px 12px',
+      },
+    },
+    '& .MuiInputBase-input': {
+      fontSize: '14px',
+      color: 'var(--text)',
+    },
+    '& .MuiInputLabel-root': {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: 'var(--muted)',
+    },
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: 'var(--muted)',
+    },
+  } as const;
+
   return (
     <div className={modalStyles.modalOverlay} onClick={onClose}>
       <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
@@ -101,43 +129,58 @@ export const LessonModal: FC<LessonModalProps> = ({
         </div>
         <div className={modalStyles.modalBody}>
           <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
-            <Autocomplete
-              multiple
-              id="students-autocomplete"
-              options={linkedStudents}
-              getOptionLabel={(option) => option.link.customName}
-              value={linkedStudents.filter((s) => draft.studentIds.includes(s.id))}
-              onChange={(_, newValue) => {
-                const ids = (Array.isArray(newValue) ? newValue : []).map((student) => student.id);
-                onDraftChange({ ...draft, studentIds: ids, studentId: ids[0] });
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Ученики" placeholder="Выберите учеников" />
-              )}
-              disableCloseOnSelect
-            />
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Ученики</span>
+              <Autocomplete
+                multiple
+                id="students-autocomplete"
+                options={linkedStudents}
+                getOptionLabel={(option) => option.link.customName}
+                value={linkedStudents.filter((s) => draft.studentIds.includes(s.id))}
+                onChange={(_, newValue) => {
+                  const ids = (Array.isArray(newValue) ? newValue : []).map((student) => student.id);
+                  onDraftChange({ ...draft, studentIds: ids, studentId: ids[0] });
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Выберите учеников"
+                    variant="outlined"
+                    sx={textFieldSx}
+                  />
+                )}
+                disableCloseOnSelect
+              />
+            </div>
           </div>
           <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <DatePickerField
               label="Дата"
               value={draft.date}
               onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
+              className={modalStyles.field}
             />
-            <TextField
-              label="Время"
-              type="time"
-              value={draft.time}
-              onChange={(e) => onDraftChange({ ...draft, time: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Длительность (мин)"
-              type="number"
-              value={draft.durationMinutes}
-              onChange={(e) => onDraftChange({ ...draft, durationMinutes: Number(e.target.value) })}
-              placeholder={`${defaultDuration}`}
-              fullWidth
-            />
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Время</span>
+              <TextField
+                type="time"
+                value={draft.time}
+                onChange={(e) => onDraftChange({ ...draft, time: e.target.value })}
+                fullWidth
+                sx={textFieldSx}
+              />
+            </div>
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Длительность (мин)</span>
+              <TextField
+                type="number"
+                value={draft.durationMinutes}
+                onChange={(e) => onDraftChange({ ...draft, durationMinutes: Number(e.target.value) })}
+                placeholder={`${defaultDuration}`}
+                fullWidth
+                sx={textFieldSx}
+              />
+            </div>
           </div>
           <FormControlLabel
             control={
@@ -151,25 +194,46 @@ export const LessonModal: FC<LessonModalProps> = ({
           />
           {draft.isRecurring && (
             <Box>
-              <Typography>Выберите дни недели для повтора</Typography>
-              <ToggleButtonGroup
-                value={draft.repeatWeekdays}
-                onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
-              >
-                {weekdayOptions.map((day) => {
-                  const selected = draft.repeatWeekdays.includes(day.value);
-                  return (
+              <div className={modalStyles.field}>
+                <span className={modalStyles.fieldLabel}>Выберите дни недели для повтора</span>
+                <ToggleButtonGroup
+                  value={draft.repeatWeekdays}
+                  onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
+                  className={modalStyles.weekdayGroup}
+                  sx={{
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    '& .MuiToggleButton-root': {
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      padding: '10px 12px',
+                      textTransform: 'none',
+                      color: 'var(--text)',
+                      minWidth: '44px',
+                    },
+                    '& .MuiToggleButton-root.Mui-selected': {
+                      background: '#2563eb',
+                      color: '#fff',
+                      borderColor: '#2563eb',
+                    },
+                    '& .MuiToggleButton-root.Mui-selected:hover': {
+                      background: '#1d4ed8',
+                      borderColor: '#1d4ed8',
+                    },
+                  }}
+                >
+                  {weekdayOptions.map((day) => (
                     <ToggleButton
                       key={day.value}
                       value={day.value}
                       aria-label={`repeat-${day.label}`}
-                      className={selected ? modalStyles.weekdaySelected : undefined}
+                      className={modalStyles.weekdayToggle}
                     >
                       {day.label}
                     </ToggleButton>
-                  );
-                })}
-              </ToggleButtonGroup>
+                  ))}
+                </ToggleButtonGroup>
+              </div>
               <Box
                 style={{
                   marginTop: '16px',
