@@ -534,6 +534,7 @@
   pointer-events: none;
   transition: opacity 0.24s ease;
   z-index: 24;
+  will-change: opacity;
 }
 
 .dayDrawer {
@@ -545,17 +546,20 @@
   background: #fff;
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.18);
-  transform: translateY(100%);
-  transition: transform 0.28s ease, height 0.28s ease;
+  transform: translate3d(0, 100%, 0);
+  transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), height 0.24s ease;
   z-index: 30;
   overflow: hidden;
   display: none;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
   max-height: 640px;
+  will-change: transform, height;
+  contain: layout paint;
+  backface-visibility: hidden;
 }
 
 .dayDrawerOpen {
-  transform: translateY(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .dayDrawerExpanded {
@@ -564,6 +568,13 @@
 
 .dayDrawerDragging {
   transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayDrawer,
+  .dayDrawerScrim {
+    transition: none;
+  }
 }
 
 .dayDrawer .dayPanelContent {
