@@ -436,7 +436,7 @@
   background: #2563eb;
 }
 
-.dayPanel {
+.dayPanel { 
   width: 400px;
   overflow: hidden;
   opacity: 0;
@@ -524,6 +524,79 @@
   align-self: stretch;
   justify-content: center;
   margin-top: auto;
+}
+
+.dayDrawerScrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+  z-index: 24;
+}
+
+.dayDrawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(320px, calc(var(--drawer-base-height, 50vh) + var(--drawer-dh, 0px)), 640px);
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.18);
+  transform: translateY(100%);
+  transition: transform 0.28s ease, height 0.28s ease;
+  z-index: 30;
+  overflow: hidden;
+  display: none;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  max-height: 640px;
+}
+
+.dayDrawerOpen {
+  transform: translateY(0);
+}
+
+.dayDrawerExpanded {
+  --drawer-base-height: 66vh;
+}
+
+.dayDrawerDragging {
+  transition: none;
+}
+
+.dayDrawer .dayPanelContent {
+  border: none;
+  border-radius: 16px 16px 0 0;
+  box-shadow: none;
+  height: 100%;
+}
+
+.dayDrawer .dayPanelList {
+  overflow-y: auto;
+}
+
+.drawerHandleArea {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.drawerHandle {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.scrimVisible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .dayCard {
@@ -884,6 +957,10 @@
 
   .dayPanel {
     display: none;
+  }
+
+  .dayDrawer {
+    display: flex;
   }
 }
 
