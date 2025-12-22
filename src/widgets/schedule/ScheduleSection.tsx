@@ -578,6 +578,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         <div className={styles.calendarControlsWrapper}>
           <div className={styles.viewToggleRow}>
             <button
+              type="button"
               className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
               onClick={() => onScheduleViewChange('month')}
               aria-label="Перейти в вид месяца"
@@ -588,6 +589,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <span className={styles.viewToggleText}>Месяц</span>
             </button>
             <button
+              type="button"
               className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
               onClick={() => onScheduleViewChange('week')}
               aria-label="Перейти в вид недели"
@@ -598,6 +600,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <span className={styles.viewToggleText}>Неделя</span>
             </button>
             <button
+              type="button"
               className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
               onClick={() => onScheduleViewChange('day')}
               aria-label="Перейти в вид дня"
@@ -606,6 +609,15 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <ViewDayIcon />
               </span>
               <span className={styles.viewToggleText}>День</span>
+            </button>
+            <button
+              className={`${controls.primaryButton} ${styles.headerAction}`}
+              onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+              type="button"
+              aria-label="Создать урок"
+            >
+              <AddOutlinedIcon className={styles.headerActionIcon} />
+              <span className={styles.headerActionLabel}>Создать урок</span>
             </button>
           </div>
 

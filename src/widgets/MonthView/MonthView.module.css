@@ -116,6 +116,6 @@
 
   .header,
   .grid {
-    min-width: 840px;
+    min-width: 100%;
   }
 }

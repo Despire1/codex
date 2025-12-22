@@ -45,6 +45,8 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .viewToggleButton {
@@ -803,18 +805,37 @@
 
   .viewToggleRow {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
   .viewToggleButton {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: center;
-    text-align: center;
-    padding: 10px 12px;
+    padding: 6px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
   }
 
   .viewToggleText {
     display: none;
+  }
+
+  .viewToggleIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .viewToggleButton:hover {
+    border: none;
+    box-shadow: none;
+  }
+
+  .toggleActive {
+    background: transparent;
+    color: #2563eb;
+    border-color: transparent;
+    box-shadow: none;
   }
 
   .periodSwitcher {
@@ -835,8 +856,12 @@
   }
 
   .headerAction {
-    padding: 8px 10px;
+    padding: 6px;
     min-width: auto;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: #2563eb;
   }
 
   .headerActionLabel {
