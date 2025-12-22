@@ -586,7 +586,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       </div>
     );
 
-    const drawerStyle = { '--drawer-dy': `${drawerDragOffset}px` } as CSSProperties;
+    const drawerStyle = {
+      '--drawer-dh': `${-drawerDragOffset}px`,
+      '--drawer-base-height': drawerMode === 'expanded' ? '66vh' : '50vh',
+    } as CSSProperties;
 
     return (
       <div className={styles.monthScroller}>
