@@ -547,7 +547,7 @@
   background: #fff;
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.18);
-  transform: translateY(100%);
+  transform: translateY(calc(100% + var(--drawer-dy, 0px)));
   transition: transform 0.28s ease, height 0.28s ease;
   z-index: 30;
   overflow: hidden;
@@ -556,7 +556,7 @@
 }
 
 .dayDrawerOpen {
-  transform: translateY(0);
+  transform: translateY(var(--drawer-dy, 0px));
 }
 
 .dayDrawerExpanded {
@@ -593,6 +593,7 @@
   border-radius: 999px;
   background: #cbd5e1;
   display: inline-block;
+  margin: 0 auto;
 }
 
 .scrimVisible {

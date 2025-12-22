@@ -17,6 +17,7 @@ import {
   type FC,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type CSSProperties,
 } from 'react';
 import {
   AddOutlinedIcon,
@@ -88,7 +89,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
+  const [drawerDragOffset, setDrawerDragOffset] = useState(0);
   const drawerPointerStart = useRef<number | null>(null);
+  const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
+  const drawerDragOffsetRef = useRef(0);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -481,24 +485,36 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       event.stopPropagation();
 
       drawerPointerStart.current = event.clientY;
+      drawerModeAtDragStart.current = drawerMode;
       setIsDraggingDrawer(true);
 
       const handleMove = (moveEvent: PointerEvent) => {
         if (drawerPointerStart.current === null) return;
         const delta = moveEvent.clientY - drawerPointerStart.current;
 
-        if (delta < -40) {
-          setDrawerMode('expanded');
-        }
-
-        if (delta > 70) {
-          setSelectedMonthDay(null);
-        }
+        const clampedDelta = Math.min(Math.max(delta, -220), 260);
+        drawerDragOffsetRef.current = clampedDelta;
+        setDrawerDragOffset(clampedDelta);
       };
 
       const handleEnd = () => {
+        const delta = drawerDragOffsetRef.current;
+
         drawerPointerStart.current = null;
         setIsDraggingDrawer(false);
+        setDrawerDragOffset(0);
+        drawerDragOffsetRef.current = 0;
+
+        if (delta > 120) {
+          setSelectedMonthDay(null);
+        } else if (delta < -80) {
+          setDrawerMode('expanded');
+        } else if (drawerModeAtDragStart.current === 'expanded' && delta > 30) {
+          setDrawerMode('half');
+        } else {
+          setDrawerMode(drawerModeAtDragStart.current);
+        }
+
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleEnd);
         window.removeEventListener('pointercancel', handleEnd);
