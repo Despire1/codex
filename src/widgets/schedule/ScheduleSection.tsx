@@ -9,7 +9,15 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   AddOutlinedIcon,
   CalendarMonthIcon,
@@ -78,6 +86,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
+  const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
+  const drawerPointerStart = useRef<number | null>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -173,6 +184,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (selectedMonthDay) {
+      setDrawerMode('half');
+    }
+  }, [selectedMonthDay]);
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -457,6 +474,41 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const selectedDayLessons = selectedMonthDay ? lessonsByDay[selectedMonthDay] ?? [] : [];
     const selectedDayDate = selectedMonthDay ? parseISO(selectedMonthDay) : null;
 
+    const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!isMobileMonthView || !selectedMonthDay) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      drawerPointerStart.current = event.clientY;
+      setIsDraggingDrawer(true);
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        if (drawerPointerStart.current === null) return;
+        const delta = moveEvent.clientY - drawerPointerStart.current;
+
+        if (delta < -40) {
+          setDrawerMode('expanded');
+        }
+
+        if (delta > 70) {
+          setSelectedMonthDay(null);
+        }
+      };
+
+      const handleEnd = () => {
+        drawerPointerStart.current = null;
+        setIsDraggingDrawer(false);
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleEnd);
+        window.removeEventListener('pointercancel', handleEnd);
+      };
+
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('pointercancel', handleEnd);
+    };
+
     const renderDayDetails = (closeHandler: () => void) => (
       <div className={styles.dayPanelContent}>
         <div className={styles.dayPanelHeader}>
@@ -585,7 +637,15 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               className={`${styles.dayDrawerScrim} ${selectedMonthDay ? styles.scrimVisible : ''}`}
               onClick={() => setSelectedMonthDay(null)}
             />
-            <div className={`${styles.dayDrawer} ${selectedMonthDay ? styles.dayDrawerOpen : ''}`} role="dialog">
+            <div
+              className={`${styles.dayDrawer} ${selectedMonthDay ? styles.dayDrawerOpen : ''} ${
+                drawerMode === 'expanded' ? styles.dayDrawerExpanded : ''
+              } ${isDraggingDrawer ? styles.dayDrawerDragging : ''}`}
+              role="dialog"
+            >
+              <div className={styles.drawerHandleArea} onPointerDown={startDrawerDrag}>
+                <span className={styles.drawerHandle} />
+              </div>
               {renderDayDetails(() => setSelectedMonthDay(null))}
             </div>
           </>
