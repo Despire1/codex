@@ -57,6 +57,18 @@ export const CalendarMonthIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const ChevronLeftIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="m15.41 7.41-1.41-1.41L8.59 12l5.41 6 1.41-1.41L11.41 12z" />
+  </svg>
+);
+
+export const ChevronRightIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="m8.59 16.59 1.41 1.41L15.41 12 10 6l-1.41 1.41L12.59 12z" />
+  </svg>
+);
+
 export const ViewDayIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M2 5v14h20V5H2zm6 12H4V7h4v10zm6 0h-4V7h4v10zm6 0h-4V7h4v10z" />

@@ -791,12 +791,10 @@ export const App = () => {
   return (
     <div className={layoutStyles.page}>
       <Topbar
-          teacher={teacher}
-          activeTab={activeTab}
-          onTabChange={(tab) => navigate(tabPathById[tab])}
-          onOpenLessonModal={() => setLessonModalOpen(true)}
-          onOpenStudentModal={() => setStudentModalOpen(true)}
-        />
+        teacher={teacher}
+        activeTab={activeTab}
+        onTabChange={(tab) => navigate(tabPathById[tab])}
+      />
 
         <main className={layoutStyles.content}>
           <Routes>
