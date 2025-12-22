@@ -95,6 +95,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
+  const drawerDragRafRef = useRef<number | null>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -499,7 +500,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         const clampedDelta = Math.min(Math.max(delta, -220), 260);
         drawerDragOffsetRef.current = clampedDelta;
-        setDrawerDragOffset(clampedDelta);
+
+        if (drawerDragRafRef.current === null) {
+          drawerDragRafRef.current = window.requestAnimationFrame(() => {
+            setDrawerDragOffset(drawerDragOffsetRef.current);
+            drawerDragRafRef.current = null;
+          });
+        }
       };
 
       const handleEnd = () => {
@@ -509,6 +516,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         setIsDraggingDrawer(false);
         setDrawerDragOffset(0);
         drawerDragOffsetRef.current = 0;
+        if (drawerDragRafRef.current !== null) {
+          cancelAnimationFrame(drawerDragRafRef.current);
+          drawerDragRafRef.current = null;
+        }
 
         if (delta > 120) {
           setSelectedMonthDay(null);
