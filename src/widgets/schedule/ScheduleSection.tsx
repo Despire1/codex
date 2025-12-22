@@ -86,7 +86,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayPickerRef = useRef<HTMLDivElement>(null);
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 720 : false,
+  );
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
@@ -119,7 +121,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
-  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
 
   const weekRangeLabel = useMemo(() => {
@@ -177,10 +179,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       daysInMonth[0];
 
     if (defaultDay) {
-      // setSelectedMonthDay(defaultDay.iso);
       onDayViewDateChange(defaultDay.date);
+
+      if (!isMobileViewport) {
+        setSelectedMonthDay(defaultDay.iso);
+      }
     }
-  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange]);
+  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange, isMobileViewport]);
 
   useEffect(() => {
     const handleResize = () => setIsMobileViewport(window.innerWidth <= 720);
