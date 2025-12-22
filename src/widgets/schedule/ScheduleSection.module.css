@@ -79,6 +79,22 @@
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
 }
 
+.headerAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.headerActionIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.headerActionLabel {
+  line-height: 1.2;
+}
+
 .monthSwitcher {
   display: inline-flex;
   align-items: center;
@@ -102,6 +118,11 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+}
+
+.monthNavIcon {
+  width: 18px;
+  height: 18px;
 }
 
 .monthNavButton:hover {
@@ -754,6 +775,78 @@
   gap: 12px;
   flex: 1;
   min-height: 0;
+  min-width: 360px;
+}
+
+@media (max-width: 720px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .calendarControlsWrapper {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-left: 0;
+  }
+
+  .viewToggleRow {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .viewToggleButton {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .periodSwitcher {
+    width: 100%;
+    justify-content: space-between;
+    row-gap: 10px;
+  }
+
+  .monthSwitcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monthName {
+    width: auto;
+    flex: 1;
+    text-align: center;
+  }
+
+  .headerAction {
+    padding: 8px 10px;
+    min-width: auto;
+  }
+
+  .headerActionLabel {
+    display: none;
+  }
+
+  .monthHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .monthTitle {
+    display: none;
+  }
+
+  .monthLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .dayPanel {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {

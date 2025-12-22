@@ -10,7 +10,14 @@ import {
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from 'react';
-import { CalendarMonthIcon, ViewDayIcon, ViewWeekIcon } from '../../icons/MaterialIcons';
+import {
+  AddOutlinedIcon,
+  CalendarMonthIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ViewDayIcon,
+  ViewWeekIcon,
+} from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import { Badge } from '../../shared/ui/Badge/Badge';
@@ -599,16 +606,24 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           <div className={styles.periodSwitcher}>
             {scheduleView === 'week' && (
                 <div className={styles.monthSwitcher}>
-                  <button className={styles.monthNavButton} onClick={() => onWeekShift(-1)}
-                          aria-label="Предыдущая неделя">
-                    ←
+                  <button
+                    className={styles.monthNavButton}
+                    onClick={() => onWeekShift(-1)}
+                    aria-label="Предыдущая неделя"
+                    type="button"
+                  >
+                    <ChevronLeftIcon className={styles.monthNavIcon} />
                   </button>
                   <div key={weekLabelKey} className={styles.monthName}>
                     {weekRangeLabel}
                   </div>
-                  <button className={styles.monthNavButton} onClick={() => onWeekShift(1)}
-                          aria-label="Следующая неделя">
-                    →
+                  <button
+                    className={styles.monthNavButton}
+                    onClick={() => onWeekShift(1)}
+                    aria-label="Следующая неделя"
+                    type="button"
+                  >
+                    <ChevronRightIcon className={styles.monthNavIcon} />
                   </button>
                 </div>
             )}
@@ -616,8 +631,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             {scheduleView === 'day' && (
               <div className={styles.daySwitcherWrapper} ref={dayPickerRef}>
                 <div className={styles.monthSwitcher}>
-                  <button className={styles.monthNavButton} onClick={() => onDayShift(-1)} aria-label="Предыдущий день">
-                    ←
+                  <button
+                    className={styles.monthNavButton}
+                    onClick={() => onDayShift(-1)}
+                    aria-label="Предыдущий день"
+                    type="button"
+                  >
+                    <ChevronLeftIcon className={styles.monthNavIcon} />
                   </button>
                   <button
                     key={dayLabelKey}
@@ -627,8 +647,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   >
                     {capitalizedDayLabel}
                   </button>
-                  <button className={styles.monthNavButton} onClick={() => onDayShift(1)} aria-label="Следующий день">
-                    →
+                  <button
+                    className={styles.monthNavButton}
+                    onClick={() => onDayShift(1)}
+                    aria-label="Следующий день"
+                    type="button"
+                  >
+                    <ChevronRightIcon className={styles.monthNavIcon} />
                   </button>
                 </div>
                 {dayPickerOpen && (
@@ -672,8 +697,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       className={styles.monthNavButton}
                       onClick={() => onMonthShift(-1)}
                       aria-label="Предыдущий месяц"
+                      type="button"
                   >
-                    ←
+                    <ChevronLeftIcon className={styles.monthNavIcon} />
                   </button>
                   <div key={monthLabelKey} className={styles.monthName}>
                     {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
@@ -682,18 +708,21 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       className={styles.monthNavButton}
                       onClick={() => onMonthShift(1)}
                       aria-label="Следующий месяц"
+                      type="button"
                   >
-                    →
+                    <ChevronRightIcon className={styles.monthNavIcon} />
                   </button>
                 </div>
             )}
+            <button
+                className={`${controls.primaryButton} ${styles.headerAction}`}
+                onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+                type="button"
+            >
+              <AddOutlinedIcon className={styles.headerActionIcon}/>
+              <span className={styles.headerActionLabel}>Создать урок</span>
+            </button>
           </div>
-          <button
-              className={`${controls.primaryButton} ${styles.headerAction}`}
-              onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
-          >
-            Создать урок
-          </button>
         </div>
       </div>
 
