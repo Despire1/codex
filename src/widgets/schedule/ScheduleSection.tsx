@@ -9,7 +9,16 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type CSSProperties,
+} from 'react';
 import {
   AddOutlinedIcon,
   CalendarMonthIcon,
@@ -77,6 +86,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayPickerRef = useRef<HTMLDivElement>(null);
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
+  const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
+  const [drawerDragOffset, setDrawerDragOffset] = useState(0);
+  const drawerPointerStart = useRef<number | null>(null);
+  const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
+  const drawerDragOffsetRef = useRef(0);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -104,6 +120,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
   const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(format(new Date(), 'yyyy-MM-dd'));
+  const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
 
   const weekRangeLabel = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -164,6 +181,19 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       onDayViewDateChange(defaultDay.date);
     }
   }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileViewport(window.innerWidth <= 720);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (selectedMonthDay) {
+      setDrawerMode('half');
+    }
+  }, [selectedMonthDay]);
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -448,6 +478,116 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const selectedDayLessons = selectedMonthDay ? lessonsByDay[selectedMonthDay] ?? [] : [];
     const selectedDayDate = selectedMonthDay ? parseISO(selectedMonthDay) : null;
 
+    const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!isMobileMonthView || !selectedMonthDay) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      drawerPointerStart.current = event.clientY;
+      drawerModeAtDragStart.current = drawerMode;
+      setIsDraggingDrawer(true);
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        if (drawerPointerStart.current === null) return;
+        const delta = moveEvent.clientY - drawerPointerStart.current;
+
+        const clampedDelta = Math.min(Math.max(delta, -220), 260);
+        drawerDragOffsetRef.current = clampedDelta;
+        setDrawerDragOffset(clampedDelta);
+      };
+
+      const handleEnd = () => {
+        const delta = drawerDragOffsetRef.current;
+
+        drawerPointerStart.current = null;
+        setIsDraggingDrawer(false);
+        setDrawerDragOffset(0);
+        drawerDragOffsetRef.current = 0;
+
+        if (delta > 120) {
+          setSelectedMonthDay(null);
+        } else if (delta < -80) {
+          setDrawerMode('expanded');
+        } else if (drawerModeAtDragStart.current === 'expanded' && delta > 30) {
+          setDrawerMode('half');
+        } else {
+          setDrawerMode(drawerModeAtDragStart.current);
+        }
+
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleEnd);
+        window.removeEventListener('pointercancel', handleEnd);
+      };
+
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleEnd);
+      window.addEventListener('pointercancel', handleEnd);
+    };
+
+    const renderDayDetails = (closeHandler: () => void) => (
+      <div className={styles.dayPanelContent}>
+        <div className={styles.dayPanelHeader}>
+          <div>
+            <div className={styles.dayPanelTitle}>
+              {selectedDayDate ? format(selectedDayDate, 'd MMMM, EEEE', { locale: ru }) : 'Выберите день'}
+            </div>
+            {selectedDayLessons.length > 0 && (
+              <div className={styles.dayPanelSubtitle}>
+                {selectedDayLessons.length} занят{selectedDayLessons.length === 1 ? 'ие' : 'ия'} за день
+              </div>
+            )}
+          </div>
+          <button className={styles.closeButton} onClick={closeHandler} aria-label="Закрыть панель">
+            ×
+          </button>
+        </div>
+
+        {selectedDayLessons.length === 0 && <div className={styles.emptyDayState}>Создайте первый урок</div>}
+
+        <div className={styles.dayPanelList}>
+          {selectedDayLessons.map((lesson) => {
+            const date = parseISO(lesson.startAt);
+            const participants = buildParticipants(lesson);
+            const isGroupLesson = participants.length > 1;
+
+            return (
+              <div
+                key={lesson.id}
+                className={`${styles.monthLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onStartEditLesson(lesson);
+                }}
+              >
+                {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
+                <div className={styles.monthLessonInfo}>
+                  <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                  <span className={styles.monthLessonName}>
+                    {isGroupLesson
+                      ? `Групповой (${participants.length})`
+                      : ((participants[0]?.student as any)?.link?.customName ?? 'Урок')}
+                  </span>
+                </div>
+                {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+              </div>
+            );
+          })}
+        </div>
+
+        {selectedMonthDay && (
+          <button
+            className={`${controls.primaryButton} ${styles.panelAction}`}
+            onClick={() => onOpenLessonModal(selectedMonthDay)}
+          >
+            Создать урок
+          </button>
+        )}
+      </div>
+    );
+
+    const drawerStyle = { '--drawer-dy': `${drawerDragOffset}px` } as CSSProperties;
+
     return (
       <div className={styles.monthScroller}>
         <div className={styles.monthSection}>
@@ -504,69 +644,31 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
 
             <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
-              <div className={styles.dayPanelContent}>
-                <div className={styles.dayPanelHeader}>
-                  <div>
-                    <div className={styles.dayPanelTitle}>
-                      {selectedDayDate ? format(selectedDayDate, 'd MMMM, EEEE', { locale: ru }) : 'Выберите день'}
-                    </div>
-                    {selectedDayLessons.length > 0 && (
-                      <div className={styles.dayPanelSubtitle}>
-                        {selectedDayLessons.length} занят{selectedDayLessons.length === 1 ? 'ие' : 'ия'} за день
-                      </div>
-                    )}
-                  </div>
-                  <button className={styles.closeButton} onClick={() => setSelectedMonthDay(null)} aria-label="Закрыть панель">
-                    ×
-                  </button>
-                </div>
-
-                {selectedDayLessons.length === 0 && (
-                  <div className={styles.emptyDayState}>Создайте первый урок</div>
-                )}
-
-                <div className={styles.dayPanelList}>
-                  {selectedDayLessons.map((lesson) => {
-                    const date = parseISO(lesson.startAt);
-                    const participants = buildParticipants(lesson);
-                    const isGroupLesson = participants.length > 1;
-
-                    return (
-                      <div
-                        key={lesson.id}
-                        className={`${styles.monthLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onStartEditLesson(lesson);
-                        }}
-                      >
-                        {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                        <div className={styles.monthLessonInfo}>
-                          <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                          <span className={styles.monthLessonName}>
-                            {isGroupLesson
-                              ? `Групповой (${participants.length})`
-                              : ((participants[0]?.student as any)?.link?.customName ?? 'Урок')}
-                          </span>
-                        </div>
-                        {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {selectedMonthDay && (
-                  <button
-                    className={`${controls.primaryButton} ${styles.panelAction}`}
-                    onClick={() => onOpenLessonModal(selectedMonthDay)}
-                  >
-                    Создать урок
-                  </button>
-                )}
-              </div>
+              {renderDayDetails(() => setSelectedMonthDay(null))}
             </div>
           </div>
         </div>
+
+        {isMobileMonthView && (
+          <>
+            <div
+              className={`${styles.dayDrawerScrim} ${selectedMonthDay ? styles.scrimVisible : ''}`}
+              onClick={() => setSelectedMonthDay(null)}
+            />
+            <div
+              className={`${styles.dayDrawer} ${selectedMonthDay ? styles.dayDrawerOpen : ''} ${
+                drawerMode === 'expanded' ? styles.dayDrawerExpanded : ''
+              } ${isDraggingDrawer ? styles.dayDrawerDragging : ''}`}
+              role="dialog"
+              style={drawerStyle}
+            >
+              <div className={styles.drawerHandleArea} onPointerDown={startDrawerDrag}>
+                <span className={styles.drawerHandle} />
+              </div>
+              {renderDayDetails(() => setSelectedMonthDay(null))}
+            </div>
+          </>
+        )}
       </div>
     );
   };
