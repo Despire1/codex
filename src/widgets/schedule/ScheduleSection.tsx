@@ -732,6 +732,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </button>
                 </div>
             )}
+            <button
+                className={`${controls.primaryButton} ${styles.headerAction}`}
+                onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+                type="button"
+            >
+              <AddOutlinedIcon className={styles.headerActionIcon}/>
+              <span className={styles.headerActionLabel}>Создать урок</span>
+            </button>
           </div>
         </div>
       </div>
