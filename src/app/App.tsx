@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { Homework, HomeworkStatus, Lesson, LinkedStudent, Payment, Student, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
+import { useToast } from '../shared/lib/toast';
 import { DialogModal } from '../shared/ui/Modal/DialogModal';
 import { Modal } from '../shared/ui/Modal/Modal';
 import modalStyles from '../shared/ui/Modal/Modal.module.css';
@@ -40,6 +41,7 @@ const parseTimeSpentMinutes = (value: string): number | null => {
 export const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
@@ -248,9 +250,15 @@ export const App = () => {
       const data = await api.toggleAutoRemind(studentId, !link.autoRemindHomework);
 
       setLinks(links.map((l) => (l.studentId === studentId ? data.link : l)));
+      showToast({
+        message: data.link.autoRemindHomework ? 'Автонапоминания включены' : 'Автонапоминания выключены',
+        variant: 'success',
+      });
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to toggle reminder', error);
+      showToast({
+        message: 'Не удалось обновить автонапоминания',
+        variant: 'error',
+      });
     }
   };
 
@@ -581,6 +589,10 @@ export const App = () => {
         }
 
         await refreshPayments(studentId);
+        showToast({
+          message: isCurrentlyPaid ? 'Оплата отменена' : 'Оплата отмечена',
+          variant: 'success',
+        });
       } else {
         const data = await api.togglePaid(lessonId);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
@@ -599,10 +611,16 @@ export const App = () => {
 
         const targetStudent = data.lesson.studentId;
         await refreshPayments(targetStudent);
+        showToast({
+          message: isCurrentlyPaid ? 'Оплата отменена' : 'Оплата отмечена',
+          variant: 'success',
+        });
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to toggle payment', error);
+      showToast({
+        message: 'Не удалось обновить оплату',
+        variant: 'error',
+      });
     }
   };
 
