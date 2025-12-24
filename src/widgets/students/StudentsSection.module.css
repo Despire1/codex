@@ -319,9 +319,13 @@
   color: #2563eb;
   font-weight: 600;
   font-size: 14px;
-  padding: 4px 0;
+  padding: 6px 0;
   cursor: pointer;
   align-self: flex-start;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
 }
 
 .card {
