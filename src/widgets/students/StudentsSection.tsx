@@ -8,24 +8,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import {
-  AddOutlinedIcon,
-  CheckCircleOutlineIcon,
-  CloseIcon,
-  ContentCopyOutlinedIcon,
-  EditIcon,
-  DeleteOutlineIcon,
-  DoneOutlinedIcon,
-  EventRepeatOutlinedIcon,
-  EditOutlinedIcon,
-  ExpandLessOutlinedIcon,
-  ExpandMoreOutlinedIcon,
-  MoreHorizIcon,
-  NotificationsNoneOutlinedIcon,
-  PaidOutlinedIcon,
-  ReplayOutlinedIcon,
-} from '../../icons/MaterialIcons';
 import {
   Homework,
   HomeworkAttachment,
@@ -35,13 +17,16 @@ import {
   Student,
   StudentListItem,
 } from '../../entities/types';
-import controls from '../../shared/styles/controls.module.css';
-import { Badge } from '../../shared/ui/Badge/Badge';
 import styles from './StudentsSection.module.css';
-import { PaymentList } from './components/PaymentList';
 import { HomeworkTab } from './components/HomeworkTab';
+import { HomeworkCreateModal } from './components/HomeworkCreateModal';
+import { HomeworkDrawer } from './components/HomeworkDrawer';
+import { LessonsTab } from './components/LessonsTab';
+import { OverviewTab } from './components/OverviewTab';
+import { PaymentsTab } from './components/PaymentsTab';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
+import { HomeworkDraft, HomeworkStatusInfo, NewHomeworkDraft, SelectedStudent } from './types';
 import { ru } from 'date-fns/locale';
 
 interface StudentsSectionProps {
@@ -76,15 +61,7 @@ interface StudentsSectionProps {
   onDuplicateHomework?: (homeworkId: number) => void;
   onDeleteHomework?: (homeworkId: number) => void;
   onAddHomework: () => void;
-  onHomeworkDraftChange: (draft: {
-    text: string;
-    deadline: string;
-    status: HomeworkStatus;
-    baseStatus: HomeworkStatus;
-    sendNow: boolean;
-    remindBefore: boolean;
-    timeSpentMinutes: string;
-  }) => void;
+  onHomeworkDraftChange: (draft: NewHomeworkDraft) => void;
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
@@ -100,18 +77,8 @@ interface StudentsSectionProps {
   onCreateLesson: (studentId?: number) => void;
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lessonId: number) => void;
-  newHomeworkDraft: {
-    text: string;
-    deadline: string;
-    status: HomeworkStatus;
-    baseStatus: HomeworkStatus;
-    sendNow: boolean;
-    remindBefore: boolean;
-    timeSpentMinutes: string;
-  };
+  newHomeworkDraft: NewHomeworkDraft;
 }
-type HomeworkStatusInfo = { status: HomeworkStatus; isOverdue: boolean };
-
 const getHomeworkStatusInfo = (homework: Homework): HomeworkStatusInfo => {
   const baseStatus = (homework.status as HomeworkStatus) ?? (homework.isDone ? 'DONE' : 'ASSIGNED');
   if (homework.deadline) {
@@ -224,7 +191,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   newHomeworkDraft,
 }) => {
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
-  const selectedStudent = selectedStudentEntry
+  const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
   const selectedStudentStats = selectedStudentEntry?.stats ?? null;
@@ -233,13 +200,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view');
-  const [homeworkDraft, setHomeworkDraft] = useState<{
-    text: string;
-    deadline: string;
-    status: HomeworkStatus;
-    attachments: HomeworkAttachment[];
-    timeSpentMinutes: string;
-  }>({ text: '', deadline: '', status: 'ASSIGNED', attachments: [], timeSpentMinutes: '' });
+  const [homeworkDraft, setHomeworkDraft] = useState<HomeworkDraft>({
+    text: '',
+    deadline: '',
+    status: 'ASSIGNED',
+    attachments: [],
+    timeSpentMinutes: '',
+  });
   const [pendingHomeworkId, setPendingHomeworkId] = useState<number | null>(null);
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<HomeworkAttachment | null>(null);
@@ -451,6 +418,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleStartEditLessonStatus = (lessonId: number) => {
     setEditableLessonStatusId(lessonId);
+  };
+
+  const handleStopEditLessonStatus = () => {
+    setEditableLessonStatusId(null);
   };
 
   const handleLessonStatusChange = (lessonId: number, status: Lesson['status']) => {
@@ -711,197 +682,38 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   formatCompletionMoment={formatCompletionMoment}
                 />
               ) : activeTab === 'lessons' ? (
-                <div className={styles.card}>
-                  <div className={styles.homeworkHeader}>
-                    <div>
-                      <div className={styles.priceLabel}>Занятия</div>
-                      <div className={styles.subtleLabel}>Список уроков для ученика</div>
-                    </div>
-                    <button
-                      className={controls.secondaryButton}
-                      onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-                    >
-                      + Урок
-                    </button>
-                  </div>
-
-                  <div className={styles.lessonTableWrapper}>
-                    {studentLessons.length ? (
-                      <TableContainer className={styles.lessonTableContainer}>
-                        <Table size="small" aria-label="Список занятий ученика">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Дата и время</TableCell>
-                              <TableCell>Длительность</TableCell>
-                              <TableCell>Статус занятия</TableCell>
-                              <TableCell>Статус оплаты</TableCell>
-                              <TableCell align="right">Цена</TableCell>
-                              <TableCell align="right">Быстрые действия</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {studentLessons.map((lesson) => {
-                              const participant = lesson.participants?.find(
-                                (p) => p.studentId === selectedStudentId,
-                              );
-                              const resolvedPrice =
-                                participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
-                              const isPaid = participant?.isPaid ?? lesson.isPaid;
-
-                              return (
-                                <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
-                                  <TableCell>
-                                    <div className={styles.lessonDateCell}>
-                                      <div className={styles.lessonTitle}>
-                                        {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
-                                      </div>
-                                      <div className={styles.lessonMeta}>#{lesson.id}</div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className={styles.monoCell}>{lesson.durationMinutes} мин</TableCell>
-                                  <TableCell>
-                                    <div className={styles.lessonStatusRow}>
-                                      <span className={styles.metaLabel}>Статус:</span>
-                                      {editableLessonStatusId === lesson.id ? (
-                                        <select
-                                          className={styles.lessonStatusSelect}
-                                          value={lesson.status}
-                                          autoFocus
-                                          onChange={(event) =>
-                                            handleLessonStatusChange(
-                                              lesson.id,
-                                              event.target.value as Lesson['status'],
-                                            )
-                                          }
-                                          onBlur={() => setEditableLessonStatusId(null)}
-                                        >
-                                          <option value="SCHEDULED">Запланирован</option>
-                                          <option value="COMPLETED">Проведён</option>
-                                          <option value="CANCELED">Отменён</option>
-                                        </select>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          className={styles.lessonStatusTrigger}
-                                          onClick={() => handleStartEditLessonStatus(lesson.id)}
-                                        >
-                                          {getLessonStatusLabel(lesson.status)}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      label={isPaid ? 'Оплачено' : 'Не оплачено'}
-                                      variant={isPaid ? 'paid' : 'unpaid'}
-                                      className={styles.paymentBadge}
-                                    />
-                                  </TableCell>
-                                  <TableCell align="right" className={styles.monoCell}>
-                                    {resolvedPrice} ₽
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    <div className={styles.iconActions}>
-                                      <button
-                                        className={controls.iconButton}
-                                        aria-label="Отметить проведённым"
-                                        title="Отметить проведённым"
-                                        onClick={() => onCompleteLesson(lesson.id)}
-                                      >
-                                        <DoneOutlinedIcon width={18} height={18} />
-                                      </button>
-                                      <button
-                                        className={controls.iconButton}
-                                        aria-label="Отметить оплату"
-                                        title="Отметить оплату"
-                                        onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
-                                      >
-                                        <PaidOutlinedIcon width={18} height={18} />
-                                      </button>
-                                      <button
-                                        className={controls.iconButton}
-                                        aria-label="Перенести"
-                                        title="Перенести"
-                                        onClick={() => onEditLesson(lesson)}
-                                      >
-                                        <EventRepeatOutlinedIcon width={18} height={18} />
-                                      </button>
-                                      <button
-                                        className={controls.iconButton}
-                                        aria-label="Удалить"
-                                        title="Удалить"
-                                        onClick={() => onDeleteLesson(lesson.id)}
-                                      >
-                                        <DeleteOutlineIcon width={18} height={18} />
-                                      </button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    ) : (
-                      <div className={styles.emptyState}>
-                        <p>Пока нет занятий. Добавьте урок.</p>
-                        <button
-                          className={controls.secondaryButton}
-                          onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-                        >
-                          + Урок
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <LessonsTab
+                  studentLessons={studentLessons}
+                  selectedStudent={selectedStudent}
+                  selectedStudentId={selectedStudentId}
+                  editableLessonStatusId={editableLessonStatusId}
+                  onStartEditLessonStatus={handleStartEditLessonStatus}
+                  onStopEditLessonStatus={handleStopEditLessonStatus}
+                  onLessonStatusChange={handleLessonStatusChange}
+                  onCreateLesson={onCreateLesson}
+                  onCompleteLesson={onCompleteLesson}
+                  onTogglePaid={onTogglePaid}
+                  onEditLesson={onEditLesson}
+                  onDeleteLesson={onDeleteLesson}
+                  getLessonStatusLabel={getLessonStatusLabel}
+                />
               ) : activeTab === 'payments' ? (
-                <div className={styles.card}>
-                  <div className={styles.homeworkHeader}>
-                    <div>
-                      <div className={styles.priceLabel}>Оплаты</div>
-                      <div className={styles.subtleLabel}>История платежей для ученика</div>
-                    </div>
-                  </div>
-                  <PaymentList
-                    payments={payments}
-                    filter={paymentFilter}
-                    date={paymentDate}
-                    onFilterChange={onPaymentFilterChange}
-                    onDateChange={onPaymentDateChange}
-                    onOpenLesson={onEditLesson}
-                  />
-                </div>
+                <PaymentsTab
+                  payments={payments}
+                  paymentFilter={paymentFilter}
+                  paymentDate={paymentDate}
+                  onPaymentFilterChange={onPaymentFilterChange}
+                  onPaymentDateChange={onPaymentDateChange}
+                  onOpenLesson={onEditLesson}
+                />
               ) : (
-                <div className={styles.card}>
-                  <div className={styles.homeworkHeader}>
-                    <div>
-                      <div className={styles.priceLabel}>Обзор</div>
-                      <div className={styles.subtleLabel}>Короткая сводка по ученику</div>
-                    </div>
-                    <button className={controls.secondaryButton} onClick={() => onRemindHomework(selectedStudent.id)}>
-                      Напомнить про ДЗ
-                    </button>
-                  </div>
-                  <div className={styles.overviewGrid}>
-                    <div className={styles.statCard}>
-                      <p className={styles.statLabel}>Баланс</p>
-                      <p className={styles.statValueLarge}>{selectedStudent.link.balanceLessons} уроков</p>
-                    </div>
-                    <div className={styles.statCard}>
-                      <p className={styles.statLabel}>ДЗ</p>
-                      <p className={styles.statValueLarge}>
-                        {selectedStudentStats?.pendingHomeworkCount ?? 0} в работе
-                      </p>
-                    </div>
-                    <div className={styles.statCard}>
-                      <p className={styles.statLabel}>Напоминания</p>
-                      <p className={styles.statValueLarge}>
-                        {selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                selectedStudent && (
+                  <OverviewTab
+                    selectedStudent={selectedStudent}
+                    selectedStudentStats={selectedStudentStats}
+                    onRemindHomework={onRemindHomework}
+                  />
+                )
               )}
             </div>
           ) : (
@@ -911,453 +723,59 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       </div>
 
       {activeHomework && (
-        <>
-          <button
-            className={`${styles.drawerScrim} ${isDrawerVisible ? styles.scrimVisible : ''}`}
-            aria-label="Закрыть карточку ДЗ"
-            onClick={closeHomeworkDrawer}
-          />
-          <aside
-            className={`${styles.homeworkDrawer} ${isDrawerVisible ? styles.drawerOpen : ''}`}
-            aria-live="polite"
-          >
-            <div className={styles.drawerHeaderSticky}>
-              <div>
-                <div className={styles.drawerTitle}>{selectedStudent?.link.customName}</div>
-                <div className={styles.drawerSubtitle}>@{selectedStudent?.username || 'нет'} • #{activeHomework.id}</div>
-              </div>
-              <div className={styles.drawerHeaderActions}>
-                {onSendHomework && activeHomework && activeStatusInfo?.status === 'DRAFT' && (
-                  <button
-                    className={controls.secondaryButton}
-                    onClick={() => handleSendHomework(activeHomework.id)}
-                    disabled={isSaving}
-                  >
-                    Отправить ученику
-                  </button>
-                )}
-                {drawerMode === 'view' && (
-                  <div className={styles.moreActionsWrapper}>
-                    <button
-                      className={controls.iconButton}
-                      aria-label="Дополнительные действия"
-                      onClick={() => setIsDrawerMenuOpen((prev) => !prev)}
-                    >
-                      <MoreHorizIcon width={18} height={18} />
-                    </button>
-                    {isDrawerMenuOpen && (
-                        <div className={styles.moreMenu}>
-                          <button
-                              aria-label="Редактировать"
-                              onClick={() => {
-                                setIsDrawerMenuOpen(false);
-                                setDrawerMode('edit');
-                              }}
-                          >
-                            Редактировать
-                          </button>
-                          {activeStatusInfo?.status !== 'DRAFT' && (
-                            <button
-                                aria-label="В черновик"
-                                onClick={() => handleMoveToDraft(activeHomework.id)}
-                            >
-                              В черновик
-                            </button>
-                          )}
-                        </div>
-                    )}
-                  </div>
-                )}
-                <button className={controls.iconButton} aria-label="Закрыть" onClick={closeHomeworkDrawer}>
-                  <CloseIcon width={18} height={18}/>
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.drawerScroll} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
-              <div className={styles.drawerBadgeRow}>
-                {activeStatusInfo && (
-                  <span
-                    className={`${styles.drawerBadge} ${
-                      activeStatusInfo.status === 'DONE'
-                        ? styles.badgeSuccess
-                        : activeStatusInfo.status === 'IN_PROGRESS'
-                          ? styles.badgeWarning
-                          : activeStatusInfo.status === 'ASSIGNED'
-                            ? styles.badgeInfo
-                            : styles.badgeMuted
-                    }`}
-                  >
-                    {getStatusLabel(activeStatusInfo.status)}
-                  </span>
-                )}
-                {activeStatusInfo?.isOverdue && activeStatusInfo.status !== 'DONE' && (
-                  <span className={`${styles.drawerBadge} ${styles.badgeDanger}`}>Просрочено</span>
-                )}
-                <span className={styles.drawerBadge}>
-                  {homeworkDraft.deadline
-                    ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM', {locale: ru})}`
-                    : 'Без дедлайна'}
-                </span>
-                <span className={styles.drawerBadge}>
-                  {resolvedTimeSpentMinutes !== null
-                    ? `Время: ${formatTimeSpentMinutes(resolvedTimeSpentMinutes)}`
-                    : 'Время не указано'}
-                </span>
-                <span className={styles.drawerBadge}>
-                  {activeHomework?.completedAt
-                    ? `Выполнено: ${formatCompletionMoment(activeHomework.completedAt)}`
-                    : 'Не выполнено'}
-                </span>
-                {hasUnsavedChanges && drawerMode === 'edit' && (
-                  <span className={`${styles.drawerBadge} ${styles.badgeMuted}`}>Есть несохранённые изменения</span>
-                )}
-              </div>
-
-              <div className={styles.drawerSection}>
-                <div className={styles.sectionHeader}>
-                  <p className={styles.priceLabel}>Описание</p>
-                  {drawerMode === 'view' && (
-                    <button className={styles.linkButton} onClick={() => setDrawerMode('edit')}>
-                      <EditOutlinedIcon width={16} height={16} />
-                    </button>
-                  )}
-                </div>
-                {drawerMode === 'edit' ? (
-                  <>
-                    <textarea
-                      className={controls.input}
-                      value={homeworkDraft.text}
-                      onChange={(e) => setHomeworkDraft({ ...homeworkDraft, text: e.target.value })}
-                      placeholder="Введите текст домашнего задания..."
-                      rows={8}
-                    />
-                    <div className={styles.inlineFields}>
-                      <label className={styles.inputLabel}>
-                        Дедлайн
-                        <input
-                          className={controls.input}
-                          type="date"
-                          value={homeworkDraft.deadline}
-                          onChange={(e) => setHomeworkDraft({ ...homeworkDraft, deadline: e.target.value })}
-                        />
-                      </label>
-                      <label className={styles.inputLabel}>
-                        Статус
-                        <select
-                          className={controls.input}
-                          value={homeworkDraft.status}
-                          onChange={(e) =>
-                            setHomeworkDraft({ ...homeworkDraft, status: e.target.value as HomeworkStatus })
-                          }
-                        >
-                          <option value="DRAFT">Черновик</option>
-                          <option value="ASSIGNED">Назначено</option>
-                          <option value="IN_PROGRESS">В работе</option>
-                          <option value="DONE">Выполнено</option>
-                        </select>
-                      </label>
-                      <label className={styles.inputLabel}>
-                        Время выполнения (мин)
-                        <input
-                          className={controls.input}
-                          type="number"
-                          min={0}
-                          step={5}
-                          value={homeworkDraft.timeSpentMinutes}
-                          onChange={(e) =>
-                            setHomeworkDraft({ ...homeworkDraft, timeSpentMinutes: e.target.value })
-                          }
-                          placeholder="Например, 45"
-                        />
-                        <span className={styles.subtleLabel}>Сколько минут заняло выполнение</span>
-                      </label>
-                    </div>
-                    {saveError && <div className={styles.errorText}>{saveError}</div>}
-                  </>
-                ) : (
-                  <div className={styles.descriptionBlock}>
-                    <p
-                      className={`${styles.drawerText} ${
-                        !isDescriptionExpanded && shouldShowDescriptionToggle ? styles.clampedText : ''
-                      }`}
-                    >
-                      {activeHomework.text}
-                    </p>
-                    {shouldShowDescriptionToggle && (
-                      <button
-                        className={styles.expandButton}
-                        onClick={() => setIsDescriptionExpanded((prev) => !prev)}
-                        aria-expanded={isDescriptionExpanded}
-                        type="button"
-                      >
-                        {isDescriptionExpanded ? (
-                          <>
-                            <ExpandLessOutlinedIcon width={16} height={16} /> Свернуть
-                          </>
-                        ) : (
-                          <>
-                            <ExpandMoreOutlinedIcon width={16} height={16} /> Развернуть
-                          </>
-                        )}
-                      </button>
-                    )}
-                </div>
-              )}
-              </div>
-
-              <div className={styles.drawerSection}>
-                <div className={styles.sectionHeader}>
-                  <p className={styles.priceLabel}>Фото</p>
-                  <span className={styles.subtleLabel}>PNG/JPG/WebP, до 10MB, до 5 фото</span>
-                  {drawerMode !== 'edit' && <button className={styles.linkButton} onClick={() => setDrawerMode('edit')}>
-                    <AddOutlinedIcon width={18} height={18}/>
-                  </button>}
-                </div>
-                {drawerMode === 'edit' && (
-                    <div className={styles.attachmentControls}>
-                      <label className={controls.secondaryButton}>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        multiple
-                        className={styles.hiddenInput}
-                        onChange={(event) => {
-                          const files = Array.from(event.target.files || []);
-                          addAttachments(files as File[]);
-                          event.target.value = '';
-                        }}
-                      />
-                      <span className={styles.iconLeading} aria-hidden>
-                        <AddOutlinedIcon width={16} height={16} />
-                      </span>
-                      Добавить фото
-                    </label>
-                    <div className={styles.dropHint}>Перетащите или вставьте фото сюда</div>
-                  </div>
-                )}
-
-                <div className={styles.attachmentsGrid}>
-                  {(homeworkDraft.attachments ?? []).map((attachment) => (
-                    <div key={attachment.id} className={styles.attachmentCard}>
-                      {drawerMode === 'edit' && (
-                        <button
-                          className={styles.attachmentRemove}
-                          aria-label="Удалить"
-                          onClick={() => removeAttachment(attachment.id)}
-                        >
-                          ×
-                        </button>
-                      )}
-                      <button className={styles.attachmentThumb} onClick={() => setAttachmentPreview(attachment)}>
-                        <img src={attachment.url} alt={attachment.fileName} />
-                      </button>
-                      <div className={styles.attachmentMeta}>
-                        <span className={styles.attachmentName}>{attachment.fileName}</span>
-                        <span className={styles.attachmentSize}>{Math.round(attachment.size / 1024)} кб</span>
-                      </div>
-                    </div>
-                  ))}
-                  {!(homeworkDraft.attachments ?? []).length && (
-                    <div className={styles.emptyState}>Пока нет вложений</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.drawerFooter}>
-              {drawerMode === 'view' ? (
-                <>
-                  <button
-                    className={controls.primaryButton}
-                    onClick={() => {
-                      onToggleHomework(activeHomework.id);
-                    }}
-                  >
-                    {activeHomework.isDone ? 'Вернуть в активные' : 'Отметить выполненным'}
-                  </button>
-                  <button
-                    className={controls.secondaryButton}
-                    onClick={() => onRemindHomeworkById?.(activeHomework.id) ?? onRemindHomework(selectedStudent!.id)}
-                  >
-                    Напомнить
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button className={controls.primaryButton} onClick={handleSaveDraft} disabled={isSaving}>
-                    {isSaving ? 'Сохранение…' : 'Сохранить'}
-                  </button>
-                  <button className={controls.secondaryButton} onClick={handleDiscardChanges} disabled={isSaving}>
-                    Отмена
-                  </button>
-                  {hasUnsavedChanges && <button
-                      className={controls.secondaryButton}
-                      onClick={() => {
-                        resetDraftToOriginal();
-                      }}
-                      disabled={isSaving}
-                  >
-                    <ReplayOutlinedIcon width={16} height={16}/> Сбросить
-                  </button>}
-                </>
-              )}
-            </div>
-          </aside>
-
-          {attachmentPreview && (
-            <div className={styles.modalOverlay} onClick={() => setAttachmentPreview(null)}>
-              <div className={styles.previewDialog} onClick={(e) => e.stopPropagation()}>
-                <img src={attachmentPreview.url} alt={attachmentPreview.fileName} />
-                <div className={styles.previewFooter}>
-                  <span>{attachmentPreview.fileName}</span>
-                  <button className={controls.secondaryButton} onClick={() => setAttachmentPreview(null)}>
-                    Закрыть
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {showUnsavedConfirm && (
-            <div className={styles.modalOverlay}>
-              <div className={styles.modalCard}>
-                <div className={styles.modalHeader}>
-                  <div>
-                    <div className={styles.priceLabel}>Несохранённые изменения</div>
-                    <div className={styles.subtleLabel}>Сохранить перед закрытием?</div>
-                  </div>
-                  <button className={controls.iconButton} aria-label="Закрыть" onClick={handleKeepEditing}>
-                    <CloseIcon width={18} height={18} />
-                  </button>
-                </div>
-                <div className={styles.modalBody}>У вас есть несохранённые изменения. Сохранить их?</div>
-                <div className={styles.modalFooter}>
-                  <button className={controls.secondaryButton} onClick={handleDiscardChanges}>
-                    Не сохранять
-                  </button>
-                  <button className={controls.secondaryButton} onClick={handleKeepEditing}>
-                    Отмена
-                  </button>
-                  <button className={controls.primaryButton} onClick={handleConfirmSaveAndClose} disabled={isSaving}>
-                    Сохранить
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        <HomeworkDrawer
+          activeHomework={activeHomework}
+          selectedStudent={selectedStudent}
+          drawerMode={drawerMode}
+          isDrawerVisible={isDrawerVisible}
+          isDrawerMenuOpen={isDrawerMenuOpen}
+          isSaving={isSaving}
+          saveError={saveError}
+          hasUnsavedChanges={hasUnsavedChanges}
+          shouldShowDescriptionToggle={shouldShowDescriptionToggle}
+          isDescriptionExpanded={isDescriptionExpanded}
+          activeStatusInfo={activeStatusInfo}
+          resolvedTimeSpentMinutes={resolvedTimeSpentMinutes}
+          homeworkDraft={homeworkDraft}
+          attachmentPreview={attachmentPreview}
+          showUnsavedConfirm={showUnsavedConfirm}
+          onClose={closeHomeworkDrawer}
+          onToggleDrawerMenu={() => setIsDrawerMenuOpen((prev) => !prev)}
+          onStartEdit={() => {
+            setIsDrawerMenuOpen(false);
+            setDrawerMode('edit');
+          }}
+          onMoveToDraft={handleMoveToDraft}
+          onSendHomework={onSendHomework ? handleSendHomework : undefined}
+          onToggleDescription={() => setIsDescriptionExpanded((prev) => !prev)}
+          onDraftChange={setHomeworkDraft}
+          onRemoveAttachment={removeAttachment}
+          onOpenAttachmentPreview={setAttachmentPreview}
+          onCloseAttachmentPreview={() => setAttachmentPreview(null)}
+          onAddAttachments={addAttachments}
+          onDrop={handleDrop}
+          onToggleHomework={onToggleHomework}
+          onRemindHomework={(homeworkId) => onRemindHomeworkById?.(homeworkId) ?? onRemindHomework(selectedStudent!.id)}
+          onSaveDraft={handleSaveDraft}
+          onDiscardChanges={handleDiscardChanges}
+          onResetDraft={resetDraftToOriginal}
+          onKeepEditing={handleKeepEditing}
+          onConfirmSaveAndClose={handleConfirmSaveAndClose}
+          formatTimeSpentMinutes={formatTimeSpentMinutes}
+          formatCompletionMoment={formatCompletionMoment}
+          getStatusLabel={getStatusLabel}
+        />
       )}
 
-      {isHomeworkModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalCard}>
-            <div className={styles.modalHeader}>
-              <div>
-                <div className={styles.priceLabel}>Новое задание</div>
-                <div className={styles.subtleLabel}>Создайте карточку и отправьте ученику</div>
-              </div>
-              <button className={controls.iconButton} aria-label="Закрыть" onClick={() => setIsHomeworkModalOpen(false)}>
-                <CloseIcon width={18} height={18} />
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              <label className={styles.inputLabel}>
-                Текст задания
-                <textarea
-                  className={controls.input}
-                  placeholder="Например: Разобрать тему 3 и сделать 10 задач"
-                  value={newHomeworkDraft.text}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, text: e.target.value })}
-                />
-              </label>
-              <label className={styles.inputLabel}>
-                Дедлайн
-                <input
-                  className={controls.input}
-                  type="date"
-                  value={newHomeworkDraft.deadline}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, deadline: e.target.value })}
-                />
-              </label>
-              <label className={styles.inputLabel}>
-                Время выполнения (мин)
-                <input
-                  className={controls.input}
-                  type="number"
-                  min={0}
-                  step={5}
-                  value={newHomeworkDraft.timeSpentMinutes}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, timeSpentMinutes: e.target.value })}
-                  placeholder="Например, 30"
-                />
-                <span className={styles.subtleLabel}>Можно оставить пустым, если ученик ещё не сделал работу</span>
-              </label>
-              <div className={styles.inputLabel}>
-                <div className={styles.sectionHeader}>
-                  <p className={styles.priceLabel}>Статус</p>
-                  <span className={styles.subtleLabel}>Выберите, когда покажем ДЗ ученику</span>
-                </div>
-                <div className={styles.toggleGroup}>
-                  <button
-                    className={`${controls.secondaryButton} ${
-                      (newHomeworkDraft.baseStatus ?? 'DRAFT') === 'DRAFT' ? styles.activeChip : ''
-                    }`}
-                    onClick={() => handleCreateStatusChange('DRAFT')}
-                    disabled={newHomeworkDraft.sendNow}
-                  >
-                    Черновик
-                  </button>
-                  <button
-                    className={`${controls.secondaryButton} ${
-                      (newHomeworkDraft.baseStatus ?? 'DRAFT') === 'ASSIGNED' ? styles.activeChip : ''
-                    }`}
-                    onClick={() => handleCreateStatusChange('ASSIGNED')}
-                    disabled={newHomeworkDraft.sendNow}
-                  >
-                    Назначено
-                  </button>
-                </div>
-              </div>
-              <label className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={newHomeworkDraft.sendNow}
-                  onChange={(e) => handleSendNowToggle(e.target.checked)}
-                />
-                <span>Сразу отправить ученику</span>
-              </label>
-              {newHomeworkDraft.sendNow && (
-                <div className={styles.helperText}>Задание будет опубликовано и станет доступно ученику</div>
-              )}
-              <label className={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={newHomeworkDraft.remindBefore}
-                  onChange={(e) => onHomeworkDraftChange({ ...newHomeworkDraft, remindBefore: e.target.checked })}
-                />
-                <span>Включить напоминание за 24 часа</span>
-              </label>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={controls.secondaryButton} onClick={() => setIsHomeworkModalOpen(false)}>
-                Отмена
-              </button>
-              <button
-                className={controls.primaryButton}
-                onClick={() => {
-                  onAddHomework();
-                  if (newHomeworkDraft.text.trim()) {
-                    setIsHomeworkModalOpen(false);
-                  }
-                }}
-              >
-                Создать
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <HomeworkCreateModal
+        isOpen={isHomeworkModalOpen}
+        draft={newHomeworkDraft}
+        onDraftChange={onHomeworkDraftChange}
+        onAddHomework={onAddHomework}
+        onClose={() => setIsHomeworkModalOpen(false)}
+        onCreateStatusChange={handleCreateStatusChange}
+        onSendNowToggle={handleSendNowToggle}
+      />
     </section>
   );
 };
