@@ -582,6 +582,14 @@
   margin-bottom: 12px;
 }
 
+.homeworkHeaderCompact {
+  align-items: center;
+}
+
+.homeworkAddButtonLabel {
+  display: inline;
+}
+
 .iconLeading {
   display: inline-flex;
   margin-right: 6px;
@@ -1581,9 +1589,19 @@
     text-align: center;
   }
 
-  .homeworkHeader {
-    flex-direction: column;
+  .homeworkHeaderCompact {
+    flex-direction: row;
     align-items: flex-start;
+  }
+
+  .homeworkAddButton {
+    padding: 8px;
+    min-width: 36px;
+    justify-content: center;
+  }
+
+  .homeworkAddButtonLabel {
+    display: none;
   }
 
   .content {
