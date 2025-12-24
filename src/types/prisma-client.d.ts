@@ -17,6 +17,7 @@ declare module '@prisma/client' {
     telegramId: bigint | null;
     pricePerLesson: number;
     payments: Payment[];
+    paymentEvents: PaymentEvent[];
     createdAt: Date;
   };
 
@@ -68,6 +69,19 @@ declare module '@prisma/client' {
     comment: string | null;
   };
 
+  export type PaymentEvent = {
+    id: number;
+    studentId: number;
+    lessonId: number | null;
+    type: string;
+    lessonsDelta: number;
+    priceSnapshot: number;
+    moneyAmount: number | null;
+    createdAt: Date;
+    createdBy: string;
+    reason: string | null;
+  };
+
   export class PrismaClient {
     constructor(options?: any);
     teacher: {
@@ -103,8 +117,16 @@ declare module '@prisma/client' {
       findUnique(args: any): PrismaPromise<Payment | null>;
       findMany(args?: any): PrismaPromise<Payment[]>;
       create(args: any): PrismaPromise<Payment>;
+      createMany(args: any): PrismaPromise<any>;
       delete(args: any): PrismaPromise<Payment>;
       deleteMany(args: any): PrismaPromise<any>;
+    };
+    paymentEvent: {
+      findUnique(args: any): PrismaPromise<PaymentEvent | null>;
+      findMany(args?: any): PrismaPromise<PaymentEvent[]>;
+      findFirst(args: any): PrismaPromise<PaymentEvent | null>;
+      create(args: any): PrismaPromise<PaymentEvent>;
+      createMany(args: any): PrismaPromise<any>;
     };
     $transaction<T>(promises: PrismaPromise<T>[]): PrismaPromise<T[]>;
   }

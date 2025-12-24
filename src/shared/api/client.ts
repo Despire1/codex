@@ -1,4 +1,4 @@
-import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, Payment, Student, StudentListItem, Teacher, TeacherStudent } from '../../entities/types';
+import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, PaymentEvent, Student, StudentListItem, Teacher, TeacherStudent } from '../../entities/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -90,8 +90,15 @@ export const api = {
         method: 'POST',
       },
     ),
-  getPayments: (studentId: number) =>
-    apiFetch<{ payments: Payment[] }>(`/api/students/${studentId}/payments`),
+  getPaymentEvents: (studentId: number, params?: { filter?: string; date?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.filter) query.set('filter', params.filter);
+    if (params?.date) query.set('date', params.date);
+    const suffix = query.toString();
+    return apiFetch<{ events: PaymentEvent[] }>(
+      `/api/students/${studentId}/payments${suffix ? `?${suffix}` : ''}`,
+    );
+  },
   createHomework: (payload: {
     studentId: number;
     text: string;

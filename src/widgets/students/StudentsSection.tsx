@@ -31,7 +31,7 @@ import {
   HomeworkAttachment,
   HomeworkStatus,
   Lesson,
-  Payment,
+  PaymentEvent,
   Student,
   StudentListItem,
 } from '../../entities/types';
@@ -89,7 +89,11 @@ interface StudentsSectionProps {
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
   lessons: Lesson[];
-  payments: Payment[];
+  payments: PaymentEvent[];
+  paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
+  paymentDate: string;
+  onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
+  onPaymentDateChange: (date: string) => void;
   onCompleteLesson: (lessonId: number) => void;
   onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
@@ -207,6 +211,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onOpenStudentModal,
   lessons,
   payments,
+  paymentFilter,
+  paymentDate,
+  onPaymentFilterChange,
+  onPaymentDateChange,
   onCompleteLesson,
   onChangeLessonStatus,
   onTogglePaid,
@@ -855,7 +863,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <div className={styles.subtleLabel}>История платежей для ученика</div>
                     </div>
                   </div>
-                  <PaymentList payments={payments} />
+                  <PaymentList
+                    payments={payments}
+                    filter={paymentFilter}
+                    date={paymentDate}
+                    onFilterChange={onPaymentFilterChange}
+                    onDateChange={onPaymentDateChange}
+                    onOpenLesson={onEditLesson}
+                  />
                 </div>
               ) : (
                 <div className={styles.card}>
