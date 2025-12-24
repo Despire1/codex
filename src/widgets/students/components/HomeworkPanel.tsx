@@ -13,6 +13,7 @@ interface HomeworkPanelProps {
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
   homeworkListLoading: boolean;
   homeworkListHasMore: boolean;
+  isMobile: boolean;
   contentRootRef: RefObject<HTMLDivElement>;
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onLoadMoreHomeworks: () => void;
@@ -88,6 +89,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
   homeworkFilter,
   homeworkListLoading,
   homeworkListHasMore,
+  isMobile,
   contentRootRef,
   onHomeworkFilterChange,
   onLoadMoreHomeworks,
@@ -488,6 +490,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
         isLoading={homeworkListLoading}
         hasMore={homeworkListHasMore}
         loadMoreRef={homeworkLoadMoreRef}
+        isMobile={isMobile}
         onOpenCreateHomework={handleOpenCreateHomework}
         onChangeFilter={onHomeworkFilterChange}
         onOpenHomework={handleOpenHomeworkCard}
