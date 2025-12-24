@@ -22,6 +22,7 @@ interface HomeworkTabProps {
   isLoading: boolean;
   hasMore: boolean;
   loadMoreRef: RefObject<HTMLDivElement>;
+  isMobile: boolean;
   onOpenCreateHomework: () => void;
   onChangeFilter: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onOpenHomework: (homeworkId: number) => void;
@@ -45,6 +46,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   isLoading,
   hasMore,
   loadMoreRef,
+  isMobile,
   onOpenCreateHomework,
   onChangeFilter,
   onOpenHomework,
@@ -140,7 +142,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
             return (
               <div
                 key={hw.id}
-                className={styles.homeworkItem}
+                className={`${styles.homeworkItem} ${isMobile ? styles.homeworkItemMobile : ''}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => onOpenHomework(hw.id)}
@@ -152,99 +154,120 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
                 }}
                 aria-pressed={activeHomeworkId === hw.id}
               >
-                <div className={styles.homeworkContent}>
-                  <div className={styles.homeworkTitleRow}>
-                    <div className={styles.homeworkTitle}>{title}</div>
-                  </div>
-                  <div className={styles.homeworkMetaRow}>
-                    <span className={styles.homeworkMeta}>{deadlineLabel}</span>
-                    <span className={styles.metaDivider}>•</span>
-                    <span className={styles.homeworkMeta}>{timeSpentLabel}</span>
-                    {hw.completedAt && (
-                      <>
-                        <span className={styles.metaDivider}>•</span>
-                        <span className={styles.homeworkMeta}>{completedLabel}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.homeworkActions}>
-                  <div className={styles.statusStack}>
-                    {renderStatusPill(statusInfo)}
-                    {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
-                      <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
-                    )}
-                  </div>
-                  <div className={styles.iconActions}>
-                    <button
-                      className={controls.iconButton}
-                      aria-label="Отметить выполненным"
-                      title="Переключить выполнено"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleHomework(hw.id);
-                      }}
-                    >
-                      <CheckCircleOutlineIcon width={18} height={18} />
-                    </button>
-                    <div className={styles.moreActionsWrapper}>
-                      <button
-                        className={controls.iconButton}
-                        aria-label="Ещё"
-                        title="Ещё действия"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onToggleHomeworkMenu(hw.id);
-                        }}
-                      >
-                        <MoreHorizIcon width={18} height={18} />
-                      </button>
-                      {openHomeworkMenuId === hw.id && (
-                        <div className={styles.moreMenu}>
-                          <button
-                            aria-label="Напомнить"
-                            title="Отправить напоминание"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onHomeworkReminder(hw.id);
-                            }}
-                          >
-                            Напомнить
-                          </button>
-                          <button
-                            aria-label="Редактировать"
-                            title="Редактировать"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onEditHomework(hw.id);
-                            }}
-                          >
-                            Редактировать
-                          </button>
-                          {statusInfo.status !== 'DRAFT' && (
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onMoveToDraft(hw.id);
-                              }}
-                            >
-                              В черновик
-                            </button>
-                          )}
-                          <button
-                            className={styles.dangerButton}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteHomework(hw.id);
-                            }}
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      )}
+                {isMobile ? (
+                  <div className={styles.homeworkContent}>
+                    <div className={styles.homeworkTitleRow}>
+                      <div className={`${styles.homeworkTitle} ${styles.homeworkTitleCompact}`}>{title}</div>
+                      <div className={styles.statusStack}>
+                        {renderStatusPill(statusInfo)}
+                        {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+                          <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`${styles.homeworkMetaRow} ${styles.homeworkMetaCompact}`}>
+                      <span className={styles.homeworkMeta}>{deadlineLabel}</span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className={styles.homeworkContent}>
+                      <div className={styles.homeworkTitleRow}>
+                        <div className={styles.homeworkTitle}>{title}</div>
+                      </div>
+                      <div className={styles.homeworkMetaRow}>
+                        <span className={styles.homeworkMeta}>{deadlineLabel}</span>
+                        <span className={`${styles.metaDivider} ${styles.homeworkMetaSecondary}`}>•</span>
+                        <span className={`${styles.homeworkMeta} ${styles.homeworkMetaSecondary}`}>{timeSpentLabel}</span>
+                        {hw.completedAt && (
+                          <>
+                            <span className={`${styles.metaDivider} ${styles.homeworkMetaSecondary}`}>•</span>
+                            <span className={`${styles.homeworkMeta} ${styles.homeworkMetaSecondary}`}>
+                              {completedLabel}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.homeworkActions}>
+                      <div className={styles.statusStack}>
+                        {renderStatusPill(statusInfo)}
+                        {statusInfo.isOverdue && statusInfo.status !== 'DONE' && (
+                          <span className={`${styles.statusPill} ${styles.statusOverdue}`}>Просрочено</span>
+                        )}
+                      </div>
+                      <div className={styles.iconActions}>
+                        <button
+                          className={controls.iconButton}
+                          aria-label="Отметить выполненным"
+                          title="Переключить выполнено"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleHomework(hw.id);
+                          }}
+                        >
+                          <CheckCircleOutlineIcon width={18} height={18} />
+                        </button>
+                        <div className={styles.moreActionsWrapper}>
+                          <button
+                            className={controls.iconButton}
+                            aria-label="Ещё"
+                            title="Ещё действия"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleHomeworkMenu(hw.id);
+                            }}
+                          >
+                            <MoreHorizIcon width={18} height={18} />
+                          </button>
+                          {openHomeworkMenuId === hw.id && (
+                            <div className={styles.moreMenu}>
+                              <button
+                                aria-label="Напомнить"
+                                title="Отправить напоминание"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onHomeworkReminder(hw.id);
+                                }}
+                              >
+                                Напомнить
+                              </button>
+                              <button
+                                aria-label="Редактировать"
+                                title="Редактировать"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onEditHomework(hw.id);
+                                }}
+                              >
+                                Редактировать
+                              </button>
+                              {statusInfo.status !== 'DRAFT' && (
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onMoveToDraft(hw.id);
+                                  }}
+                                >
+                                  В черновик
+                                </button>
+                              )}
+                              <button
+                                className={styles.dangerButton}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onDeleteHomework(hw.id);
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })

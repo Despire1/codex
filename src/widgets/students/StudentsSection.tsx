@@ -263,6 +263,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     homeworkFilter={homeworkFilter}
                     homeworkListLoading={homeworkListLoading}
                     homeworkListHasMore={homeworkListHasMore}
+                    isMobile={isMobile}
                     contentRootRef={contentGridRef}
                     onHomeworkFilterChange={onHomeworkFilterChange}
                     onLoadMoreHomeworks={onLoadMoreHomeworks}
