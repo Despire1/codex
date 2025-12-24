@@ -308,6 +308,7 @@
 .mobileContentGrid {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  max-height: 100%;
 }
 
 .backButton {
@@ -1509,6 +1510,8 @@
 @media (max-width: 720px) {
   .section {
     padding: 8px 0 16px;
+    height: 100dvh;
+    max-height: 100dvh;
   }
 
   .sidebarCard {
@@ -1569,6 +1572,10 @@
   .homeworkHeader {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .content {
+    height: 100%;
   }
 
   .lessonTableContainer {
