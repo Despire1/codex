@@ -372,7 +372,10 @@ const adjustBalance = async (studentId: number, delta: number) => {
   return updatedLink;
 };
 
-const listPaymentEventsForStudent = async (studentId: number) => {
+const listPaymentEventsForStudent = async (
+  studentId: number,
+  options?: { filter?: string; date?: string },
+) => {
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
@@ -380,8 +383,30 @@ const listPaymentEventsForStudent = async (studentId: number) => {
 
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
+  const filter = options?.filter ?? 'all';
+  const where: Record<string, any> = { studentId };
+
+  if (filter === 'topup') {
+    where.type = 'TOP_UP';
+  } else if (filter === 'manual') {
+    where.type = 'MANUAL_PAID';
+  } else if (filter === 'charges') {
+    where.type = { in: ['AUTO_CHARGE', 'ADJUSTMENT'] };
+    where.lessonsDelta = { lt: 0 };
+  }
+
+  if (options?.date) {
+    const parsed = new Date(`${options.date}T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      const start = new Date(parsed);
+      const end = new Date(parsed);
+      end.setDate(end.getDate() + 1);
+      where.createdAt = { gte: start, lt: end };
+    }
+  }
+
   const events = await prisma.paymentEvent.findMany({
-    where: { studentId },
+    where,
     include: { lesson: true },
     orderBy: { createdAt: 'desc' },
   });
@@ -1610,7 +1635,9 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const paymentsMatch = pathname.match(/^\/api\/students\/(\d+)\/payments$/);
     if (req.method === 'GET' && paymentsMatch) {
       const studentId = Number(paymentsMatch[1]);
-      const events = await listPaymentEventsForStudent(studentId);
+      const filter = url.searchParams.get('filter') ?? undefined;
+      const date = url.searchParams.get('date') ?? undefined;
+      const events = await listPaymentEventsForStudent(studentId, { filter, date });
       return sendJson(res, 200, { events });
     }
 

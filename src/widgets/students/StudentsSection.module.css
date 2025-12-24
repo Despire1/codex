@@ -1296,6 +1296,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .paymentFilterButton {
@@ -1317,6 +1318,24 @@
   background: #111827;
   color: #fff;
   border-color: #111827;
+}
+
+.paymentDateFilter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.paymentDateInput {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .paymentListRoot {

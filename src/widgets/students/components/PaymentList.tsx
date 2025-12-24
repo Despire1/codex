@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useMemo } from 'react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Box, Chip, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Stack } from '@mui/material';
@@ -9,6 +9,10 @@ import styles from '../StudentsSection.module.css';
 
 interface PaymentListProps {
   payments: PaymentEvent[];
+  filter: FilterId;
+  date: string;
+  onFilterChange: (filter: FilterId) => void;
+  onDateChange: (date: string) => void;
   onOpenLesson?: (lesson: Lesson) => void;
 }
 
@@ -78,28 +82,21 @@ const formatEventValue = (event: PaymentEvent) => {
   return `${sign}${event.lessonsDelta}`;
 };
 
-export const PaymentList: FC<PaymentListProps> = ({ payments, onOpenLesson }) => {
-  const [activeFilter, setActiveFilter] = useState<FilterId>('all');
-
-  const filteredPayments = useMemo(() => {
-    if (activeFilter === 'all') return payments;
-    if (activeFilter === 'topup') return payments.filter((event) => event.type === 'TOP_UP');
-    if (activeFilter === 'manual') return payments.filter((event) => event.type === 'MANUAL_PAID');
-    if (activeFilter === 'charges') {
-      return payments.filter(
-        (event) => event.type === 'AUTO_CHARGE' || (event.type === 'ADJUSTMENT' && event.lessonsDelta < 0),
-      );
-    }
-    return payments;
-  }, [activeFilter, payments]);
-
+export const PaymentList: FC<PaymentListProps> = ({
+  payments,
+  filter,
+  date,
+  onFilterChange,
+  onDateChange,
+  onOpenLesson,
+}) => {
   const groupedEvents = useMemo(() => {
-    return filteredPayments.reduce<Record<string, PaymentEvent[]>>((acc, event) => {
+    return payments.reduce<Record<string, PaymentEvent[]>>((acc, event) => {
       const key = getDateLabel(event.createdAt);
       acc[key] = acc[key] ? [...acc[key], event] : [event];
       return acc;
     }, {});
-  }, [filteredPayments]);
+  }, [payments]);
 
   const groupEntries = Object.entries(groupedEvents);
 
@@ -114,18 +111,29 @@ export const PaymentList: FC<PaymentListProps> = ({ payments, onOpenLesson }) =>
   return (
     <div className={styles.paymentList}>
       <div className={styles.paymentFilters}>
-        {FILTERS.map((filter) => (
+        {FILTERS.map((filterOption) => (
           <button
-            key={filter.id}
+            key={filterOption.id}
             type="button"
-            onClick={() => setActiveFilter(filter.id)}
-            className={`${styles.paymentFilterButton} ${activeFilter === filter.id ? styles.paymentFilterActive : ''}`}
+            onClick={() => onFilterChange(filterOption.id)}
+            className={`${styles.paymentFilterButton} ${
+              filterOption.id === filter ? styles.paymentFilterActive : ''
+            }`}
           >
-            {filter.label}
+            {filterOption.label}
           </button>
         ))}
+        <label className={styles.paymentDateFilter}>
+          <span>Дата</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => onDateChange(event.target.value)}
+            className={styles.paymentDateInput}
+          />
+        </label>
       </div>
-      {filteredPayments.length === 0 ? (
+      {payments.length === 0 ? (
         <div className={styles.emptyState}>
           <p>По выбранному фильтру ничего нет</p>
         </div>
