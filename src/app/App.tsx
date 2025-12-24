@@ -272,7 +272,7 @@ export const App = () => {
     if (selectedStudentId) {
       refreshPayments(selectedStudentId);
     }
-  }, [selectedStudentId, refreshPayments]);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
@@ -315,16 +315,10 @@ export const App = () => {
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
-    if (selectedStudentId) {
-      refreshPayments(selectedStudentId, { filter: nextFilter });
-    }
   };
 
   const handlePaymentDateChange = (nextDate: string) => {
     setPaymentDate(nextDate);
-    if (selectedStudentId) {
-      refreshPayments(selectedStudentId, { date: nextDate });
-    }
   };
 
     const handleAddStudent = async () => {
