@@ -730,7 +730,7 @@ export const App = () => {
 
         await refreshPayments(studentId);
         showToast({
-          message: isCurrentlyPaid ? 'Оплата отменена' : 'Оплата отмечена',
+          message: isCurrentlyPaid ? 'Оплата отменена' : 'Урок оплачен',
           variant: 'success',
         });
       } else {
