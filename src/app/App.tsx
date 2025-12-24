@@ -1,5 +1,5 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Homework, HomeworkStatus, Lesson, LinkedStudent, PaymentEvent, Student, StudentListItem, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
@@ -62,6 +62,8 @@ export const App = () => {
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
+  const paymentFilterRef = useRef(paymentFilter);
+  const paymentDateRef = useRef(paymentDate);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -253,11 +255,19 @@ export const App = () => {
     loadStudentHomeworks({ offset: studentHomeworks.length, append: true });
   }, [loadStudentHomeworks, studentHomeworkHasMore, studentHomeworkLoading, studentHomeworks.length]);
 
+  useEffect(() => {
+    paymentFilterRef.current = paymentFilter;
+  }, [paymentFilter]);
+
+  useEffect(() => {
+    paymentDateRef.current = paymentDate;
+  }, [paymentDate]);
+
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
       try {
-        const filter = options?.filter ?? paymentFilter;
-        const date = options?.date ?? paymentDate;
+        const filter = options?.filter ?? paymentFilterRef.current;
+        const date = options?.date ?? paymentDateRef.current;
         const data = await api.getPaymentEvents(studentId, { filter, date: date || undefined });
         setPaymentEventsByStudent((prev) => ({ ...prev, [studentId]: data.events }));
       } catch (error) {
@@ -265,7 +275,7 @@ export const App = () => {
         console.error('Failed to load payment events', error);
       }
     },
-    [paymentDate, paymentFilter],
+    [],
   );
 
   useEffect(() => {
