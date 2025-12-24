@@ -3,9 +3,12 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
+import type { HomeworkStatus } from '../entities/types';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEMO_TEACHER_ID = BigInt(process.env.DEMO_TEACHER_ID ?? '111222333');
+const DEFAULT_PAGE_SIZE = 15;
+const MAX_PAGE_SIZE = 50;
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status;
@@ -106,6 +109,140 @@ const searchStudents = async (query?: string, filter?: 'all' | 'pendingHomework'
     links: withPending,
     homeworks,
   };
+};
+
+const resolvePageParams = (url: URL) => {
+  const limitRaw = Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE);
+  const offsetRaw = Number(url.searchParams.get('offset') ?? 0);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+  return { limit, offset };
+};
+
+const isHomeworkDone = (homework: any) => normalizeTeacherStatus(homework.status) === 'DONE' || homework.isDone;
+
+const isHomeworkOverdue = (homework: any, todayStart: Date) => {
+  if (!homework.deadline) return false;
+  if (isHomeworkDone(homework)) return false;
+  return new Date(homework.deadline).getTime() < todayStart.getTime();
+};
+
+const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
+  let pendingHomeworkCount = 0;
+  let overdueHomeworkCount = 0;
+  const totalHomeworkCount = homeworks.length;
+
+  homeworks.forEach((homework) => {
+    if (!isHomeworkDone(homework)) {
+      pendingHomeworkCount += 1;
+    }
+    if (isHomeworkOverdue(homework, todayStart)) {
+      overdueHomeworkCount += 1;
+    }
+  });
+
+  return { pendingHomeworkCount, overdueHomeworkCount, totalHomeworkCount };
+};
+
+const listStudents = async (query?: string, filter?: 'all' | 'debt' | 'overdue', limit = DEFAULT_PAGE_SIZE, offset = 0) => {
+  const teacher = await ensureTeacher();
+  const normalizedQuery = query?.trim();
+  const where: any = { teacherId: teacher.chatId };
+
+  if (normalizedQuery) {
+    where.OR = [
+      { customName: { contains: normalizedQuery, mode: 'insensitive' } },
+      { student: { username: { contains: normalizedQuery, mode: 'insensitive' } } },
+    ];
+  }
+
+  const links = await prisma.teacherStudent.findMany({
+    where,
+    include: { student: true },
+    orderBy: { customName: 'asc' },
+  });
+
+  const studentIds = links.map((link) => link.studentId);
+  const homeworks = studentIds.length
+    ? await prisma.homework.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: studentIds } },
+      })
+    : [];
+
+  const homeworksByStudent = new Map<number, any[]>();
+  homeworks.forEach((homework) => {
+    const existing = homeworksByStudent.get(homework.studentId) ?? [];
+    existing.push(homework);
+    homeworksByStudent.set(homework.studentId, existing);
+  });
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const statsByStudent = new Map<number, ReturnType<typeof buildHomeworkStats>>();
+  links.forEach((link) => {
+    const stats = buildHomeworkStats(homeworksByStudent.get(link.studentId) ?? [], todayStart);
+    statsByStudent.set(link.studentId, stats);
+  });
+
+  const filteredLinks = links.filter((link) => {
+    const stats = statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 };
+    if (filter === 'debt') return link.balanceLessons < 0;
+    if (filter === 'overdue') return stats.overdueHomeworkCount > 0;
+    return true;
+  });
+
+  const total = filteredLinks.length;
+  const pageItems = filteredLinks.slice(offset, offset + limit).map((link) => {
+    const { student, ...linkData } = link;
+    return {
+      student,
+      link: linkData,
+      stats: statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 },
+    };
+  });
+
+  const nextOffset = offset + limit < total ? offset + limit : null;
+  const counts = {
+    withDebt: links.filter((link) => link.balanceLessons < 0).length,
+    overdue: links.filter((link) => (statsByStudent.get(link.studentId)?.overdueHomeworkCount ?? 0) > 0).length,
+  };
+
+  return { items: pageItems, total, nextOffset, counts };
+};
+
+const listStudentHomeworks = async (
+  studentId: number,
+  filter: 'all' | HomeworkStatus | 'overdue' = 'all',
+  limit = DEFAULT_PAGE_SIZE,
+  offset = 0,
+) => {
+  const teacher = await ensureTeacher();
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  const where: any = { teacherId: teacher.chatId, studentId };
+  if (filter === 'overdue') {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    where.deadline = { lt: todayStart };
+    where.isDone = false;
+    where.NOT = { status: 'DONE' };
+  } else if (filter && filter !== 'all') {
+    where.status = filter;
+  }
+
+  const total = await prisma.homework.count({ where });
+  const items = await prisma.homework.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    skip: offset,
+    take: limit,
+  });
+  const nextOffset = offset + limit < total ? offset + limit : null;
+  return { items, total, nextOffset };
 };
 
 const bootstrap = async () => {
@@ -1246,6 +1383,15 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       });
     }
 
+    if (req.method === 'GET' && pathname === '/api/students') {
+      const { searchParams } = url;
+      const query = searchParams.get('query') ?? undefined;
+      const filter = (searchParams.get('filter') as 'all' | 'debt' | 'overdue' | null) ?? 'all';
+      const { limit, offset } = resolvePageParams(url);
+      const data = await listStudents(query, filter, limit, offset);
+      return sendJson(res, 200, data);
+    }
+
     if (req.method === 'GET' && pathname === '/api/students/search') {
       const { searchParams } = url;
       const query = searchParams.get('query') ?? undefined;
@@ -1267,6 +1413,17 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const data = await addStudent(body);
       return sendJson(res, 201, data);
+    }
+
+    const studentHomeworkListMatch = pathname.match(/^\/api\/students\/(\d+)\/homeworks$/);
+    if (req.method === 'GET' && studentHomeworkListMatch) {
+      const studentId = Number(studentHomeworkListMatch[1]);
+      const { searchParams } = url;
+      const filter = (searchParams.get('filter') as HomeworkStatus | 'all' | 'overdue' | null) ?? 'all';
+      const { limit, offset } = resolvePageParams(url);
+      const data = await listStudentHomeworks(studentId, filter, limit, offset);
+      const filteredHomeworks = filterHomeworksForRole(data.items, role, requestedStudentId);
+      return sendJson(res, 200, { ...data, items: filteredHomeworks });
     }
 
     const autoRemindMatch = pathname.match(/^\/api\/students\/(\d+)\/auto-remind$/);

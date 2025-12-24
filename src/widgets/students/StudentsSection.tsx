@@ -31,9 +31,9 @@ import {
   HomeworkAttachment,
   HomeworkStatus,
   Lesson,
-  LinkedStudent,
   Payment,
   Student,
+  StudentListItem,
 } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { Badge } from '../../shared/ui/Badge/Badge';
@@ -45,10 +45,25 @@ import { StudentsSidebar } from './components/StudentsSidebar';
 import { ru } from 'date-fns/locale';
 
 interface StudentsSectionProps {
-  linkedStudents: LinkedStudent[];
+  studentListItems: StudentListItem[];
+  studentListCounts: { withDebt: number; overdue: number };
+  studentListTotal: number;
+  studentListLoading: boolean;
+  studentListHasMore: boolean;
+  studentSearch: string;
+  studentFilter: 'all' | 'debt' | 'overdue';
   selectedStudentId: number | null;
   priceEditState: { id: number | null; value: string };
+  studentHomeworks: Homework[];
+  homeworkFilter: 'all' | HomeworkStatus | 'overdue';
+  homeworkListLoading: boolean;
+  homeworkListHasMore: boolean;
   onSelectStudent: (id: number) => void;
+  onStudentSearchChange: (value: string) => void;
+  onStudentFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
+  onLoadMoreStudents: () => void;
+  onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
+  onLoadMoreHomeworks: () => void;
   onToggleAutoReminder: (studentId: number) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onStartEditPrice: (student: Student) => void;
@@ -93,7 +108,7 @@ interface StudentsSectionProps {
 }
 type HomeworkStatusInfo = { status: HomeworkStatus; isOverdue: boolean };
 
-const getHomeworkStatusInfo = (homework: LinkedStudent['homeworks'][number]): HomeworkStatusInfo => {
+const getHomeworkStatusInfo = (homework: Homework): HomeworkStatusInfo => {
   const baseStatus = (homework.status as HomeworkStatus) ?? (homework.isDone ? 'DONE' : 'ASSIGNED');
   if (homework.deadline) {
     const deadlineDate = parseISO(`${homework.deadline}T00:00:00`);
@@ -155,10 +170,25 @@ const getLessonStatusLabel = (status: Lesson['status']) => {
 };
 
 export const StudentsSection: FC<StudentsSectionProps> = ({
-  linkedStudents,
+  studentListItems,
+  studentListCounts,
+  studentListTotal,
+  studentListLoading,
+  studentListHasMore,
+  studentSearch,
+  studentFilter,
   selectedStudentId,
   priceEditState,
+  studentHomeworks,
+  homeworkFilter,
+  homeworkListLoading,
+  homeworkListHasMore,
   onSelectStudent,
+  onStudentSearchChange,
+  onStudentFilterChange,
+  onLoadMoreStudents,
+  onHomeworkFilterChange,
+  onLoadMoreHomeworks,
   onToggleAutoReminder,
   onAdjustBalance,
   onStartEditPrice,
@@ -185,13 +215,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onDeleteLesson,
   newHomeworkDraft,
 }) => {
-  const selectedStudent = linkedStudents.find((s) => s.id === selectedStudentId);
+  const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
+  const selectedStudent = selectedStudentEntry
+    ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
+    : null;
+  const selectedStudentStats = selectedStudentEntry?.stats ?? null;
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'debt' | 'overdue'>('all');
   const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons' | 'payments'>('homework');
-  const [homeworkFilter, setHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [activeHomeworkId, setActiveHomeworkId] = useState<number | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit'>('view');
@@ -214,6 +244,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const DRAWER_TRANSITION_MS = 250;
   const drawerAnimationTimeoutRef = useRef<number | null>(null);
+  const studentListRef = useRef<HTMLDivElement | null>(null);
+  const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const homeworkLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const contentGridRef = useRef<HTMLDivElement | null>(null);
 
   const clearDrawerAnimationTimeout = () => {
     if (drawerAnimationTimeoutRef.current) {
@@ -229,37 +263,36 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, []);
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery.trim());
-    }, 350);
+    const target = studentLoadMoreRef.current;
+    if (!target || !studentListHasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMoreStudents();
+        }
+      },
+      { root: studentListRef.current, rootMargin: '120px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [onLoadMoreStudents, studentListHasMore]);
 
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
+  useEffect(() => {
+    const target = homeworkLoadMoreRef.current;
+    if (!target || !homeworkListHasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMoreHomeworks();
+        }
+      },
+      { root: contentGridRef.current, rootMargin: '120px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [homeworkListHasMore, onLoadMoreHomeworks]);
 
-  const visibleStudents = useMemo(() => {
-    return linkedStudents.filter((student) => {
-      const matchesQuery = `${student.link.customName} ${student.username ?? ''}`
-        .toLowerCase()
-        .includes(debouncedQuery.toLowerCase());
-
-      if (!matchesQuery) return false;
-
-      const hasDebt = student.link.balanceLessons < 0;
-      const hasOverdue = student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue);
-      if (activeFilter === 'debt') return hasDebt;
-      if (activeFilter === 'overdue') return hasOverdue;
-
-      return true;
-    });
-  }, [activeFilter, debouncedQuery, linkedStudents]);
-
-  const counts = useMemo(() => {
-    const withDebt = linkedStudents.filter((student) => student.link.balanceLessons < 0).length;
-    const overdue = linkedStudents.filter((student) =>
-      student.homeworks.some((hw) => getHomeworkStatusInfo(hw).isOverdue),
-    ).length;
-    return { withDebt, overdue };
-  }, [linkedStudents]);
+  const visibleStudents = studentListItems;
 
   const studentLessons = useMemo(() => {
     return lessons
@@ -267,20 +300,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
   }, [lessons, selectedStudentId]);
 
-  const filteredHomeworks = useMemo(() => {
-    const homeworks = selectedStudent?.homeworks ?? [];
-    return homeworks.filter((hw) => {
-      const info = getHomeworkStatusInfo(hw);
-      if (homeworkFilter === 'all') return true;
-      if (homeworkFilter === 'overdue') return info.isOverdue;
-      return info.status === homeworkFilter;
-    });
-  }, [homeworkFilter, selectedStudent]);
+  const filteredHomeworks = studentHomeworks;
 
-  const activeHomework = selectedStudent?.homeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
+  const activeHomework = studentHomeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
   const draftTimeSpentMinutes = parseTimeSpentInput(homeworkDraft.timeSpentMinutes);
   const resolvedTimeSpentMinutes =
     draftTimeSpentMinutes ?? (typeof activeHomework?.timeSpentMinutes === 'number' ? activeHomework.timeSpentMinutes : null);
+
+  useEffect(() => {
+    if (activeHomeworkId && !studentHomeworks.some((hw) => hw.id === activeHomeworkId)) {
+      setActiveHomeworkId(null);
+    }
+  }, [activeHomeworkId, studentHomeworks]);
 
   const activeStatusInfo = useMemo(() => {
     if (!activeHomework) return null;
@@ -288,7 +319,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       ...activeHomework,
       status: homeworkDraft.status,
       deadline: homeworkDraft.deadline || activeHomework.deadline,
-    } as LinkedStudent['homeworks'][number]);
+    } as Homework);
   }, [activeHomework, homeworkDraft.deadline, homeworkDraft.status]);
   const shouldShowDescriptionToggle = useMemo(() => {
     if (!activeHomework?.text) return false;
@@ -550,7 +581,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleMoveToDraft = (homeworkId: number) => {
     if (!onUpdateHomework) return;
-    const homework = selectedStudent?.homeworks.find((item) => item.id === homeworkId);
+    const homework = studentHomeworks.find((item) => item.id === homeworkId);
     if (!homework) return;
     const info = getHomeworkStatusInfo(homework);
     if (info.status === 'DRAFT') {
@@ -587,10 +618,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   };
 
   const handleDeleteHomework = (homeworkId: number) => {
-    if (!handleDeleteHomework) return;
+    if (!onDeleteHomework) return;
     const confirmed = window.confirm('Удалить домашнее задание? Его нельзя будет вернуть.');
     if (!confirmed) return;
-    handleDeleteHomework(homeworkId);
+    onDeleteHomework(homeworkId);
     setOpenHomeworkMenuId(null);
   };
 
@@ -615,22 +646,25 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     <section className={styles.section}>
       <div className={styles.grid}>
         <StudentsSidebar
-          linkedStudents={linkedStudents}
-          visibleStudents={visibleStudents}
+          studentListItems={visibleStudents}
           selectedStudentId={selectedStudentId}
-          searchQuery={searchQuery}
-          activeFilter={activeFilter}
-          counts={counts}
+          searchQuery={studentSearch}
+          activeFilter={studentFilter}
+          counts={studentListCounts}
+          totalCount={studentListTotal}
+          isLoading={studentListLoading}
+          hasMore={studentListHasMore}
+          listRef={studentListRef}
+          loadMoreRef={studentLoadMoreRef}
           onSelectStudent={onSelectStudent}
-          onSearchChange={setSearchQuery}
-          onFilterChange={setActiveFilter}
+          onSearchChange={onStudentSearchChange}
+          onFilterChange={onStudentFilterChange}
           onOpenStudentModal={onOpenStudentModal}
-          getHomeworkStatusInfo={getHomeworkStatusInfo}
         />
 
         <div className={styles.content}>
           {selectedStudent ? (
-            <div className={styles.contentGrid}>
+            <div className={styles.contentGrid} ref={contentGridRef}>
               <StudentHero
                 selectedStudent={selectedStudent}
                 priceEditState={priceEditState}
@@ -651,8 +685,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   filteredHomeworks={filteredHomeworks}
                   activeHomeworkId={activeHomeworkId}
                   openHomeworkMenuId={openHomeworkMenuId}
+                  isLoading={homeworkListLoading}
+                  hasMore={homeworkListHasMore}
+                  loadMoreRef={homeworkLoadMoreRef}
                   onOpenCreateHomework={handleOpenCreateHomework}
-                  onChangeFilter={setHomeworkFilter}
+                  onChangeFilter={onHomeworkFilterChange}
                   onOpenHomework={handleOpenHomeworkCard}
                   onToggleHomeworkMenu={handleToggleHomeworkMenu}
                   onToggleHomework={onToggleHomework}
@@ -839,7 +876,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     <div className={styles.statCard}>
                       <p className={styles.statLabel}>ДЗ</p>
                       <p className={styles.statValueLarge}>
-                        {selectedStudent.homeworks.filter((hw) => !hw.isDone).length} в работе
+                        {selectedStudentStats?.pendingHomeworkCount ?? 0} в работе
                       </p>
                     </div>
                     <div className={styles.statCard}>

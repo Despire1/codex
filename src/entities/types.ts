@@ -92,3 +92,13 @@ export interface LinkedStudent extends Student {
   link: TeacherStudent;
   homeworks: Homework[];
 }
+
+export interface StudentListItem {
+  student: Student;
+  link: TeacherStudent;
+  stats: {
+    pendingHomeworkCount: number;
+    overdueHomeworkCount: number;
+    totalHomeworkCount: number;
+  };
+}
