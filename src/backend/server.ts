@@ -346,16 +346,33 @@ const adjustBalance = async (studentId: number, delta: number) => {
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+    include: { student: true },
   });
   if (!link) throw new Error('Student link not found');
   const nextBalance = link.balanceLessons + delta;
-  return prisma.teacherStudent.update({
+  const updatedLink = await prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { balanceLessons: nextBalance },
   });
+  if (delta !== 0) {
+    const type = delta > 0 ? 'TOP_UP' : 'ADJUSTMENT';
+    await prisma.paymentEvent.create({
+      data: {
+        studentId,
+        lessonId: null,
+        type,
+        lessonsDelta: delta,
+        priceSnapshot: link.student?.pricePerLesson ?? 0,
+        moneyAmount: null,
+        createdBy: 'TEACHER',
+        reason: type === 'ADJUSTMENT' ? 'BALANCE_ADJUSTMENT' : null,
+      },
+    });
+  }
+  return updatedLink;
 };
 
-const listPaymentsForStudent = async (studentId: number) => {
+const listPaymentEventsForStudent = async (studentId: number) => {
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
@@ -363,13 +380,13 @@ const listPaymentsForStudent = async (studentId: number) => {
 
   if (!link) throw new Error('Ученик не найден у текущего преподавателя');
 
-  const payments = await prisma.payment.findMany({
-    where: { teacherStudentId: link.id },
+  const events = await prisma.paymentEvent.findMany({
+    where: { studentId },
     include: { lesson: true },
-    orderBy: { paidAt: 'desc' },
+    orderBy: { createdAt: 'desc' },
   });
 
-  return payments;
+  return events;
 };
 
 type RequestRole = 'TEACHER' | 'STUDENT';
@@ -418,6 +435,10 @@ const calcLessonPaymentAmount = (participant: any, lesson: any, link: any) =>
     (value) => typeof value === 'number' && value > 0,
   ) ?? 0;
 
+const createPaymentEvent = async (tx: any, payload: any) => {
+  return tx.paymentEvent.create({ data: payload });
+};
+
 const settleLessonPayments = async (lessonId: number) => {
   const teacher = await ensureTeacher();
   const lesson = await prisma.lesson.findUnique({
@@ -442,12 +463,16 @@ const settleLessonPayments = async (lessonId: number) => {
     const updatedLinks: any[] = [];
     const existingPayments = await tx.payment.findMany({ where: { lessonId: lesson.id } });
     const paymentTeacherStudentIds = new Set(existingPayments.map((payment) => payment.teacherStudentId));
+    const existingEvents = await tx.paymentEvent.findMany({ where: { lessonId: lesson.id, type: 'AUTO_CHARGE' } });
+    const eventStudentIds = new Set(existingEvents.map((event: any) => event.studentId));
 
     for (const participant of lesson.participants ?? []) {
       const link = linksByStudentId.get(participant.studentId);
       if (!link || participant.isPaid) continue;
+      if (link.balanceLessons <= 0) continue;
 
       const nextBalance = link.balanceLessons - 1;
+      const priceSnapshot = calcLessonPaymentAmount(participant, lesson, link);
 
       const savedLink = await tx.teacherStudent.update({
         where: { id: link.id },
@@ -460,12 +485,25 @@ const settleLessonPayments = async (lessonId: number) => {
           data: {
             lessonId: lesson.id,
             teacherStudentId: link.id,
-            amount: calcLessonPaymentAmount(participant, lesson, link),
+            amount: priceSnapshot,
             paidAt: new Date(),
             comment: null,
           },
         });
         paymentTeacherStudentIds.add(link.id);
+      }
+      if (!eventStudentIds.has(participant.studentId)) {
+        await createPaymentEvent(tx, {
+          studentId: participant.studentId,
+          lessonId: lesson.id,
+          type: 'AUTO_CHARGE',
+          lessonsDelta: -1,
+          priceSnapshot,
+          moneyAmount: null,
+          createdBy: 'SYSTEM',
+          reason: null,
+        });
+        eventStudentIds.add(participant.studentId);
       }
 
       await tx.lessonParticipant.update({
@@ -706,6 +744,19 @@ const createLesson = async (body: any) => {
       })),
       skipDuplicates: true,
     });
+    await prisma.paymentEvent.createMany({
+      data: lesson.participants.map((participant: any) => ({
+        studentId: participant.studentId,
+        lessonId: lesson.id,
+        type: 'MANUAL_PAID',
+        lessonsDelta: 0,
+        priceSnapshot: confirmedPrice,
+        moneyAmount: confirmedPrice,
+        createdBy: 'TEACHER',
+        reason: null,
+      })),
+      skipDuplicates: true,
+    });
 
     const updated = await prisma.lesson.update({
       where: { id: lesson.id },
@@ -852,6 +903,19 @@ const createRecurringLessons = async (body: any) => {
           teacherId: teacher.chatId,
           paidAt: new Date(),
           comment: null,
+        })),
+        skipDuplicates: true,
+      });
+      await prisma.paymentEvent.createMany({
+        data: lesson.participants.map((participant: any) => ({
+          studentId: participant.studentId,
+          lessonId: lesson.id,
+          type: 'MANUAL_PAID',
+          lessonsDelta: 0,
+          priceSnapshot: confirmedPrice,
+          moneyAmount: confirmedPrice,
+          createdBy: 'TEACHER',
+          reason: null,
         })),
         skipDuplicates: true,
       });
@@ -1166,6 +1230,11 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
   let updatedLink = link;
 
   if (participant.isPaid || lesson.isPaid) {
+    const deltaChange = existingPayment ? -1 : 1;
+    const priceSnapshot =
+      [link.student?.pricePerLesson, participant.price, lesson.price].find(
+        (value) => typeof value === 'number' && value > 0,
+      ) ?? 0;
     if (existingPayment) {
       await prisma.payment.delete({ where: { id: existingPayment.id } });
       updatedLink = await prisma.teacherStudent.update({
@@ -1178,6 +1247,18 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
         data: { balanceLessons: link.balanceLessons + 1 },
       });
     }
+    await prisma.paymentEvent.create({
+      data: {
+        studentId,
+        lessonId,
+        type: 'ADJUSTMENT',
+        lessonsDelta: deltaChange,
+        priceSnapshot,
+        moneyAmount: null,
+        createdBy: 'TEACHER',
+        reason: 'PAYMENT_REVERT',
+      },
+    });
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
@@ -1201,6 +1282,23 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
         comment: null,
       },
     });
+    const existingManualEvent = await prisma.paymentEvent.findFirst({
+      where: { studentId, lessonId, type: 'MANUAL_PAID' },
+    });
+    if (!existingManualEvent) {
+      await prisma.paymentEvent.create({
+        data: {
+          studentId,
+          lessonId,
+          type: 'MANUAL_PAID',
+          lessonsDelta: 0,
+          priceSnapshot: amount,
+          moneyAmount: amount,
+          createdBy: 'TEACHER',
+          reason: null,
+        },
+      });
+    }
 
     if (link.balanceLessons < 0) {
       updatedLink = await prisma.teacherStudent.update({
@@ -1265,10 +1363,69 @@ const updateLessonStatus = async (lessonId: number, status: any) => {
   if (normalizedStatus === 'COMPLETED') {
     return settleLessonPayments(lessonId);
   }
+  if (normalizedStatus === 'CANCELED') {
+    const result = await prisma.$transaction(async (tx) => {
+      const autoChargeEvents = await tx.paymentEvent.findMany({
+        where: { lessonId, type: 'AUTO_CHARGE' },
+      });
+      const existingAdjustments = await tx.paymentEvent.findMany({
+        where: { lessonId, type: 'ADJUSTMENT', reason: 'LESSON_CANCELED' },
+      });
+      const adjustedStudentIds = new Set(existingAdjustments.map((event: any) => event.studentId));
+      const autoChargeStudentIds = Array.from(new Set(autoChargeEvents.map((event: any) => event.studentId)));
+      const links = autoChargeStudentIds.length
+        ? await tx.teacherStudent.findMany({
+            where: { teacherId: teacher.chatId, studentId: { in: autoChargeStudentIds } },
+          })
+        : [];
+      const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
+
+      for (const event of autoChargeEvents) {
+        if (adjustedStudentIds.has(event.studentId)) continue;
+        const link = linksByStudentId.get(event.studentId);
+        if (!link) continue;
+
+        await tx.teacherStudent.update({
+          where: { id: link.id },
+          data: { balanceLessons: link.balanceLessons + 1 },
+        });
+        await createPaymentEvent(tx, {
+          studentId: event.studentId,
+          lessonId,
+          type: 'ADJUSTMENT',
+          lessonsDelta: 1,
+          priceSnapshot: event.priceSnapshot,
+          moneyAmount: null,
+          createdBy: 'SYSTEM',
+          reason: 'LESSON_CANCELED',
+        });
+        await tx.lessonParticipant.update({
+          where: { lessonId_studentId: { lessonId, studentId: event.studentId } },
+          data: { isPaid: false, price: 0 },
+        });
+      }
+
+      const participants = await tx.lessonParticipant.findMany({
+        where: { lessonId },
+        include: { student: true },
+      });
+      const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
+
+      const updatedLesson = await tx.lesson.update({
+        where: { id: lessonId },
+        data: { status: normalizedStatus, isPaid: normalizedStatus === 'COMPLETED' ? participantsPaid : false },
+        include: { participants: { include: { student: true } } },
+      });
+
+      return { lesson: updatedLesson, links };
+    });
+
+    return result;
+  }
 
   const updatedLesson = await prisma.lesson.update({
     where: { id: lessonId },
-    data: { status: normalizedStatus },
+    data: { status: normalizedStatus, isPaid: false },
     include: { participants: { include: { student: true } } },
   });
 
@@ -1453,8 +1610,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const paymentsMatch = pathname.match(/^\/api\/students\/(\d+)\/payments$/);
     if (req.method === 'GET' && paymentsMatch) {
       const studentId = Number(paymentsMatch[1]);
-      const payments = await listPaymentsForStudent(studentId);
-      return sendJson(res, 200, { payments });
+      const events = await listPaymentEventsForStudent(studentId);
+      return sendJson(res, 200, { events });
     }
 
     if (req.method === 'POST' && pathname === '/api/homeworks') {

@@ -78,13 +78,20 @@ export interface Lesson {
   participants?: LessonParticipant[];
 }
 
-export interface Payment {
+export type PaymentEventType = 'TOP_UP' | 'AUTO_CHARGE' | 'MANUAL_PAID' | 'ADJUSTMENT';
+export type PaymentEventCreatedBy = 'TEACHER' | 'SYSTEM';
+
+export interface PaymentEvent {
   id: number;
-  teacherStudentId: number;
+  studentId: number;
   lessonId?: number | null;
-  amount: number;
-  paidAt: string;
-  comment?: string | null;
+  type: PaymentEventType;
+  lessonsDelta: number;
+  priceSnapshot: number;
+  moneyAmount?: number | null;
+  createdAt: string;
+  createdBy: PaymentEventCreatedBy;
+  reason?: string | null;
   lesson?: Lesson | null;
 }
 
