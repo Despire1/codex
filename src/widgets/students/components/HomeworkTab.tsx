@@ -81,16 +81,20 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
 
   return (
     <div className={styles.card}>
-      <div className={styles.homeworkHeader}>
+      <div className={`${styles.homeworkHeader} ${styles.homeworkHeaderCompact}`}>
         <div>
           <div className={styles.priceLabel}>Домашка</div>
           <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
         </div>
-        <button className={controls.primaryButton} onClick={onOpenCreateHomework}>
+        <button
+          className={`${controls.primaryButton} ${styles.homeworkAddButton}`}
+          onClick={onOpenCreateHomework}
+          aria-label="Новое ДЗ"
+        >
           <span className={styles.iconLeading} aria-hidden>
             <AddOutlinedIcon width={16} height={16} />
           </span>
-          Новое ДЗ
+          <span className={styles.homeworkAddButtonLabel}>Новое ДЗ</span>
         </button>
       </div>
 
