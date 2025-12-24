@@ -232,83 +232,85 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
         {showDetails && (
           <div className={`${styles.content} ${isMobile ? styles.mobileContent : ''}`}>
+            {isMobile && (
+              <button className={styles.backButton} type="button" onClick={handleBackToList}>
+                ← Назад
+              </button>
+            )}
             <div
               className={`${styles.contentGrid} ${isMobile ? styles.mobileContentGrid : ''}`}
               ref={contentGridRef}
             >
-              {isMobile && (
-                <button className={styles.backButton} type="button" onClick={handleBackToList}>
-                  ← Назад
-                </button>
-              )}
-              <StudentHero
-                selectedStudent={selectedStudent}
-                priceEditState={priceEditState}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                onStartEditPrice={onStartEditPrice}
-                onPriceChange={onPriceChange}
-                onSavePrice={onSavePrice}
-                onCancelPriceEdit={onCancelPriceEdit}
-                onToggleAutoReminder={onToggleAutoReminder}
-                onAdjustBalance={onAdjustBalance}
-                onOpenStudentModal={onOpenStudentModal}
-              />
+              <div className={isMobile ? styles.mobileScrollArea : undefined}>
+                <StudentHero
+                  selectedStudent={selectedStudent}
+                  priceEditState={priceEditState}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                  onStartEditPrice={onStartEditPrice}
+                  onPriceChange={onPriceChange}
+                  onSavePrice={onSavePrice}
+                  onCancelPriceEdit={onCancelPriceEdit}
+                  onToggleAutoReminder={onToggleAutoReminder}
+                  onAdjustBalance={onAdjustBalance}
+                  onOpenStudentModal={onOpenStudentModal}
+                />
 
-              {activeTab === 'homework' ? (
-                <HomeworkPanel
-                  selectedStudent={selectedStudent}
-                  studentHomeworks={studentHomeworks}
-                  homeworkFilter={homeworkFilter}
-                  homeworkListLoading={homeworkListLoading}
-                  homeworkListHasMore={homeworkListHasMore}
-                  contentRootRef={contentGridRef}
-                  onHomeworkFilterChange={onHomeworkFilterChange}
-                  onLoadMoreHomeworks={onLoadMoreHomeworks}
-                  onToggleHomework={onToggleHomework}
-                  onUpdateHomework={onUpdateHomework}
-                  onRemindHomework={onRemindHomework}
-                  onRemindHomeworkById={onRemindHomeworkById}
-                  onSendHomework={onSendHomework}
-                  onDeleteHomework={onDeleteHomework}
-                  onAddHomework={onAddHomework}
-                  onHomeworkDraftChange={onHomeworkDraftChange}
-                  newHomeworkDraft={newHomeworkDraft}
-                />
-              ) : activeTab === 'lessons' ? (
-                <LessonsTab
-                  studentLessons={studentLessons}
-                  selectedStudent={selectedStudent}
-                  selectedStudentId={selectedStudentId}
-                  editableLessonStatusId={editableLessonStatusId}
-                  onStartEditLessonStatus={handleStartEditLessonStatus}
-                  onStopEditLessonStatus={handleStopEditLessonStatus}
-                  onLessonStatusChange={handleLessonStatusChange}
-                  onCreateLesson={onCreateLesson}
-                  onCompleteLesson={onCompleteLesson}
-                  onTogglePaid={onTogglePaid}
-                  onEditLesson={onEditLesson}
-                  onDeleteLesson={onDeleteLesson}
-                  getLessonStatusLabel={getLessonStatusLabel}
-                />
-              ) : activeTab === 'payments' ? (
-                <PaymentsTab
-                  payments={payments}
-                  paymentFilter={paymentFilter}
-                  paymentDate={paymentDate}
-                  onPaymentFilterChange={onPaymentFilterChange}
-                  onPaymentDateChange={onPaymentDateChange}
-                  onOpenLesson={onEditLesson}
-                />
-              ) : (
-                selectedStudent && (
-                  <OverviewTab
+                {activeTab === 'homework' ? (
+                  <HomeworkPanel
                     selectedStudent={selectedStudent}
-                    selectedStudentStats={selectedStudentStats}
+                    studentHomeworks={studentHomeworks}
+                    homeworkFilter={homeworkFilter}
+                    homeworkListLoading={homeworkListLoading}
+                    homeworkListHasMore={homeworkListHasMore}
+                    contentRootRef={contentGridRef}
+                    onHomeworkFilterChange={onHomeworkFilterChange}
+                    onLoadMoreHomeworks={onLoadMoreHomeworks}
+                    onToggleHomework={onToggleHomework}
+                    onUpdateHomework={onUpdateHomework}
                     onRemindHomework={onRemindHomework}
+                    onRemindHomeworkById={onRemindHomeworkById}
+                    onSendHomework={onSendHomework}
+                    onDeleteHomework={onDeleteHomework}
+                    onAddHomework={onAddHomework}
+                    onHomeworkDraftChange={onHomeworkDraftChange}
+                    newHomeworkDraft={newHomeworkDraft}
                   />
-                )
-              )}
+                ) : activeTab === 'lessons' ? (
+                  <LessonsTab
+                    studentLessons={studentLessons}
+                    selectedStudent={selectedStudent}
+                    selectedStudentId={selectedStudentId}
+                    editableLessonStatusId={editableLessonStatusId}
+                    onStartEditLessonStatus={handleStartEditLessonStatus}
+                    onStopEditLessonStatus={handleStopEditLessonStatus}
+                    onLessonStatusChange={handleLessonStatusChange}
+                    onCreateLesson={onCreateLesson}
+                    onCompleteLesson={onCompleteLesson}
+                    onTogglePaid={onTogglePaid}
+                    onEditLesson={onEditLesson}
+                    onDeleteLesson={onDeleteLesson}
+                    getLessonStatusLabel={getLessonStatusLabel}
+                  />
+                ) : activeTab === 'payments' ? (
+                  <PaymentsTab
+                    payments={payments}
+                    paymentFilter={paymentFilter}
+                    paymentDate={paymentDate}
+                    onPaymentFilterChange={onPaymentFilterChange}
+                    onPaymentDateChange={onPaymentDateChange}
+                    onOpenLesson={onEditLesson}
+                  />
+                ) : (
+                  selectedStudent && (
+                    <OverviewTab
+                      selectedStudent={selectedStudent}
+                      selectedStudentStats={selectedStudentStats}
+                      onRemindHomework={onRemindHomework}
+                    />
+                  )
+                )}
+              </div>
             </div>
           </div>
         )}
