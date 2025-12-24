@@ -51,7 +51,7 @@ const getEventTitle = (event: PaymentEvent) => {
       if (event.reason === 'LESSON_CANCELED' || event.lessonsDelta > 0) {
         return 'Возврат занятия после отмены';
       }
-      return 'Корректировка оплаты';
+      return 'Корректировка баланса';
     default:
       return 'Изменение оплаты';
   }
@@ -190,9 +190,9 @@ export const PaymentList: FC<PaymentListProps> = ({
           {groupEntries.map(([groupLabel, events]) => (
             <li key={groupLabel} className={styles.paymentGroup}>
               <ul className={styles.paymentGroupList}>
-                <ListSubheader className={styles.paymentGroupTitle} disableSticky>
+                <div className={styles.paymentGroupTitle}>
                   {groupLabel}
-                </ListSubheader>
+                </div>
                 {events.map((event) => {
                   const IconComponent = getEventIcon(event);
                   const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });

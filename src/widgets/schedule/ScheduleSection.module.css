@@ -597,7 +597,7 @@
 }
 
 .drawerHandle {
-  width: 44px;
+  width: 84px;
   height: 5px;
   border-radius: 999px;
   background: #cbd5e1;
@@ -840,6 +840,10 @@
   line-height: 1.4;
 }
 
+.addLessonMobile {
+  display: none;
+}
+
 .lessonHeader {
   display: flex;
   flex-direction: column;
@@ -948,6 +952,16 @@
     color: #2563eb;
   }
 
+  .addLessonComputer {
+    display: none;
+  }
+
+  .addLessonMobile {
+    display: flex;
+    background: #2563eb;
+    color: #fff;
+  }
+
   .headerActionLabel {
     display: none;
   }
@@ -972,6 +986,12 @@
 
   .dayDrawer {
     display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .drawerHandleArea {
+    margin-top: -12px;
   }
 }
 

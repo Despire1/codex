@@ -615,10 +615,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div key={monthLabelKey} className={styles.monthTitle}>
                 {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
               </div>
-              <div className={styles.monthSubtitle}>Нажмите на день, чтобы открыть расписание</div>
-            </div>
-            <div className={styles.monthLegend}>
-              <span className={styles.legendDot} /> Уроки
             </div>
           </div>
 
@@ -695,7 +691,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   return (
     <section className={styles.viewGrid}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>Расписание</h2>
         <div className={styles.calendarControlsWrapper}>
           <div className={styles.viewToggleRow}>
             <button
@@ -732,7 +727,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <span className={styles.viewToggleText}>День</span>
             </button>
             <button
-              className={`${controls.primaryButton} ${styles.headerAction}`}
+              className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonMobile}`}
               onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
               type="button"
               aria-label="Создать урок"
@@ -854,7 +849,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 </div>
             )}
             <button
-                className={`${controls.primaryButton} ${styles.headerAction}`}
+                className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonComputer}`}
                 onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
                 type="button"
             >
