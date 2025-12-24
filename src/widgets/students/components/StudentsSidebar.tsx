@@ -1,37 +1,40 @@
-import { FC } from 'react';
-import { HomeworkStatus, LinkedStudent } from '../../../entities/types';
+import { FC, type RefObject } from 'react';
+import { StudentListItem } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
 
 interface StudentsSidebarProps {
-  linkedStudents: LinkedStudent[];
-  visibleStudents: LinkedStudent[];
+  studentListItems: StudentListItem[];
   selectedStudentId: number | null;
   searchQuery: string;
   activeFilter: 'all' | 'debt' | 'overdue';
   counts: { withDebt: number; overdue: number };
+  totalCount: number;
+  isLoading: boolean;
+  hasMore: boolean;
+  listRef: RefObject<HTMLDivElement>;
+  loadMoreRef: RefObject<HTMLDivElement>;
   onSelectStudent: (id: number) => void;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
   onOpenStudentModal: () => void;
-  getHomeworkStatusInfo: (homework: LinkedStudent['homeworks'][number]) => {
-    status: HomeworkStatus;
-    isOverdue: boolean;
-  };
 }
 
 export const StudentsSidebar: FC<StudentsSidebarProps> = ({
-  linkedStudents,
-  visibleStudents,
+  studentListItems,
   selectedStudentId,
   searchQuery,
   activeFilter,
   counts,
+  totalCount,
+  isLoading,
+  hasMore,
+  listRef,
+  loadMoreRef,
   onSelectStudent,
   onSearchChange,
   onFilterChange,
   onOpenStudentModal,
-  getHomeworkStatusInfo,
 }) => {
   return (
     <aside className={styles.sidebar}>
@@ -40,7 +43,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
           <div>
             <div className={styles.titleRow}>
               <div>Ученики</div>
-              <span className={styles.counter}>{linkedStudents.length}</span>
+              <span className={styles.counter}>{totalCount}</span>
             </div>
           </div>
           <button className={controls.secondaryButton} onClick={onOpenStudentModal}>
@@ -77,48 +80,59 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
           </div>
         </div>
 
-        <div className={styles.studentList}>
-          {visibleStudents.map((student) => {
-            const status =
-              student.link.balanceLessons < 0 ? 'debt' : student.link.balanceLessons > 0 ? 'prepaid' : 'neutral';
-            const overdueCount = student.homeworks.filter((hw) => getHomeworkStatusInfo(hw).isOverdue).length;
-            const pendingCount = student.homeworks.filter((hw) => !hw.isDone).length;
+        <div className={styles.studentList} ref={listRef}>
+          {isLoading && studentListItems.length === 0 ? (
+            <div className={styles.listLoader}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className={`${styles.skeletonCard} ${styles.skeletonStudentCard}`} />
+              ))}
+            </div>
+          ) : (
+            studentListItems.map((item) => {
+              const { student, link, stats } = item;
+              const status = link.balanceLessons < 0 ? 'debt' : link.balanceLessons > 0 ? 'prepaid' : 'neutral';
 
-            return (
-              <button
-                key={student.id}
-                className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
-                onClick={() => onSelectStudent(student.id)}
-              >
-                <div className={styles.studentStripe} aria-hidden />
-                <div className={styles.studentCardBody}>
-                  <div className={styles.studentCardHeader}>
-                    <div className={styles.studentName}>{student.link.customName}</div>
-                    <div className={styles.badgeRow}>
-                      {status === 'debt' && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
-                      {overdueCount > 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeWarning}`}>ДЗ: {overdueCount}</span>
-                      )}
-                      {pendingCount === 0 && student.homeworks.length > 0 && (
-                        <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>ДЗ сделано</span>
-                      )}
+              return (
+                <button
+                  key={student.id}
+                  className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
+                  onClick={() => onSelectStudent(student.id)}
+                >
+                  <div className={styles.studentStripe} aria-hidden />
+                  <div className={styles.studentCardBody}>
+                    <div className={styles.studentCardHeader}>
+                      <div className={styles.studentName}>{link.customName}</div>
+                      <div className={styles.badgeRow}>
+                        {status === 'debt' && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
+                        {stats.overdueHomeworkCount > 0 && (
+                          <span className={`${styles.lozenge} ${styles.badgeWarning}`}>ДЗ: {stats.overdueHomeworkCount}</span>
+                        )}
+                        {stats.pendingHomeworkCount === 0 && stats.totalHomeworkCount > 0 && (
+                          <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>ДЗ сделано</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.studentSecondaryRow}>
+                      <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
+                      <span className={styles.metaDivider}>•</span>
+                      <span className={styles.studentMeta}>
+                        автонапоминания: {link.autoRemindHomework ? 'вкл' : 'выкл'}
+                      </span>
+                      <span className={styles.metaDivider}>•</span>
+                      <span className={styles.studentMeta}>баланс: {link.balanceLessons}</span>
                     </div>
                   </div>
-                  <div className={styles.studentSecondaryRow}>
-                    <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
-                    <span className={styles.metaDivider}>•</span>
-                    <span className={styles.studentMeta}>
-                      автонапоминания: {student.link.autoRemindHomework ? 'вкл' : 'выкл'}
-                    </span>
-                    <span className={styles.metaDivider}>•</span>
-                    <span className={styles.studentMeta}>баланс: {student.link.balanceLessons}</span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })
+          )}
 
-          {!visibleStudents.length && <div className={styles.emptyState}>Ничего не найдено</div>}
+          {!isLoading && studentListItems.length === 0 && <div className={styles.emptyState}>Ничего не найдено</div>}
+          {hasMore && (
+            <div ref={loadMoreRef} className={styles.loadMoreSentinel}>
+              {isLoading && <div className={styles.loadingRow}>Загрузка…</div>}
+            </div>
+          )}
         </div>
       </div>
     </aside>

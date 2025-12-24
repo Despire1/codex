@@ -1,7 +1,7 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Homework, HomeworkStatus, Lesson, LinkedStudent, Payment, Student, Teacher, TeacherStudent } from '../entities/types';
+import { Homework, HomeworkStatus, Lesson, LinkedStudent, Payment, Student, StudentListItem, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { useToast } from '../shared/lib/toast';
@@ -47,6 +47,18 @@ export const App = () => {
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentFilter, setStudentFilter] = useState<'all' | 'debt' | 'overdue'>('all');
+  const [studentListItems, setStudentListItems] = useState<StudentListItem[]>([]);
+  const [studentListCounts, setStudentListCounts] = useState({ withDebt: 0, overdue: 0 });
+  const [studentListTotal, setStudentListTotal] = useState(0);
+  const [studentListHasMore, setStudentListHasMore] = useState(false);
+  const [studentListLoading, setStudentListLoading] = useState(false);
+  const [studentHomeworks, setStudentHomeworks] = useState<Homework[]>([]);
+  const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
+  const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
+  const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [paymentsByStudent, setPaymentsByStudent] = useState<Record<number, Payment[]>>({});
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
@@ -141,6 +153,14 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setStudentQuery(studentSearch.trim());
+    }, 350);
+
+    return () => clearTimeout(handler);
+  }, [studentSearch]);
+
+  useEffect(() => {
     setNewLessonDraft((draft) => ({ ...draft, durationMinutes: teacher.defaultLessonDuration }));
   }, [teacher.defaultLessonDuration]);
 
@@ -149,6 +169,87 @@ export const App = () => {
       setNewLessonDraft((draft) => ({ ...draft, studentId: selectedStudentId }));
     }
   }, [selectedStudentId]);
+
+  const loadStudentList = useCallback(
+    async (options?: { offset?: number; append?: boolean }) => {
+      const offset = options?.offset ?? 0;
+      const append = options?.append ?? false;
+      setStudentListLoading(true);
+      try {
+        const data = await api.listStudents({
+          query: studentQuery || undefined,
+          filter: studentFilter,
+          limit: 15,
+          offset,
+        });
+        setStudentListCounts(data.counts);
+        setStudentListTotal(data.total);
+        setStudentListHasMore(data.nextOffset !== null);
+        setStudentListItems((prev) => (append ? [...prev, ...data.items] : data.items));
+        if (!append) {
+          setSelectedStudentId((prev) => {
+            if (prev && data.items.some((item) => item.student.id === prev)) {
+              return prev;
+            }
+            return data.items[0]?.student.id ?? null;
+          });
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load students list', error);
+      } finally {
+        setStudentListLoading(false);
+      }
+    },
+    [studentFilter, studentQuery],
+  );
+
+  const loadStudentHomeworks = useCallback(
+    async (options?: { offset?: number; append?: boolean; studentIdOverride?: number | null }) => {
+      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
+      if (!targetStudentId) {
+        setStudentHomeworks([]);
+        setStudentHomeworkHasMore(false);
+        return;
+      }
+      const offset = options?.offset ?? 0;
+      const append = options?.append ?? false;
+      setStudentHomeworkLoading(true);
+      try {
+        const data = await api.listStudentHomeworks(targetStudentId, {
+          filter: studentHomeworkFilter,
+          limit: 15,
+          offset,
+        });
+        setStudentHomeworkHasMore(data.nextOffset !== null);
+        setStudentHomeworks((prev) => (append ? [...prev, ...data.items.map(normalizeHomework)] : data.items.map(normalizeHomework)));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load student homeworks', error);
+      } finally {
+        setStudentHomeworkLoading(false);
+      }
+    },
+    [selectedStudentId, studentHomeworkFilter],
+  );
+
+  useEffect(() => {
+    loadStudentList();
+  }, [loadStudentList]);
+
+  useEffect(() => {
+    loadStudentHomeworks();
+  }, [loadStudentHomeworks]);
+
+  const loadMoreStudents = useCallback(() => {
+    if (studentListLoading || !studentListHasMore) return;
+    loadStudentList({ offset: studentListItems.length, append: true });
+  }, [loadStudentList, studentListHasMore, studentListItems.length, studentListLoading]);
+
+  const loadMoreStudentHomeworks = useCallback(() => {
+    if (studentHomeworkLoading || !studentHomeworkHasMore) return;
+    loadStudentHomeworks({ offset: studentHomeworks.length, append: true });
+  }, [loadStudentHomeworks, studentHomeworkHasMore, studentHomeworkLoading, studentHomeworks.length]);
 
   const refreshPayments = useCallback(
     async (studentId: number) => {
@@ -224,7 +325,7 @@ export const App = () => {
         return [...prev, student];
       });
 
-        setLinks((prev) => {
+      setLinks((prev) => {
           const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
           if (exists) {
             return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
@@ -236,6 +337,7 @@ export const App = () => {
         setSelectedStudentId(student.id);
         navigate(tabPathById.students);
         setStudentModalOpen(false);
+        loadStudentList();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to add student', error);
@@ -250,6 +352,11 @@ export const App = () => {
       const data = await api.toggleAutoRemind(studentId, !link.autoRemindHomework);
 
       setLinks(links.map((l) => (l.studentId === studentId ? data.link : l)));
+      setStudentListItems((prev) =>
+        prev.map((item) =>
+          item.student.id === studentId ? { ...item, link: data.link } : item,
+        ),
+      );
       showToast({
         message: data.link.autoRemindHomework ? 'Автонапоминания включены' : 'Автонапоминания выключены',
         variant: 'success',
@@ -266,6 +373,12 @@ export const App = () => {
     try {
       const data = await api.adjustBalance(studentId, delta);
       setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
+      setStudentListItems((prev) =>
+        prev.map((item) =>
+          item.student.id === studentId ? { ...item, link: data.link } : item,
+        ),
+      );
+      loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to adjust balance', error);
@@ -283,6 +396,11 @@ export const App = () => {
     try {
       const data = await api.updatePrice(priceEditState.id, numeric);
       setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
+      setStudentListItems((prev) =>
+        prev.map((item) =>
+          item.student.id === data.student.id ? { ...item, student: data.student } : item,
+        ),
+      );
       setPriceEditState({ id: null, value: '' });
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -651,6 +769,8 @@ export const App = () => {
     try {
       const result = await api.sendHomework(homeworkId);
       setHomeworks((prev) => prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework) : hw)));
+      loadStudentHomeworks();
+      loadStudentList();
       showInfoDialog('Отправлено ученику', 'Задание опубликовано и отправлено ученику.');
     } catch (error) {
       setDialogState({
@@ -687,6 +807,8 @@ export const App = () => {
 
       const normalized = normalizeHomework(data.homework);
       setHomeworks([...homeworks, normalized]);
+      loadStudentHomeworks();
+      loadStudentList();
 
       if (newHomeworkDraft.sendNow) {
         await sendHomeworkToStudent(normalized.id);
@@ -721,6 +843,8 @@ export const App = () => {
       });
       const normalized = normalizeHomework(data.homework);
       setHomeworks([...homeworks, normalized]);
+      loadStudentHomeworks();
+      loadStudentList();
       showInfoDialog('Черновик создан', 'Копия задания сохранена в черновики.');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -732,6 +856,8 @@ export const App = () => {
     try {
       const data = await api.toggleHomework(homeworkId);
       setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+      loadStudentHomeworks();
+      loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to toggle homework', error);
@@ -742,6 +868,8 @@ export const App = () => {
     try {
       const data = await api.updateHomework(homeworkId, payload);
       setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+      loadStudentHomeworks();
+      loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update homework', error);
@@ -752,6 +880,8 @@ export const App = () => {
     try {
       await api.deleteHomework(homeworkId);
       setHomeworks(homeworks.filter((hw) => hw.id !== homeworkId));
+      loadStudentHomeworks();
+      loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete homework', error);
@@ -843,11 +973,26 @@ export const App = () => {
               path={tabPathById.students}
               element={
                 <StudentsSection
-                  linkedStudents={linkedStudents}
+                  studentListItems={studentListItems}
+                  studentListCounts={studentListCounts}
+                  studentListTotal={studentListTotal}
+                  studentListLoading={studentListLoading}
+                  studentListHasMore={studentListHasMore}
+                  studentSearch={studentSearch}
+                  studentFilter={studentFilter}
                   selectedStudentId={selectedStudentId}
                   priceEditState={priceEditState}
+                  studentHomeworks={studentHomeworks}
+                  homeworkFilter={studentHomeworkFilter}
+                  homeworkListLoading={studentHomeworkLoading}
+                  homeworkListHasMore={studentHomeworkHasMore}
                   newHomeworkDraft={newHomeworkDraft}
                   onSelectStudent={setSelectedStudentId}
+                  onStudentSearchChange={setStudentSearch}
+                  onStudentFilterChange={setStudentFilter}
+                  onLoadMoreStudents={loadMoreStudents}
+                  onHomeworkFilterChange={setStudentHomeworkFilter}
+                  onLoadMoreHomeworks={loadMoreStudentHomeworks}
                   onToggleAutoReminder={toggleAutoReminder}
                   onAdjustBalance={adjustBalance}
                   onStartEditPrice={startEditPrice}

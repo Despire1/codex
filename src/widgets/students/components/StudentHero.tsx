@@ -1,5 +1,5 @@
 import { FC, useState } from 'react';
-import { LinkedStudent, Student } from '../../../entities/types';
+import { Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   EditOutlinedIcon,
@@ -7,7 +7,7 @@ import {
 import styles from '../StudentsSection.module.css';
 
 interface StudentHeroProps {
-  selectedStudent: LinkedStudent;
+  selectedStudent: Student & { link: TeacherStudent };
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
   onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;

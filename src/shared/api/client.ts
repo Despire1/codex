@@ -1,4 +1,4 @@
-import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, Payment, Student, Teacher, TeacherStudent } from '../../entities/types';
+import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, Payment, Student, StudentListItem, Teacher, TeacherStudent } from '../../entities/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -124,6 +124,37 @@ export const api = {
     const path = suffix ? `/api/students/search?${suffix}` : '/api/students/search';
 
     return apiFetch<{ students: Student[]; links: TeacherStudent[]; homeworks: Homework[] }>(path);
+  },
+  listStudents: (params: { query?: string; filter?: 'all' | 'debt' | 'overdue'; limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    if (params.query) query.set('query', params.query);
+    if (params.filter) query.set('filter', params.filter);
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.offset) query.set('offset', String(params.offset));
+
+    const suffix = query.toString();
+    const path = suffix ? `/api/students?${suffix}` : '/api/students';
+
+    return apiFetch<{
+      items: StudentListItem[];
+      total: number;
+      nextOffset: number | null;
+      counts: { withDebt: number; overdue: number };
+    }>(path);
+  },
+  listStudentHomeworks: (
+    studentId: number,
+    params: { filter?: 'all' | HomeworkStatus | 'overdue'; limit?: number; offset?: number },
+  ) => {
+    const query = new URLSearchParams();
+    if (params.filter) query.set('filter', params.filter);
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.offset) query.set('offset', String(params.offset));
+
+    const suffix = query.toString();
+    const path = suffix ? `/api/students/${studentId}/homeworks?${suffix}` : `/api/students/${studentId}/homeworks`;
+
+    return apiFetch<{ items: Homework[]; total: number; nextOffset: number | null }>(path);
   },
 };
 

@@ -117,6 +117,41 @@
   padding-right: 4px;
 }
 
+.listLoader {
+  display: grid;
+  gap: 10px;
+}
+
+.skeletonCard {
+  border-radius: 14px;
+  background: linear-gradient(110deg, #f1f5f9 8%, #e2e8f0 18%, #f1f5f9 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonStudentCard {
+  height: 74px;
+}
+
+.skeletonHomeworkCard {
+  height: 86px;
+}
+
+.loadMoreSentinel {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.loadingRow {
+  font-size: 13px;
+  color: #94a3b8;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
 .studentCard {
   border: 1px solid #e5e7eb;
   background: #fff;
@@ -1323,5 +1358,14 @@
 
   .drawerScrim {
     position: fixed;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
   }
 }
