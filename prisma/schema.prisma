@@ -30,6 +30,7 @@ model Student {
   takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
+  paymentEvents        PaymentEvent[]
   createdAt            DateTime             @default(now())
 }
 
@@ -86,6 +87,7 @@ model Lesson {
   student             Student             @relation(fields: [studentId], references: [id])
   participants        LessonParticipant[]
   payments            Payment[]
+  paymentEvents       PaymentEvent[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
@@ -105,6 +107,39 @@ model Payment {
   @@unique([teacherStudentId, lessonId])
   @@index([teacherStudentId])
   @@index([lessonId])
+}
+
+enum PaymentEventType {
+  TOP_UP
+  AUTO_CHARGE
+  MANUAL_PAID
+  ADJUSTMENT
+}
+
+enum PaymentEventCreatedBy {
+  TEACHER
+  SYSTEM
+}
+
+model PaymentEvent {
+  id            Int                    @id @default(autoincrement())
+  studentId     Int
+  lessonId      Int?
+  type          PaymentEventType
+  lessonsDelta  Int
+  priceSnapshot Int
+  moneyAmount   Int?
+  createdAt     DateTime               @default(now())
+  createdBy     PaymentEventCreatedBy
+  reason        String?
+
+  student Student @relation(fields: [studentId], references: [id])
+  lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([createdAt])
+  @@unique([studentId, lessonId, type])
 }
 
 model LessonParticipant {

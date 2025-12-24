@@ -150,6 +150,19 @@ export const AddOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const RemoveOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 13H5v-2h14v2z" />
+  </svg>
+);
+
+export const HistoryOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A8.96 8.96 0 0 0 13 21a9 9 0 0 0 0-18z" />
+    <path d="M12 8h2v5l4 2-1 1.73-5-2.73V8z" />
+  </svg>
+);
+
 export const BackspaceOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7L2.38 12 7 5h15v14z" />

@@ -1,7 +1,7 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Homework, HomeworkStatus, Lesson, LinkedStudent, Payment, Student, StudentListItem, Teacher, TeacherStudent } from '../entities/types';
+import { Homework, HomeworkStatus, Lesson, LinkedStudent, PaymentEvent, Student, StudentListItem, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { useToast } from '../shared/lib/toast';
@@ -59,7 +59,7 @@ export const App = () => {
   const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
-  const [paymentsByStudent, setPaymentsByStudent] = useState<Record<number, Payment[]>>({});
+  const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -254,11 +254,11 @@ export const App = () => {
   const refreshPayments = useCallback(
     async (studentId: number) => {
       try {
-        const data = await api.getPayments(studentId);
-        setPaymentsByStudent((prev) => ({ ...prev, [studentId]: data.payments }));
+        const data = await api.getPaymentEvents(studentId);
+        setPaymentEventsByStudent((prev) => ({ ...prev, [studentId]: data.events }));
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Failed to load payments', error);
+        console.error('Failed to load payment events', error);
       }
     },
     [],
@@ -307,7 +307,7 @@ export const App = () => {
 
   const unpaidLessons = lessons.filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid).length;
 
-  const payments = selectedStudentId ? paymentsByStudent[selectedStudentId] ?? [] : [];
+  const paymentEvents = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
 
     const handleAddStudent = async () => {
       if (!newStudentDraft.customName.trim()) return;
@@ -1015,7 +1015,7 @@ export const App = () => {
                   onUpdateHomework={updateHomework}
                   onOpenStudentModal={() => setStudentModalOpen(true)}
                   lessons={lessons}
-                  payments={payments}
+                  payments={paymentEvents}
                   onCompleteLesson={markLessonCompleted}
                   onChangeLessonStatus={updateLessonStatus}
                   onTogglePaid={togglePaid}

@@ -31,7 +31,7 @@ import {
   HomeworkAttachment,
   HomeworkStatus,
   Lesson,
-  Payment,
+  PaymentEvent,
   Student,
   StudentListItem,
 } from '../../entities/types';
@@ -89,7 +89,7 @@ interface StudentsSectionProps {
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
   lessons: Lesson[];
-  payments: Payment[];
+  payments: PaymentEvent[];
   onCompleteLesson: (lessonId: number) => void;
   onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
@@ -855,7 +855,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                       <div className={styles.subtleLabel}>История платежей для ученика</div>
                     </div>
                   </div>
-                  <PaymentList payments={payments} />
+                  <PaymentList payments={payments} onOpenLesson={onEditLesson} />
                 </div>
               ) : (
                 <div className={styles.card}>
