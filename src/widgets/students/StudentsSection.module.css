@@ -300,6 +300,28 @@
   gap: 12px;
 }
 
+.mobileContent {
+  height: 100%;
+  max-height: 100%;
+}
+
+.mobileContentGrid {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: 100%;
+}
+
+.backButton {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 4px 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
 .card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -1482,6 +1504,96 @@
 
   .drawerScrim {
     position: fixed;
+  }
+}
+
+@media (max-width: 720px) {
+  .section {
+    padding: 8px 0 16px;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .sidebarCard {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .titleRow {
+    font-size: 20px;
+  }
+
+  .studentCardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .badgeRow {
+    justify-content: flex-start;
+  }
+
+  .heroHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .heroActions {
+    align-self: flex-end;
+  }
+
+  .summaryRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summaryLine {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summaryDivider {
+    display: none;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+
+  .homeworkHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .content {
+    height: 100%;
+  }
+
+  .lessonTableContainer {
+    overflow-x: auto;
+  }
+
+  .lessonTableContainer :global(.MuiTable-root) {
+    min-width: 720px;
+  }
+
+  .paymentItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .paymentAmount {
+    margin-left: 0;
+    align-items: flex-start;
   }
 }
 
