@@ -282,7 +282,7 @@ export const App = () => {
     if (selectedStudentId) {
       refreshPayments(selectedStudentId);
     }
-  }, [selectedStudentId, refreshPayments]);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
