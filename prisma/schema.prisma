@@ -109,28 +109,16 @@ model Payment {
   @@index([lessonId])
 }
 
-enum PaymentEventType {
-  TOP_UP
-  AUTO_CHARGE
-  MANUAL_PAID
-  ADJUSTMENT
-}
-
-enum PaymentEventCreatedBy {
-  TEACHER
-  SYSTEM
-}
-
 model PaymentEvent {
   id            Int                    @id @default(autoincrement())
   studentId     Int
   lessonId      Int?
-  type          PaymentEventType
+  type          String
   lessonsDelta  Int
   priceSnapshot Int
   moneyAmount   Int?
   createdAt     DateTime               @default(now())
-  createdBy     PaymentEventCreatedBy
+  createdBy     String
   reason        String?
 
   student Student @relation(fields: [studentId], references: [id])
