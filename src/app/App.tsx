@@ -1,24 +1,16 @@
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Homework, HomeworkStatus, Lesson, LinkedStudent, PaymentEvent, Student, StudentListItem, Teacher, TeacherStudent } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { useToast } from '../shared/lib/toast';
-import { DialogModal } from '../shared/ui/Modal/DialogModal';
-import { Modal } from '../shared/ui/Modal/Modal';
-import modalStyles from '../shared/ui/Modal/Modal.module.css';
-import controls from '../shared/styles/controls.module.css';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
-import { DashboardSection } from '../widgets/dashboard/DashboardSection';
-import { StudentsSection } from '../widgets/students/StudentsSection';
-import { ScheduleSection } from '../widgets/schedule/ScheduleSection';
-import { SettingsSection } from '../widgets/settings/SettingsSection';
-import { StudentModal } from '../features/modals/StudentModal/StudentModal';
-import { LessonModal } from '../features/modals/LessonModal/LessonModal';
 import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
+import { AppRoutes } from './components/AppRoutes';
+import { AppModals, DialogState } from './components/AppModals';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -97,32 +89,7 @@ export const App = () => {
   const [weekLabelKey, setWeekLabelKey] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
-  const [dialogState, setDialogState] = useState<
-    | {
-        type: 'info';
-        title: string;
-        message: string;
-        confirmText?: string;
-      }
-    | {
-        type: 'confirm';
-        title: string;
-        message: string;
-        confirmText?: string;
-        cancelText?: string;
-        onConfirm: () => void;
-        onCancel: () => void;
-      }
-    | {
-        type: 'recurring-delete';
-        title: string;
-        message: string;
-        applyToSeries: boolean;
-        onConfirm: (applyToSeries: boolean) => void;
-        onCancel: () => void;
-      }
-    | null
-  >(null);
+  const [dialogState, setDialogState] = useState<DialogState>(null);
 
   const closeDialog = () => setDialogState(null);
 
@@ -331,8 +298,8 @@ export const App = () => {
     setPaymentDate(nextDate);
   };
 
-    const handleAddStudent = async () => {
-      if (!newStudentDraft.customName.trim()) return;
+  const handleAddStudent = async () => {
+    if (!newStudentDraft.customName.trim()) return;
 
     try {
       const data = await api.addStudent({
@@ -348,22 +315,22 @@ export const App = () => {
       });
 
       setLinks((prev) => {
-          const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
-          if (exists) {
-            return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
-          }
-          return [...prev, link];
-        });
+        const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
+        if (exists) {
+          return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
+        }
+        return [...prev, link];
+      });
 
-        setNewStudentDraft({ customName: '', username: '' });
-        setSelectedStudentId(student.id);
-        navigate(tabPathById.students);
-        setStudentModalOpen(false);
-        loadStudentList();
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to add student', error);
-      }
+      setNewStudentDraft({ customName: '', username: '' });
+      setSelectedStudentId(student.id);
+      navigate(tabPathById.students);
+      setStudentModalOpen(false);
+      loadStudentList();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add student', error);
+    }
   };
 
   const toggleAutoReminder = async (studentId: number) => {
@@ -643,16 +610,16 @@ export const App = () => {
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);
-        }
+      }
 
-        setLessonModalOpen(false);
-        setEditingLessonId(null);
-        navigate(tabPathById.schedule);
-        setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Не удалось создать урок';
-        showInfoDialog('Ошибка', message);
-        // eslint-disable-next-line no-console
+      setLessonModalOpen(false);
+      setEditingLessonId(null);
+      navigate(tabPathById.schedule);
+      setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось создать урок';
+      showInfoDialog('Ошибка', message);
+      // eslint-disable-next-line no-console
       console.error('Failed to create lesson', error);
     }
   };
@@ -966,199 +933,125 @@ export const App = () => {
         onTabChange={(tab) => navigate(tabPathById[tab])}
       />
 
-        <main className={layoutStyles.content}>
-          <Routes>
-            <Route path="/" element={<Navigate to={resolveLastVisitedPath()} replace />} />
-            <Route
-              path={tabPathById.dashboard}
-              element={
-                <DashboardSection
-                  upcomingLessons={upcomingLessons}
-                  linkedStudents={linkedStudents}
-                  unpaidLessons={unpaidLessons}
-                  pendingHomeworks={homeworks}
-                  onAddStudent={() => {
-                    navigate(tabPathById.students);
-                    setStudentModalOpen(true);
-                  }}
-                  onCreateLesson={() => {
-                    navigate(tabPathById.schedule);
-                    setLessonModalOpen(true);
-                  }}
-                  onRemindHomework={() => selectedStudentId && remindHomework(selectedStudentId)}
-                  onCompleteLesson={markLessonCompleted}
-                  onTogglePaid={togglePaid}
-                />
-              }
-            />
-            <Route
-              path={tabPathById.students}
-              element={
-                <StudentsSection
-                  studentListItems={studentListItems}
-                  studentListCounts={studentListCounts}
-                  studentListTotal={studentListTotal}
-                  studentListLoading={studentListLoading}
-                  studentListHasMore={studentListHasMore}
-                  studentSearch={studentSearch}
-                  studentFilter={studentFilter}
-                  selectedStudentId={selectedStudentId}
-                  priceEditState={priceEditState}
-                  studentHomeworks={studentHomeworks}
-                  homeworkFilter={studentHomeworkFilter}
-                  homeworkListLoading={studentHomeworkLoading}
-                  homeworkListHasMore={studentHomeworkHasMore}
-                  newHomeworkDraft={newHomeworkDraft}
-                  onSelectStudent={setSelectedStudentId}
-                  onStudentSearchChange={setStudentSearch}
-                  onStudentFilterChange={setStudentFilter}
-                  onLoadMoreStudents={loadMoreStudents}
-                  onHomeworkFilterChange={setStudentHomeworkFilter}
-                  onLoadMoreHomeworks={loadMoreStudentHomeworks}
-                  onToggleAutoReminder={toggleAutoReminder}
-                  onAdjustBalance={adjustBalance}
-                  onStartEditPrice={startEditPrice}
-                  onPriceChange={(value) => setPriceEditState((prev) => ({ ...prev, value }))}
-                  onSavePrice={savePrice}
-                  onCancelPriceEdit={() => setPriceEditState({ id: null, value: '' })}
-                  onRemindHomework={remindHomework}
-                  onRemindHomeworkById={remindHomeworkById}
-                  onSendHomework={sendHomeworkToStudent}
-                  onDuplicateHomework={duplicateHomework}
-                  onDeleteHomework={deleteHomework}
-                  onAddHomework={addHomework}
-                  onHomeworkDraftChange={(draft) =>
-                    setNewHomeworkDraft({
-                      ...draft,
-                      baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
-                    })
-                  }
-                  onToggleHomework={toggleHomeworkDone}
-                  onUpdateHomework={updateHomework}
-                  onOpenStudentModal={() => setStudentModalOpen(true)}
-                  lessons={lessons}
-                  payments={paymentEvents}
-                  paymentFilter={paymentFilter}
-                  paymentDate={paymentDate}
-                  onPaymentFilterChange={handlePaymentFilterChange}
-                  onPaymentDateChange={handlePaymentDateChange}
-                  onCompleteLesson={markLessonCompleted}
-                  onChangeLessonStatus={updateLessonStatus}
-                  onTogglePaid={togglePaid}
-                  onCreateLesson={openCreateLessonForStudent}
-                  onEditLesson={startEditLesson}
-                  onDeleteLesson={deleteLessonById}
-                />
-              }
-            />
-            <Route
-              path={tabPathById.schedule}
-              element={
-                <ScheduleSection
-                  scheduleView={scheduleView}
-                  onScheduleViewChange={setScheduleView}
-                  dayViewDate={dayViewDate}
-                  onDayShift={handleDayShift}
-                  onWeekShift={handleWeekShift}
-                  onMonthShift={handleMonthShift}
-                  dayLabelKey={dayLabelKey}
-                  weekLabelKey={weekLabelKey}
-                  monthLabelKey={monthLabelKey}
-                  lessons={lessons}
-                  linkedStudents={linkedStudents}
-                  monthAnchor={monthAnchor}
-                  monthOffset={monthOffset}
-                  onOpenLessonModal={openLessonModal}
-                  onStartEditLesson={startEditLesson}
-                  onTogglePaid={togglePaid}
-                  onDayViewDateChange={setDayViewDate}
-                />
-              }
-            />
-            <Route
-              path={tabPathById.settings}
-              element={<SettingsSection teacher={teacher} onTeacherChange={setTeacher} />}
-            />
-            <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
-          </Routes>
-        </main>
-
-        <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
-
-        <StudentModal
-          open={studentModalOpen}
-          onClose={() => setStudentModalOpen(false)}
-          draft={newStudentDraft}
-          onDraftChange={setNewStudentDraft}
-          onSubmit={handleAddStudent}
+      <main className={layoutStyles.content}>
+        <AppRoutes
+          resolveLastVisitedPath={resolveLastVisitedPath}
+          dashboard={{
+            upcomingLessons,
+            linkedStudents,
+            unpaidLessons,
+            pendingHomeworks: homeworks,
+            onAddStudent: () => {
+              navigate(tabPathById.students);
+              setStudentModalOpen(true);
+            },
+            onCreateLesson: () => {
+              navigate(tabPathById.schedule);
+              setLessonModalOpen(true);
+            },
+            onRemindHomework: () => selectedStudentId && remindHomework(selectedStudentId),
+            onCompleteLesson: markLessonCompleted,
+            onTogglePaid: togglePaid,
+          }}
+          students={{
+            studentListItems,
+            studentListCounts,
+            studentListTotal,
+            studentListLoading,
+            studentListHasMore,
+            studentSearch,
+            studentFilter,
+            selectedStudentId,
+            priceEditState,
+            studentHomeworks,
+            homeworkFilter: studentHomeworkFilter,
+            homeworkListLoading: studentHomeworkLoading,
+            homeworkListHasMore: studentHomeworkHasMore,
+            newHomeworkDraft,
+            onSelectStudent: setSelectedStudentId,
+            onStudentSearchChange: setStudentSearch,
+            onStudentFilterChange: setStudentFilter,
+            onLoadMoreStudents: loadMoreStudents,
+            onHomeworkFilterChange: setStudentHomeworkFilter,
+            onLoadMoreHomeworks: loadMoreStudentHomeworks,
+            onToggleAutoReminder: toggleAutoReminder,
+            onAdjustBalance: adjustBalance,
+            onStartEditPrice: startEditPrice,
+            onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
+            onSavePrice: savePrice,
+            onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
+            onRemindHomework: remindHomework,
+            onRemindHomeworkById: remindHomeworkById,
+            onSendHomework: sendHomeworkToStudent,
+            onDuplicateHomework: duplicateHomework,
+            onDeleteHomework: deleteHomework,
+            onAddHomework: addHomework,
+            onHomeworkDraftChange: (draft) =>
+              setNewHomeworkDraft({
+                ...draft,
+                baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
+              }),
+            onToggleHomework: toggleHomeworkDone,
+            onUpdateHomework: updateHomework,
+            onOpenStudentModal: () => setStudentModalOpen(true),
+            lessons,
+            payments: paymentEvents,
+            paymentFilter,
+            paymentDate,
+            onPaymentFilterChange: handlePaymentFilterChange,
+            onPaymentDateChange: handlePaymentDateChange,
+            onCompleteLesson: markLessonCompleted,
+            onChangeLessonStatus: updateLessonStatus,
+            onTogglePaid: togglePaid,
+            onCreateLesson: openCreateLessonForStudent,
+            onEditLesson: startEditLesson,
+            onDeleteLesson: deleteLessonById,
+          }}
+          schedule={{
+            scheduleView,
+            onScheduleViewChange: setScheduleView,
+            dayViewDate,
+            onDayShift: handleDayShift,
+            onWeekShift: handleWeekShift,
+            onMonthShift: handleMonthShift,
+            dayLabelKey,
+            weekLabelKey,
+            monthLabelKey,
+            lessons,
+            linkedStudents,
+            monthAnchor,
+            monthOffset,
+            onOpenLessonModal: openLessonModal,
+            onStartEditLesson: startEditLesson,
+            onTogglePaid: togglePaid,
+            onDayViewDateChange: setDayViewDate,
+          }}
+          settings={{ teacher, onTeacherChange: setTeacher }}
         />
+      </main>
 
-        <LessonModal
-          open={lessonModalOpen}
-          onClose={closeLessonModal}
-          editingLessonId={editingLessonId}
-          defaultDuration={teacher.defaultLessonDuration}
-          linkedStudents={linkedStudents}
-          draft={newLessonDraft}
-          recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
-          onDraftChange={setNewLessonDraft}
-          onDelete={editingLessonId ? requestDeleteLesson : undefined}
-          onSubmit={saveLesson}
-        />
-        {dialogState && dialogState.type !== 'recurring-delete' && (
-          <DialogModal
-            open
-            title={dialogState.title}
-            description={dialogState.message}
-            confirmText={dialogState.confirmText}
-            cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
-            onClose={closeDialog}
-            onConfirm={() => {
-              if (dialogState.type === 'confirm') {
-                dialogState.onConfirm();
-              } else {
-                closeDialog();
-              }
-            }}
-            onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
-          />
-        )}
-        {dialogState?.type === 'recurring-delete' && (
-          <Modal open title={dialogState.title} onClose={closeDialog}>
-            <p className={modalStyles.message}>{dialogState.message}</p>
-            <div className={modalStyles.toggleRow}>
-              <label className={controls.switch}>
-                <input
-                  type="checkbox"
-                  checked={dialogState.applyToSeries}
-                  onChange={(e) =>
-                    setDialogState((state) =>
-                      state?.type === 'recurring-delete'
-                        ? { ...state, applyToSeries: e.target.checked }
-                        : state,
-                    )
-                  }
-                />
-                <span className={controls.slider} />
-              </label>
-              <span className={modalStyles.toggleLabel}>
-                {dialogState.applyToSeries ? 'Удалить все уроки серии' : 'Удалить только выбранный урок'}
-              </span>
-            </div>
-            <div className={modalStyles.actions}>
-              <button type="button" className={controls.secondaryButton} onClick={dialogState.onCancel}>
-                Отмена
-              </button>
-              <button
-                type="button"
-                className={controls.dangerButton}
-                onClick={() => dialogState.onConfirm(dialogState.applyToSeries)}
-              >
-                Удалить
-              </button>
-            </div>
-          </Modal>
-        )}
+      <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+
+      <AppModals
+        studentModalOpen={studentModalOpen}
+        onCloseStudentModal={() => setStudentModalOpen(false)}
+        newStudentDraft={newStudentDraft}
+        onStudentDraftChange={setNewStudentDraft}
+        onSubmitStudent={handleAddStudent}
+        lessonModalOpen={lessonModalOpen}
+        onCloseLessonModal={closeLessonModal}
+        editingLessonId={editingLessonId}
+        defaultLessonDuration={teacher.defaultLessonDuration}
+        linkedStudents={linkedStudents}
+        lessonDraft={newLessonDraft}
+        recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
+        onLessonDraftChange={setNewLessonDraft}
+        onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
+        onSubmitLesson={saveLesson}
+        dialogState={dialogState}
+        onCloseDialog={closeDialog}
+        onDialogStateChange={setDialogState}
+      />
     </div>
   );
 };
