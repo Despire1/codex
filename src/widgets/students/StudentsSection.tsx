@@ -231,8 +231,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         )}
 
         {showDetails && (
-          <div className={styles.content}>
-            <div className={styles.contentGrid} ref={contentGridRef}>
+          <div className={`${styles.content} ${isMobile ? styles.mobileContent : ''}`}>
+            <div
+              className={`${styles.contentGrid} ${isMobile ? styles.mobileContentGrid : ''}`}
+              ref={contentGridRef}
+            >
               {isMobile && (
                 <button className={styles.backButton} type="button" onClick={handleBackToList}>
                   ← Назад

@@ -300,6 +300,16 @@
   gap: 12px;
 }
 
+.mobileContent {
+  height: 100%;
+  max-height: 100%;
+}
+
+.mobileContentGrid {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .backButton {
   border: none;
   background: none;
