@@ -126,14 +126,6 @@ export const PaymentList: FC<PaymentListProps> = ({
 
   const groupEntries = Object.entries(groupedEvents);
 
-  if (!payments.length) {
-    return (
-      <div className={styles.emptyState}>
-        <p>Событий по оплатам пока нет</p>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.paymentList}>
       <div className={styles.paymentFilters}>
@@ -189,7 +181,7 @@ export const PaymentList: FC<PaymentListProps> = ({
           </div>
         </label>
       </div>
-      {payments.length === 0 ? (
+      {!payments.length ? (
         <div className={styles.emptyState}>
           <p>По выбранному фильтру ничего нет</p>
         </div>
