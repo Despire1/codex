@@ -6,6 +6,7 @@ import {
   Lesson,
   LessonDateRange,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
@@ -90,9 +91,11 @@ interface AppRoutesProps {
     lessonStatusFilter: LessonStatusFilter;
     lessonDateRange: LessonDateRange;
     lessonListLoading: boolean;
+    lessonSortOrder: LessonSortOrder;
     onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
     onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
     onLessonDateRangeChange: (range: LessonDateRange) => void;
+    onLessonSortOrderChange: (order: LessonSortOrder) => void;
     payments: PaymentEvent[];
     paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
     paymentDate: string;

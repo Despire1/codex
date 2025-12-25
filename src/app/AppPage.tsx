@@ -7,6 +7,7 @@ import {
   Lesson,
   LessonDateRange,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
@@ -67,6 +68,7 @@ export const AppPage = () => {
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
   const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
+  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('desc');
   const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
     from: '',
     to: '',
@@ -74,6 +76,8 @@ export const AppPage = () => {
     toTime: '23:59',
   });
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
+  const lessonLoadRequestId = useRef(0);
+  const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
@@ -237,6 +241,8 @@ export const AppPage = () => {
         return;
       }
 
+      const requestId = lessonLoadRequestId.current + 1;
+      lessonLoadRequestId.current = requestId;
       setStudentLessonLoading(true);
       try {
         const startFrom =
@@ -252,13 +258,17 @@ export const AppPage = () => {
           status: studentLessonStatusFilter,
           startFrom,
           startTo,
+          sort: studentLessonSortOrder,
         });
+        if (lessonLoadRequestId.current !== requestId) return;
         setStudentLessons(data.items.map(normalizeLesson));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
       } finally {
-        setStudentLessonLoading(false);
+        if (lessonLoadRequestId.current === requestId) {
+          setStudentLessonLoading(false);
+        }
       }
     },
     [
@@ -269,6 +279,7 @@ export const AppPage = () => {
       studentLessonDateRange.toTime,
       studentLessonPaymentFilter,
       studentLessonStatusFilter,
+      studentLessonSortOrder,
     ],
   );
 
@@ -281,8 +292,19 @@ export const AppPage = () => {
   }, [loadStudentHomeworks]);
 
   useEffect(() => {
+    if (skipNextLessonLoadRef.current) {
+      skipNextLessonLoadRef.current = false;
+    }
     loadStudentLessons();
   }, [loadStudentLessons]);
+
+  const handleLessonSortOrderChange = useCallback(
+    (order: LessonSortOrder) => {
+      if (order === studentLessonSortOrder) return;
+      setStudentLessonSortOrder(order);
+    },
+    [studentLessonSortOrder],
+  );
 
   const loadMoreStudents = useCallback(() => {
     if (studentListLoading || !studentListHasMore) return;
@@ -1086,9 +1108,11 @@ export const AppPage = () => {
             lessonStatusFilter: studentLessonStatusFilter,
             lessonDateRange: studentLessonDateRange,
             lessonListLoading: studentLessonLoading,
+            lessonSortOrder: studentLessonSortOrder,
             onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
             onLessonStatusFilterChange: setStudentLessonStatusFilter,
             onLessonDateRangeChange: setStudentLessonDateRange,
+            onLessonSortOrderChange: handleLessonSortOrderChange,
             payments: paymentEvents,
             paymentFilter,
             paymentDate,
