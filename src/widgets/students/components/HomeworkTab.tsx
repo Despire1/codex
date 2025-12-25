@@ -1,14 +1,16 @@
-import { FC, type RefObject } from 'react';
+import { FC, useState, type RefObject } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { Homework, HomeworkStatus } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
+import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
   EditOutlinedIcon,
   MoreHorizIcon,
+  FilterAltOutlinedIcon,
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
 
@@ -63,6 +65,8 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   formatTimeSpentMinutes,
   formatCompletionMoment,
 }) => {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const getStatusLabel = (status: HomeworkStatus) => {
     if (status === 'DONE') return 'Выполнено';
     if (status === 'IN_PROGRESS') return 'В работе';
@@ -86,8 +90,48 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={`${styles.homeworkHeader} ${styles.homeworkHeaderCompact}`}>
-        <div>
+        <div className={styles.lessonsActions}>
           <div className={styles.priceLabel}>Домашки</div>
+          <AdaptivePopover
+            isOpen={filtersOpen}
+            onClose={() => setFiltersOpen(false)}
+            trigger={
+              <button
+                type="button"
+                className={controls.iconButton}
+                onClick={() => setFiltersOpen((prev) => !prev)}
+                aria-label="Фильтры списка домашних заданий"
+              >
+                <span className={styles.filterIconWrapper}>
+                  <FilterAltOutlinedIcon width={18} height={18} />
+                  {homeworkFilter !== 'all' && <span className={styles.filterDot} aria-hidden />}
+                </span>
+              </button>
+            }
+            className={styles.filtersPopoverContent}
+          >
+            <div className={`${styles.filters} ${styles.filtersPopoverList}`}>
+              {[
+                { id: 'all', label: 'Все' },
+                { id: 'DRAFT', label: 'Черновики' },
+                { id: 'ASSIGNED', label: 'Назначено' },
+                { id: 'IN_PROGRESS', label: 'В работе' },
+                { id: 'DONE', label: 'Выполнено' },
+                { id: 'overdue', label: 'Просрочено' },
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  className={`${styles.filterChip} ${homeworkFilter === filter.id ? styles.activeChip : ''}`}
+                  onClick={() => {
+                    onChangeFilter(filter.id as typeof homeworkFilter);
+                    setFiltersOpen(false);
+                  }}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </AdaptivePopover>
         </div>
         <button
           className={`${controls.primaryButton} ${styles.homeworkAddButton}`}
@@ -99,25 +143,6 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
           </span>
           <span className={styles.homeworkAddButtonLabel}>Новое ДЗ</span>
         </button>
-      </div>
-
-      <div className={styles.filters}>
-        {[
-          { id: 'all', label: 'Все' },
-          { id: 'DRAFT', label: 'Черновики' },
-          { id: 'ASSIGNED', label: 'Назначено' },
-          { id: 'IN_PROGRESS', label: 'В работе' },
-          { id: 'DONE', label: 'Выполнено' },
-          { id: 'overdue', label: 'Просрочено' },
-        ].map((filter) => (
-          <button
-            key={filter.id}
-            className={`${styles.filterChip} ${homeworkFilter === filter.id ? styles.activeChip : ''}`}
-            onClick={() => onChangeFilter(filter.id as typeof homeworkFilter)}
-          >
-            {filter.label}
-          </button>
-        ))}
       </div>
 
       <div className={`${styles.homeworkList} ${styles.tabContentScroll}`} ref={listRef}>
