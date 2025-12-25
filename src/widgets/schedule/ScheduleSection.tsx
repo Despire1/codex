@@ -97,6 +97,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
   const drawerDragRafRef = useRef<number | null>(null);
+  const mobileWeekKeyRef = useRef<string | null>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -126,7 +127,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
   const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
-  const [mobileWeekDayIso, setMobileWeekDayIso] = useState<string | null>(null);
 
   const weekRangeLabel = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -205,23 +205,30 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isMobileWeekView) return;
-
-    setMobileWeekDayIso((prev) => {
-      if (prev && weekDays.some((day) => day.iso === prev)) {
-        return prev;
-      }
-      return defaultWeekDayIso;
-    });
-  }, [isMobileWeekView, weekDays, defaultWeekDayIso]);
-
-  useEffect(() => {
-    if (!isMobileWeekView || !mobileWeekDayIso) return;
-    const selectedDate = parseISO(mobileWeekDayIso);
-    if (!isSameDay(dayViewDate, selectedDate)) {
-      onDayViewDateChange(selectedDate);
+    if (!isMobileWeekView) {
+      mobileWeekKeyRef.current = null;
+      return;
     }
-  }, [isMobileWeekView, mobileWeekDayIso, dayViewDate, onDayViewDateChange]);
+
+    const weekStart = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    const weekEnd = addDays(weekStart, 6);
+    const today = new Date();
+    const todayIso = format(today, 'yyyy-MM-dd');
+    const weekStartIso = format(weekStart, 'yyyy-MM-dd');
+    const weekKey = weekStartIso;
+
+    if (mobileWeekKeyRef.current === weekKey) {
+      return;
+    }
+
+    mobileWeekKeyRef.current = weekKey;
+    const targetIso = today >= weekStart && today <= weekEnd ? todayIso : weekStartIso;
+    const currentIso = format(dayViewDate, 'yyyy-MM-dd');
+
+    if (currentIso !== targetIso) {
+      onDayViewDateChange(new Date(targetIso));
+    }
+  }, [isMobileWeekView, dayViewDate, onDayViewDateChange]);
 
   useEffect(() => {
     if (selectedMonthDay) {
@@ -436,7 +443,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   );
 
   const renderMobileWeekView = () => {
-    const selectedIso = mobileWeekDayIso ?? defaultWeekDayIso;
+    const selectedIso = format(dayViewDate, 'yyyy-MM-dd');
     const selectedDate = selectedIso ? parseISO(selectedIso) : dayViewDate;
     const selectedLessons = selectedIso
       ? (lessonsByDay[selectedIso] ?? [])
@@ -862,7 +869,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             {isMobileWeekView && (
               <div className={styles.weekDayPicker}>
                 {weekDays.map((day, index) => {
-                  const isSelected = (mobileWeekDayIso ?? defaultWeekDayIso) === day.iso;
+                  const isSelected = format(dayViewDate, 'yyyy-MM-dd') === day.iso;
                   const isTodayCell = isToday(day.date);
 
                   return (
@@ -872,7 +879,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       className={`${styles.weekDayButton} ${
                         isSelected ? styles.weekDayButtonActive : ''
                       } ${isTodayCell ? styles.weekDayButtonToday : ''}`}
-                      onClick={() => setMobileWeekDayIso(day.iso)}
+                      onClick={() => onDayViewDateChange(day.date)}
                     >
                       <span className={styles.weekDayButtonName}>
                         {weekDayShortLabels[index] ?? format(day.date, 'EE', { locale: ru })}
