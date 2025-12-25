@@ -104,6 +104,7 @@ interface AppRoutesProps {
     onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
     onDayViewDateChange: (date: Date) => void;
+    onGoToToday: () => void;
   };
   settings: {
     teacher: Teacher;

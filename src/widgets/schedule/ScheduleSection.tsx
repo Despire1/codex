@@ -25,6 +25,7 @@ import {
   CalendarMonthIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  HistoryOutlinedIcon,
   ViewDayIcon,
   ViewWeekIcon,
 } from '../../icons/MaterialIcons';
@@ -61,6 +62,7 @@ interface ScheduleSectionProps {
   onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onDayViewDateChange: (date: Date) => void;
+  onGoToToday: () => void;
 }
 
 export const ScheduleSection: FC<ScheduleSectionProps> = ({
@@ -81,6 +83,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   onStartEditLesson,
   onTogglePaid,
   onDayViewDateChange,
+  onGoToToday,
 }) => {
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
@@ -348,6 +351,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const clampedMinutes = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), LAST_MINUTE);
     const roundedMinutes = Math.min(Math.round(clampedMinutes / 10) * 10, LAST_MINUTE);
     setHoverIndicator({ dayIso, minutes: roundedMinutes });
+  };
+
+  const handleGoToToday = () => {
+    setDayPickerOpen(false);
+    setSelectedMonthDay(null);
+    onGoToToday();
   };
 
   const handleWeekSlotClick = (dayIso: string) => (event: MouseEvent<HTMLDivElement>) => {
@@ -811,6 +820,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       <div className={styles.sectionHeader}>
         <div className={styles.calendarControlsWrapper}>
           <div className={styles.viewToggleRow}>
+            <button
+              type="button"
+              className={`${styles.viewToggleButton} ${styles.todayButton}`}
+              onClick={handleGoToToday}
+              aria-label="Вернуться к сегодняшней дате"
+            >
+              <span className={styles.viewToggleIcon}>
+                <HistoryOutlinedIcon />
+              </span>
+            </button>
             <button
               type="button"
               className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
