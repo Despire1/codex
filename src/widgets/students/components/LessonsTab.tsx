@@ -61,6 +61,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc'>('asc');
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,6 +92,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     [lessonDateRange.from, lessonDateRange.to],
   );
 
+  const sortedLessons = useMemo(() => {
+    const sorted = [...studentLessons].sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return dateSortOrder === 'desc' ? sorted.reverse() : sorted;
+  }, [dateSortOrder, studentLessons]);
+
   const formatRangeLabel = () => {
     const from = selectedRange.from;
     const to = selectedRange.to;
@@ -112,6 +118,10 @@ export const LessonsTab: FC<LessonsTabProps> = ({
 
   const handleCloseDeleteModal = useCallback(() => {
     setLessonToDelete(null);
+  }, []);
+
+  const handleToggleDateSort = useCallback(() => {
+    setDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   }, []);
 
   return (
@@ -153,7 +163,19 @@ export const LessonsTab: FC<LessonsTabProps> = ({
             <Table size="small" aria-label="Список занятий ученика">
               <TableHead>
                 <TableRow>
-                  <TableCell>Дата и время</TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className={styles.lessonSortButton}
+                      onClick={handleToggleDateSort}
+                      aria-label={`Сортировать по дате ${dateSortOrder === 'asc' ? 'по убыванию' : 'по возрастанию'}`}
+                    >
+                      <span>Дата и время</span>
+                      <span className={styles.lessonSortIcon} aria-hidden>
+                        {dateSortOrder === 'asc' ? '↑' : '↓'}
+                      </span>
+                    </button>
+                  </TableCell>
                   <TableCell>Длительность</TableCell>
                   <TableCell>Статус занятия</TableCell>
                   <TableCell>Статус оплаты</TableCell>
@@ -162,7 +184,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {studentLessons.map((lesson) => {
+                {sortedLessons.map((lesson) => {
                   const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
                   const resolvedPrice =
                     participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
