@@ -1,4 +1,16 @@
-import { Homework, HomeworkAttachment, HomeworkStatus, Lesson, PaymentEvent, Student, StudentListItem, Teacher, TeacherStudent } from '../../entities/types';
+import {
+  Homework,
+  HomeworkAttachment,
+  HomeworkStatus,
+  Lesson,
+  LessonPaymentFilter,
+  LessonStatusFilter,
+  PaymentEvent,
+  Student,
+  StudentListItem,
+  Teacher,
+  TeacherStudent,
+} from '../../entities/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -162,6 +174,21 @@ export const api = {
     const path = suffix ? `/api/students/${studentId}/homeworks?${suffix}` : `/api/students/${studentId}/homeworks`;
 
     return apiFetch<{ items: Homework[]; total: number; nextOffset: number | null }>(path);
+  },
+  listStudentLessons: (
+    studentId: number,
+    params: { payment?: LessonPaymentFilter; status?: LessonStatusFilter; startFrom?: string; startTo?: string },
+  ) => {
+    const query = new URLSearchParams();
+    if (params.payment) query.set('payment', params.payment);
+    if (params.status) query.set('status', params.status);
+    if (params.startFrom) query.set('startFrom', params.startFrom);
+    if (params.startTo) query.set('startTo', params.startTo);
+
+    const suffix = query.toString();
+    const path = suffix ? `/api/students/${studentId}/lessons?${suffix}` : `/api/students/${studentId}/lessons`;
+
+    return apiFetch<{ items: Lesson[] }>(path);
   },
 };
 

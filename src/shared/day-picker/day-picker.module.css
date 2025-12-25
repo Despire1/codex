@@ -124,6 +124,20 @@
   box-shadow: 0 8px 18px rgba(91, 141, 239, 0.25);
 }
 
+.dayRange {
+  background: rgba(91, 141, 239, 0.16);
+  color: var(--text);
+  border-color: transparent;
+}
+
+.dayRangeStart,
+.dayRangeEnd {
+  background: linear-gradient(120deg, var(--primary), var(--primary-strong));
+  color: #fff;
+  border-color: var(--primary-strong);
+  box-shadow: 0 8px 18px rgba(91, 141, 239, 0.25);
+}
+
 .dayToday {
   border-color: var(--primary);
   color: var(--primary-strong);

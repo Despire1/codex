@@ -245,6 +245,73 @@ const listStudentHomeworks = async (
   return { items, total, nextOffset };
 };
 
+const parseDateFilter = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const listStudentLessons = async (
+  studentId: number,
+  filters: {
+    payment?: 'all' | 'paid' | 'unpaid';
+    status?: 'all' | 'completed' | 'not_completed';
+    startFrom?: string;
+    startTo?: string;
+  },
+) => {
+  const teacher = await ensureTeacher();
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+
+  const participantWhere: Record<string, any> = { studentId };
+  if (filters.payment === 'paid') {
+    participantWhere.isPaid = true;
+  }
+  if (filters.payment === 'unpaid') {
+    participantWhere.isPaid = false;
+  }
+
+  const where: Record<string, any> = {
+    teacherId: teacher.chatId,
+    participants: {
+      some: participantWhere,
+    },
+  };
+
+  if (filters.status === 'completed') {
+    where.status = 'COMPLETED';
+  }
+
+  if (filters.status === 'not_completed') {
+    where.status = { not: 'COMPLETED' };
+  }
+
+  const startFrom = parseDateFilter(filters.startFrom);
+  const startTo = parseDateFilter(filters.startTo);
+  if (startFrom || startTo) {
+    where.startAt = {};
+    if (startFrom) where.startAt.gte = startFrom;
+    if (startTo) where.startAt.lte = startTo;
+  }
+
+  const items = await prisma.lesson.findMany({
+    where,
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+
+  return { items };
+};
+
 const bootstrap = async () => {
   const teacher = await ensureTeacher();
   const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
@@ -1606,6 +1673,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const data = await listStudentHomeworks(studentId, filter, limit, offset);
       const filteredHomeworks = filterHomeworksForRole(data.items, role, requestedStudentId);
       return sendJson(res, 200, { ...data, items: filteredHomeworks });
+    }
+
+    const studentLessonsMatch = pathname.match(/^\/api\/students\/(\d+)\/lessons$/);
+    if (req.method === 'GET' && studentLessonsMatch) {
+      const studentId = Number(studentLessonsMatch[1]);
+      const { searchParams } = url;
+      const payment = (searchParams.get('payment') as 'all' | 'paid' | 'unpaid' | null) ?? 'all';
+      const status = (searchParams.get('status') as 'all' | 'completed' | 'not_completed' | null) ?? 'all';
+      const startFrom = searchParams.get('startFrom') ?? undefined;
+      const startTo = searchParams.get('startTo') ?? undefined;
+      const data = await listStudentLessons(studentId, { payment, status, startFrom, startTo });
+      return sendJson(res, 200, data);
     }
 
     const autoRemindMatch = pathname.match(/^\/api\/students\/(\d+)\/auto-remind$/);

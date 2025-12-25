@@ -7,6 +7,7 @@ import {
   isSameDay,
   isSameMonth,
   isToday,
+  isWithinInterval,
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
@@ -30,9 +31,14 @@ type ClassNames = {
   year: string;
   day: string;
   day_selected: string;
+  day_range: string;
+  day_range_start: string;
+  day_range_end: string;
   day_outside: string;
   day_today: string;
 };
+
+type DateRange = { from?: Date; to?: Date };
 
 type DayPickerProps = {
   mode?: 'single';
@@ -44,11 +50,22 @@ type DayPickerProps = {
   classNames?: Partial<ClassNames>;
   numberOfMonths?: number;
   defaultMonth?: Date;
+} | {
+  mode: 'range';
+  selected?: DateRange;
+  onSelect?: (range?: DateRange) => void;
+  weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  locale?: Locale;
+  className?: string;
+  classNames?: Partial<ClassNames>;
+  numberOfMonths?: number;
+  defaultMonth?: Date;
 };
 
 const mergeClassName = (base: string, override?: string) => `${base}${override ? ` ${override}` : ''}`;
 
 export const DayPicker: React.FC<DayPickerProps> = ({
+  mode = 'single',
   selected,
   onSelect,
   weekStartsOn = 1,
@@ -58,21 +75,30 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   numberOfMonths = 1,
   defaultMonth,
 }) => {
+  const isRangeMode = mode === 'range';
+  const selectedRange = (isRangeMode ? selected : undefined) as DateRange | undefined;
+  const selectedDate = (!isRangeMode ? selected : undefined) as Date | undefined;
+
   const initialMonth = useMemo(() => {
-    if (selected) return startOfMonth(selected);
+    if (isRangeMode && selectedRange?.from) return startOfMonth(selectedRange.from);
+    if (!isRangeMode && selectedDate) return startOfMonth(selectedDate);
     if (defaultMonth) return startOfMonth(defaultMonth);
     return startOfMonth(new Date());
-  }, [defaultMonth, selected]);
+  }, [defaultMonth, isRangeMode, selectedDate, selectedRange?.from]);
 
   const [month, setMonth] = useState<Date>(() => initialMonth);
   const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
   const [yearPage, setYearPage] = useState(0);
 
   useEffect(() => {
-    if (selected && !isSameMonth(selected, month)) {
-      setMonth(startOfMonth(selected));
+    if (isRangeMode && selectedRange?.from && !isSameMonth(selectedRange.from, month)) {
+      setMonth(startOfMonth(selectedRange.from));
     }
-  }, [selected]);
+
+    if (!isRangeMode && selectedDate && !isSameMonth(selectedDate, month)) {
+      setMonth(startOfMonth(selectedDate));
+    }
+  }, [isRangeMode, selectedDate, selectedRange?.from]);
 
   const weekdays = useMemo(() => {
     const base = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -122,7 +148,23 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   }, [locale, month, viewMode, yearRangeStart]);
 
   const handleSelect = (date: Date) => {
-    onSelect?.(date);
+    if (isRangeMode) {
+      const current = selectedRange ?? {};
+      const hasCompleteRange = Boolean(current.from && current.to);
+
+      if (!current.from || hasCompleteRange) {
+        onSelect?.({ from: date, to: undefined });
+      } else if (current.from && !current.to) {
+        if (date < current.from) {
+          onSelect?.({ from: date, to: undefined });
+        } else {
+          onSelect?.({ from: current.from, to: date });
+        }
+      }
+    } else {
+      onSelect?.(date);
+    }
+
     setMonth(date);
     setViewMode('days');
   };
@@ -243,11 +285,22 @@ export const DayPicker: React.FC<DayPickerProps> = ({
 
               <div className={mergeClassName(styles.grid, classNames?.grid)}>
                 {days.map(({ date, outside }) => {
-                  const isSelected = selected ? isSameDay(selected, date) : false;
+                  const isSelected = !isRangeMode && selectedDate ? isSameDay(selectedDate, date) : false;
+                  const isRangeStart = Boolean(selectedRange?.from && isSameDay(selectedRange.from, date));
+                  const isRangeEnd = Boolean(selectedRange?.to && isSameDay(selectedRange.to, date));
+                  const isInRange =
+                    Boolean(selectedRange?.from && selectedRange?.to) &&
+                    isWithinInterval(date, {
+                      start: selectedRange!.from!,
+                      end: selectedRange!.to!,
+                    });
                   const today = isToday(date);
                   const classes = [styles.dayButton, classNames?.day];
                   if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
                   if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
+                  if (isRangeMode && isInRange) classes.push(styles.dayRange, classNames?.day_range);
+                  if (isRangeMode && isRangeStart) classes.push(styles.dayRangeStart, classNames?.day_range_start);
+                  if (isRangeMode && isRangeEnd) classes.push(styles.dayRangeEnd, classNames?.day_range_end);
                   if (today) classes.push(styles.dayToday, classNames?.day_today);
 
                   return (
