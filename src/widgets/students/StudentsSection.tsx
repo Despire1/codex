@@ -128,7 +128,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
   const studentListRef = useRef<HTMLDivElement | null>(null);
   const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
-  const contentGridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -239,9 +238,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             )}
             <div
               className={`${styles.contentGrid} ${isMobile ? styles.mobileContentGrid : ''}`}
-              ref={contentGridRef}
             >
-              <div className={isMobile ? styles.mobileScrollArea : undefined}>
+              <div className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}>
                 <StudentHero
                   selectedStudent={selectedStudent}
                   priceEditState={priceEditState}
@@ -264,7 +262,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     homeworkListLoading={homeworkListLoading}
                     homeworkListHasMore={homeworkListHasMore}
                     isMobile={isMobile}
-                    contentRootRef={contentGridRef}
                     onHomeworkFilterChange={onHomeworkFilterChange}
                     onLoadMoreHomeworks={onLoadMoreHomeworks}
                     onToggleHomework={onToggleHomework}

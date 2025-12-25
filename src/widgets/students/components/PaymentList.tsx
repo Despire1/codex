@@ -181,74 +181,76 @@ export const PaymentList: FC<PaymentListProps> = ({
           </div>
         </label>
       </div>
-      {!payments.length ? (
-        <div className={styles.emptyState}>
-          <p>По выбранному фильтру ничего нет</p>
-        </div>
-      ) : (
-        <List className={styles.paymentListRoot}>
-          {groupEntries.map(([groupLabel, events]) => (
-            <li key={groupLabel} className={styles.paymentGroup}>
-              <ul className={styles.paymentGroupList}>
-                <div className={styles.paymentGroupTitle}>
-                  {groupLabel}
-                </div>
-                {events.map((event) => {
-                  const IconComponent = getEventIcon(event);
-                  const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });
-                  const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson) : 'Без привязки к занятию';
-                  const isClickable = Boolean(event.lessonId && event.lesson && onOpenLesson);
-                  const listItemContent = (
-                    <>
-                      <ListItemIcon className={styles.paymentIcon}>
-                        <IconComponent width={20} height={20} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Stack direction="row" spacing={1} alignItems="center" className={styles.paymentTitleRow}>
-                            <span className={styles.paymentTitle}>{getEventTitle(event)}</span>
-                            <Chip label={getEventChipLabel(event)} size="small" className={styles.paymentChip} />
-                          </Stack>
-                        }
-                        secondary={
-                          <Stack className={styles.paymentMeta} spacing={0.5}>
-                            <span>{timestamp}</span>
-                            <span>{lessonLabel}</span>
-                          </Stack>
-                        }
-                      />
-                      <Box className={styles.paymentAmount}>
-                        <span>{formatEventValue(event)}</span>
-                        {typeof event.moneyAmount !== 'number' && (
-                          <span className={styles.paymentAmountSuffix}>ур.</span>
-                        )}
-                      </Box>
-                    </>
-                  );
-
-                  if (isClickable) {
-                    return (
-                      <ListItemButton
-                        key={event.id}
-                        className={styles.paymentItem}
-                        onClick={() => event.lesson && onOpenLesson?.(event.lesson)}
-                      >
-                        {listItemContent}
-                      </ListItemButton>
+      <div className={styles.tabContentScroll}>
+        {!payments.length ? (
+          <div className={styles.emptyState}>
+            <p>По выбранному фильтру ничего нет</p>
+          </div>
+        ) : (
+          <List className={styles.paymentListRoot}>
+            {groupEntries.map(([groupLabel, events]) => (
+              <li key={groupLabel} className={styles.paymentGroup}>
+                <ul className={styles.paymentGroupList}>
+                  <div className={styles.paymentGroupTitle}>
+                    {groupLabel}
+                  </div>
+                  {events.map((event) => {
+                    const IconComponent = getEventIcon(event);
+                    const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });
+                    const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson) : 'Без привязки к занятию';
+                    const isClickable = Boolean(event.lessonId && event.lesson && onOpenLesson);
+                    const listItemContent = (
+                      <>
+                        <ListItemIcon className={styles.paymentIcon}>
+                          <IconComponent width={20} height={20} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Stack direction="row" spacing={1} alignItems="center" className={styles.paymentTitleRow}>
+                              <span className={styles.paymentTitle}>{getEventTitle(event)}</span>
+                              <Chip label={getEventChipLabel(event)} size="small" className={styles.paymentChip} />
+                            </Stack>
+                          }
+                          secondary={
+                            <Stack className={styles.paymentMeta} spacing={0.5}>
+                              <span>{timestamp}</span>
+                              <span>{lessonLabel}</span>
+                            </Stack>
+                          }
+                        />
+                        <Box className={styles.paymentAmount}>
+                          <span>{formatEventValue(event)}</span>
+                          {typeof event.moneyAmount !== 'number' && (
+                            <span className={styles.paymentAmountSuffix}>ур.</span>
+                          )}
+                        </Box>
+                      </>
                     );
-                  }
 
-                  return (
-                    <ListItem key={event.id} className={styles.paymentItem}>
-                      {listItemContent}
-                    </ListItem>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
-        </List>
-      )}
+                    if (isClickable) {
+                      return (
+                        <ListItemButton
+                          key={event.id}
+                          className={styles.paymentItem}
+                          onClick={() => event.lesson && onOpenLesson?.(event.lesson)}
+                        >
+                          {listItemContent}
+                        </ListItemButton>
+                      );
+                    }
+
+                    return (
+                      <ListItem key={event.id} className={styles.paymentItem}>
+                        {listItemContent}
+                      </ListItem>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </List>
+        )}
+      </div>
     </div>
   );
 };

@@ -21,7 +21,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   onOpenLesson,
 }) => {
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
         <div>
           <div className={styles.priceLabel}>Оплаты</div>
