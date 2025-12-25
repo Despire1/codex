@@ -1,4 +1,4 @@
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
@@ -59,6 +59,51 @@ export const LessonsTab: FC<LessonsTabProps> = ({
 }) => {
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!datePickerOpen) return undefined;
+
+    const handleOutside = (event: MouseEvent) => {
+      if (!datePickerRef.current) return;
+      if (!datePickerRef.current.contains(event.target as Node)) {
+        setDatePickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [datePickerOpen]);
+
+  const parseDateValue = (value?: string) => {
+    if (!value) return undefined;
+    const parsed = parseISO(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+
+  const selectedRange = useMemo(
+    () => ({
+      from: parseDateValue(lessonDateRange.from),
+      to: parseDateValue(lessonDateRange.to),
+    }),
+    [lessonDateRange.from, lessonDateRange.to],
+  );
+
+  const formatRangeLabel = () => {
+    const from = selectedRange.from;
+    const to = selectedRange.to;
+    if (from && to) {
+      return `${format(from, 'dd.MM.yyyy')} — ${format(to, 'dd.MM.yyyy')}`;
+    }
+    if (from) {
+      return `С ${format(from, 'dd.MM.yyyy')}`;
+    }
+    if (to) {
+      return `До ${format(to, 'dd.MM.yyyy')}`;
+    }
+    return 'Все';
+  };
 
   const handleCloseLessonMenu = useCallback(() => {
     setOpenLessonMenuId(null);
