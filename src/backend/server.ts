@@ -258,6 +258,7 @@ const listStudentLessons = async (
     status?: 'all' | 'completed' | 'not_completed';
     startFrom?: string;
     startTo?: string;
+    sort?: 'asc' | 'desc';
   },
 ) => {
   const teacher = await ensureTeacher();
@@ -306,7 +307,7 @@ const listStudentLessons = async (
         },
       },
     },
-    orderBy: { startAt: 'asc' },
+    orderBy: { startAt: filters.sort === 'asc' ? 'asc' : 'desc' },
   });
 
   return { items };
@@ -1683,7 +1684,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const status = (searchParams.get('status') as 'all' | 'completed' | 'not_completed' | null) ?? 'all';
       const startFrom = searchParams.get('startFrom') ?? undefined;
       const startTo = searchParams.get('startTo') ?? undefined;
-      const data = await listStudentLessons(studentId, { payment, status, startFrom, startTo });
+      const sort = (searchParams.get('sort') as 'asc' | 'desc' | null) ?? 'desc';
+      const data = await listStudentLessons(studentId, { payment, status, startFrom, startTo, sort });
       return sendJson(res, 200, data);
     }
 

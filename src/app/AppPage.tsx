@@ -7,6 +7,7 @@ import {
   Lesson,
   LessonDateRange,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
@@ -67,6 +68,7 @@ export const AppPage = () => {
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
   const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
+  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('desc');
   const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
     from: '',
     to: '',
@@ -74,6 +76,7 @@ export const AppPage = () => {
     toTime: '23:59',
   });
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
+  const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
@@ -230,7 +233,7 @@ export const AppPage = () => {
   );
 
   const loadStudentLessons = useCallback(
-    async (options?: { studentIdOverride?: number | null }) => {
+    async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
@@ -247,11 +250,13 @@ export const AppPage = () => {
           studentLessonDateRange.to
             ? new Date(`${studentLessonDateRange.to}T${studentLessonDateRange.toTime || '23:59'}`).toISOString()
             : undefined;
+        const sortOrder = options?.sortOverride ?? studentLessonSortOrder;
         const data = await api.listStudentLessons(targetStudentId, {
           payment: studentLessonPaymentFilter,
           status: studentLessonStatusFilter,
           startFrom,
           startTo,
+          sort: sortOrder,
         });
         setStudentLessons(data.items.map(normalizeLesson));
       } catch (error) {
@@ -269,6 +274,7 @@ export const AppPage = () => {
       studentLessonDateRange.toTime,
       studentLessonPaymentFilter,
       studentLessonStatusFilter,
+      studentLessonSortOrder,
     ],
   );
 
@@ -281,8 +287,22 @@ export const AppPage = () => {
   }, [loadStudentHomeworks]);
 
   useEffect(() => {
+    if (skipNextLessonLoadRef.current) {
+      skipNextLessonLoadRef.current = false;
+      return;
+    }
     loadStudentLessons();
   }, [loadStudentLessons]);
+
+  const handleLessonSortOrderChange = useCallback(
+    (order: LessonSortOrder) => {
+      if (order === studentLessonSortOrder) return;
+      setStudentLessonSortOrder(order);
+      skipNextLessonLoadRef.current = true;
+      loadStudentLessons({ sortOverride: order });
+    },
+    [loadStudentLessons, studentLessonSortOrder],
+  );
 
   const loadMoreStudents = useCallback(() => {
     if (studentListLoading || !studentListHasMore) return;
@@ -1086,9 +1106,11 @@ export const AppPage = () => {
             lessonStatusFilter: studentLessonStatusFilter,
             lessonDateRange: studentLessonDateRange,
             lessonListLoading: studentLessonLoading,
+            lessonSortOrder: studentLessonSortOrder,
             onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
             onLessonStatusFilterChange: setStudentLessonStatusFilter,
             onLessonDateRangeChange: setStudentLessonDateRange,
+            onLessonSortOrderChange: handleLessonSortOrderChange,
             payments: paymentEvents,
             paymentFilter,
             paymentDate,

@@ -5,6 +5,7 @@ import {
   Lesson,
   LessonDateRange,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   PaymentEvent,
   Student,
@@ -60,9 +61,11 @@ interface StudentsSectionProps {
   lessonStatusFilter: LessonStatusFilter;
   lessonDateRange: LessonDateRange;
   lessonListLoading: boolean;
+  lessonSortOrder: LessonSortOrder;
   onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
   onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
   onLessonDateRangeChange: (range: LessonDateRange) => void;
+  onLessonSortOrderChange: (order: LessonSortOrder) => void;
   payments: PaymentEvent[];
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
@@ -123,9 +126,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   lessonStatusFilter,
   lessonDateRange,
   lessonListLoading,
+  lessonSortOrder,
   onLessonPaymentFilterChange,
   onLessonStatusFilterChange,
   onLessonDateRangeChange,
+  onLessonSortOrderChange,
   payments,
   paymentFilter,
   paymentDate,
@@ -301,9 +306,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     lessonStatusFilter={lessonStatusFilter}
                     lessonDateRange={lessonDateRange}
                     lessonListLoading={lessonListLoading}
+                    lessonSortOrder={lessonSortOrder}
                     onLessonPaymentFilterChange={onLessonPaymentFilterChange}
                     onLessonStatusFilterChange={onLessonStatusFilterChange}
                     onLessonDateRangeChange={onLessonDateRangeChange}
+                    onLessonSortOrderChange={onLessonSortOrderChange}
                     onStartEditLessonStatus={handleStartEditLessonStatus}
                     onStopEditLessonStatus={handleStopEditLessonStatus}
                     onLessonStatusChange={handleLessonStatusChange}
