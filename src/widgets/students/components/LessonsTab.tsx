@@ -71,7 +71,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [dateSortOrder, setDateSortOrder] = useState<'asc' | 'desc'>('asc');
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,8 +103,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
 
   const sortedLessons = useMemo(() => {
     const sorted = [...studentLessons].sort((a, b) => a.startAt.localeCompare(b.startAt));
-    return dateSortOrder === 'desc' ? sorted.reverse() : sorted;
-  }, [dateSortOrder, studentLessons]);
+    return lessonSortOrder === 'desc' ? sorted.reverse() : sorted;
+  }, [lessonSortOrder, studentLessons]);
 
   const formatRangeLabel = () => {
     const from = selectedRange.from;
