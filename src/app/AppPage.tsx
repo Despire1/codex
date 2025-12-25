@@ -234,7 +234,7 @@ export const AppPage = () => {
   );
 
   const loadStudentLessons = useCallback(
-    async (options?: { studentIdOverride?: number | null }) => {
+    async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
@@ -253,6 +253,7 @@ export const AppPage = () => {
           studentLessonDateRange.to
             ? new Date(`${studentLessonDateRange.to}T${studentLessonDateRange.toTime || '23:59'}`).toISOString()
             : undefined;
+        const sortOrder = options?.sortOverride ?? studentLessonSortOrder;
         const data = await api.listStudentLessons(targetStudentId, {
           payment: studentLessonPaymentFilter,
           status: studentLessonStatusFilter,
