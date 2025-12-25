@@ -632,7 +632,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
     const monthLabel = format(selectedMonth, 'LLLL yyyy', { locale: ru });
-    const selectedDayLessons = selectedMonthDay ? lessonsByDay[selectedMonthDay] ?? [] : [];
+    const selectedDayLessons = selectedMonthDay
+      ? (lessonsByDay[selectedMonthDay] ?? []).slice().sort((a, b) => a.startAt.localeCompare(b.startAt))
+      : [];
     const selectedDayDate = selectedMonthDay ? parseISO(selectedMonthDay) : null;
 
     const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
