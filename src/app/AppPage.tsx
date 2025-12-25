@@ -5,6 +5,9 @@ import {
   Homework,
   HomeworkStatus,
   Lesson,
+  LessonDateRange,
+  LessonPaymentFilter,
+  LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
   Student,
@@ -61,6 +64,16 @@ export const AppPage = () => {
   const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
+  const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
+  const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
+  const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
+  const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
+    from: '',
+    to: '',
+    fromTime: '00:00',
+    toTime: '23:59',
+  });
+  const [studentLessonLoading, setStudentLessonLoading] = useState(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
@@ -216,6 +229,49 @@ export const AppPage = () => {
     [selectedStudentId, studentHomeworkFilter],
   );
 
+  const loadStudentLessons = useCallback(
+    async (options?: { studentIdOverride?: number | null }) => {
+      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
+      if (!targetStudentId) {
+        setStudentLessons([]);
+        return;
+      }
+
+      setStudentLessonLoading(true);
+      try {
+        const startFrom =
+          studentLessonDateRange.from
+            ? new Date(`${studentLessonDateRange.from}T${studentLessonDateRange.fromTime || '00:00'}`).toISOString()
+            : undefined;
+        const startTo =
+          studentLessonDateRange.to
+            ? new Date(`${studentLessonDateRange.to}T${studentLessonDateRange.toTime || '23:59'}`).toISOString()
+            : undefined;
+        const data = await api.listStudentLessons(targetStudentId, {
+          payment: studentLessonPaymentFilter,
+          status: studentLessonStatusFilter,
+          startFrom,
+          startTo,
+        });
+        setStudentLessons(data.items.map(normalizeLesson));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load student lessons', error);
+      } finally {
+        setStudentLessonLoading(false);
+      }
+    },
+    [
+      selectedStudentId,
+      studentLessonDateRange.from,
+      studentLessonDateRange.fromTime,
+      studentLessonDateRange.to,
+      studentLessonDateRange.toTime,
+      studentLessonPaymentFilter,
+      studentLessonStatusFilter,
+    ],
+  );
+
   useEffect(() => {
     loadStudentList();
   }, [loadStudentList]);
@@ -223,6 +279,10 @@ export const AppPage = () => {
   useEffect(() => {
     loadStudentHomeworks();
   }, [loadStudentHomeworks]);
+
+  useEffect(() => {
+    loadStudentLessons();
+  }, [loadStudentLessons]);
 
   const loadMoreStudents = useCallback(() => {
     if (studentListLoading || !studentListHasMore) return;
@@ -464,6 +524,7 @@ export const AppPage = () => {
         }
         return prev.filter((lesson) => lesson.id !== editingLessonId);
       });
+      await loadStudentLessons();
       closeLessonModal();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
@@ -626,6 +687,7 @@ export const AppPage = () => {
         setLessons([...lessons, normalizeLesson(data.lesson)]);
       }
 
+      await loadStudentLessons();
       setLessonModalOpen(false);
       setEditingLessonId(null);
       navigate(tabPathById.schedule);
@@ -658,6 +720,8 @@ export const AppPage = () => {
           ),
         );
       }
+
+      await loadStudentLessons();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to complete lesson', error);
@@ -676,6 +740,8 @@ export const AppPage = () => {
           return Array.from(map.values());
         });
       }
+
+      await loadStudentLessons();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update lesson status', error);
@@ -736,6 +802,8 @@ export const AppPage = () => {
           variant: 'success',
         });
       }
+
+      await loadStudentLessons();
     } catch (error) {
       showToast({
         message: 'Не удалось обновить оплату',
@@ -761,6 +829,7 @@ export const AppPage = () => {
     try {
       await api.deleteLesson(lessonId);
       setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
+      await loadStudentLessons();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete lesson', error);
@@ -1012,7 +1081,14 @@ export const AppPage = () => {
             onToggleHomework: toggleHomeworkDone,
             onUpdateHomework: updateHomework,
             onOpenStudentModal: () => setStudentModalOpen(true),
-            lessons,
+            studentLessons,
+            lessonPaymentFilter: studentLessonPaymentFilter,
+            lessonStatusFilter: studentLessonStatusFilter,
+            lessonDateRange: studentLessonDateRange,
+            lessonListLoading: studentLessonLoading,
+            onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
+            onLessonStatusFilterChange: setStudentLessonStatusFilter,
+            onLessonDateRangeChange: setStudentLessonDateRange,
             payments: paymentEvents,
             paymentFilter,
             paymentDate,

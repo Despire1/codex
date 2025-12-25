@@ -78,6 +78,16 @@ export interface Lesson {
   participants?: LessonParticipant[];
 }
 
+export type LessonPaymentFilter = 'all' | 'paid' | 'unpaid';
+export type LessonStatusFilter = 'all' | 'completed' | 'not_completed';
+
+export interface LessonDateRange {
+  from: string;
+  to: string;
+  fromTime: string;
+  toTime: string;
+}
+
 export type PaymentEventType = 'TOP_UP' | 'AUTO_CHARGE' | 'MANUAL_PAID' | 'ADJUSTMENT';
 export type PaymentEventCreatedBy = 'TEACHER' | 'SYSTEM';
 
