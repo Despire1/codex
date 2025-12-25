@@ -4,6 +4,7 @@ import {
   HomeworkStatus,
   Lesson,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   PaymentEvent,
   Student,
@@ -177,13 +178,20 @@ export const api = {
   },
   listStudentLessons: (
     studentId: number,
-    params: { payment?: LessonPaymentFilter; status?: LessonStatusFilter; startFrom?: string; startTo?: string },
+    params: {
+      payment?: LessonPaymentFilter;
+      status?: LessonStatusFilter;
+      startFrom?: string;
+      startTo?: string;
+      sort?: LessonSortOrder;
+    },
   ) => {
     const query = new URLSearchParams();
     if (params.payment) query.set('payment', params.payment);
     if (params.status) query.set('status', params.status);
     if (params.startFrom) query.set('startFrom', params.startFrom);
     if (params.startTo) query.set('startTo', params.startTo);
+    if (params.sort) query.set('sort', params.sort);
 
     const suffix = query.toString();
     const path = suffix ? `/api/students/${studentId}/lessons?${suffix}` : `/api/students/${studentId}/lessons`;

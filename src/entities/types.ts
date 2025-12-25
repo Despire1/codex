@@ -80,6 +80,7 @@ export interface Lesson {
 
 export type LessonPaymentFilter = 'all' | 'paid' | 'unpaid';
 export type LessonStatusFilter = 'all' | 'completed' | 'not_completed';
+export type LessonSortOrder = 'asc' | 'desc';
 
 export interface LessonDateRange {
   from: string;
