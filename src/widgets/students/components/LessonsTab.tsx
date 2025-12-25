@@ -167,6 +167,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                   const resolvedPrice =
                     participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
                   const isPaid = participant?.isPaid ?? lesson.isPaid;
+                  const isPastLesson = parseISO(lesson.startAt) < new Date();
 
                   return (
                     <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
@@ -191,7 +192,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                               }
                               onBlur={onStopEditLessonStatus}
                             >
-                              <option value="SCHEDULED">Запланирован</option>
+                              {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
                               <option value="COMPLETED">Проведён</option>
                               <option value="CANCELED">Отменён</option>
                             </select>
