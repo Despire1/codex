@@ -3,7 +3,13 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MoreHorizIcon } from '../../../icons/MaterialIcons';
-import { Lesson, LessonDateRange, LessonPaymentFilter, LessonStatusFilter } from '../../../entities/types';
+import {
+  Lesson,
+  LessonDateRange,
+  LessonPaymentFilter,
+  LessonSortOrder,
+  LessonStatusFilter,
+} from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
@@ -22,9 +28,11 @@ interface LessonsTabProps {
   lessonStatusFilter: LessonStatusFilter;
   lessonDateRange: LessonDateRange;
   lessonListLoading: boolean;
+  lessonSortOrder: LessonSortOrder;
   onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
   onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
   onLessonDateRangeChange: (range: LessonDateRange) => void;
+  onLessonSortOrderChange: (order: LessonSortOrder) => void;
   onStartEditLessonStatus: (lessonId: number) => void;
   onStopEditLessonStatus: () => void;
   onLessonStatusChange: (lessonId: number, status: Lesson['status']) => void;
@@ -45,9 +53,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   lessonStatusFilter,
   lessonDateRange,
   lessonListLoading,
+  lessonSortOrder,
   onLessonPaymentFilterChange,
   onLessonStatusFilterChange,
   onLessonDateRangeChange,
+  onLessonSortOrderChange,
   onStartEditLessonStatus,
   onStopEditLessonStatus,
   onLessonStatusChange,
@@ -121,8 +131,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   }, []);
 
   const handleToggleDateSort = useCallback(() => {
-    setDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-  }, []);
+    onLessonSortOrderChange(lessonSortOrder === 'asc' ? 'desc' : 'asc');
+  }, [lessonSortOrder, onLessonSortOrderChange]);
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
@@ -168,11 +178,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       type="button"
                       className={styles.lessonSortButton}
                       onClick={handleToggleDateSort}
-                      aria-label={`Сортировать по дате ${dateSortOrder === 'asc' ? 'по убыванию' : 'по возрастанию'}`}
+                      aria-label={`Сортировать по дате ${lessonSortOrder === 'asc' ? 'по убыванию' : 'по возрастанию'}`}
                     >
                       <span>Дата и время</span>
                       <span className={styles.lessonSortIcon} aria-hidden>
-                        {dateSortOrder === 'asc' ? '↑' : '↓'}
+                        {lessonSortOrder === 'asc' ? '↑' : '↓'}
                       </span>
                     </button>
                   </TableCell>

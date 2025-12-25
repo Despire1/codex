@@ -7,6 +7,7 @@ import {
   Lesson,
   LessonDateRange,
   LessonPaymentFilter,
+  LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
@@ -67,6 +68,7 @@ export const AppPage = () => {
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
   const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
+  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('desc');
   const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
     from: '',
     to: '',
@@ -252,6 +254,7 @@ export const AppPage = () => {
           status: studentLessonStatusFilter,
           startFrom,
           startTo,
+          sort: studentLessonSortOrder,
         });
         setStudentLessons(data.items.map(normalizeLesson));
       } catch (error) {
@@ -269,6 +272,7 @@ export const AppPage = () => {
       studentLessonDateRange.toTime,
       studentLessonPaymentFilter,
       studentLessonStatusFilter,
+      studentLessonSortOrder,
     ],
   );
 
@@ -1086,9 +1090,11 @@ export const AppPage = () => {
             lessonStatusFilter: studentLessonStatusFilter,
             lessonDateRange: studentLessonDateRange,
             lessonListLoading: studentLessonLoading,
+            lessonSortOrder: studentLessonSortOrder,
             onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
             onLessonStatusFilterChange: setStudentLessonStatusFilter,
             onLessonDateRangeChange: setStudentLessonDateRange,
+            onLessonSortOrderChange: setStudentLessonSortOrder,
             payments: paymentEvents,
             paymentFilter,
             paymentDate,
