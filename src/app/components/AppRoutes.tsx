@@ -1,6 +1,18 @@
 import { FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { Homework, HomeworkStatus, Lesson, LinkedStudent, PaymentEvent, Student, StudentListItem, Teacher } from '../../entities/types';
+import {
+  Homework,
+  HomeworkStatus,
+  Lesson,
+  LessonDateRange,
+  LessonPaymentFilter,
+  LessonStatusFilter,
+  LinkedStudent,
+  PaymentEvent,
+  Student,
+  StudentListItem,
+  Teacher,
+} from '../../entities/types';
 import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
 import { SettingsSection } from '../../widgets/settings/SettingsSection';
@@ -73,7 +85,14 @@ interface AppRoutesProps {
     onToggleHomework: (homeworkId: number) => void;
     onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
     onOpenStudentModal: () => void;
-    lessons: Lesson[];
+    studentLessons: Lesson[];
+    lessonPaymentFilter: LessonPaymentFilter;
+    lessonStatusFilter: LessonStatusFilter;
+    lessonDateRange: LessonDateRange;
+    lessonListLoading: boolean;
+    onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
+    onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
+    onLessonDateRangeChange: (range: LessonDateRange) => void;
     payments: PaymentEvent[];
     paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
     paymentDate: string;

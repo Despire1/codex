@@ -82,6 +82,100 @@
   margin-bottom: 12px;
 }
 
+.lessonFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.lessonFilterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lessonFilterLabel {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.lessonDateFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lessonDatePicker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lessonDateButton {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fff;
+  cursor: pointer;
+}
+
+.lessonDateButton:hover {
+  border-color: #cbd5f5;
+}
+
+.lessonDateClear {
+  border: none;
+  background: #e2e8f0;
+  color: #475569;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lessonDatePopover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+}
+
+.lessonTimeFields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lessonTimeField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.lessonTimeInput {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #fff;
+}
+
 .listFilters {
   margin-bottom: 0;
 }
@@ -135,6 +229,10 @@
 
 .skeletonHomeworkCard {
   height: 86px;
+}
+
+.skeletonLessonRow {
+  height: 54px;
 }
 
 .loadMoreSentinel {
