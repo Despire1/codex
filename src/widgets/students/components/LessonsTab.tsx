@@ -54,7 +54,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   }, []);
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
         <div>
           <div className={styles.priceLabel}>Занятия</div>
@@ -68,7 +68,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
         </button>
       </div>
 
-      <div className={styles.lessonTableWrapper}>
+      <div className={`${styles.lessonTableWrapper} ${styles.tabContentScroll}`}>
         {studentLessons.length ? (
           <TableContainer className={styles.lessonTableContainer}>
             <Table size="small" aria-label="Список занятий ученика">

@@ -23,6 +23,7 @@ interface HomeworkTabProps {
   hasMore: boolean;
   loadMoreRef: RefObject<HTMLDivElement>;
   isMobile: boolean;
+  listRef: RefObject<HTMLDivElement>;
   onOpenCreateHomework: () => void;
   onChangeFilter: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onOpenHomework: (homeworkId: number) => void;
@@ -47,6 +48,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   hasMore,
   loadMoreRef,
   isMobile,
+  listRef,
   onOpenCreateHomework,
   onChangeFilter,
   onOpenHomework,
@@ -82,7 +84,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   };
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={`${styles.homeworkHeader} ${styles.homeworkHeaderCompact}`}>
         <div>
           <div className={styles.priceLabel}>Домашка</div>
@@ -119,7 +121,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
         ))}
       </div>
 
-      <div className={styles.homeworkList}>
+      <div className={`${styles.homeworkList} ${styles.tabContentScroll}`} ref={listRef}>
         {isLoading && filteredHomeworks.length === 0 ? (
           <div className={styles.listLoader}>
             {Array.from({ length: 3 }).map((_, index) => (

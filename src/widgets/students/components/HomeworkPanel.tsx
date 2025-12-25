@@ -1,4 +1,4 @@
-import { ClipboardEvent as ReactClipboardEvent, DragEvent, FC, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardEvent as ReactClipboardEvent, DragEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
 import { format, isBefore, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Homework, HomeworkAttachment, HomeworkStatus } from '../../../entities/types';
@@ -14,7 +14,6 @@ interface HomeworkPanelProps {
   homeworkListLoading: boolean;
   homeworkListHasMore: boolean;
   isMobile: boolean;
-  contentRootRef: RefObject<HTMLDivElement>;
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onLoadMoreHomeworks: () => void;
   onToggleHomework: (homeworkId: number) => void;
@@ -90,7 +89,6 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
   homeworkListLoading,
   homeworkListHasMore,
   isMobile,
-  contentRootRef,
   onHomeworkFilterChange,
   onLoadMoreHomeworks,
   onToggleHomework,
@@ -124,6 +122,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const homeworkLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const drawerAnimationTimeoutRef = useRef<number | null>(null);
+  const homeworkListRef = useRef<HTMLDivElement | null>(null);
   const DRAWER_TRANSITION_MS = 250;
 
   const clearDrawerAnimationTimeout = () => {
@@ -148,11 +147,11 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
           onLoadMoreHomeworks();
         }
       },
-      { root: contentRootRef.current, rootMargin: '120px' },
+      { root: homeworkListRef.current, rootMargin: '120px' },
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [contentRootRef, homeworkListHasMore, onLoadMoreHomeworks]);
+  }, [homeworkListHasMore, onLoadMoreHomeworks]);
 
   const activeHomework = studentHomeworks.find((hw) => hw.id === activeHomeworkId) ?? null;
   const draftTimeSpentMinutes = parseTimeSpentInput(homeworkDraft.timeSpentMinutes);
@@ -491,6 +490,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
         hasMore={homeworkListHasMore}
         loadMoreRef={homeworkLoadMoreRef}
         isMobile={isMobile}
+        listRef={homeworkListRef}
         onOpenCreateHomework={handleOpenCreateHomework}
         onChangeFilter={onHomeworkFilterChange}
         onOpenHomework={handleOpenHomeworkCard}

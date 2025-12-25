@@ -16,7 +16,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   onRemindHomework,
 }) => {
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
         <div>
           <div className={styles.priceLabel}>Обзор</div>
