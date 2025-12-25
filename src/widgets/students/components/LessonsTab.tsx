@@ -4,13 +4,13 @@ import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { Lesson, LessonDateRange, LessonPaymentFilter, LessonStatusFilter } from '../../../entities/types';
-import { DayPicker } from '../../../shared/day-picker';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
 import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
+import { LessonFiltersPopover } from './LessonFiltersPopover';
 
 interface LessonsTabProps {
   studentLessons: Lesson[];
@@ -120,12 +120,22 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           <div className={styles.priceLabel}>Занятия</div>
           <div className={styles.subtleLabel}>Список уроков для ученика</div>
         </div>
-        <button
-          className={controls.primaryButton}
-          onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-        >
-          + Урок
-        </button>
+        <div className={styles.lessonHeaderActions}>
+          <LessonFiltersPopover
+            lessonPaymentFilter={lessonPaymentFilter}
+            lessonStatusFilter={lessonStatusFilter}
+            lessonDateRange={lessonDateRange}
+            onLessonPaymentFilterChange={onLessonPaymentFilterChange}
+            onLessonStatusFilterChange={onLessonStatusFilterChange}
+            onLessonDateRangeChange={onLessonDateRangeChange}
+          />
+          <button
+            className={controls.primaryButton}
+            onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
+          >
+            + Урок
+          </button>
+        </div>
       </div>
 
       <div className={styles.lessonFilters}>

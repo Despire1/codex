@@ -199,6 +199,12 @@ export const EventRepeatOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const FilterAltOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M4.25 5.61A1 1 0 0 1 5.16 5h13.68a1 1 0 0 1 .76 1.65L14 13.5V19a1 1 0 0 1-1.45.89l-2-1A1 1 0 0 1 10 18v-4.5L4.4 6.65a1 1 0 0 1-.15-1.04z" />
+  </svg>
+);
+
 export const EditCalendarOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M17 12h-5v5h5v-5z" />
