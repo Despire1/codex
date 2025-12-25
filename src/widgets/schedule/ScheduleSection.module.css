@@ -984,6 +984,15 @@
     row-gap: 10px;
   }
 
+  .daySwitcherWrapper {
+    width: 100%;
+    flex: 1;
+  }
+
+  .daySwitcherWrapper .monthSwitcher {
+    width: 100%;
+  }
+
   .monthSwitcher {
     width: 100%;
     justify-content: space-between;
