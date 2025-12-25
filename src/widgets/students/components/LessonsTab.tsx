@@ -6,6 +6,7 @@ import { MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { Lesson, LessonDateRange, LessonPaymentFilter, LessonStatusFilter } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
+import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
 import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
@@ -217,17 +218,24 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       </TableCell>
                       <TableCell align="right">
                         <div className={styles.moreActionsWrapper}>
-                          <button
-                            className={controls.iconButton}
-                            aria-label="Быстрые действия"
-                            title="Быстрые действия"
-                            onClick={() =>
-                              setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
+                          <AdaptivePopover
+                            isOpen={openLessonMenuId === lesson.id}
+                            onClose={handleCloseLessonMenu}
+                            side="bottom"
+                            align="end"
+                            trigger={
+                              <button
+                                className={controls.iconButton}
+                                aria-label="Быстрые действия"
+                                title="Быстрые действия"
+                                onClick={() =>
+                                  setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
+                                }
+                              >
+                                <MoreHorizIcon width={18} height={18} />
+                              </button>
                             }
                           >
-                            <MoreHorizIcon width={18} height={18} />
-                          </button>
-                          {openLessonMenuId === lesson.id && (
                             <LessonQuickActionsPopover
                               onClose={handleCloseLessonMenu}
                               actions={[
@@ -250,7 +258,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                                 },
                               ]}
                             />
-                          )}
+                          </AdaptivePopover>
                         </div>
                       </TableCell>
                     </TableRow>
