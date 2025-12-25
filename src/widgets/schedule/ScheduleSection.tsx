@@ -32,6 +32,7 @@ import {
 import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import { Badge } from '../../shared/ui/Badge/Badge';
+import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './ScheduleSection.module.css';
 
@@ -302,6 +303,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           },
         ];
 
+  const getParticipantName = (participant: any) =>
+    (participant?.student as any)?.link?.customName ?? (participant?.student as any)?.name ?? 'Ученик';
+
+  const getLessonLabel = (participants: any[]) => {
+    const names = participants.map(getParticipantName).filter((name) => name);
+    return names.length > 0 ? names.join(', ') : 'Урок';
+  };
+
   const renderPaymentBadges = (lessonId: number, participants: any[], isGroupLesson: boolean) => {
     const paidCount = participants.filter((participant: any) => participant.isPaid).length;
     const unpaidCount = participants.length - paidCount;
@@ -427,7 +436,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       const dateTimeLabel = `${format(startDate, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                         isGroupLesson ? ` · ${participants.length} уч.` : ''
                       }`;
-                      const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
+                      const lessonLabel = getLessonLabel(participants);
+                      const lessonMeta = isGroupLesson
+                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                        : '';
 
                       return (
                         <div
@@ -439,15 +451,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         >
                           {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                           <div className={styles.lessonHeader}>
-                            <span className={styles.lessonLabel}>{lessonLabel}</span>
+                            <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
+                              {lessonLabel}
+                            </Ellipsis>
                             <span className={styles.lessonDate}>{dateTimeLabel}</span>
                           </div>
                           {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                          <div className={styles.weekLessonMeta}>
-                            {isGroupLesson
-                              ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                              : (participants[0]?.student as any)?.link?.customName}
-                          </div>
+                          {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                         </div>
                       );
                     })}
@@ -499,7 +509,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
                 }`;
-                const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
+                const lessonLabel = getLessonLabel(participants);
+                const lessonMeta = isGroupLesson
+                  ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                  : '';
 
                 return (
                   <div
@@ -513,15 +526,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   >
                     {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                     <div className={styles.lessonHeader}>
-                      <span className={styles.lessonLabel}>{lessonLabel}</span>
+                      <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
+                        {lessonLabel}
+                      </Ellipsis>
                       <span className={styles.lessonDate}>{dateTimeLabel}</span>
                     </div>
                     {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                    <div className={styles.weekLessonMeta}>
-                      {isGroupLesson
-                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                        : (participants[0]?.student as any)?.link?.customName}
-                    </div>
+                    {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                   </div>
                 );
               })}
@@ -571,7 +582,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
                 }`;
-                const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
+                const lessonLabel = getLessonLabel(participants);
+                const lessonMeta = isGroupLesson
+                  ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                  : '';
 
                 return (
                   <div
@@ -585,15 +599,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   >
                     {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                     <div className={styles.lessonHeader}>
-                      <span className={styles.lessonLabel}>{lessonLabel}</span>
+                      <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
+                        {lessonLabel}
+                      </Ellipsis>
                       <span className={styles.lessonDate}>{dateTimeLabel}</span>
                     </div>
                     {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                    <div className={styles.weekLessonMeta}>
-                      {isGroupLesson
-                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                        : (participants[0]?.student as any)?.link?.customName}
-                    </div>
+                    {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                   </div>
                 );
               })}
@@ -693,6 +705,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             const date = parseISO(lesson.startAt);
             const participants = buildParticipants(lesson);
             const isGroupLesson = participants.length > 1;
+            const lessonLabel = getLessonLabel(participants);
 
             return (
               <div
@@ -706,11 +719,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                 <div className={styles.monthLessonInfo}>
                   <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                  <span className={styles.monthLessonName}>
-                    {isGroupLesson
-                      ? `Групповой (${participants.length})`
-                      : ((participants[0]?.student as any)?.link?.customName ?? 'Урок')}
-                  </span>
+                  <Ellipsis className={styles.monthLessonName} title={lessonLabel}>
+                    {lessonLabel}
+                  </Ellipsis>
                 </div>
                 {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
               </div>
