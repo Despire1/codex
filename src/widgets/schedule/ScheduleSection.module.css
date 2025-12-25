@@ -876,6 +876,58 @@
   min-width: 360px;
 }
 
+.weekDayPicker {
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  padding: 6px 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.weekDayPicker::-webkit-scrollbar {
+  display: none;
+}
+
+.weekDayButton {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  font-weight: 600;
+  min-width: 44px;
+  cursor: pointer;
+}
+
+.weekDayButtonName {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.weekDayButtonDate {
+  font-size: 13px;
+}
+
+.weekDayButtonActive {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.18);
+}
+
+.weekDayButtonToday {
+  border-color: #93c5fd;
+}
+
 @media (max-width: 720px) {
   .sectionHeader {
     flex-direction: column;
