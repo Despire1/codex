@@ -938,6 +938,15 @@ export const AppPage = () => {
     setDayLabelKey((key) => key + 1);
   };
 
+  const handleGoToToday = () => {
+    const today = new Date();
+    setDayViewDate(today);
+    setMonthOffset(0);
+    setDayLabelKey((key) => key + 1);
+    setWeekLabelKey((key) => key + 1);
+    setMonthLabelKey((key) => key + 1);
+  };
+
   return (
     <div className={layoutStyles.page}>
       <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
@@ -1034,6 +1043,7 @@ export const AppPage = () => {
             onStartEditLesson: startEditLesson,
             onTogglePaid: togglePaid,
             onDayViewDateChange: setDayViewDate,
+            onGoToToday: handleGoToToday,
           }}
           settings={{ teacher, onTeacherChange: setTeacher }}
         />
