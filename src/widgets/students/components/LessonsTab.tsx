@@ -116,19 +116,18 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
-        <div>
+        <div className={styles.lessonsActions}>
           <div className={styles.priceLabel}>Занятия</div>
-          <div className={styles.subtleLabel}>Список уроков для ученика</div>
+          <LessonFiltersPopover
+              lessonPaymentFilter={lessonPaymentFilter}
+              lessonStatusFilter={lessonStatusFilter}
+              lessonDateRange={lessonDateRange}
+              onLessonPaymentFilterChange={onLessonPaymentFilterChange}
+              onLessonStatusFilterChange={onLessonStatusFilterChange}
+              onLessonDateRangeChange={onLessonDateRangeChange}
+          />
         </div>
         <div className={styles.lessonHeaderActions}>
-          <LessonFiltersPopover
-            lessonPaymentFilter={lessonPaymentFilter}
-            lessonStatusFilter={lessonStatusFilter}
-            lessonDateRange={lessonDateRange}
-            onLessonPaymentFilterChange={onLessonPaymentFilterChange}
-            onLessonStatusFilterChange={onLessonStatusFilterChange}
-            onLessonDateRangeChange={onLessonDateRangeChange}
-          />
           <button
             className={controls.primaryButton}
             onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
@@ -175,7 +174,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           <div className={styles.lessonTitle}>
                             {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
                           </div>
-                          <div className={styles.lessonMeta}>#{lesson.id}</div>
                         </div>
                       </TableCell>
                       <TableCell className={styles.monoCell}>{lesson.durationMinutes} мин</TableCell>

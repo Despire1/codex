@@ -68,16 +68,18 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
       <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
         <div className={styles.summaryLine}>
-          <span className={styles.summaryLabel}>Баланс:</span>
-          <span className={styles.summaryValueInline}>
+          <div className={styles.balanceRow}>
+            <span className={styles.summaryLabel}>Баланс:</span>
+            <span className={styles.summaryValueInline}>
             {selectedStudent.link.balanceLessons}
-            {selectedStudent.link.balanceLessons < 0 && (
-              <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-            )}
-            {selectedStudent.link.balanceLessons > 0 && (
-              <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
-            )}
+              {selectedStudent.link.balanceLessons < 0 && (
+                  <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
+              )}
+              {selectedStudent.link.balanceLessons > 0 && (
+                  <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
+              )}
           </span>
+          </div>
           <span className={styles.summaryDivider}>|</span>
           <div className={styles.inlinePopover}>
             <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
@@ -85,7 +87,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
               <span className={styles.summaryValueInline}>{selectedStudent.link.balanceLessons} уроков</span>
             </button>
             {isPrepaidOpen && (
-              <div className={styles.popover}>
+                <div className={styles.popover}>
                 <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
                 <button
                   onClick={() => onAdjustBalance(selectedStudent.id, -1)}

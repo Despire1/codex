@@ -20,7 +20,6 @@ export const OverviewTab: FC<OverviewTabProps> = ({
       <div className={styles.homeworkHeader}>
         <div>
           <div className={styles.priceLabel}>Обзор</div>
-          <div className={styles.subtleLabel}>Короткая сводка по ученику</div>
         </div>
         <button className={controls.secondaryButton} onClick={() => onRemindHomework(selectedStudent.id)}>
           Напомнить про ДЗ

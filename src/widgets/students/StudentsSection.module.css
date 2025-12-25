@@ -90,6 +90,12 @@
   margin-bottom: 12px;
 }
 
+.lessonsActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .lessonHeaderActions {
   display: flex;
   align-items: center;
@@ -121,9 +127,9 @@
 .lessonFiltersPopoverContent {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
   z-index: 30;
-  min-width: 320px;
+  min-width: 370px;
   padding: 14px;
   background: #fff;
   border-radius: 16px;
@@ -624,6 +630,12 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.balanceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .summaryLabel {
@@ -1750,11 +1762,6 @@
     border-radius: 16px;
   }
 
-  .headerRow {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .titleRow {
     font-size: 20px;
   }
@@ -1766,11 +1773,6 @@
 
   .badgeRow {
     justify-content: flex-start;
-  }
-
-  .heroHeader {
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .heroActions {
@@ -1802,13 +1804,22 @@
 
   .homeworkHeaderCompact {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .homeworkAddButton {
-    padding: 8px;
-    min-width: 36px;
+    padding: 6px;
+    min-width: 32px;
     justify-content: center;
+  }
+
+  .filterChip {
+    font-size: 12px;
+    padding: 6px 6px;
+  }
+
+  .iconLeading {
+    margin: 0;
   }
 
   .homeworkAddButtonLabel {

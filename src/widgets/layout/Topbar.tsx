@@ -17,7 +17,6 @@ export const Topbar: FC<TopbarProps> = ({
   return (
     <header className={styles.topbar}>
       <div className={styles.topbarGreeting}>
-        <div className={styles.subtitle}>Здравствуйте, {teacher.name}</div>
         <h1 className={styles.title}>TeacherBot Web</h1>
       </div>
 

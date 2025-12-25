@@ -24,8 +24,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
     <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
         <div>
-          <div className={styles.priceLabel}>Оплаты</div>
-          <div className={styles.subtleLabel}>История платежей для ученика</div>
+          <div className={styles.priceLabel}>История оплат</div>
         </div>
       </div>
       <PaymentList

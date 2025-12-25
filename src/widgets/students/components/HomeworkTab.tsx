@@ -87,8 +87,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
     <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={`${styles.homeworkHeader} ${styles.homeworkHeaderCompact}`}>
         <div>
-          <div className={styles.priceLabel}>Домашка</div>
-          <div className={styles.subtleLabel}>Статусы, дедлайны и быстрые действия</div>
+          <div className={styles.priceLabel}>Домашки</div>
         </div>
         <button
           className={`${controls.primaryButton} ${styles.homeworkAddButton}`}
