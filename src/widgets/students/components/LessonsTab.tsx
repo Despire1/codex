@@ -8,6 +8,7 @@ import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
+import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
 
 interface LessonsTabProps {
@@ -42,9 +43,14 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   getLessonStatusLabel,
 }) => {
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
 
   const handleCloseLessonMenu = useCallback(() => {
     setOpenLessonMenuId(null);
+  }, []);
+
+  const handleCloseDeleteModal = useCallback(() => {
+    setLessonToDelete(null);
   }, []);
 
   return (
@@ -162,7 +168,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                                 },
                                 {
                                   label: 'Удалить',
-                                  onClick: () => onDeleteLesson(lesson.id),
+                                  onClick: () => setLessonToDelete(lesson),
                                   variant: 'danger',
                                 },
                               ]}
@@ -188,6 +194,16 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           </div>
         )}
       </div>
+      <LessonDeleteConfirmModal
+        open={Boolean(lessonToDelete)}
+        lessonId={lessonToDelete?.id}
+        onClose={handleCloseDeleteModal}
+        onConfirm={() => {
+          if (!lessonToDelete) return;
+          onDeleteLesson(lessonToDelete.id);
+          setLessonToDelete(null);
+        }}
+      />
     </div>
   );
 };
