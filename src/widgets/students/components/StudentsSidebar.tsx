@@ -1,6 +1,8 @@
-import { FC, type RefObject } from 'react';
+import { FC, useState, type RefObject } from 'react';
 import { StudentListItem } from '../../../entities/types';
+import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
+import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from '../StudentsSection.module.css';
 
 interface StudentsSidebarProps {
@@ -36,6 +38,9 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
   onFilterChange,
   onOpenStudentModal,
 }) => {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const isFilterActive = activeFilter !== 'all';
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.sidebarCard}>
@@ -52,31 +57,61 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
         </div>
 
         <div className={styles.searchBlock}>
-          <input
-            className={controls.input}
-            placeholder="Поиск"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-          <div className={`${styles.filters} ${styles.listFilters}`}>
-            <button
-              className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
-              onClick={() => onFilterChange('all')}
+          <div className={styles.searchRow}>
+            <input
+              className={`${controls.input} ${styles.searchInput}`}
+              placeholder="Поиск"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+            <AdaptivePopover
+              isOpen={filtersOpen}
+              onClose={() => setFiltersOpen(false)}
+              trigger={
+                <button
+                  type="button"
+                  className={controls.iconButton}
+                  onClick={() => setFiltersOpen((prev) => !prev)}
+                  aria-label="Фильтры списка учеников"
+                >
+                  <span className={styles.filterIconWrapper}>
+                    <FilterAltOutlinedIcon width={18} height={18} />
+                    {isFilterActive && <span className={styles.filterDot} aria-hidden />}
+                  </span>
+                </button>
+              }
+              className={styles.filtersPopoverContent}
             >
-              Все
-            </button>
-            <button
-              className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
-              onClick={() => onFilterChange('debt')}
-            >
-              С долгом ({counts.withDebt})
-            </button>
-            <button
-              className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
-              onClick={() => onFilterChange('overdue')}
-            >
-              Просрочено ДЗ ({counts.overdue})
-            </button>
+              <div className={`${styles.filters} ${styles.filtersPopoverList}`}>
+                <button
+                  className={`${styles.filterChip} ${activeFilter === 'all' ? styles.activeChip : ''}`}
+                  onClick={() => {
+                    onFilterChange('all');
+                    setFiltersOpen(false);
+                  }}
+                >
+                  Все
+                </button>
+                <button
+                  className={`${styles.filterChip} ${activeFilter === 'debt' ? styles.activeChip : ''}`}
+                  onClick={() => {
+                    onFilterChange('debt');
+                    setFiltersOpen(false);
+                  }}
+                >
+                  С долгом ({counts.withDebt})
+                </button>
+                <button
+                  className={`${styles.filterChip} ${activeFilter === 'overdue' ? styles.activeChip : ''}`}
+                  onClick={() => {
+                    onFilterChange('overdue');
+                    setFiltersOpen(false);
+                  }}
+                >
+                  Просрочено ДЗ ({counts.overdue})
+                </button>
+              </div>
+            </AdaptivePopover>
           </div>
         </div>
 
