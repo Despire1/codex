@@ -4,6 +4,7 @@ import {
   endOfMonth,
   format,
   isToday,
+  isSameDay,
   parseISO,
   startOfMonth,
   startOfWeek,
@@ -142,6 +143,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     () => format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru }),
     [monthAnchor, monthOffset],
   );
+
+  const defaultWeekDayIso = useMemo(() => {
+    const todayIso = format(new Date(), 'yyyy-MM-dd');
+    return weekDays.find((day) => day.iso === todayIso)?.iso ?? weekDays[0]?.iso ?? todayIso;
+  }, [weekDays]);
 
   const capitalizedDayLabel = useMemo(
     () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
