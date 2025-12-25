@@ -1,17 +1,14 @@
-import { FC } from 'react';
+import { FC, useCallback, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import {
-  DeleteOutlineIcon,
-  DoneOutlinedIcon,
-  EventRepeatOutlinedIcon,
-  PaidOutlinedIcon,
-} from '../../../icons/MaterialIcons';
+import { MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { Lesson } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from '../StudentsSection.module.css';
+import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
+import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
 
 interface LessonsTabProps {
@@ -45,6 +42,17 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   onDeleteLesson,
   getLessonStatusLabel,
 }) => {
+  const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
+
+  const handleCloseLessonMenu = useCallback(() => {
+    setOpenLessonMenuId(null);
+  }, []);
+
+  const handleCloseDeleteModal = useCallback(() => {
+    setLessonToDelete(null);
+  }, []);
+
   return (
     <div className={styles.card}>
       <div className={styles.homeworkHeader}>
@@ -53,7 +61,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           <div className={styles.subtleLabel}>Список уроков для ученика</div>
         </div>
         <button
-          className={controls.secondaryButton}
+          className={controls.primaryButton}
           onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
         >
           + Урок
@@ -131,39 +139,41 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         {resolvedPrice} ₽
                       </TableCell>
                       <TableCell align="right">
-                        <div className={styles.iconActions}>
+                        <div className={styles.moreActionsWrapper}>
                           <button
                             className={controls.iconButton}
-                            aria-label="Отметить проведённым"
-                            title="Отметить проведённым"
-                            onClick={() => onCompleteLesson(lesson.id)}
+                            aria-label="Быстрые действия"
+                            title="Быстрые действия"
+                            onClick={() =>
+                              setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
+                            }
                           >
-                            <DoneOutlinedIcon width={18} height={18} />
+                            <MoreHorizIcon width={18} height={18} />
                           </button>
-                          <button
-                            className={controls.iconButton}
-                            aria-label="Отметить оплату"
-                            title="Отметить оплату"
-                            onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
-                          >
-                            <PaidOutlinedIcon width={18} height={18} />
-                          </button>
-                          <button
-                            className={controls.iconButton}
-                            aria-label="Перенести"
-                            title="Перенести"
-                            onClick={() => onEditLesson(lesson)}
-                          >
-                            <EventRepeatOutlinedIcon width={18} height={18} />
-                          </button>
-                          <button
-                            className={controls.iconButton}
-                            aria-label="Удалить"
-                            title="Удалить"
-                            onClick={() => onDeleteLesson(lesson.id)}
-                          >
-                            <DeleteOutlineIcon width={18} height={18} />
-                          </button>
+                          {openLessonMenuId === lesson.id && (
+                            <LessonQuickActionsPopover
+                              onClose={handleCloseLessonMenu}
+                              actions={[
+                                {
+                                  label: 'Отметить проведённым',
+                                  onClick: () => onCompleteLesson(lesson.id),
+                                },
+                                {
+                                  label: 'Отметить оплату',
+                                  onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
+                                },
+                                {
+                                  label: 'Перенести',
+                                  onClick: () => onEditLesson(lesson),
+                                },
+                                {
+                                  label: 'Удалить',
+                                  onClick: () => setLessonToDelete(lesson),
+                                  variant: 'danger',
+                                },
+                              ]}
+                            />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -184,6 +194,16 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           </div>
         )}
       </div>
+      <LessonDeleteConfirmModal
+        open={Boolean(lessonToDelete)}
+        lessonId={lessonToDelete?.id}
+        onClose={handleCloseDeleteModal}
+        onConfirm={() => {
+          if (!lessonToDelete) return;
+          onDeleteLesson(lessonToDelete.id);
+          setLessonToDelete(null);
+        }}
+      />
     </div>
   );
 };
