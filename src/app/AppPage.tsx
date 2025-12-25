@@ -259,7 +259,7 @@ export const AppPage = () => {
           status: studentLessonStatusFilter,
           startFrom,
           startTo,
-          sort: studentLessonSortOrder,
+          sort: sortOrder,
         });
         if (lessonLoadRequestId.current !== requestId) return;
         setStudentLessons(data.items.map(normalizeLesson));
