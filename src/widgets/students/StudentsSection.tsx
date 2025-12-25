@@ -1,6 +1,15 @@
-import { parseISO } from 'date-fns';
-import { type FC, useEffect, useMemo, useRef, useState } from 'react';
-import { Homework, HomeworkStatus, Lesson, PaymentEvent, Student, StudentListItem } from '../../entities/types';
+import { type FC, useEffect, useRef, useState } from 'react';
+import {
+  Homework,
+  HomeworkStatus,
+  Lesson,
+  LessonDateRange,
+  LessonPaymentFilter,
+  LessonStatusFilter,
+  PaymentEvent,
+  Student,
+  StudentListItem,
+} from '../../entities/types';
 import styles from './StudentsSection.module.css';
 import { HomeworkPanel } from './components/HomeworkPanel';
 import { LessonsTab } from './components/LessonsTab';
@@ -46,7 +55,14 @@ interface StudentsSectionProps {
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
-  lessons: Lesson[];
+  studentLessons: Lesson[];
+  lessonPaymentFilter: LessonPaymentFilter;
+  lessonStatusFilter: LessonStatusFilter;
+  lessonDateRange: LessonDateRange;
+  lessonListLoading: boolean;
+  onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
+  onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
+  onLessonDateRangeChange: (range: LessonDateRange) => void;
   payments: PaymentEvent[];
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
@@ -102,7 +118,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onToggleHomework,
   onUpdateHomework,
   onOpenStudentModal,
-  lessons,
+  studentLessons,
+  lessonPaymentFilter,
+  lessonStatusFilter,
+  lessonDateRange,
+  lessonListLoading,
+  onLessonPaymentFilterChange,
+  onLessonStatusFilterChange,
+  onLessonDateRangeChange,
   payments,
   paymentFilter,
   paymentDate,
@@ -198,12 +221,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   };
   const visibleStudents = studentListItems;
 
-  const studentLessons = useMemo(() => {
-    return lessons
-      .filter((lesson) => lesson.studentId === selectedStudentId)
-      .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
-  }, [lessons, selectedStudentId]);
-
   const showDetails = Boolean(selectedStudent) && (!isMobile || mobileView === 'details');
   const showList = !isMobile || mobileView === 'list' || !selectedStudent;
 
@@ -280,6 +297,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     selectedStudent={selectedStudent}
                     selectedStudentId={selectedStudentId}
                     editableLessonStatusId={editableLessonStatusId}
+                    lessonPaymentFilter={lessonPaymentFilter}
+                    lessonStatusFilter={lessonStatusFilter}
+                    lessonDateRange={lessonDateRange}
+                    lessonListLoading={lessonListLoading}
+                    onLessonPaymentFilterChange={onLessonPaymentFilterChange}
+                    onLessonStatusFilterChange={onLessonStatusFilterChange}
+                    onLessonDateRangeChange={onLessonDateRangeChange}
                     onStartEditLessonStatus={handleStartEditLessonStatus}
                     onStopEditLessonStatus={handleStopEditLessonStatus}
                     onLessonStatusChange={handleLessonStatusChange}

@@ -3,19 +3,27 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MoreHorizIcon } from '../../../icons/MaterialIcons';
-import { Lesson } from '../../../entities/types';
+import { Lesson, LessonDateRange, LessonPaymentFilter, LessonStatusFilter } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
 import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
+import { LessonFiltersPopover } from './LessonFiltersPopover';
 
 interface LessonsTabProps {
   studentLessons: Lesson[];
   selectedStudent: SelectedStudent | null;
   selectedStudentId: number | null;
   editableLessonStatusId: number | null;
+  lessonPaymentFilter: LessonPaymentFilter;
+  lessonStatusFilter: LessonStatusFilter;
+  lessonDateRange: LessonDateRange;
+  lessonListLoading: boolean;
+  onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
+  onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
+  onLessonDateRangeChange: (range: LessonDateRange) => void;
   onStartEditLessonStatus: (lessonId: number) => void;
   onStopEditLessonStatus: () => void;
   onLessonStatusChange: (lessonId: number, status: Lesson['status']) => void;
@@ -32,6 +40,13 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   selectedStudent,
   selectedStudentId,
   editableLessonStatusId,
+  lessonPaymentFilter,
+  lessonStatusFilter,
+  lessonDateRange,
+  lessonListLoading,
+  onLessonPaymentFilterChange,
+  onLessonStatusFilterChange,
+  onLessonDateRangeChange,
   onStartEditLessonStatus,
   onStopEditLessonStatus,
   onLessonStatusChange,
@@ -60,17 +75,36 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           <div className={styles.priceLabel}>Занятия</div>
           <div className={styles.subtleLabel}>Список уроков для ученика</div>
         </div>
-        <button
-          className={controls.primaryButton}
-          onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-        >
-          + Урок
-        </button>
+        <div className={styles.lessonHeaderActions}>
+          <LessonFiltersPopover
+            lessonPaymentFilter={lessonPaymentFilter}
+            lessonStatusFilter={lessonStatusFilter}
+            lessonDateRange={lessonDateRange}
+            onLessonPaymentFilterChange={onLessonPaymentFilterChange}
+            onLessonStatusFilterChange={onLessonStatusFilterChange}
+            onLessonDateRangeChange={onLessonDateRangeChange}
+          />
+          <button
+            className={controls.primaryButton}
+            onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
+          >
+            + Урок
+          </button>
+        </div>
       </div>
 
       <div className={`${styles.lessonTableWrapper} ${styles.tabContentScroll}`}>
-        {studentLessons.length ? (
+        {lessonListLoading && studentLessons.length === 0 ? (
+          <div className={styles.listLoader}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className={`${styles.skeletonCard} ${styles.skeletonLessonRow}`} />
+            ))}
+          </div>
+        ) : studentLessons.length ? (
           <TableContainer className={styles.lessonTableContainer}>
+            {lessonListLoading && (
+              <div className={styles.loadingRow}>Обновляем список...</div>
+            )}
             <Table size="small" aria-label="Список занятий ученика">
               <TableHead>
                 <TableRow>
