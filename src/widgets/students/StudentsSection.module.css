@@ -1817,6 +1817,49 @@
     align-items: center;
   }
 
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filtersPopoverContent {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    min-width: unset;
+  }
+
+  .filtersPopoverWide {
+    min-width: unset;
+  }
+
+  .filtersPopoverList {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filtersPopoverList .filterChip {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .paymentFilters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .paymentDateFilter {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .paymentDatePicker {
+    width: 100%;
+  }
+
+  .paymentDateButton {
+    flex: 1;
+  }
+
   .homeworkAddButton {
     padding: 6px;
     min-width: 32px;
