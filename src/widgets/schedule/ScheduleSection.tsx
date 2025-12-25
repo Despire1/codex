@@ -153,6 +153,17 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
     [dayLabel],
   );
+  const daySwitchLabel = useMemo(() => {
+    if (!isMobileViewport) {
+      return capitalizedDayLabel;
+    }
+
+    const weekdayIndex = Number(format(dayViewDate, 'i')) - 1;
+    const shortWeekday =
+      weekDayShortLabels[weekdayIndex] ?? format(dayViewDate, 'EE', { locale: ru }).toUpperCase();
+
+    return `${shortWeekday}, ${format(dayViewDate, 'd MMMM', { locale: ru })}`;
+  }, [capitalizedDayLabel, dayViewDate, isMobileViewport, weekDayShortLabels]);
 
   useEffect(() => {
     if (!dayPickerOpen) return undefined;
@@ -519,11 +530,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
 
     return (
-      <div className={styles.dayView}>
-        <div key={dayLabelKey} className={styles.dayHeading}>
-          <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM', { locale: ru })}</div>
-          <div className={styles.weekDayDate}>{format(dayViewDate, 'yyyy-MM-dd')}</div>
-        </div>
+        <div className={styles.dayView}>
+          <div key={dayLabelKey} className={styles.dayHeading}>
+            <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM', { locale: ru })}</div>
+            {!isMobileViewport && (
+              <div className={styles.weekDayDate}>{format(dayViewDate, 'yyyy-MM-dd')}</div>
+            )}
+          </div>
         <div className={styles.dayGridScroll} ref={dayScrollRef}>
           <div className={styles.dayGrid}>
             <div className={styles.timeColumn}>
@@ -908,7 +921,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onClick={() => setDayPickerOpen((open) => !open)}
                     type="button"
                   >
-                    {capitalizedDayLabel}
+                    {daySwitchLabel}
                   </button>
                   <button
                     className={styles.monthNavButton}
