@@ -75,6 +75,16 @@
   gap: 10px;
 }
 
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+}
+
 .filters {
   display: flex;
   gap: 8px;
@@ -102,10 +112,6 @@
   gap: 10px;
 }
 
-.lessonFiltersPopover {
-  position: relative;
-}
-
 .filterIconWrapper {
   position: relative;
   display: inline-flex;
@@ -124,12 +130,8 @@
   box-shadow: 0 0 0 2px #fff;
 }
 
-.lessonFiltersPopoverContent {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
-  min-width: 370px;
+.filtersPopoverContent {
+  min-width: 260px;
   padding: 14px;
   background: #fff;
   border-radius: 16px;
@@ -138,6 +140,14 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.filtersPopoverWide {
+  min-width: 370px;
+}
+
+.filtersPopoverList {
+  margin-bottom: 0;
 }
 
 .lessonFilterGroup {

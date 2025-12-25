@@ -1,42 +1,22 @@
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useMemo } from 'react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Box, Chip, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Stack } from '@mui/material';
+import { Box, Chip, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack } from '@mui/material';
 
 import { AddOutlinedIcon, HistoryOutlinedIcon, RemoveOutlinedIcon } from '../../../icons/MaterialIcons';
 import { Lesson, PaymentEvent } from '../../../entities/types';
-import { DayPicker } from '../../../shared/day-picker';
 import styles from '../StudentsSection.module.css';
 
 interface PaymentListProps {
   payments: PaymentEvent[];
-  filter: FilterId;
-  date: string;
-  onFilterChange: (filter: FilterId) => void;
-  onDateChange: (date: string) => void;
   onOpenLesson?: (lesson: Lesson) => void;
 }
-
-type FilterId = 'all' | 'topup' | 'charges' | 'manual';
-
-const FILTERS: Array<{ id: FilterId; label: string }> = [
-  { id: 'all', label: 'Все' },
-  { id: 'topup', label: 'Пополнения' },
-  { id: 'charges', label: 'Списания' },
-  { id: 'manual', label: 'Ручные оплаты' },
-];
 
 const getDateLabel = (value: string) => {
   const date = parseISO(value);
   if (isToday(date)) return 'Сегодня';
   if (isYesterday(date)) return 'Вчера';
   return format(date, 'd MMMM', { locale: ru });
-};
-
-const parseDateValue = (value?: string) => {
-  if (!value) return null;
-  const parsed = parseISO(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const getEventTitle = (event: PaymentEvent) => {
@@ -91,31 +71,8 @@ const formatEventValue = (event: PaymentEvent) => {
 
 export const PaymentList: FC<PaymentListProps> = ({
   payments,
-  filter,
-  date,
-  onFilterChange,
-  onDateChange,
   onOpenLesson,
 }) => {
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const datePickerRef = useRef<HTMLDivElement>(null);
-  const selectedDate = useMemo(() => parseDateValue(date), [date]);
-  const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : 'Все';
-
-  useEffect(() => {
-    if (!datePickerOpen) return undefined;
-
-    const handleOutside = (event: MouseEvent) => {
-      if (!datePickerRef.current) return;
-      if (!datePickerRef.current.contains(event.target as Node)) {
-        setDatePickerOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [datePickerOpen]);
-
   const groupedEvents = useMemo(() => {
     return payments.reduce<Record<string, PaymentEvent[]>>((acc, event) => {
       const key = getDateLabel(event.createdAt);
@@ -128,59 +85,6 @@ export const PaymentList: FC<PaymentListProps> = ({
 
   return (
     <div className={styles.paymentList}>
-      <div className={styles.paymentFilters}>
-        {FILTERS.map((filterOption) => (
-          <button
-            key={filterOption.id}
-            type="button"
-            onClick={() => onFilterChange(filterOption.id)}
-            className={`${styles.paymentFilterButton} ${
-              filterOption.id === filter ? styles.paymentFilterActive : ''
-            }`}
-          >
-            {filterOption.label}
-          </button>
-        ))}
-        <label className={styles.paymentDateFilter}>
-          <span>Дата</span>
-          <div className={styles.paymentDatePicker} ref={datePickerRef}>
-            <button
-              type="button"
-              className={styles.paymentDateButton}
-              onClick={() => setDatePickerOpen((prev) => !prev)}
-            >
-              {dateLabel}
-            </button>
-            {selectedDate && (
-              <button
-                type="button"
-                className={styles.paymentDateClear}
-                onClick={() => {
-                  onDateChange('');
-                  setDatePickerOpen(false);
-                }}
-                aria-label="Сбросить дату"
-              >
-                ×
-              </button>
-            )}
-            {datePickerOpen && (
-              <div className={styles.paymentDatePopover}>
-                <DayPicker
-                  selected={selectedDate ?? undefined}
-                  onSelect={(nextDate) => {
-                    if (!nextDate) return;
-                    onDateChange(format(nextDate, 'yyyy-MM-dd'));
-                    setDatePickerOpen(false);
-                  }}
-                  weekStartsOn={1}
-                  locale={ru}
-                />
-              </div>
-            )}
-          </div>
-        </label>
-      </div>
       <div className={styles.tabContentScroll}>
         {!payments.length ? (
           <div className={styles.emptyState}>

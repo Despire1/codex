@@ -1,0 +1,12 @@
+.root {
+  display: inline-flex;
+}
+
+.trigger {
+  display: inline-flex;
+}
+
+.popover {
+  position: fixed;
+  z-index: 50;
+}
