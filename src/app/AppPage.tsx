@@ -77,6 +77,7 @@ export const AppPage = () => {
   });
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
   const lessonLoadRequestId = useRef(0);
+  const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
@@ -294,7 +295,6 @@ export const AppPage = () => {
   useEffect(() => {
     if (skipNextLessonLoadRef.current) {
       skipNextLessonLoadRef.current = false;
-      return;
     }
     loadStudentLessons();
   }, [loadStudentLessons]);
