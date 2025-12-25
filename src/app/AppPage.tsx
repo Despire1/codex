@@ -76,7 +76,7 @@ export const AppPage = () => {
     toTime: '23:59',
   });
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
-  const skipNextLessonLoadRef = useRef(false);
+  const lessonLoadRequestId = useRef(0);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
   const [paymentDate, setPaymentDate] = useState('');
@@ -240,6 +240,8 @@ export const AppPage = () => {
         return;
       }
 
+      const requestId = lessonLoadRequestId.current + 1;
+      lessonLoadRequestId.current = requestId;
       setStudentLessonLoading(true);
       try {
         const startFrom =
@@ -256,14 +258,17 @@ export const AppPage = () => {
           status: studentLessonStatusFilter,
           startFrom,
           startTo,
-          sort: sortOrder,
+          sort: studentLessonSortOrder,
         });
+        if (lessonLoadRequestId.current !== requestId) return;
         setStudentLessons(data.items.map(normalizeLesson));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
       } finally {
-        setStudentLessonLoading(false);
+        if (lessonLoadRequestId.current === requestId) {
+          setStudentLessonLoading(false);
+        }
       }
     },
     [
@@ -298,10 +303,8 @@ export const AppPage = () => {
     (order: LessonSortOrder) => {
       if (order === studentLessonSortOrder) return;
       setStudentLessonSortOrder(order);
-      skipNextLessonLoadRef.current = true;
-      loadStudentLessons({ sortOverride: order });
     },
-    [loadStudentLessons, studentLessonSortOrder],
+    [studentLessonSortOrder],
   );
 
   const loadMoreStudents = useCallback(() => {
