@@ -96,6 +96,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
   const drawerDragRafRef = useRef<number | null>(null);
+  const mobileWeekKeyRef = useRef<string | null>(null);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -124,6 +125,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
   const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
+  const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
 
   const weekRangeLabel = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -134,6 +136,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayLabel = useMemo(() => format(dayViewDate, 'EE, d MMMM', { locale: ru }), [dayViewDate]);
 
   const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
+  const weekDayShortLabels = useMemo(() => ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'], []);
 
   const currentMonthLabel = useMemo(
     () => format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru }),
@@ -163,10 +166,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       weekScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
     }
 
-    if (scheduleView === 'day' && dayScrollRef.current) {
+    if ((scheduleView === 'day' || (scheduleView === 'week' && isMobileViewport)) && dayScrollRef.current) {
       dayScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
     }
-  }, [scheduleView, dayViewDate]);
+  }, [scheduleView, dayViewDate, isMobileViewport]);
 
   useEffect(() => {
     if (scheduleView !== 'month' || selectedMonthDay) return;
@@ -194,6 +197,32 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!isMobileWeekView) {
+      mobileWeekKeyRef.current = null;
+      return;
+    }
+
+    const weekStart = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
+    const weekEnd = addDays(weekStart, 6);
+    const today = new Date();
+    const todayIso = format(today, 'yyyy-MM-dd');
+    const weekStartIso = format(weekStart, 'yyyy-MM-dd');
+    const weekKey = weekStartIso;
+
+    if (mobileWeekKeyRef.current === weekKey) {
+      return;
+    }
+
+    mobileWeekKeyRef.current = weekKey;
+    const targetIso = today >= weekStart && today <= weekEnd ? todayIso : weekStartIso;
+    const currentIso = format(dayViewDate, 'yyyy-MM-dd');
+
+    if (currentIso !== targetIso) {
+      onDayViewDateChange(new Date(targetIso));
+    }
+  }, [isMobileWeekView, dayViewDate, onDayViewDateChange]);
 
   useEffect(() => {
     if (selectedMonthDay) {
@@ -406,6 +435,76 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     </div>
 
   );
+
+  const renderMobileWeekView = () => {
+    const selectedIso = format(dayViewDate, 'yyyy-MM-dd');
+    const selectedDate = selectedIso ? parseISO(selectedIso) : dayViewDate;
+    const selectedLessons = selectedIso
+      ? (lessonsByDay[selectedIso] ?? [])
+          .slice()
+          .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime())
+      : [];
+    const selectedDayIso = format(selectedDate, 'yyyy-MM-dd');
+
+    return (
+      <div className={styles.dayView}>
+        <div className={styles.dayGridScroll} ref={dayScrollRef}>
+          <div className={styles.dayGrid}>
+            <div className={styles.timeColumn}>
+              {hours.map((hour) => (
+                <div key={hour} className={styles.timeSlot} style={{ height: HOUR_BLOCK_HEIGHT }}>
+                  {hour}:00
+                </div>
+              ))}
+            </div>
+            <div
+              className={styles.dayColumn}
+              style={{ height: dayHeight }}
+              onClick={handleWeekSlotClick(selectedDayIso)}
+              onMouseMove={(event) => handleTimeHover(event, selectedDayIso)}
+              onMouseLeave={() => setHoverIndicator(null)}
+            >
+              {hoverIndicator?.dayIso === selectedDayIso && renderHoverIndicator(hoverIndicator.minutes)}
+              {selectedLessons.map((lesson) => {
+                const position = lessonPosition(lesson);
+                const participants = buildParticipants(lesson);
+                const isGroupLesson = participants.length > 1;
+                const date = parseISO(lesson.startAt);
+                const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
+                  isGroupLesson ? ` · ${participants.length} уч.` : ''
+                }`;
+                const lessonLabel = isGroupLesson ? 'Групповой урок' : 'Урок';
+
+                return (
+                  <div
+                    key={lesson.id}
+                    className={`${styles.weekLesson} ${styles.dayLesson} ${
+                      lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+                    }`}
+                    style={{ top: position.top, height: position.height }}
+                    onClick={() => onStartEditLesson(lesson)}
+                    onMouseEnter={() => setHoverIndicator(null)}
+                  >
+                    {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
+                    <div className={styles.lessonHeader}>
+                      <span className={styles.lessonLabel}>{lessonLabel}</span>
+                      <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                    </div>
+                    {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    <div className={styles.weekLessonMeta}>
+                      {isGroupLesson
+                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
+                        : (participants[0]?.student as any)?.link?.customName}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderDayView = () => {
     const dayIso = format(dayViewDate, 'yyyy-MM-dd');
@@ -761,6 +860,30 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </button>
                 </div>
             )}
+            {isMobileWeekView && (
+              <div className={styles.weekDayPicker}>
+                {weekDays.map((day, index) => {
+                  const isSelected = format(dayViewDate, 'yyyy-MM-dd') === day.iso;
+                  const isTodayCell = isToday(day.date);
+
+                  return (
+                    <button
+                      key={day.iso}
+                      type="button"
+                      className={`${styles.weekDayButton} ${
+                        isSelected ? styles.weekDayButtonActive : ''
+                      } ${isTodayCell ? styles.weekDayButtonToday : ''}`}
+                      onClick={() => onDayViewDateChange(day.date)}
+                    >
+                      <span className={styles.weekDayButtonName}>
+                        {weekDayShortLabels[index] ?? format(day.date, 'EE', { locale: ru })}
+                      </span>
+                      <span className={styles.weekDayButtonDate}>{format(day.date, 'd')}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {scheduleView === 'day' && (
               <div className={styles.daySwitcherWrapper} ref={dayPickerRef}>
@@ -860,7 +983,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         </div>
       </div>
 
-      {scheduleView === 'week' && renderWeekGrid()}
+      {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
     </section>
