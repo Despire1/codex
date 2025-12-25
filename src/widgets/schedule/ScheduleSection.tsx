@@ -292,6 +292,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     );
   };
 
+  const linkedStudentsById = useMemo(
+    () => new Map(linkedStudents.map((student) => [student.id, student])),
+    [linkedStudents],
+  );
+
   const buildParticipants = (lesson: Lesson) =>
     lesson.participants && lesson.participants.length > 0
       ? lesson.participants
@@ -299,12 +304,19 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           {
             studentId: lesson.studentId,
             isPaid: lesson.isPaid,
-            student: linkedStudents.find((s) => s.id === lesson.studentId),
+            student: linkedStudentsById.get(lesson.studentId),
           },
         ];
 
-  const getParticipantName = (participant: any) =>
-    (participant?.student as any)?.link?.customName ?? (participant?.student as any)?.name ?? 'Ученик';
+  const getParticipantName = (participant: any) => {
+    const linkedStudent = linkedStudentsById.get(participant?.studentId);
+    return (
+      linkedStudent?.link?.customName ??
+      participant?.student?.username ??
+      participant?.student?.name ??
+      'Ученик'
+    );
+  };
 
   const getLessonLabel = (participants: any[]) => {
     const names = participants.map(getParticipantName).filter((name) => name);
