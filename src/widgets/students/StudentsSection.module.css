@@ -1673,13 +1673,14 @@
 }
 
 .modalOverlayBottom {
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
 }
 
 .modalCardBottom {
-  width: 100%;
-  border-radius: 16px 16px 0 0;
-  max-height: 90vh;
+  width: min(520px, 100%);
+  border-radius: 16px;
+  max-height: min(90vh, 720px);
   display: flex;
   flex-direction: column;
 }
