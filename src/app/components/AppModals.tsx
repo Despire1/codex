@@ -6,6 +6,7 @@ import modalStyles from '../../shared/ui/Modal/Modal.module.css';
 import controls from '../../shared/styles/controls.module.css';
 import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
 import { LessonModal } from '../../features/modals/LessonModal/LessonModal';
+import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
 
 export type DialogState =
   | {
@@ -29,6 +30,14 @@ export type DialogState =
       message: string;
       applyToSeries: boolean;
       onConfirm: (applyToSeries: boolean) => void;
+      onCancel: () => void;
+    }
+  | {
+      type: 'payment-cancel';
+      title: string;
+      message: string;
+      onRefund: () => void;
+      onWriteOff: () => void;
       onCancel: () => void;
     }
   | null;
@@ -108,7 +117,7 @@ export const AppModals: FC<AppModalsProps> = ({
         onSubmit={onSubmitLesson}
       />
 
-      {dialogState && dialogState.type !== 'recurring-delete' && (
+      {dialogState && dialogState.type !== 'recurring-delete' && dialogState.type !== 'payment-cancel' && (
         <DialogModal
           open
           title={dialogState.title}
@@ -161,6 +170,16 @@ export const AppModals: FC<AppModalsProps> = ({
             </button>
           </div>
         </Modal>
+      )}
+      {dialogState?.type === 'payment-cancel' && (
+        <PaymentCancelModal
+          open
+          title={dialogState.title}
+          message={dialogState.message}
+          onClose={dialogState.onCancel}
+          onRefund={dialogState.onRefund}
+          onWriteOff={dialogState.onWriteOff}
+        />
       )}
     </>
   );

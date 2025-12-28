@@ -28,8 +28,20 @@ const getEventTitle = (event: PaymentEvent) => {
     case 'MANUAL_PAID':
       return 'Оплата занятия вручную';
     case 'ADJUSTMENT':
-      if (event.reason === 'LESSON_CANCELED' || event.lessonsDelta > 0) {
-        return 'Возврат занятия после отмены';
+      if (event.reason === 'LESSON_CANCELED') {
+        return 'Возврат урока после отмены занятия';
+      }
+      if (event.reason === 'PAYMENT_REVERT_REFUND' || event.reason === 'PAYMENT_REVERT') {
+        return 'Оплата отменена, урок возвращён на баланс';
+      }
+      if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+        return 'Оплата отменена без возврата';
+      }
+      if (event.lessonsDelta > 0) {
+        return 'Возврат урока на баланс';
+      }
+      if (event.lessonsDelta < 0) {
+        return 'Списание урока с баланса';
       }
       return 'Корректировка баланса';
     default:
@@ -46,6 +58,16 @@ const getEventChipLabel = (event: PaymentEvent) => {
     case 'MANUAL_PAID':
       return 'Ручная оплата';
     case 'ADJUSTMENT':
+      if (
+        event.reason === 'LESSON_CANCELED' ||
+        event.reason === 'PAYMENT_REVERT_REFUND' ||
+        event.reason === 'PAYMENT_REVERT'
+      ) {
+        return 'Возврат';
+      }
+      if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+        return 'Отмена оплаты';
+      }
       return 'Корректировка';
     default:
       return 'Событие';
@@ -62,11 +84,14 @@ const formatLessonLabel = (lesson?: Lesson | null) =>
   lesson?.startAt ? `Занятие ${format(parseISO(lesson.startAt), 'd MMM, HH:mm', { locale: ru })}` : 'Без привязки к занятию';
 
 const formatEventValue = (event: PaymentEvent) => {
+  if (event.type === 'ADJUSTMENT' && event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+    return { value: '—', withSuffix: false };
+  }
   if (typeof event.moneyAmount === 'number') {
-    return `${event.moneyAmount} ₽`;
+    return { value: `${event.moneyAmount} ₽`, withSuffix: false };
   }
   const sign = event.lessonsDelta > 0 ? '+' : '';
-  return `${sign}${event.lessonsDelta}`;
+  return { value: `${sign}${event.lessonsDelta}`, withSuffix: true };
 };
 
 export const PaymentList: FC<PaymentListProps> = ({
@@ -103,6 +128,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                     const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });
                     const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson) : 'Без привязки к занятию';
                     const isClickable = Boolean(event.lessonId && event.lesson && onOpenLesson);
+                    const valueMeta = formatEventValue(event);
                     const listItemContent = (
                       <>
                         <ListItemIcon className={styles.paymentIcon}>
@@ -123,8 +149,8 @@ export const PaymentList: FC<PaymentListProps> = ({
                           }
                         />
                         <Box className={styles.paymentAmount}>
-                          <span>{formatEventValue(event)}</span>
-                          {typeof event.moneyAmount !== 'number' && (
+                          <span>{valueMeta.value}</span>
+                          {valueMeta.withSuffix && (
                             <span className={styles.paymentAmountSuffix}>ур.</span>
                           )}
                         </Box>
