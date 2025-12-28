@@ -673,6 +673,24 @@
   gap: 6px;
 }
 
+.balanceButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 16px;
+  color: #1d4ed8;
+}
+
+.balanceButton:hover {
+  text-decoration: underline;
+  color: #1e40af;
+}
+
 .summaryDivider {
   color: #cbd5e1;
   font-weight: 700;
@@ -1531,6 +1549,23 @@
   font-weight: 800;
 }
 
+.modalSubtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.modalClose {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  padding: 4px;
+}
+
 .modalBody {
   display: flex;
   flex-direction: column;
@@ -1561,13 +1596,23 @@
   color: var(--text);
 }
 
+.modalSelect {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 .modalTextarea {
   min-height: 120px;
   resize: vertical;
 }
 
 .modalInput:focus,
-.modalTextarea:focus {
+.modalTextarea:focus,
+.modalSelect:focus {
   outline: 2px solid var(--primary-weak);
   border-color: var(--primary);
 }
@@ -1609,6 +1654,107 @@
   gap: 10px;
   margin-top: 14px;
   flex-wrap: wrap;
+}
+
+.modalFooterSticky {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding-top: 12px;
+}
+
+.modalError {
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modalOverlayBottom {
+  align-items: center;
+  justify-content: center;
+}
+
+.modalCardBottom {
+  width: min(520px, 100%);
+  border-radius: 16px;
+  max-height: min(90vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalCardBottom .modalBody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.modalHandle {
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  margin: 0 auto 10px;
+}
+
+.balanceMeta {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.balanceModeToggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  gap: 4px;
+}
+
+.balanceModeButton {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+}
+
+.balanceModeButtonActive {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+.balanceQuickRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.balanceQuickButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.balanceQuickButton {
+  border: 1px solid #cbd5f5;
+  background: #eef2ff;
+  color: #1d4ed8;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.balanceQuickButton:hover {
+  background: #e0e7ff;
 }
 
 .priceLabel {
@@ -1764,6 +1910,11 @@
 .paymentMeta {
   color: #6b7280;
   font-size: 12px;
+}
+
+.paymentComment {
+  color: #334155;
+  font-weight: 600;
 }
 
 .paymentChip {

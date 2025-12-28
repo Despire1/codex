@@ -454,15 +454,40 @@ export const AppPage = () => {
 
   const adjustBalance = async (studentId: number, delta: number) => {
     try {
-      const data = await api.adjustBalance(studentId, delta);
+      const data = await api.adjustBalance(studentId, { delta });
       setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
       setStudentListItems((prev) =>
         prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link } : item)),
       );
+      await refreshPayments(studentId);
       loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to adjust balance', error);
+    }
+  };
+
+  const topupBalance = async (
+    studentId: number,
+    payload: { delta: number; type: PaymentEvent['type']; comment?: string; createdAt?: string },
+  ) => {
+    try {
+      const data = await api.adjustBalance(studentId, payload);
+      setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
+      setStudentListItems((prev) =>
+        prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link } : item)),
+      );
+      await refreshPayments(studentId);
+      loadStudentList();
+      showToast({
+        message:
+          payload.delta > 0
+            ? `Баланс пополнен на ${payload.delta} занятий`
+            : `Списано ${Math.abs(payload.delta)} занятий`,
+        variant: 'success',
+      });
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Не удалось пополнить баланс.');
     }
   };
 
@@ -1119,6 +1144,7 @@ export const AppPage = () => {
               onLoadMoreHomeworks: loadMoreStudentHomeworks,
               onToggleAutoReminder: toggleAutoReminder,
               onAdjustBalance: adjustBalance,
+              onBalanceTopup: topupBalance,
               onStartEditPrice: startEditPrice,
               onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
               onSavePrice: savePrice,

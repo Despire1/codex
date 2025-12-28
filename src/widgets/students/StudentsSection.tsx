@@ -8,6 +8,7 @@ import {
   LessonSortOrder,
   LessonStatusFilter,
   PaymentEvent,
+  PaymentEventType,
   Student,
   StudentListItem,
 } from '../../entities/types';
@@ -16,6 +17,7 @@ import { HomeworkPanel } from './components/HomeworkPanel';
 import { LessonsTab } from './components/LessonsTab';
 import { OverviewTab } from './components/OverviewTab';
 import { PaymentsTab } from './components/PaymentsTab';
+import { BalanceTopupModal } from './components/BalanceTopupModal';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
 import { NewHomeworkDraft, SelectedStudent } from './types';
@@ -42,6 +44,15 @@ interface StudentsSectionProps {
   onLoadMoreHomeworks: () => void;
   onToggleAutoReminder: (studentId: number) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
+  onBalanceTopup: (
+    studentId: number,
+    payload: {
+      delta: number;
+      type: Extract<PaymentEventType, 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER' | 'ADJUSTMENT'>;
+      comment?: string;
+      createdAt?: string;
+    },
+  ) => Promise<void>;
   onStartEditPrice: (student: Student) => void;
   onPriceChange: (value: string) => void;
   onSavePrice: () => void;
@@ -107,6 +118,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onLoadMoreHomeworks,
   onToggleAutoReminder,
   onAdjustBalance,
+  onBalanceTopup,
   onStartEditPrice,
   onPriceChange,
   onSavePrice,
@@ -154,6 +166,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
+  const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
   const studentListRef = useRef<HTMLDivElement | null>(null);
   const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -185,6 +198,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setMobileView('list');
     }
   }, [selectedStudentId, isMobile]);
+
+  useEffect(() => {
+    if (!selectedStudentId) {
+      setIsBalanceTopupOpen(false);
+    }
+  }, [selectedStudentId]);
 
   useEffect(() => {
     const target = studentLoadMoreRef.current;
@@ -223,6 +242,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleBackToList = () => {
     setMobileView('list');
+  };
+
+  const handleOpenBalanceTopup = () => {
+    if (!selectedStudent) return;
+    setIsBalanceTopupOpen(true);
+  };
+
+  const handleCloseBalanceTopup = () => {
+    setIsBalanceTopupOpen(false);
   };
   const visibleStudents = studentListItems;
 
@@ -273,6 +301,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onCancelPriceEdit={onCancelPriceEdit}
                   onToggleAutoReminder={onToggleAutoReminder}
                   onAdjustBalance={onAdjustBalance}
+                  onOpenBalanceTopup={handleOpenBalanceTopup}
                   onOpenStudentModal={onOpenStudentModal}
                 />
 
@@ -348,7 +377,17 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           <div className={styles.placeholder}>Выберите ученика в списке, чтобы увидеть детали</div>
         )}
       </div>
-
+      <BalanceTopupModal
+        isOpen={isBalanceTopupOpen}
+        isMobile={isMobile}
+        student={selectedStudent ? { ...selectedStudent, link: selectedStudent.link } : null}
+        onClose={handleCloseBalanceTopup}
+        onSubmit={(payload) =>
+          selectedStudent
+            ? onBalanceTopup(selectedStudent.id, payload)
+            : Promise.resolve()
+        }
+      />
     </section>
   );
 };

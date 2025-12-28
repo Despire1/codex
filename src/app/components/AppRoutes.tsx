@@ -64,6 +64,15 @@ interface AppRoutesProps {
     onLoadMoreHomeworks: () => void;
     onToggleAutoReminder: (studentId: number) => void;
     onAdjustBalance: (studentId: number, delta: number) => void;
+    onBalanceTopup: (
+      studentId: number,
+      payload: {
+        delta: number;
+        type: Extract<PaymentEvent['type'], 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER' | 'ADJUSTMENT'>;
+        comment?: string;
+        createdAt?: string;
+      },
+    ) => Promise<void>;
     onStartEditPrice: (student: Student) => void;
     onPriceChange: (value: string) => void;
     onSavePrice: () => void;

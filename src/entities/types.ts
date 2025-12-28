@@ -89,7 +89,7 @@ export interface LessonDateRange {
   toTime: string;
 }
 
-export type PaymentEventType = 'TOP_UP' | 'AUTO_CHARGE' | 'MANUAL_PAID' | 'ADJUSTMENT';
+export type PaymentEventType = 'TOP_UP' | 'AUTO_CHARGE' | 'MANUAL_PAID' | 'ADJUSTMENT' | 'SUBSCRIPTION' | 'OTHER';
 export type PaymentEventCreatedBy = 'TEACHER' | 'SYSTEM';
 export type PaymentCancelBehavior = 'refund' | 'writeoff';
 
@@ -104,6 +104,7 @@ export interface PaymentEvent {
   createdAt: string;
   createdBy: PaymentEventCreatedBy;
   reason?: string | null;
+  comment?: string | null;
   lesson?: Lesson | null;
 }
 
