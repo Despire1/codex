@@ -31,36 +31,35 @@ export const HomeworkCreateModal: FC<HomeworkCreateModalProps> = ({
       <div className={styles.modalCard}>
         <div className={styles.modalHeader}>
           <div>
-            <div className={styles.priceLabel}>Новое задание</div>
-            <div className={styles.subtleLabel}>Создайте карточку и отправьте ученику</div>
+            <div className={styles.modalTitle}>Новое домашнее задание</div>
           </div>
           <button className={controls.iconButton} aria-label="Закрыть" onClick={onClose}>
             <CloseIcon width={18} height={18} />
           </button>
         </div>
         <div className={styles.modalBody}>
-          <label className={styles.inputLabel}>
-            Текст задания
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Текст задания</span>
             <textarea
-              className={controls.input}
+              className={styles.modalTextarea}
               placeholder="Например: Разобрать тему 3 и сделать 10 задач"
               value={draft.text}
               onChange={(e) => onDraftChange({ ...draft, text: e.target.value })}
             />
           </label>
-          <label className={styles.inputLabel}>
-            Дедлайн
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Дедлайн</span>
             <input
-              className={controls.input}
+              className={styles.modalInput}
               type="date"
               value={draft.deadline}
               onChange={(e) => onDraftChange({ ...draft, deadline: e.target.value })}
             />
           </label>
-          <label className={styles.inputLabel}>
-            Время выполнения (мин)
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Время выполнения (мин)</span>
             <input
-              className={controls.input}
+              className={styles.modalInput}
               type="number"
               min={0}
               step={5}
@@ -68,13 +67,9 @@ export const HomeworkCreateModal: FC<HomeworkCreateModalProps> = ({
               onChange={(e) => onDraftChange({ ...draft, timeSpentMinutes: e.target.value })}
               placeholder="Например, 30"
             />
-            <span className={styles.subtleLabel}>Можно оставить пустым, если ученик ещё не сделал работу</span>
           </label>
-          <div className={styles.inputLabel}>
-            <div className={styles.sectionHeader}>
-              <p className={styles.priceLabel}>Статус</p>
-              <span className={styles.subtleLabel}>Выберите, когда покажем ДЗ ученику</span>
-            </div>
+          <div className={styles.modalField}>
+            <span className={styles.modalLabel}>Статус</span>
             <div className={styles.toggleGroup}>
               <button
                 className={`${controls.secondaryButton} ${
@@ -98,17 +93,16 @@ export const HomeworkCreateModal: FC<HomeworkCreateModalProps> = ({
           </div>
           <label className={styles.checkboxRow}>
             <input
+              className={styles.modalCheckbox}
               type="checkbox"
               checked={draft.sendNow}
               onChange={(e) => onSendNowToggle(e.target.checked)}
             />
             <span>Сразу отправить ученику</span>
           </label>
-          {draft.sendNow && (
-            <div className={styles.helperText}>Задание будет опубликовано и станет доступно ученику</div>
-          )}
           <label className={styles.checkboxRow}>
             <input
+              className={styles.modalCheckbox}
               type="checkbox"
               checked={draft.remindBefore}
               onChange={(e) => onDraftChange({ ...draft, remindBefore: e.target.checked })}
