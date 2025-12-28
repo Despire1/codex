@@ -68,7 +68,7 @@ interface AppRoutesProps {
       studentId: number,
       payload: {
         delta: number;
-        type: Extract<PaymentEvent['type'], 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER'>;
+        type: Extract<PaymentEvent['type'], 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER' | 'ADJUSTMENT'>;
         comment?: string;
         createdAt?: string;
       },

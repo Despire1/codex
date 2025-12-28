@@ -480,7 +480,10 @@ export const AppPage = () => {
       await refreshPayments(studentId);
       loadStudentList();
       showToast({
-        message: `Баланс пополнен на ${payload.delta} занятий`,
+        message:
+          payload.delta > 0
+            ? `Баланс пополнен на ${payload.delta} занятий`
+            : `Списано ${Math.abs(payload.delta)} занятий`,
         variant: 'success',
       });
     } catch (error) {
