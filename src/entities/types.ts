@@ -91,6 +91,7 @@ export interface LessonDateRange {
 
 export type PaymentEventType = 'TOP_UP' | 'AUTO_CHARGE' | 'MANUAL_PAID' | 'ADJUSTMENT';
 export type PaymentEventCreatedBy = 'TEACHER' | 'SYSTEM';
+export type PaymentCancelBehavior = 'refund' | 'writeoff';
 
 export interface PaymentEvent {
   id: number;
