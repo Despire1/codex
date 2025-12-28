@@ -410,20 +410,30 @@ const updatePricePerLesson = async (studentId: number, value: number) => {
   });
 };
 
-const adjustBalance = async (studentId: number, delta: number) => {
+const adjustBalance = async (
+  studentId: number,
+  payload: { delta: number; type?: string; comment?: string; createdAt?: string },
+) => {
   const teacher = await ensureTeacher();
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     include: { student: true },
   });
   if (!link) throw new Error('Student link not found');
+  const delta = Number(payload.delta ?? 0);
+  if (!Number.isFinite(delta)) {
+    throw new Error('Некорректное значение баланса');
+  }
   const nextBalance = link.balanceLessons + delta;
   const updatedLink = await prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { balanceLessons: nextBalance },
   });
   if (delta !== 0) {
-    const type = delta > 0 ? 'TOP_UP' : 'ADJUSTMENT';
+    const type = payload.type?.toString().trim() || (delta > 0 ? 'TOP_UP' : 'ADJUSTMENT');
+    const createdAt = payload.createdAt ? new Date(payload.createdAt) : new Date();
+    const resolvedDate = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
+    const comment = typeof payload.comment === 'string' && payload.comment.trim() ? payload.comment.trim() : null;
     await prisma.paymentEvent.create({
       data: {
         studentId,
@@ -432,8 +442,10 @@ const adjustBalance = async (studentId: number, delta: number) => {
         lessonsDelta: delta,
         priceSnapshot: link.student?.pricePerLesson ?? 0,
         moneyAmount: null,
+        createdAt: resolvedDate,
         createdBy: 'TEACHER',
         reason: type === 'ADJUSTMENT' ? 'BALANCE_ADJUSTMENT' : null,
+        comment,
       },
     });
   }
@@ -455,7 +467,7 @@ const listPaymentEventsForStudent = async (
   const where: Record<string, any> = { studentId };
 
   if (filter === 'topup') {
-    where.type = 'TOP_UP';
+    where.type = { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] };
   } else if (filter === 'manual') {
     where.type = 'MANUAL_PAID';
   } else if (filter === 'charges') {
@@ -1731,7 +1743,12 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'POST' && balanceMatch) {
       const studentId = Number(balanceMatch[1]);
       const body = await readBody(req);
-      const link = await adjustBalance(studentId, Number(body.delta || 0));
+      const link = await adjustBalance(studentId, {
+        delta: Number(body.delta || 0),
+        type: body.type,
+        comment: body.comment,
+        createdAt: body.createdAt,
+      });
       return sendJson(res, 200, { link });
     }
 

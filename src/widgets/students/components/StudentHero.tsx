@@ -17,6 +17,7 @@ interface StudentHeroProps {
   onCancelPriceEdit: () => void;
   onToggleAutoReminder: (studentId: number) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
+  onOpenBalanceTopup: () => void;
   onOpenStudentModal: () => void;
 }
 
@@ -31,6 +32,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onCancelPriceEdit,
   onToggleAutoReminder,
   onAdjustBalance,
+  onOpenBalanceTopup,
   onOpenStudentModal,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -69,12 +71,18 @@ export const StudentHero: FC<StudentHeroProps> = ({
         <div className={styles.summaryLine}>
           <div className={styles.balanceRow}>
             <span className={styles.summaryLabel}>Баланс:</span>
-            <span className={styles.summaryValueInline}>
-            {selectedStudent.link.balanceLessons}
+            <button
+              type="button"
+              className={styles.balanceButton}
+              onClick={onOpenBalanceTopup}
+              title="Нажмите, чтобы пополнить баланс"
+              aria-label="Нажмите, чтобы пополнить баланс"
+            >
+              {selectedStudent.link.balanceLessons}
               {selectedStudent.link.balanceLessons < 0 && (
-                  <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
+                <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
               )}
-          </span>
+            </button>
           </div>
           <span className={styles.summaryDivider}>|</span>
           <div className={styles.priceInline}>

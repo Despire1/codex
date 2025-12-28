@@ -49,10 +49,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ value }),
     }),
-  adjustBalance: (studentId: number, delta: number) =>
+  adjustBalance: (
+    studentId: number,
+    payload: { delta: number; type?: string; comment?: string; createdAt?: string },
+  ) =>
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/balance`, {
       method: 'POST',
-      body: JSON.stringify({ delta }),
+      body: JSON.stringify(payload),
     }),
   updatePrice: (studentId: number, value: number) =>
     apiFetch<{ student: Student }>(`/api/students/${studentId}/price`, {

@@ -120,6 +120,7 @@ model PaymentEvent {
   createdAt     DateTime               @default(now())
   createdBy     String
   reason        String?
+  comment       String?
 
   student Student @relation(fields: [studentId], references: [id])
   lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
