@@ -1340,8 +1340,23 @@ const togglePaymentForStudent = async (
     if (existingPayment) {
       await prisma.payment.delete({ where: { id: existingPayment.id } });
     }
-    const existingAdjustment = await prisma.paymentEvent.findFirst({
-      where: { studentId, lessonId, type: 'ADJUSTMENT' },
+    if (shouldRefund) {
+      updatedLink = await prisma.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: link.balanceLessons + 1 },
+      });
+    }
+    await prisma.paymentEvent.create({
+      data: {
+        studentId,
+        lessonId,
+        type: 'ADJUSTMENT',
+        lessonsDelta: deltaChange,
+        priceSnapshot,
+        moneyAmount: null,
+        createdBy: 'TEACHER',
+        reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+      },
     });
     if (!existingAdjustment) {
       if (shouldRefund) {

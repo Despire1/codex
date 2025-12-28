@@ -793,6 +793,9 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
+          setStudentListItems((prev) =>
+            prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link! } : item)),
+          );
         }
 
         await refreshPayments(studentId);
@@ -814,6 +817,9 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
+          setStudentListItems((prev) =>
+            prev.map((item) => (item.student.id === data.link!.studentId ? { ...item, link: data.link! } : item)),
+          );
         }
 
         const targetStudent = data.lesson.studentId;
