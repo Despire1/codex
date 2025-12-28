@@ -23,10 +23,14 @@ const getEventTitle = (event: PaymentEvent) => {
   switch (event.type) {
     case 'TOP_UP':
       return `Пополнение предоплаты: +${event.lessonsDelta} занятия`;
+    case 'SUBSCRIPTION':
+      return `Абонемент: +${event.lessonsDelta} занятия`;
     case 'AUTO_CHARGE':
       return 'Автосписание за занятие';
     case 'MANUAL_PAID':
       return 'Оплата занятия вручную';
+    case 'OTHER':
+      return `Другое: +${event.lessonsDelta} занятия`;
     case 'ADJUSTMENT':
       if (event.reason === 'LESSON_CANCELED') {
         return 'Возврат урока после отмены занятия';
@@ -57,6 +61,10 @@ const getEventChipLabel = (event: PaymentEvent) => {
       return 'Списание';
     case 'MANUAL_PAID':
       return 'Ручная оплата';
+    case 'SUBSCRIPTION':
+      return 'Абонемент';
+    case 'OTHER':
+      return 'Другое';
     case 'ADJUSTMENT':
       if (
         event.reason === 'LESSON_CANCELED' ||
@@ -75,7 +83,7 @@ const getEventChipLabel = (event: PaymentEvent) => {
 };
 
 const getEventIcon = (event: PaymentEvent) => {
-  if (event.type === 'TOP_UP') return AddOutlinedIcon;
+  if (event.type === 'TOP_UP' || event.type === 'SUBSCRIPTION' || event.type === 'OTHER') return AddOutlinedIcon;
   if (event.type === 'AUTO_CHARGE') return RemoveOutlinedIcon;
   return HistoryOutlinedIcon;
 };
@@ -145,6 +153,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                             <Stack className={styles.paymentMeta} spacing={0.5}>
                               <span>{timestamp}</span>
                               <span>{lessonLabel}</span>
+                              {event.comment && <span className={styles.paymentComment}>{event.comment}</span>}
                             </Stack>
                           }
                         />
