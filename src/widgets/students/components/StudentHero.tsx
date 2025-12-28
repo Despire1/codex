@@ -34,7 +34,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenStudentModal,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const [isPrepaidOpen, setIsPrepaidOpen] = useState(false);
 
   return (
     <div className={`${styles.card} ${styles.headerCard}`}>
@@ -75,31 +74,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
               {selectedStudent.link.balanceLessons < 0 && (
                   <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
               )}
-              {selectedStudent.link.balanceLessons > 0 && (
-                  <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>Переплата</span>
-              )}
           </span>
-          </div>
-          <span className={styles.summaryDivider}>|</span>
-          <div className={styles.inlinePopover}>
-            <button className={styles.summaryButton} onClick={() => setIsPrepaidOpen((prev) => !prev)}>
-              <span className={styles.summaryLabel}>Предоплачено:</span>
-              <span className={styles.summaryValueInline}>{selectedStudent.link.balanceLessons} уроков</span>
-            </button>
-            {isPrepaidOpen && (
-                <div className={styles.popover}>
-                <button onClick={() => onAdjustBalance(selectedStudent.id, 1)}>+1 занятие</button>
-                <button
-                  onClick={() => onAdjustBalance(selectedStudent.id, -1)}
-                  disabled={selectedStudent.link.balanceLessons <= 0}
-                >
-                  -1 занятие
-                </button>
-                <button onClick={() => onAdjustBalance(selectedStudent.id, -selectedStudent.link.balanceLessons)}>
-                  Сбросить в 0
-                </button>
-              </div>
-            )}
           </div>
           <span className={styles.summaryDivider}>|</span>
           <div className={styles.priceInline}>
