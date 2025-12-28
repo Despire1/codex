@@ -3,7 +3,7 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
-import type { HomeworkStatus } from '../entities/types';
+import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEMO_TEACHER_ID = BigInt(process.env.DEMO_TEACHER_ID ?? '111222333');
@@ -522,6 +522,9 @@ const normalizeLessonStatus = (status: any): 'SCHEDULED' | 'COMPLETED' | 'CANCEL
   if (status === 'CANCELED') return 'CANCELED';
   return 'SCHEDULED';
 };
+
+const normalizeCancelBehavior = (value: any): PaymentCancelBehavior =>
+  value === 'writeoff' ? 'writeoff' : 'refund';
 
 const calcLessonPaymentAmount = (participant: any, lesson: any, link: any) =>
   [participant.price, lesson.price, link.student?.pricePerLesson].find(
@@ -1297,7 +1300,11 @@ const markLessonCompleted = async (lessonId: number) => {
   return { lesson, link: primaryLink };
 };
 
-const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
+const togglePaymentForStudent = async (
+  lessonId: number,
+  studentId: number,
+  options?: { cancelBehavior?: PaymentCancelBehavior },
+) => {
   const teacher = await ensureTeacher();
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -1323,35 +1330,50 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
   let updatedLink = link;
 
   if (participant.isPaid || lesson.isPaid) {
-    const deltaChange = existingPayment ? -1 : 1;
+    const cancelBehavior = normalizeCancelBehavior(options?.cancelBehavior);
+    const shouldRefund = cancelBehavior === 'refund';
+    const deltaChange = shouldRefund ? 1 : 0;
     const priceSnapshot =
       [link.student?.pricePerLesson, participant.price, lesson.price].find(
         (value) => typeof value === 'number' && value > 0,
       ) ?? 0;
     if (existingPayment) {
       await prisma.payment.delete({ where: { id: existingPayment.id } });
-      updatedLink = await prisma.teacherStudent.update({
-        where: { id: link.id },
-        data: { balanceLessons: link.balanceLessons - 1 },
-      });
-    } else {
+    }
+    if (shouldRefund) {
       updatedLink = await prisma.teacherStudent.update({
         where: { id: link.id },
         data: { balanceLessons: link.balanceLessons + 1 },
       });
     }
-    await prisma.paymentEvent.create({
-      data: {
-        studentId,
-        lessonId,
-        type: 'ADJUSTMENT',
-        lessonsDelta: deltaChange,
-        priceSnapshot,
-        moneyAmount: null,
-        createdBy: 'TEACHER',
-        reason: 'PAYMENT_REVERT',
-      },
+    const existingAdjustment = await prisma.paymentEvent.findFirst({
+      where: { studentId, lessonId, type: 'ADJUSTMENT' },
     });
+    if (existingAdjustment) {
+      await prisma.paymentEvent.update({
+        where: { id: existingAdjustment.id },
+        data: {
+          lessonsDelta: deltaChange,
+          priceSnapshot,
+          moneyAmount: null,
+          createdBy: 'TEACHER',
+          reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+        },
+      });
+    } else {
+      await prisma.paymentEvent.create({
+        data: {
+          studentId,
+          lessonId,
+          type: 'ADJUSTMENT',
+          lessonsDelta: deltaChange,
+          priceSnapshot,
+          moneyAmount: null,
+          createdBy: 'TEACHER',
+          reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+        },
+      });
+    }
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
@@ -1431,16 +1453,16 @@ const togglePaymentForStudent = async (lessonId: number, studentId: number) => {
   return { lesson: normalizedLesson, participant: updatedParticipant, link: updatedLink };
 };
 
-const toggleLessonPaid = async (lessonId: number) => {
+const toggleLessonPaid = async (lessonId: number, cancelBehavior?: PaymentCancelBehavior) => {
   const baseLesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!baseLesson) throw new Error('Урок не найден');
 
-  const { lesson, link } = await togglePaymentForStudent(lessonId, baseLesson.studentId);
+  const { lesson, link } = await togglePaymentForStudent(lessonId, baseLesson.studentId, { cancelBehavior });
   return { lesson, link };
 };
 
-const toggleParticipantPaid = async (lessonId: number, studentId: number) =>
-  togglePaymentForStudent(lessonId, studentId);
+const toggleParticipantPaid = async (lessonId: number, studentId: number, cancelBehavior?: PaymentCancelBehavior) =>
+  togglePaymentForStudent(lessonId, studentId, { cancelBehavior });
 
 const updateLessonStatus = async (lessonId: number, status: any) => {
   const teacher = await ensureTeacher();
@@ -1818,7 +1840,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const lessonPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/toggle-paid$/);
     if (req.method === 'POST' && lessonPaidMatch) {
       const lessonId = Number(lessonPaidMatch[1]);
-      const result = await toggleLessonPaid(lessonId);
+      const body = await readBody(req);
+      const result = await toggleLessonPaid(lessonId, normalizeCancelBehavior((body as any)?.cancelBehavior));
       return sendJson(res, 200, { lesson: result.lesson, link: result.link });
     }
 
@@ -1826,7 +1849,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'POST' && participantPaidMatch) {
       const lessonId = Number(participantPaidMatch[1]);
       const studentId = Number(participantPaidMatch[2]);
-      const result = await toggleParticipantPaid(lessonId, studentId);
+      const body = await readBody(req);
+      const result = await toggleParticipantPaid(lessonId, studentId, normalizeCancelBehavior((body as any)?.cancelBehavior));
       return sendJson(res, 200, { participant: result.participant, lesson: result.lesson, link: result.link });
     }
 

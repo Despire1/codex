@@ -1,0 +1,42 @@
+import { FC } from 'react';
+import { Modal } from '../../../shared/ui/Modal/Modal';
+import modalStyles from '../../../shared/ui/Modal/Modal.module.css';
+import controls from '../../../shared/styles/controls.module.css';
+
+interface PaymentCancelModalProps {
+  open: boolean;
+  title: string;
+  message: string;
+  onClose: () => void;
+  onRefund: () => void;
+  onWriteOff: () => void;
+}
+
+export const PaymentCancelModal: FC<PaymentCancelModalProps> = ({
+  open,
+  title,
+  message,
+  onClose,
+  onRefund,
+  onWriteOff,
+}) => {
+  return (
+    <Modal open={open} title={title} onClose={onClose}>
+      <p className={modalStyles.message}>{message}</p>
+      <p className={modalStyles.message}>
+        Если вернуть, баланс увеличится на 1 урок. Если нет — оплата будет отменена без возврата на баланс.
+      </p>
+      <div className={modalStyles.actions}>
+        <button type="button" className={controls.secondaryButton} onClick={onClose}>
+          Отмена
+        </button>
+        <button type="button" className={controls.secondaryButton} onClick={onWriteOff}>
+          Списать без возврата
+        </button>
+        <button type="button" className={controls.primaryButton} onClick={onRefund}>
+          Вернуть на баланс
+        </button>
+      </div>
+    </Modal>
+  );
+};

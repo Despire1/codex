@@ -10,6 +10,7 @@ import {
   LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
+  PaymentCancelBehavior,
   PaymentEvent,
   Student,
   StudentListItem,
@@ -771,18 +772,15 @@ export const AppPage = () => {
     }
   };
 
-  const togglePaid = async (lessonId: number, studentId?: number) => {
+  const applyTogglePaid = async (
+    lessonId: number,
+    studentId?: number,
+    cancelBehavior?: PaymentCancelBehavior,
+  ) => {
     try {
-      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
-      const isCurrentlyPaid =
-        studentId !== undefined
-          ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
-          : targetLesson?.isPaid ?? false;
-
-      if (isCurrentlyPaid && !window.confirm('Снять отметку оплаты?')) return;
-
+      const payload = cancelBehavior ? { cancelBehavior } : undefined;
       if (studentId !== undefined) {
-        const data = await api.toggleParticipantPaid(lessonId, studentId);
+        const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
 
         if (data.link) {
@@ -795,15 +793,18 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
+          setStudentListItems((prev) =>
+            prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link! } : item)),
+          );
         }
 
         await refreshPayments(studentId);
         showToast({
-          message: isCurrentlyPaid ? 'Оплата отменена' : 'Оплата отмечена',
+          message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
           variant: 'success',
         });
       } else {
-        const data = await api.togglePaid(lessonId);
+        const data = await api.togglePaid(lessonId, payload);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
 
         if (data.link) {
@@ -816,12 +817,15 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
+          setStudentListItems((prev) =>
+            prev.map((item) => (item.student.id === data.link!.studentId ? { ...item, link: data.link! } : item)),
+          );
         }
 
         const targetStudent = data.lesson.studentId;
         await refreshPayments(targetStudent);
         showToast({
-          message: isCurrentlyPaid ? 'Оплата отменена' : 'Оплата отмечена',
+          message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
           variant: 'success',
         });
       }
@@ -833,6 +837,34 @@ export const AppPage = () => {
         variant: 'error',
       });
     }
+  };
+
+  const togglePaid = async (lessonId: number, studentId?: number) => {
+    const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
+    const isCurrentlyPaid =
+      studentId !== undefined
+        ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
+        : targetLesson?.isPaid ?? false;
+
+    if (isCurrentlyPaid) {
+      setDialogState({
+        type: 'payment-cancel',
+        title: 'Отмена оплаты',
+        message: 'Вернуть оплаченный урок на баланс ученика?',
+        onRefund: () => {
+          closeDialog();
+          void applyTogglePaid(lessonId, studentId, 'refund');
+        },
+        onWriteOff: () => {
+          closeDialog();
+          void applyTogglePaid(lessonId, studentId, 'writeoff');
+        },
+        onCancel: closeDialog,
+      });
+      return;
+    }
+
+    await applyTogglePaid(lessonId, studentId);
   };
 
   const openCreateLessonForStudent = (studentId?: number) => {

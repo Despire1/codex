@@ -6,6 +6,7 @@ import {
   LessonPaymentFilter,
   LessonSortOrder,
   LessonStatusFilter,
+  PaymentCancelBehavior,
   PaymentEvent,
   Student,
   StudentListItem,
@@ -92,15 +93,17 @@ export const api = {
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {
       method: 'POST',
     }),
-  togglePaid: (lessonId: number) =>
+  togglePaid: (lessonId: number, payload?: { cancelBehavior?: PaymentCancelBehavior }) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/toggle-paid`, {
       method: 'POST',
+      body: payload ? JSON.stringify(payload) : undefined,
     }),
-  toggleParticipantPaid: (lessonId: number, studentId: number) =>
+  toggleParticipantPaid: (lessonId: number, studentId: number, payload?: { cancelBehavior?: PaymentCancelBehavior }) =>
     apiFetch<{ participant: any; lesson: Lesson; link?: TeacherStudent }>(
       `/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`,
       {
         method: 'POST',
+        body: payload ? JSON.stringify(payload) : undefined,
       },
     ),
   getPaymentEvents: (studentId: number, params?: { filter?: string; date?: string }) => {
