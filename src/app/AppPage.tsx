@@ -1073,114 +1073,116 @@ export const AppPage = () => {
 
   return (
     <div className={layoutStyles.page}>
-      <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+      <div className={layoutStyles.pageInner}>
+        <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
-      <main className={layoutStyles.content}>
-        <AppRoutes
-          resolveLastVisitedPath={resolveLastVisitedPath}
-          dashboard={{
-            upcomingLessons,
-            linkedStudents,
-            unpaidLessons,
-            pendingHomeworks: homeworks,
-            onAddStudent: () => {
-              navigate(tabPathById.students);
-              setStudentModalOpen(true);
-            },
-            onCreateLesson: () => {
-              navigate(tabPathById.schedule);
-              setLessonModalOpen(true);
-            },
-            onRemindHomework: () => selectedStudentId && remindHomework(selectedStudentId),
-            onCompleteLesson: markLessonCompleted,
-            onTogglePaid: togglePaid,
-          }}
-          students={{
-            studentListItems,
-            studentListCounts,
-            studentListTotal,
-            studentListLoading,
-            studentListHasMore,
-            studentSearch,
-            studentFilter,
-            selectedStudentId,
-            priceEditState,
-            studentHomeworks,
-            homeworkFilter: studentHomeworkFilter,
-            homeworkListLoading: studentHomeworkLoading,
-            homeworkListHasMore: studentHomeworkHasMore,
-            newHomeworkDraft,
-            onSelectStudent: setSelectedStudentId,
-            onStudentSearchChange: setStudentSearch,
-            onStudentFilterChange: setStudentFilter,
-            onLoadMoreStudents: loadMoreStudents,
-            onHomeworkFilterChange: setStudentHomeworkFilter,
-            onLoadMoreHomeworks: loadMoreStudentHomeworks,
-            onToggleAutoReminder: toggleAutoReminder,
-            onAdjustBalance: adjustBalance,
-            onStartEditPrice: startEditPrice,
-            onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
-            onSavePrice: savePrice,
-            onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
-            onRemindHomework: remindHomework,
-            onRemindHomeworkById: remindHomeworkById,
-            onSendHomework: sendHomeworkToStudent,
-            onDuplicateHomework: duplicateHomework,
-            onDeleteHomework: deleteHomework,
-            onAddHomework: addHomework,
-            onHomeworkDraftChange: (draft) =>
-              setNewHomeworkDraft({
-                ...draft,
-                baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
-              }),
-            onToggleHomework: toggleHomeworkDone,
-            onUpdateHomework: updateHomework,
-            onOpenStudentModal: () => setStudentModalOpen(true),
-            studentLessons,
-            lessonPaymentFilter: studentLessonPaymentFilter,
-            lessonStatusFilter: studentLessonStatusFilter,
-            lessonDateRange: studentLessonDateRange,
-            lessonListLoading: studentLessonLoading,
-            lessonSortOrder: studentLessonSortOrder,
-            onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
-            onLessonStatusFilterChange: setStudentLessonStatusFilter,
-            onLessonDateRangeChange: setStudentLessonDateRange,
-            onLessonSortOrderChange: handleLessonSortOrderChange,
-            payments: paymentEvents,
-            paymentFilter,
-            paymentDate,
-            onPaymentFilterChange: handlePaymentFilterChange,
-            onPaymentDateChange: handlePaymentDateChange,
-            onCompleteLesson: markLessonCompleted,
-            onChangeLessonStatus: updateLessonStatus,
-            onTogglePaid: togglePaid,
-            onCreateLesson: openCreateLessonForStudent,
-            onEditLesson: startEditLesson,
-            onDeleteLesson: deleteLessonById,
-          }}
-          schedule={{
-            scheduleView,
-            onScheduleViewChange: setScheduleView,
-            dayViewDate,
-            onDayShift: handleDayShift,
-            onWeekShift: handleWeekShift,
-            onMonthShift: handleMonthShift,
-            dayLabelKey,
-            weekLabelKey,
-            monthLabelKey,
-            lessons,
-            linkedStudents,
-            monthAnchor,
-            monthOffset,
-            onOpenLessonModal: openLessonModal,
-            onStartEditLesson: startEditLesson,
-            onTogglePaid: togglePaid,
-            onDayViewDateChange: setDayViewDate,
-            onGoToToday: handleGoToToday,
-          }}
-          settings={{ teacher, onTeacherChange: setTeacher }}
-        />
-      </main>
+        <main className={layoutStyles.content}>
+          <AppRoutes
+            resolveLastVisitedPath={resolveLastVisitedPath}
+            dashboard={{
+              upcomingLessons,
+              linkedStudents,
+              unpaidLessons,
+              pendingHomeworks: homeworks,
+              onAddStudent: () => {
+                navigate(tabPathById.students);
+                setStudentModalOpen(true);
+              },
+              onCreateLesson: () => {
+                navigate(tabPathById.schedule);
+                setLessonModalOpen(true);
+              },
+              onRemindHomework: () => selectedStudentId && remindHomework(selectedStudentId),
+              onCompleteLesson: markLessonCompleted,
+              onTogglePaid: togglePaid,
+            }}
+            students={{
+              studentListItems,
+              studentListCounts,
+              studentListTotal,
+              studentListLoading,
+              studentListHasMore,
+              studentSearch,
+              studentFilter,
+              selectedStudentId,
+              priceEditState,
+              studentHomeworks,
+              homeworkFilter: studentHomeworkFilter,
+              homeworkListLoading: studentHomeworkLoading,
+              homeworkListHasMore: studentHomeworkHasMore,
+              newHomeworkDraft,
+              onSelectStudent: setSelectedStudentId,
+              onStudentSearchChange: setStudentSearch,
+              onStudentFilterChange: setStudentFilter,
+              onLoadMoreStudents: loadMoreStudents,
+              onHomeworkFilterChange: setStudentHomeworkFilter,
+              onLoadMoreHomeworks: loadMoreStudentHomeworks,
+              onToggleAutoReminder: toggleAutoReminder,
+              onAdjustBalance: adjustBalance,
+              onStartEditPrice: startEditPrice,
+              onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
+              onSavePrice: savePrice,
+              onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
+              onRemindHomework: remindHomework,
+              onRemindHomeworkById: remindHomeworkById,
+              onSendHomework: sendHomeworkToStudent,
+              onDuplicateHomework: duplicateHomework,
+              onDeleteHomework: deleteHomework,
+              onAddHomework: addHomework,
+              onHomeworkDraftChange: (draft) =>
+                setNewHomeworkDraft({
+                  ...draft,
+                  baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
+                }),
+              onToggleHomework: toggleHomeworkDone,
+              onUpdateHomework: updateHomework,
+              onOpenStudentModal: () => setStudentModalOpen(true),
+              studentLessons,
+              lessonPaymentFilter: studentLessonPaymentFilter,
+              lessonStatusFilter: studentLessonStatusFilter,
+              lessonDateRange: studentLessonDateRange,
+              lessonListLoading: studentLessonLoading,
+              lessonSortOrder: studentLessonSortOrder,
+              onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
+              onLessonStatusFilterChange: setStudentLessonStatusFilter,
+              onLessonDateRangeChange: setStudentLessonDateRange,
+              onLessonSortOrderChange: handleLessonSortOrderChange,
+              payments: paymentEvents,
+              paymentFilter,
+              paymentDate,
+              onPaymentFilterChange: handlePaymentFilterChange,
+              onPaymentDateChange: handlePaymentDateChange,
+              onCompleteLesson: markLessonCompleted,
+              onChangeLessonStatus: updateLessonStatus,
+              onTogglePaid: togglePaid,
+              onCreateLesson: openCreateLessonForStudent,
+              onEditLesson: startEditLesson,
+              onDeleteLesson: deleteLessonById,
+            }}
+            schedule={{
+              scheduleView,
+              onScheduleViewChange: setScheduleView,
+              dayViewDate,
+              onDayShift: handleDayShift,
+              onWeekShift: handleWeekShift,
+              onMonthShift: handleMonthShift,
+              dayLabelKey,
+              weekLabelKey,
+              monthLabelKey,
+              lessons,
+              linkedStudents,
+              monthAnchor,
+              monthOffset,
+              onOpenLessonModal: openLessonModal,
+              onStartEditLesson: startEditLesson,
+              onTogglePaid: togglePaid,
+              onDayViewDateChange: setDayViewDate,
+              onGoToToday: handleGoToToday,
+            }}
+            settings={{ teacher, onTeacherChange: setTeacher }}
+          />
+        </main>
+      </div>
 
       <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
