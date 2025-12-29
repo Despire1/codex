@@ -1,0 +1,67 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 18, 20, 0.5);
+  opacity: 0;
+  transition: opacity 250ms ease;
+  will-change: opacity;
+  z-index: 40;
+}
+
+.overlayOpen {
+  opacity: 1;
+}
+
+.wrapper {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 41;
+  pointer-events: none;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 24px 24px 0 0;
+  padding: 12px 16px 16px;
+  box-shadow: 0 -12px 32px rgba(17, 18, 20, 0.18);
+  transform: translate3d(0, 100%, 0);
+  transition: transform 250ms ease;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  overscroll-behavior: contain;
+  will-change: transform;
+}
+
+.sheetOpen {
+  transform: translate3d(0, 0, 0);
+}
+
+.sheetDragging {
+  transition: none;
+}
+
+.handleZone {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 10px;
+}
+
+.handle {
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(17, 18, 20, 0.2);
+}
+
+.content {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
