@@ -126,7 +126,6 @@ export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
         ))}
       </div>
       <div className={styles.lessonFilterGroup}>
-        <span className={styles.lessonFilterLabel}>Статус:</span>
         {[
           { id: 'all', label: 'Все' },
           { id: 'completed', label: 'Проведены' },

@@ -1482,6 +1482,7 @@
 
 .lessonTableContainer {
   border: 1px solid #e2e8f0;
+  height: 100%;
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
@@ -1876,6 +1877,7 @@
 
 .balanceModeToggle {
   display: inline-flex;
+  width: max-content;
   padding: 4px;
   border-radius: 999px;
   background: #f1f5f9;

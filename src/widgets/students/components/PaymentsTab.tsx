@@ -61,6 +61,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
               </button>
             }
             className={styles.filtersPopoverContent}
+            side={"right"}
           >
             <div className={styles.paymentFilters}>
               {[

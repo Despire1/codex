@@ -109,6 +109,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
               </button>
             }
             className={styles.filtersPopoverContent}
+            side={"right"}
           >
             <div className={`${styles.filters} ${styles.filtersPopoverList}`}>
               {[
