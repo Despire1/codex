@@ -71,6 +71,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [isLessonsMobile, setIsLessonsMobile] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,6 +87,29 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [datePickerOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsLessonsMobile(event.matches);
+    };
+
+    setIsLessonsMobile(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+
+    return () => {
+      if (mediaQuery.addEventListener) {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, []);
 
   const parseDateValue = (value?: string) => {
     if (!value) return undefined;
@@ -133,6 +157,60 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     onLessonSortOrderChange(lessonSortOrder === 'asc' ? 'desc' : 'asc');
   }, [lessonSortOrder, onLessonSortOrderChange]);
 
+  const getLessonDerivedData = useCallback(
+    (lesson: Lesson) => {
+      const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
+      const resolvedPrice = participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
+      const isPaid = participant?.isPaid ?? lesson.isPaid;
+      const isPastLesson = parseISO(lesson.startAt) < new Date();
+      return { participant, resolvedPrice, isPaid, isPastLesson };
+    },
+    [selectedStudent?.pricePerLesson, selectedStudentId],
+  );
+
+  const renderLessonActions = (lesson: Lesson) => (
+    <AdaptivePopover
+      isOpen={openLessonMenuId === lesson.id}
+      onClose={handleCloseLessonMenu}
+      side="bottom"
+      align="end"
+      className={isLessonsMobile ? styles.lessonQuickActionsSheet : undefined}
+      trigger={
+        <button
+          className={controls.iconButton}
+          aria-label="Быстрые действия"
+          title="Быстрые действия"
+          onClick={() => setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))}
+        >
+          <MoreHorizIcon width={18} height={18} />
+        </button>
+      }
+    >
+      <LessonQuickActionsPopover
+        onClose={handleCloseLessonMenu}
+        actions={[
+          {
+            label: 'Отметить проведённым',
+            onClick: () => onCompleteLesson(lesson.id),
+          },
+          {
+            label: 'Отметить оплату',
+            onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
+          },
+          {
+            label: 'Перенести',
+            onClick: () => onEditLesson(lesson),
+          },
+          {
+            label: 'Удалить',
+            onClick: () => setLessonToDelete(lesson),
+            variant: 'danger',
+          },
+        ]}
+      />
+    </AdaptivePopover>
+  );
+
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
       <div className={styles.homeworkHeader}>
@@ -165,140 +243,154 @@ export const LessonsTab: FC<LessonsTabProps> = ({
             ))}
           </div>
         ) : studentLessons.length ? (
-          <TableContainer className={styles.lessonTableContainer}>
-            {lessonListLoading && (
-              <div className={styles.loadingRow}>Обновляем список...</div>
-            )}
-            <Table size="small" aria-label="Список занятий ученика">
-              <TableHead>
-                <TableRow>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className={styles.lessonSortButton}
-                      onClick={handleToggleDateSort}
-                      aria-label={`Сортировать по дате ${lessonSortOrder === 'asc' ? 'по убыванию' : 'по возрастанию'}`}
-                    >
-                      <span>Дата и время</span>
-                      <span className={styles.lessonSortIcon} aria-hidden>
-                        {lessonSortOrder === 'asc' ? '↑' : '↓'}
-                      </span>
-                    </button>
-                  </TableCell>
-                  <TableCell>Длительность</TableCell>
-                  <TableCell>Статус занятия</TableCell>
-                  <TableCell>Статус оплаты</TableCell>
-                  <TableCell align="right">Цена</TableCell>
-                  <TableCell align="right">Быстрые действия</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sortedLessons.map((lesson) => {
-                  const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
-                  const resolvedPrice =
-                    participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
-                  const isPaid = participant?.isPaid ?? lesson.isPaid;
-                  const isPastLesson = parseISO(lesson.startAt) < new Date();
+          isLessonsMobile ? (
+            <div className={styles.lessonCardList}>
+              {lessonListLoading && <div className={styles.loadingRow}>Обновляем список...</div>}
+              {sortedLessons.map((lesson) => {
+                const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
 
-                  return (
-                    <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
-                      <TableCell>
-                        <div className={styles.lessonDateCell}>
-                          <div className={styles.lessonTitle}>
-                            {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                return (
+                  <article key={lesson.id} className={styles.lessonCard}>
+                    <div className={styles.lessonCardHeader}>
+                      <div className={styles.lessonCardDate}>
+                        {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                      </div>
+                      <div className={styles.lessonCardActions}>{renderLessonActions(lesson)}</div>
+                    </div>
+                    <div className={styles.lessonCardStatuses}>
+                      {editableLessonStatusId === lesson.id ? (
+                        <select
+                          className={styles.lessonStatusSelectMobile}
+                          value={lesson.status}
+                          autoFocus
+                          onChange={(event) =>
+                            onLessonStatusChange(lesson.id, event.target.value as Lesson['status'])
+                          }
+                          onBlur={onStopEditLessonStatus}
+                        >
+                          {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
+                          <option value="COMPLETED">Проведён</option>
+                          <option value="CANCELED">Отменён</option>
+                        </select>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.lessonStatusChip}
+                          onClick={() => onStartEditLessonStatus(lesson.id)}
+                        >
+                          {getLessonStatusLabel(lesson.status)}
+                        </button>
+                      )}
+                      <Badge
+                        label={isPaid ? 'Оплачено' : 'Не оплачено'}
+                        variant={isPaid ? 'paid' : 'unpaid'}
+                        className={styles.lessonPaymentChip}
+                      />
+                    </div>
+                    <div className={styles.lessonCardMeta}>
+                      <div className={styles.lessonCardMetaItem}>
+                        <span className={styles.lessonCardMetaLabel}>Длительность</span>
+                        <span className={styles.lessonCardMetaValue}>{lesson.durationMinutes} мин</span>
+                      </div>
+                      <div className={styles.lessonCardMetaItem}>
+                        <span className={styles.lessonCardMetaLabel}>Цена</span>
+                        <span className={styles.lessonCardMetaValue}>{resolvedPrice} ₽</span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <TableContainer className={styles.lessonTableContainer}>
+              {lessonListLoading && (
+                <div className={styles.loadingRow}>Обновляем список...</div>
+              )}
+              <Table size="small" aria-label="Список занятий ученика">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className={styles.lessonSortButton}
+                        onClick={handleToggleDateSort}
+                        aria-label={`Сортировать по дате ${lessonSortOrder === 'asc' ? 'по убыванию' : 'по возрастанию'}`}
+                      >
+                        <span>Дата и время</span>
+                        <span className={styles.lessonSortIcon} aria-hidden>
+                          {lessonSortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      </button>
+                    </TableCell>
+                    <TableCell>Длительность</TableCell>
+                    <TableCell>Статус занятия</TableCell>
+                    <TableCell>Статус оплаты</TableCell>
+                    <TableCell align="right">Цена</TableCell>
+                    <TableCell align="right">Быстрые действия</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedLessons.map((lesson) => {
+                    const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
+
+                    return (
+                      <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
+                        <TableCell>
+                          <div className={styles.lessonDateCell}>
+                            <div className={styles.lessonTitle}>
+                              {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className={styles.monoCell}>{lesson.durationMinutes} мин</TableCell>
-                      <TableCell>
-                        <div className={styles.lessonStatusRow}>
-                          <span className={styles.metaLabel}>Статус:</span>
-                          {editableLessonStatusId === lesson.id ? (
-                            <select
-                              className={styles.lessonStatusSelect}
-                              value={lesson.status}
-                              autoFocus
-                              onChange={(event) =>
-                                onLessonStatusChange(lesson.id, event.target.value as Lesson['status'])
-                              }
-                              onBlur={onStopEditLessonStatus}
-                            >
-                              {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
-                              <option value="COMPLETED">Проведён</option>
-                              <option value="CANCELED">Отменён</option>
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={styles.lessonStatusTrigger}
-                              onClick={() => onStartEditLessonStatus(lesson.id)}
-                            >
-                              {getLessonStatusLabel(lesson.status)}
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          label={isPaid ? 'Оплачено' : 'Не оплачено'}
-                          variant={isPaid ? 'paid' : 'unpaid'}
-                          className={styles.paymentBadge}
-                        />
-                      </TableCell>
-                      <TableCell align="right" className={styles.monoCell}>
-                        {resolvedPrice} ₽
-                      </TableCell>
-                      <TableCell align="right">
-                        <div className={styles.moreActionsWrapper}>
-                          <AdaptivePopover
-                            isOpen={openLessonMenuId === lesson.id}
-                            onClose={handleCloseLessonMenu}
-                            side="bottom"
-                            align="end"
-                            trigger={
-                              <button
-                                className={controls.iconButton}
-                                aria-label="Быстрые действия"
-                                title="Быстрые действия"
-                                onClick={() =>
-                                  setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
+                        </TableCell>
+                        <TableCell className={styles.monoCell}>{lesson.durationMinutes} мин</TableCell>
+                        <TableCell>
+                          <div className={styles.lessonStatusRow}>
+                            <span className={styles.metaLabel}>Статус:</span>
+                            {editableLessonStatusId === lesson.id ? (
+                              <select
+                                className={styles.lessonStatusSelect}
+                                value={lesson.status}
+                                autoFocus
+                                onChange={(event) =>
+                                  onLessonStatusChange(lesson.id, event.target.value as Lesson['status'])
                                 }
+                                onBlur={onStopEditLessonStatus}
                               >
-                                <MoreHorizIcon width={18} height={18} />
+                                {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
+                                <option value="COMPLETED">Проведён</option>
+                                <option value="CANCELED">Отменён</option>
+                              </select>
+                            ) : (
+                              <button
+                                type="button"
+                                className={styles.lessonStatusTrigger}
+                                onClick={() => onStartEditLessonStatus(lesson.id)}
+                              >
+                                {getLessonStatusLabel(lesson.status)}
                               </button>
-                            }
-                          >
-                            <LessonQuickActionsPopover
-                              onClose={handleCloseLessonMenu}
-                              actions={[
-                                {
-                                  label: 'Отметить проведённым',
-                                  onClick: () => onCompleteLesson(lesson.id),
-                                },
-                                {
-                                  label: 'Отметить оплату',
-                                  onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
-                                },
-                                {
-                                  label: 'Перенести',
-                                  onClick: () => onEditLesson(lesson),
-                                },
-                                {
-                                  label: 'Удалить',
-                                  onClick: () => setLessonToDelete(lesson),
-                                  variant: 'danger',
-                                },
-                              ]}
-                            />
-                          </AdaptivePopover>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            label={isPaid ? 'Оплачено' : 'Не оплачено'}
+                            variant={isPaid ? 'paid' : 'unpaid'}
+                            className={styles.paymentBadge}
+                          />
+                        </TableCell>
+                        <TableCell align="right" className={styles.monoCell}>
+                          {resolvedPrice} ₽
+                        </TableCell>
+                        <TableCell align="right">
+                          <div className={styles.moreActionsWrapper}>{renderLessonActions(lesson)}</div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
         ) : (
           <div className={styles.emptyState}>
             <p>Пока нет занятий. Добавьте урок.</p>
