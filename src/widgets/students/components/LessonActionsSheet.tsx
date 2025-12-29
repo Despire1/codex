@@ -33,6 +33,7 @@ export const LessonActionsSheet = ({
   const durationLabel = lesson.durationMinutes ? `${lesson.durationMinutes} мин` : '—';
   const priceLabel = resolvedPrice === undefined || resolvedPrice === null ? '—' : `${resolvedPrice} ₽`;
   const isCompleted = lesson.status === 'COMPLETED';
+  const paymentActionLabel = isPaid ? 'Отменить оплату' : 'Отметить оплату';
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose}>
@@ -57,15 +58,13 @@ export const LessonActionsSheet = ({
         </button>
         <button
           type="button"
-          className={`${styles.actionButton} ${isPaid ? styles.disabled : ''}`}
+          className={styles.actionButton}
           onClick={() => {
-            if (isPaid) return;
             onTogglePaid();
             onClose();
           }}
-          disabled={isPaid}
         >
-          Отметить оплату
+          {paymentActionLabel}
         </button>
         <button
           type="button"

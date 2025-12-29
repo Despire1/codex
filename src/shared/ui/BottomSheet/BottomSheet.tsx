@@ -16,6 +16,7 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
   const [isVisible, setIsVisible] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const startYRef = useRef(0);
   const draggingRef = useRef(false);
   const previousOverflow = useRef('');
@@ -58,6 +59,7 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     draggingRef.current = true;
     startYRef.current = event.clientY;
+    setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -70,6 +72,7 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
   const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    setIsDragging(false);
     event.currentTarget.releasePointerCapture(event.pointerId);
     if (dragOffset > CLOSE_THRESHOLD) {
       onClose();
@@ -90,8 +93,10 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
       />
       <div className={styles.wrapper} aria-hidden={!isOpen}>
         <div
-          className={`${styles.sheet} ${isOpen && !isClosing ? styles.sheetOpen : ''} ${className}`}
-          style={dragOffset ? { transform: `translateY(${dragOffset}px)` } : undefined}
+          className={`${styles.sheet} ${isOpen && !isClosing ? styles.sheetOpen : ''} ${
+            isDragging ? styles.sheetDragging : ''
+          } ${className}`}
+          style={dragOffset ? { transform: `translate3d(0, ${dragOffset}px, 0)` } : undefined}
           onClick={(event) => event.stopPropagation()}
         >
           <div

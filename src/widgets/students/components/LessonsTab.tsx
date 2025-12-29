@@ -178,7 +178,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const formatPriceLabel = (price?: number | null) =>
     price === undefined || price === null ? '—' : `${price} ₽`;
 
-  const renderLessonActions = (lesson: Lesson) => {
+  const renderLessonActions = (lesson: Lesson, isPaid: boolean) => {
     if (isLessonsMobile) {
       return (
         <button
@@ -217,7 +217,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
               onClick: () => onCompleteLesson(lesson.id),
             },
             {
-              label: 'Отметить оплату',
+              label: isPaid ? 'Отменить оплату' : 'Отметить оплату',
               onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
             },
             {
@@ -279,7 +279,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       <div className={styles.lessonCardDate}>
                         {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
                       </div>
-                      <div className={styles.lessonCardActions}>{renderLessonActions(lesson)}</div>
+                      <div className={styles.lessonCardActions}>{renderLessonActions(lesson, isPaid)}</div>
                     </div>
                     <div className={styles.lessonCardStatuses}>
                       {editableLessonStatusId === lesson.id ? (
@@ -406,7 +406,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           {formatPriceLabel(resolvedPrice)}
                         </TableCell>
                         <TableCell align="right">
-                          <div className={styles.moreActionsWrapper}>{renderLessonActions(lesson)}</div>
+                          <div className={styles.moreActionsWrapper}>{renderLessonActions(lesson, isPaid)}</div>
                         </TableCell>
                       </TableRow>
                     );
