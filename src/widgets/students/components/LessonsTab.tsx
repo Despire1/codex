@@ -74,6 +74,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [isLessonsMobile, setIsLessonsMobile] = useState(false);
   const [activeLessonActions, setActiveLessonActions] = useState<Lesson | null>(null);
+  const [isLessonSheetOpen, setIsLessonSheetOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,6 +113,15 @@ export const LessonsTab: FC<LessonsTabProps> = ({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (isLessonSheetOpen) return undefined;
+    if (!activeLessonActions) return undefined;
+    const timer = window.setTimeout(() => {
+      setActiveLessonActions(null);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [activeLessonActions, isLessonSheetOpen]);
 
   const parseDateValue = (value?: string) => {
     if (!value) return undefined;
@@ -185,7 +195,10 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           className={controls.iconButton}
           aria-label="Быстрые действия"
           title="Быстрые действия"
-          onClick={() => setActiveLessonActions(lesson)}
+          onClick={() => {
+            setActiveLessonActions(lesson);
+            setIsLessonSheetOpen(true);
+          }}
         >
           <MoreHorizIcon width={18} height={18} />
         </button>
@@ -429,10 +442,10 @@ export const LessonsTab: FC<LessonsTabProps> = ({
       </div>
       <LessonActionsSheet
         lesson={activeLessonActions}
-        isOpen={Boolean(activeLessonActions)}
+        isOpen={isLessonSheetOpen}
         isPaid={activeLessonDerived?.isPaid ?? false}
         resolvedPrice={activeLessonDerived?.resolvedPrice}
-        onClose={() => setActiveLessonActions(null)}
+        onClose={() => setIsLessonSheetOpen(false)}
         onComplete={() => {
           if (!activeLessonActions) return;
           onCompleteLesson(activeLessonActions.id);
