@@ -14,7 +14,7 @@ const CLOSE_THRESHOLD = 80;
 
 export const BottomSheet = ({ isOpen, onClose, children, className = '' }: BottomSheetProps) => {
   const [isVisible, setIsVisible] = useState(isOpen);
-  const [isClosing, setIsClosing] = useState(false);
+  const [isPresented, setIsPresented] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startYRef = useRef(0);
@@ -24,14 +24,15 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      setIsClosing(false);
-      return undefined;
+      const frame = window.requestAnimationFrame(() => {
+        setIsPresented(true);
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
+    setIsPresented(false);
     if (!isVisible) return undefined;
-    setIsClosing(true);
     const timer = window.setTimeout(() => {
       setIsVisible(false);
-      setIsClosing(false);
       setDragOffset(0);
     }, ANIMATION_DURATION);
 
@@ -87,13 +88,13 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
   return createPortal(
     <>
       <div
-        className={`${styles.overlay} ${isOpen && !isClosing ? styles.overlayOpen : ''}`}
+        className={`${styles.overlay} ${isPresented ? styles.overlayOpen : ''}`}
         onClick={onClose}
         aria-hidden
       />
       <div className={styles.wrapper} aria-hidden={!isOpen}>
         <div
-          className={`${styles.sheet} ${isOpen && !isClosing ? styles.sheetOpen : ''} ${
+          className={`${styles.sheet} ${isPresented ? styles.sheetOpen : ''} ${
             isDragging ? styles.sheetDragging : ''
           } ${className}`}
           style={dragOffset ? { transform: `translate3d(0, ${dragOffset}px, 0)` } : undefined}
