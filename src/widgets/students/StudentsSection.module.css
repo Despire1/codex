@@ -963,6 +963,10 @@
   background: #f3f4f6;
 }
 
+.lessonQuickActionsSheet {
+  z-index: 60;
+}
+
 .statusPill {
   padding: 8px 12px;
   border-radius: 12px;
@@ -1397,6 +1401,95 @@
 
 .lessonTableWrapper {
   margin-top: 12px;
+}
+
+.lessonCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lessonCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lessonCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.lessonCardDate {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lessonCardActions {
+  display: flex;
+  align-items: center;
+}
+
+.lessonCardStatuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lessonStatusChip {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #1f2937;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.lessonStatusSelectMobile {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lessonPaymentChip {
+  font-size: 12px;
+}
+
+.lessonCardMeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lessonCardMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lessonCardMetaLabel {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.lessonCardMetaValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .lessonTableContainer {
@@ -2145,6 +2238,24 @@
   .paymentAmount {
     margin-left: 0;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .lessonQuickActionsSheet {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0;
+    width: 100%;
+    padding: 0 16px 16px;
+    box-sizing: border-box;
+  }
+
+  .lessonQuickActionsSheet .moreMenu {
+    width: 100%;
+    border-radius: 16px;
+    box-shadow: 0 -12px 28px rgba(15, 23, 42, 0.24);
   }
 }
 
