@@ -315,6 +315,10 @@
   height: 54px;
 }
 
+.skeletonLessonCard {
+  height: 122px;
+}
+
 .loadMoreSentinel {
   display: flex;
   justify-content: center;
@@ -1399,6 +1403,83 @@
   margin-top: 12px;
 }
 
+.lessonCardsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lessonCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lessonCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lessonCardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lessonCardBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lessonStatusChip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lessonStatusSelectCompact {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.lessonCardBadge {
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.lessonCardMeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.lessonCardMetaItem {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.lessonCardMetaItem span {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.lessonCardPrice {
+  text-align: right;
+}
+
 .lessonTableContainer {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -1515,6 +1596,91 @@
 .metaLabel {
   font-weight: 600;
   color: #111827;
+}
+
+.lessonFab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 1100;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+  cursor: pointer;
+}
+
+.lessonFab:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.lessonFilterSummary {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.lessonFilterClear {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lessonFilterSheetFooter {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.lessonFilterSheetFooter button {
+  flex: 1;
+}
+
+.lessonActionSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lessonActionSheetHeader {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111827;
+}
+
+.lessonActionSheetButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lessonActionSheetButton {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lessonActionSheetDanger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .modalOverlay {
