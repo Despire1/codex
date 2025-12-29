@@ -18,6 +18,7 @@ import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
 import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
 import { LessonFiltersPopover } from './LessonFiltersPopover';
+import { LessonActionsSheet } from './LessonActionsSheet';
 
 interface LessonsTabProps {
   studentLessons: Lesson[];
@@ -72,6 +73,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [isLessonsMobile, setIsLessonsMobile] = useState(false);
+  const [activeLessonActions, setActiveLessonActions] = useState<Lesson | null>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const getLessonDerivedData = useCallback(
     (lesson: Lesson) => {
       const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
-      const resolvedPrice = participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price ?? 0;
+      const resolvedPrice = participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price;
       const isPaid = participant?.isPaid ?? lesson.isPaid;
       const isPastLesson = parseISO(lesson.startAt) < new Date();
       return { participant, resolvedPrice, isPaid, isPastLesson };
@@ -168,48 +170,70 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     [selectedStudent?.pricePerLesson, selectedStudentId],
   );
 
-  const renderLessonActions = (lesson: Lesson) => (
-    <AdaptivePopover
-      isOpen={openLessonMenuId === lesson.id}
-      onClose={handleCloseLessonMenu}
-      side="bottom"
-      align="end"
-      className={isLessonsMobile ? styles.lessonQuickActionsSheet : undefined}
-      trigger={
+  const activeLessonDerived = useMemo(
+    () => (activeLessonActions ? getLessonDerivedData(activeLessonActions) : null),
+    [activeLessonActions, getLessonDerivedData],
+  );
+
+  const formatPriceLabel = (price?: number | null) =>
+    price === undefined || price === null ? '—' : `${price} ₽`;
+
+  const renderLessonActions = (lesson: Lesson) => {
+    if (isLessonsMobile) {
+      return (
         <button
           className={controls.iconButton}
           aria-label="Быстрые действия"
           title="Быстрые действия"
-          onClick={() => setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))}
+          onClick={() => setActiveLessonActions(lesson)}
         >
           <MoreHorizIcon width={18} height={18} />
         </button>
-      }
-    >
-      <LessonQuickActionsPopover
+      );
+    }
+
+    return (
+      <AdaptivePopover
+        isOpen={openLessonMenuId === lesson.id}
         onClose={handleCloseLessonMenu}
-        actions={[
-          {
-            label: 'Отметить проведённым',
-            onClick: () => onCompleteLesson(lesson.id),
-          },
-          {
-            label: 'Отметить оплату',
-            onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
-          },
-          {
-            label: 'Перенести',
-            onClick: () => onEditLesson(lesson),
-          },
-          {
-            label: 'Удалить',
-            onClick: () => setLessonToDelete(lesson),
-            variant: 'danger',
-          },
-        ]}
-      />
-    </AdaptivePopover>
-  );
+        side="bottom"
+        align="end"
+        trigger={
+          <button
+            className={controls.iconButton}
+            aria-label="Быстрые действия"
+            title="Быстрые действия"
+            onClick={() => setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))}
+          >
+            <MoreHorizIcon width={18} height={18} />
+          </button>
+        }
+      >
+        <LessonQuickActionsPopover
+          onClose={handleCloseLessonMenu}
+          actions={[
+            {
+              label: 'Отметить проведённым',
+              onClick: () => onCompleteLesson(lesson.id),
+            },
+            {
+              label: 'Отметить оплату',
+              onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
+            },
+            {
+              label: 'Перенести',
+              onClick: () => onEditLesson(lesson),
+            },
+            {
+              label: 'Удалить',
+              onClick: () => setLessonToDelete(lesson),
+              variant: 'danger',
+            },
+          ]}
+        />
+      </AdaptivePopover>
+    );
+  };
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
@@ -294,7 +318,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       </div>
                       <div className={styles.lessonCardMetaItem}>
                         <span className={styles.lessonCardMetaLabel}>Цена</span>
-                        <span className={styles.lessonCardMetaValue}>{resolvedPrice} ₽</span>
+                        <span className={styles.lessonCardMetaValue}>{formatPriceLabel(resolvedPrice)}</span>
                       </div>
                     </div>
                   </article>
@@ -379,7 +403,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           />
                         </TableCell>
                         <TableCell align="right" className={styles.monoCell}>
-                          {resolvedPrice} ₽
+                          {formatPriceLabel(resolvedPrice)}
                         </TableCell>
                         <TableCell align="right">
                           <div className={styles.moreActionsWrapper}>{renderLessonActions(lesson)}</div>
@@ -403,6 +427,29 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           </div>
         )}
       </div>
+      <LessonActionsSheet
+        lesson={activeLessonActions}
+        isOpen={Boolean(activeLessonActions)}
+        isPaid={activeLessonDerived?.isPaid ?? false}
+        resolvedPrice={activeLessonDerived?.resolvedPrice}
+        onClose={() => setActiveLessonActions(null)}
+        onComplete={() => {
+          if (!activeLessonActions) return;
+          onCompleteLesson(activeLessonActions.id);
+        }}
+        onTogglePaid={() => {
+          if (!activeLessonActions) return;
+          onTogglePaid(activeLessonActions.id, selectedStudentId ?? undefined);
+        }}
+        onEdit={() => {
+          if (!activeLessonActions) return;
+          onEditLesson(activeLessonActions);
+        }}
+        onDelete={() => {
+          if (!activeLessonActions) return;
+          setLessonToDelete(activeLessonActions);
+        }}
+      />
       <LessonDeleteConfirmModal
         open={Boolean(lessonToDelete)}
         lessonId={lessonToDelete?.id}
