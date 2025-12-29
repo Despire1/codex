@@ -2,6 +2,7 @@ import { FC, TouchEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { PaymentEventType, Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
+import { NumberInput } from '../../../shared/ui/NumberInput/NumberInput';
 import styles from '../StudentsSection.module.css';
 
 const quickValues = [1, 2, 4, 8];
@@ -37,7 +38,8 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const touchStartY = useRef<number | null>(null);
 
-  const isSaveDisabled = isSubmitting || lessonCount < 1;
+  const normalizedLessonCount = Math.abs(Math.trunc(lessonCount));
+  const isSaveDisabled = isSubmitting || normalizedLessonCount < 1;
   const currentBalance = student?.link.balanceLessons ?? 0;
 
   useEffect(() => {
@@ -60,12 +62,24 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
 
   const handleQuickAdd = (delta: number) => {
     const signedDelta = operationMode === 'remove' ? -delta : delta;
-    setLessonCount((prev) => Math.max(0, prev + signedDelta));
+    setLessonCount((prev) => prev + signedDelta);
+  };
+
+  const handleModeChange = (nextMode: 'add' | 'remove') => {
+    setOperationMode(nextMode);
+    setLessonCount((prev) => (nextMode === 'remove' ? -Math.abs(prev) : Math.abs(prev)));
+  };
+
+  const handleLessonChange = (value: number) => {
+    if (value < 0 && operationMode !== 'remove') {
+      setOperationMode('remove');
+    }
+    setLessonCount(value);
   };
 
   const handleSubmit = async () => {
     if (!student) return;
-    const normalizedCount = Math.floor(lessonCount);
+    const normalizedCount = Math.abs(Math.trunc(lessonCount));
     if (normalizedCount < 1) {
       setErrorMessage('Добавьте хотя бы одно занятие.');
       return;
@@ -152,7 +166,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
               className={`${styles.balanceModeButton} ${
                 operationMode === 'add' ? styles.balanceModeButtonActive : ''
               }`}
-              onClick={() => setOperationMode('add')}
+              onClick={() => handleModeChange('add')}
             >
               Пополнить
             </button>
@@ -161,7 +175,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
               className={`${styles.balanceModeButton} ${
                 operationMode === 'remove' ? styles.balanceModeButtonActive : ''
               }`}
-              onClick={() => setOperationMode('remove')}
+              onClick={() => handleModeChange('remove')}
             >
               Списать
             </button>
@@ -187,13 +201,12 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
             <span className={styles.modalLabel}>
               {operationMode === 'remove' ? 'Списать занятий' : 'Добавить занятий'}
             </span>
-            <input
-              className={styles.modalInput}
-              type="number"
-              min={1}
-              step={1}
+            <NumberInput
+              className={styles.modalNumberInput}
               value={lessonCount}
-              onChange={(event) => setLessonCount(Math.max(0, Number(event.target.value)))}
+              onChange={handleLessonChange}
+              step={1}
+              ariaLabel={operationMode === 'remove' ? 'Списать занятий' : 'Добавить занятий'}
             />
           </label>
           <label className={styles.modalField}>

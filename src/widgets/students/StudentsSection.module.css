@@ -1596,6 +1596,10 @@
   color: var(--text);
 }
 
+.modalNumberInput {
+  width: 100%;
+}
+
 .modalSelect {
   border-radius: 10px;
   border: 1px solid var(--border);
