@@ -30,7 +30,6 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   onSubmit,
 }) => {
   const [lessonCount, setLessonCount] = useState(1);
-  const [operationMode, setOperationMode] = useState<'add' | 'remove'>('add');
   const [operationType, setOperationType] = useState<BalanceOperationType>('TOP_UP');
   const [comment, setComment] = useState('');
   const [dateTime, setDateTime] = useState(defaultDateTime);
@@ -38,14 +37,14 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const touchStartY = useRef<number | null>(null);
 
-  const normalizedLessonCount = Math.abs(Math.trunc(lessonCount));
-  const isSaveDisabled = isSubmitting || normalizedLessonCount < 1;
+  const normalizedLessonCount = Math.trunc(lessonCount);
+  const isRemoval = normalizedLessonCount < 0;
+  const isSaveDisabled = isSubmitting || normalizedLessonCount === 0;
   const currentBalance = student?.link.balanceLessons ?? 0;
 
   useEffect(() => {
     if (!isOpen) return;
     setLessonCount(1);
-    setOperationMode('add');
     setOperationType('TOP_UP');
     setComment('');
     setDateTime(defaultDateTime());
@@ -53,44 +52,35 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   }, [isOpen, student?.id]);
 
   useEffect(() => {
-    if (operationMode === 'remove') {
+    if (isRemoval) {
       setOperationType('ADJUSTMENT');
     } else if (operationType === 'ADJUSTMENT') {
       setOperationType('TOP_UP');
     }
-  }, [operationMode, operationType]);
+  }, [isRemoval, operationType]);
 
   const handleQuickAdd = (delta: number) => {
-    const signedDelta = operationMode === 'remove' ? -delta : delta;
-    setLessonCount((prev) => prev + signedDelta);
-  };
-
-  const handleModeChange = (nextMode: 'add' | 'remove') => {
-    setOperationMode(nextMode);
-    setLessonCount((prev) => (nextMode === 'remove' ? -Math.abs(prev) : Math.abs(prev)));
+    const direction = lessonCount < 0 ? -1 : 1;
+    setLessonCount((prev) => prev + direction * delta);
   };
 
   const handleLessonChange = (value: number) => {
-    if (value < 0 && operationMode !== 'remove') {
-      setOperationMode('remove');
-    }
     setLessonCount(value);
   };
 
   const handleSubmit = async () => {
     if (!student) return;
-    const normalizedCount = Math.abs(Math.trunc(lessonCount));
-    if (normalizedCount < 1) {
-      setErrorMessage('Добавьте хотя бы одно занятие.');
+    const normalizedCount = Math.trunc(lessonCount);
+    if (normalizedCount === 0) {
+      setErrorMessage('Введите значение отличное от нуля.');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage('');
     try {
-      const signedDelta = operationMode === 'remove' ? -normalizedCount : normalizedCount;
       await onSubmit({
-        delta: signedDelta,
+        delta: normalizedCount,
         type: operationType,
         comment: comment.trim() ? comment.trim() : undefined,
         createdAt: dateTime || undefined,
@@ -120,7 +110,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   };
 
   const operationOptions = useMemo(() => {
-    if (operationMode === 'remove') {
+    if (isRemoval) {
       return [{ value: 'ADJUSTMENT', label: 'Списание занятий' }];
     }
     return [
@@ -129,7 +119,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
       { value: 'SUBSCRIPTION', label: 'Абонемент' },
       { value: 'OTHER', label: 'Другое' },
     ];
-  }, [operationMode]);
+  }, [isRemoval]);
 
   if (!isOpen || !student) return null;
 
@@ -146,12 +136,12 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
         onTouchEnd={handleTouchEnd}
         role="dialog"
         aria-modal="true"
-        aria-label="Пополнить баланс"
+        aria-label="Изменение баланса"
       >
         {isMobile && <div className={styles.modalHandle} />}
         <div className={styles.modalHeader}>
           <div>
-            <div className={styles.modalTitle}>Пополнить баланс</div>
+            <div className={styles.modalTitle}>Изменение баланса</div>
             <div className={styles.modalSubtitle}>{student.link.customName}</div>
           </div>
           <button className={styles.modalClose} type="button" onClick={onClose} aria-label="Закрыть">
@@ -160,29 +150,9 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
         </div>
         <div className={styles.modalBody}>
           <div className={styles.balanceMeta}>Текущий баланс: {currentBalance} занятий</div>
-          <div className={styles.balanceModeToggle}>
-            <button
-              type="button"
-              className={`${styles.balanceModeButton} ${
-                operationMode === 'add' ? styles.balanceModeButtonActive : ''
-              }`}
-              onClick={() => handleModeChange('add')}
-            >
-              Пополнить
-            </button>
-            <button
-              type="button"
-              className={`${styles.balanceModeButton} ${
-                operationMode === 'remove' ? styles.balanceModeButtonActive : ''
-              }`}
-              onClick={() => handleModeChange('remove')}
-            >
-              Списать
-            </button>
-          </div>
           <div className={styles.balanceQuickRow}>
             <span className={styles.modalLabel}>
-              {operationMode === 'remove' ? 'Быстро списать' : 'Быстро добавить'}
+              Быстро изменить
             </span>
             <div className={styles.balanceQuickButtons}>
               {quickValues.map((value) => (
@@ -192,21 +162,21 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
                   className={styles.balanceQuickButton}
                   onClick={() => handleQuickAdd(value)}
                 >
-                  {operationMode === 'remove' ? `-${value}` : `+${value}`}
+                  {lessonCount < 0 ? `-${value}` : `+${value}`}
                 </button>
               ))}
             </div>
           </div>
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>
-              {operationMode === 'remove' ? 'Списать занятий' : 'Добавить занятий'}
+              Изменить баланс занятий
             </span>
             <NumberInput
               className={styles.modalNumberInput}
               value={lessonCount}
               onChange={handleLessonChange}
               step={1}
-              ariaLabel={operationMode === 'remove' ? 'Списать занятий' : 'Добавить занятий'}
+              ariaLabel="Изменить баланс занятий"
             />
           </label>
           <label className={styles.modalField}>
@@ -215,7 +185,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
               className={styles.modalSelect}
               value={operationType}
               onChange={(event) => setOperationType(event.target.value as BalanceOperationType)}
-              disabled={operationMode === 'remove'}
+              disabled={isRemoval}
             >
               {operationOptions.map((option) => (
                 <option key={option.value} value={option.value}>
