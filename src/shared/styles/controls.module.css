@@ -1,20 +1,20 @@
 .input {
   width: 100%;
   padding: 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-slate-300);
   border-radius: 12px;
   font-size: 14px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .textArea {
   width: 100%;
   padding: 12px;
   min-height: 80px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-slate-300);
   border-radius: 12px;
   font-size: 14px;
-  background: #fff;
+  background: var(--color-surface);
   resize: vertical;
 }
 
@@ -22,44 +22,44 @@
   padding: 12px;
   border: none;
   border-radius: 12px;
-  background: #2563eb;
-  color: #fff;
+  background: var(--color-blue-600);
+  color: var(--color-on-primary);
   font-weight: 600;
   cursor: pointer;
 }
 
 .primaryGhost {
   padding: 12px;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--color-blue-600);
   border-radius: 12px;
-  background: #e0ebff;
-  color: #1d4ed8;
+  background: var(--color-blue-100);
+  color: var(--color-blue-700);
   font-weight: 600;
   cursor: pointer;
 }
 
 .secondaryButton {
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 12px;
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
 }
 
 .dangerButton {
   padding: 10px;
-  border: 1px solid #fecdd3;
+  border: 1px solid var(--color-rose-200);
   border-radius: 12px;
-  background: #fff1f2;
-  color: #b91c1c;
+  background: var(--color-rose-50);
+  color: var(--color-red-700);
   cursor: pointer;
 }
 
 .smallButton {
   padding: 8px 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
   font-size: 13px;
 }
@@ -71,9 +71,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-surface);
+  color: var(--color-slate-900);
   cursor: pointer;
 }
 
@@ -97,7 +97,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e1;
+  background-color: var(--color-slate-300);
   transition: 0.2s;
   border-radius: 34px;
 }
@@ -116,7 +116,7 @@
 }
 
 .switch input:checked + .slider {
-  background-color: #2563eb;
+  background-color: var(--color-blue-600);
 }
 
 .switch input:checked + .slider:before {
@@ -131,5 +131,5 @@
 }
 
 .error {
-  color: #dc2626;
+  color: var(--color-red-600);
 }

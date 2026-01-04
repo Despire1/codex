@@ -3,10 +3,10 @@
   grid-template-columns: 2fr 1fr;
   gap: 16px;
   padding: 14px 16px;
-  background: linear-gradient(120deg, rgba(91, 141, 239, 0.12), rgba(91, 141, 239, 0.04));
+  background: linear-gradient(120deg, var(--shadow-primary-12), rgba(91, 141, 239, 0.04));
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 10px 28px rgba(91, 141, 239, 0.16);
+  box-shadow: 0 10px 28px var(--shadow-primary-16);
 }
 
 .levelBlock {
@@ -34,11 +34,11 @@
   align-items: center;
   justify-content: center;
   padding: 6px 10px;
-  background: #fff;
+  background: var(--color-surface);
   color: var(--primary-strong);
   font-weight: 800;
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1px rgba(91, 141, 239, 0.3);
+  box-shadow: inset 0 0 0 1px var(--shadow-primary-30);
 }
 
 .xp {
@@ -51,7 +51,7 @@
   width: 100%;
   height: 12px;
   border-radius: 999px;
-  background: rgba(91, 141, 239, 0.16);
+  background: var(--shadow-primary-16);
   overflow: hidden;
 }
 
@@ -76,7 +76,7 @@
 
 .reward,
 .completion {
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border);

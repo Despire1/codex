@@ -4,9 +4,9 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 10px;
-  background: #0f172a;
+  background: var(--color-slate-900);
   border-radius: 0;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 12px 28px var(--shadow-slate-900-25);
   width: 100%;
 }
 
@@ -19,17 +19,17 @@
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
-  color: #cbd5e1;
+  color: var(--color-slate-300);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .tabActive {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+  background: var(--color-blue-600);
+  color: var(--color-on-primary);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 10px 20px var(--shadow-blue-600-30);
 }
 
 .tabIcon {

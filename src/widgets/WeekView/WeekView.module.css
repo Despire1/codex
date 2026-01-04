@@ -1,7 +1,7 @@
 .wrapper {
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: #fff;
+  background: var(--color-surface);
   overflow: hidden;
 }
 
@@ -15,7 +15,7 @@
   display: grid;
   grid-template-columns: 90px repeat(7, 1fr);
   background: linear-gradient(120deg, var(--primary-weak), var(--primary));
-  color: #fff;
+  color: var(--color-on-primary);
   padding: 12px 10px;
   gap: 4px;
 }
@@ -43,7 +43,7 @@
 }
 
 .hourLabel {
-  background: #fff;
+  background: var(--color-surface);
   font-size: 12px;
   color: var(--muted);
   display: flex;
@@ -62,9 +62,9 @@
   right: 6px;
   border-radius: 10px;
   padding: 8px;
-  background: linear-gradient(180deg, #ffffff 0%, #f0f6ff 100%);
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-sky-30) 100%);
   border: 1px solid var(--border);
-  box-shadow: 0 6px 16px rgba(91, 141, 239, 0.18);
+  box-shadow: 0 6px 16px var(--shadow-primary-18);
 }
 
 .taskRow {

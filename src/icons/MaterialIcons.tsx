@@ -114,6 +114,18 @@ export const MoreHorizIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const LightModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5 1.06 2.37L15.7 5l-2.64.63L12 8l-1.06-2.37L8.3 5l2.64-.63L12 2zm8 8-2.37 1.06L17 13.7l.63-2.64L20 10zm-16 0 .63 2.64L7 13.7l-2.63-1.64L4 10zm12.7 7 2.64.63-1.64 2.63-2.37-1.06L15 17zm-9.4 0-1.06 2.37-2.64-.63L7 17l.63 2.64L7 19.7 4.37 18.06 7 17zm9.4-12L19.33 4.37 18.06 7 16.7 6.37 15 7l.7-2.64zM7.3 5 5.94 7 4.37 4.37 7 5l.3 0z" />
+  </svg>
+);
+
+export const DarkModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 2a9.77 9.77 0 0 0 0 20 9.64 9.64 0 0 0 7.5-3.5A8 8 0 0 1 12 4a8 8 0 0 1 .5-2z" />
+  </svg>
+);
+
 export const CloseIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />

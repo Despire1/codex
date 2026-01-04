@@ -5,11 +5,11 @@
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-slate-200);
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
 }
 
 .cardHeader {
@@ -32,8 +32,8 @@
 }
 
 .statCard {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
   padding: 10px;
 }
@@ -44,7 +44,7 @@
 }
 
 .statLabel {
-  color: #64748b;
+  color: var(--color-slate-500);
   font-size: 12px;
 }
 
@@ -53,10 +53,10 @@
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 12px;
   margin-bottom: 8px;
-  background: #f8fafc;
+  background: var(--color-slate-50);
 }
 
 .lessonTitle {
@@ -64,12 +64,12 @@
 }
 
 .lessonTime {
-  color: #94a3b8;
+  color: var(--color-slate-400);
   font-size: 12px;
 }
 
 .lessonMeta {
-  color: #94a3b8;
+  color: var(--color-slate-400);
   font-size: 13px;
 }
 
@@ -80,6 +80,6 @@
 }
 
 .muted {
-  color: #94a3b8;
+  color: var(--color-slate-400);
   font-size: 13px;
 }

@@ -7,7 +7,7 @@
 .title {
   font-size: 18px;
   font-weight: 600;
-  color: #1b1c21;
+  color: var(--color-ink-900);
 }
 
 .subtitle {
@@ -16,8 +16,8 @@
 }
 
 .actionsCard {
-  background: #ffffff;
-  border: 1px solid #e4e6eb;
+  background: var(--color-surface);
+  border: 1px solid var(--color-gray-250);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -29,12 +29,12 @@
   background: transparent;
   text-align: left;
   font-size: 16px;
-  color: #1b1c21;
+  color: var(--color-ink-900);
   cursor: pointer;
 }
 
 .actionButton + .actionButton {
-  border-top: 1px solid #e4e6eb;
+  border-top: 1px solid var(--color-gray-250);
 }
 
 .danger {
@@ -50,9 +50,9 @@
   width: 100%;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid #e4e6eb;
-  background: #ffffff;
+  border: 1px solid var(--color-gray-250);
+  background: var(--color-surface);
   font-size: 16px;
-  color: #1b1c21;
+  color: var(--color-ink-900);
   cursor: pointer;
 }

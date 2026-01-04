@@ -1,6 +1,8 @@
 import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
 import { tabs, type TabId } from '../../app/tabs';
+import { DarkModeIcon, LightModeIcon } from '../../icons/MaterialIcons';
+import { useTheme } from '../../shared/lib/theme';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -14,6 +16,11 @@ export const Topbar: FC<TopbarProps> = ({
   activeTab,
   onTabChange,
 }) => {
+  const { isDark, toggleTheme } = useTheme();
+
+  const themeLabel = isDark ? 'Тёмная' : 'Светлая';
+  const themeHint = isDark ? 'Переключить на светлую тему' : 'Переключить на тёмную тему';
+
   return (
     <header className={styles.topbar}>
       <div className={styles.topbarGreeting}>
@@ -35,6 +42,15 @@ export const Topbar: FC<TopbarProps> = ({
             </button>
           ))}
         </nav>
+      </div>
+
+      <div className={styles.topbarActions}>
+        <button type="button" className={styles.themeToggle} onClick={toggleTheme} aria-label={themeHint}>
+          <span className={styles.themeIcon} aria-hidden>
+            {isDark ? <LightModeIcon /> : <DarkModeIcon />}
+          </span>
+          <span className={styles.themeLabel}>{themeLabel}</span>
+        </button>
       </div>
     </header>
   );

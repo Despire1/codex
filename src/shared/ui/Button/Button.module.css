@@ -3,10 +3,10 @@
   border-radius: 10px;
   padding: 10px 14px;
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: #fff;
+  color: var(--color-on-primary);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(91, 141, 239, 0.3);
+  box-shadow: 0 6px 18px var(--shadow-primary-30);
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 

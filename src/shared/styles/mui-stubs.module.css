@@ -10,7 +10,7 @@
 
 .label {
   font-size: 13px;
-  color: #475569;
+  color: var(--color-slate-600);
   font-weight: 600;
 }
 
@@ -19,10 +19,10 @@
 .textInput {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-slate-300);
   border-radius: 10px;
   font-size: 14px;
-  background: #fff;
+  background: var(--color-surface);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -30,22 +30,22 @@
 .select:focus,
 .textInput:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 0 0 2px var(--shadow-blue-600-12);
 }
 
 .helperText {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-slate-500);
 }
 
 .error .textInput,
 .error .select {
-  border-color: #ef4444;
+  border-color: var(--color-red-500);
 }
 
 .errorText {
-  color: #dc2626;
+  color: var(--color-red-600);
 }
 
 .checkboxRow {
@@ -57,7 +57,7 @@
 .checkboxInput {
   width: 18px;
   height: 18px;
-  accent-color: #2563eb;
+  accent-color: var(--color-blue-600);
 }
 
 .toggleGroup {
@@ -69,26 +69,26 @@
 .toggleButton {
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
+  border: 1px solid var(--color-slate-300);
+  background: var(--color-slate-50);
   cursor: pointer;
   font-size: 13px;
 }
 
 .toggleButton.selected {
-  background: #2563eb;
-  color: #fff;
-  border-color: #1d4ed8;
+  background: var(--color-blue-600);
+  color: var(--color-on-primary);
+  border-color: var(--color-blue-700);
 }
 
 .inlineLabel {
   font-size: 14px;
-  color: #0f172a;
+  color: var(--color-slate-900);
 }
 
 .caption {
   font-size: 12px;
-  color: #475569;
+  color: var(--color-slate-600);
 }
 
 .stack {

@@ -5,11 +5,11 @@
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-slate-200);
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
 }
 
 .cardHeader {
@@ -34,12 +34,12 @@
 }
 
 .muted {
-  color: #94a3b8;
+  color: var(--color-slate-400);
   font-size: 13px;
 }
 
 .label {
   font-size: 13px;
-  color: #64748b;
+  color: var(--color-slate-500);
   margin-bottom: 4px;
 }

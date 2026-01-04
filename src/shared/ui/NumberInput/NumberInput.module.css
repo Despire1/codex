@@ -5,7 +5,7 @@
   padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--color-surface);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -33,15 +33,15 @@
   height: 28px;
   border-radius: 8px;
   border: none;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-slate-100);
+  color: var(--color-slate-900);
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .stepButton:hover {
-  background: #e2e8f0;
+  background: var(--color-slate-200);
 }
 
 .stepButton:active {
