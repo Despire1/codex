@@ -1,6 +1,7 @@
 import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
 import { tabs, type TabId } from '../../app/tabs';
+import { ThemeToggle } from '../../shared/ui/ThemeToggle/ThemeToggle';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -35,6 +36,10 @@ export const Topbar: FC<TopbarProps> = ({
             </button>
           ))}
         </nav>
+      </div>
+
+      <div className={styles.topbarActions}>
+        <ThemeToggle />
       </div>
     </header>
   );

@@ -25,7 +25,7 @@
 
 .toggle button.active {
   background: linear-gradient(120deg, var(--primary-weak), var(--primary));
-  color: var(--color-white);
+  color: var(--text-inverse);
 }
 
 .title {

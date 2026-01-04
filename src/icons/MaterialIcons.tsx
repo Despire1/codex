@@ -27,6 +27,19 @@ export const SettingsIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const DarkModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M9.37 5.51A7 7 0 0 0 12 19a7 7 0 0 0 6.49-4.37 9 9 0 0 1-9.12-9.12z" />
+    <path d="M12 3a9 9 0 1 0 9 9c0-.34-.02-.68-.06-1.02A7.99 7.99 0 0 1 12 3z" />
+  </svg>
+);
+
+export const LightModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 1 1-2 0V5.5a1 1 0 0 1 1-1zm0 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.5-3.5a1 1 0 0 1 1 1v.01a1 1 0 1 1-2 0V12a1 1 0 0 1 1-1zM12 17a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V18a1 1 0 0 1 1-1zm-7.5-5a1 1 0 0 1 1 1v.01a1 1 0 1 1-2 0V12a1 1 0 0 1 1-1zm11.66-5.66a1 1 0 0 1 1.41 0l.01.01a1 1 0 1 1-1.42 1.41l-.01-.01a1 1 0 0 1 0-1.41zM6.93 16.07a1 1 0 0 1 1.41 0l.01.01a1 1 0 1 1-1.42 1.41l-.01-.01a1 1 0 0 1 0-1.41zM17.07 16.07a1 1 0 0 1 1.41 0l.01.01a1 1 0 1 1-1.42 1.41l-.01-.01a1 1 0 0 1 0-1.41zM6.93 7.93a1 1 0 0 1 1.41 0l.01.01a1 1 0 1 1-1.42 1.41l-.01-.01a1 1 0 0 1 0-1.41z" />
+  </svg>
+);
+
 export const EditIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm3.92 1.42H5v-1.92l8.06-8.06 1.92 1.92-8.06 8.06zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 1 0-1.41 1.41l2.34 2.34a.996.996 0 0 0 1.41 0z" />

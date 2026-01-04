@@ -3,7 +3,7 @@
   border-radius: 10px;
   padding: 10px 14px;
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--color-white);
+  color: var(--text-inverse);
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 6px 18px var(--shadow-primary-30);
