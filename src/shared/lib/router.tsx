@@ -13,6 +13,7 @@ import {
 
 type Location = {
   pathname: string;
+  search: string;
 };
 
 type NavigateOptions = {
@@ -54,21 +55,30 @@ const matchPath = (routePath: string, currentPath: string) => {
 };
 
 export const BrowserRouter = ({ children }: PropsWithChildren) => {
-  const [location, setLocation] = useState<Location>(() => ({ pathname: normalizePath(window.location.pathname) }));
+  const [location, setLocation] = useState<Location>(() => ({
+    pathname: normalizePath(window.location.pathname),
+    search: window.location.search,
+  }));
 
   const navigate = useCallback((to: string, options?: NavigateOptions) => {
-    const target = normalizePath(to);
+    const url = new URL(to, window.location.origin);
+    const targetPathname = normalizePath(url.pathname);
+    const targetSearch = url.search;
+    const target = `${targetPathname}${targetSearch}`;
     if (options?.replace) {
       window.history.replaceState(null, '', target);
     } else {
       window.history.pushState(null, '', target);
     }
-    setLocation({ pathname: target });
+    setLocation({ pathname: targetPathname, search: targetSearch });
   }, []);
 
   useEffect(() => {
     const handlePopState = () => {
-      setLocation({ pathname: normalizePath(window.location.pathname) });
+      setLocation({
+        pathname: normalizePath(window.location.pathname),
+        search: window.location.search,
+      });
     };
 
     window.addEventListener('popstate', handlePopState);
