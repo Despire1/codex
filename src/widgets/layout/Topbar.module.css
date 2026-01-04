@@ -37,13 +37,6 @@
   min-width: 240px;
 }
 
-.topbarActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-left: auto;
-}
-
 .topNav {
   display: inline-flex;
   background: var(--color-slate-50);
@@ -72,7 +65,7 @@
 
 .topNavActive {
   background: var(--color-blue-600);
-  color: var(--text-inverse);
+  color: var(--color-white);
   cursor: pointer;
   border-color: var(--color-blue-600);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);

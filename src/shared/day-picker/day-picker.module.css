@@ -49,7 +49,7 @@
 
 .navButton:hover {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--text-inverse);
+  color: var(--color-white);
   border-color: var(--primary);
   box-shadow: 0 6px 18px rgba(91, 141, 239, 0.22);
 }
@@ -119,7 +119,7 @@
 
 .daySelected {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--text-inverse);
+  color: var(--color-white);
   border-color: var(--primary-strong);
   box-shadow: 0 8px 18px var(--shadow-primary-25);
 }
@@ -133,7 +133,7 @@
 .dayRangeStart,
 .dayRangeEnd {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--text-inverse);
+  color: var(--color-white);
   border-color: var(--primary-strong);
   box-shadow: 0 8px 18px var(--shadow-primary-25);
 }
@@ -174,7 +174,7 @@
 .monthButton:hover,
 .yearButton:hover {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--text-inverse);
+  color: var(--color-white);
   border-color: var(--primary);
   box-shadow: 0 8px 18px var(--shadow-primary-18);
 }

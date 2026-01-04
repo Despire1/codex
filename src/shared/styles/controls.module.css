@@ -23,7 +23,7 @@
   border: none;
   border-radius: 12px;
   background: var(--color-blue-600);
-  color: var(--text-inverse);
+  color: var(--color-white);
   font-weight: 600;
   cursor: pointer;
 }

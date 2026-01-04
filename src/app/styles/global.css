@@ -74,57 +74,6 @@
   --muted: #7183a3;
   --border: #d8e6ff;
   --shadow: 0 10px 30px var(--shadow-primary-15);
-  --text-inverse: #fff;
-  --body-radial-start: var(--color-sky-40);
-  --body-radial-mid: var(--color-sky-70);
-  --body-radial-end: var(--color-sky-40);
-  --body-linear-start: var(--color-sky-50);
-  --body-linear-mid: var(--color-sky-80);
-  --body-linear-end: var(--color-sky-50);
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --color-white: #0b1120;
-  --color-ink-900: #f8fafc;
-  --color-slate-900: #f8fafc;
-  --color-slate-800: #e2e8f0;
-  --color-slate-700: #cbd5e1;
-  --color-slate-600: #94a3b8;
-  --color-slate-500: #94a3b8;
-  --color-slate-400: #64748b;
-  --color-slate-300: #475569;
-  --color-slate-200: #334155;
-  --color-slate-100: #1e293b;
-  --color-slate-50: #0f172a;
-  --color-gray-900: #f8fafc;
-  --color-gray-500: #cbd5e1;
-  --color-gray-250: #1f2937;
-  --color-gray-200: #1f2937;
-  --color-gray-100: #111827;
-  --color-gray-50: #0b1120;
-  --color-sky-200: #1f2a44;
-  --color-sky-100: #15203a;
-  --color-sky-80: #0f172a;
-  --color-sky-70: #0b1427;
-  --color-sky-50: #0b1120;
-  --color-sky-40: #0b1120;
-  --color-sky-25: #0b1120;
-  --color-indigo-50: #1e293b;
-  --bg: #0b1120;
-  --bg-strong: #111827;
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --border: #1f2a44;
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
-  --shadow-white-40: rgba(15, 23, 42, 0.4);
-  --shadow-white-70: rgba(15, 23, 42, 0.7);
-  --body-radial-start: #101827;
-  --body-radial-mid: #0b1120;
-  --body-radial-end: #101827;
-  --body-linear-start: #0b1120;
-  --body-linear-mid: #101827;
-  --body-linear-end: #0b1120;
 }
 
 * {
@@ -142,16 +91,11 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: radial-gradient(
       circle at 20% 20%,
-      var(--body-radial-start) 0%,
-      var(--body-radial-mid) 35%,
-      var(--body-radial-end) 60%
+      var(--color-sky-40) 0%,
+      var(--color-sky-70) 35%,
+      var(--color-sky-40) 60%
     ),
-    linear-gradient(
-      120deg,
-      var(--body-linear-start) 0%,
-      var(--body-linear-mid) 50%,
-      var(--body-linear-end) 100%
-    );
+    linear-gradient(120deg, var(--color-sky-50) 0%, var(--color-sky-80) 50%, var(--color-sky-50) 100%);
   color: var(--text);
 }
 

@@ -27,7 +27,7 @@
 
 .tabActive {
   background: var(--color-blue-600);
-  color: var(--text-inverse);
+  color: var(--color-white);
   border-color: var(--color-blue-600);
   box-shadow: 0 10px 20px var(--shadow-blue-600-30);
 }
