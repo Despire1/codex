@@ -3,7 +3,7 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
   align-items: end;
-  background: linear-gradient(120deg, rgba(91, 141, 239, 0.08), rgba(91, 141, 239, 0.02));
+  background: linear-gradient(120deg, var(--shadow-primary-08), rgba(91, 141, 239, 0.02));
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 16px;

@@ -86,7 +86,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   const textFieldSx = {
     '& .MuiOutlinedInput-root': {
       borderRadius: '10px',
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--color-white)',
       '& fieldset': {
         borderColor: 'var(--border)',
       },
@@ -212,13 +212,13 @@ export const LessonModal: FC<LessonModalProps> = ({
                       minWidth: '44px',
                     },
                     '& .MuiToggleButton-root.Mui-selected': {
-                      background: '#2563eb',
-                      color: '#fff',
-                      borderColor: '#2563eb',
+                      background: 'var(--color-blue-600)',
+                      color: 'var(--color-white)',
+                      borderColor: 'var(--color-blue-600)',
                     },
                     '& .MuiToggleButton-root.Mui-selected:hover': {
-                      background: '#1d4ed8',
-                      borderColor: '#1d4ed8',
+                      background: 'var(--color-blue-700)',
+                      borderColor: 'var(--color-blue-700)',
                     },
                   }}
                 >

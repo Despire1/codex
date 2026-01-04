@@ -1,9 +1,9 @@
 .card {
-  background: #fff;
+  background: var(--color-white);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 12px;
-  box-shadow: 0 6px 20px rgba(91, 141, 239, 0.12);
+  box-shadow: 0 6px 20px var(--shadow-primary-12);
 }
 
 .title {

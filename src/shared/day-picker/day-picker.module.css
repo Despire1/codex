@@ -1,6 +1,6 @@
 .root {
   padding: 12px;
-  background: #fff;
+  background: var(--color-white);
   border-radius: 16px;
   min-width: calc(260px * var(--months-count, 1));
   color: var(--text);
@@ -29,7 +29,7 @@
 }
 
 .captionLabel:hover {
-  background: #eef5ff;
+  background: var(--color-sky-70);
   color: var(--primary-strong);
 }
 
@@ -38,7 +38,7 @@
   height: 34px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--color-white);
   color: var(--muted);
   font-weight: 700;
   display: inline-flex;
@@ -49,7 +49,7 @@
 
 .navButton:hover {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--primary);
   box-shadow: 0 6px 18px rgba(91, 141, 239, 0.22);
 }
@@ -63,9 +63,9 @@
 .month {
   padding: 8px;
   border-radius: 14px;
-  background: #f8fbff;
+  background: var(--color-sky-25);
   border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 var(--shadow-white-70);
 }
 
 .monthTitle {
@@ -98,7 +98,7 @@
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   border: 1px solid transparent;
-  background: #fff;
+  background: var(--color-white);
   color: var(--text);
   font-weight: 700;
   transition: all 0.2s ease;
@@ -106,26 +106,26 @@
 }
 
 .dayButton:hover {
-  background: #eef5ff;
+  background: var(--color-sky-70);
   border-color: var(--primary-weak);
   color: var(--primary-strong);
-  box-shadow: 0 4px 12px rgba(91, 141, 239, 0.16);
+  box-shadow: 0 4px 12px var(--shadow-primary-16);
 }
 
 .dayOutside {
-  color: #cbd5e1;
-  background: #f8fafc;
+  color: var(--color-slate-300);
+  background: var(--color-slate-50);
 }
 
 .daySelected {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--primary-strong);
-  box-shadow: 0 8px 18px rgba(91, 141, 239, 0.25);
+  box-shadow: 0 8px 18px var(--shadow-primary-25);
 }
 
 .dayRange {
-  background: rgba(91, 141, 239, 0.16);
+  background: var(--shadow-primary-16);
   color: var(--text);
   border-color: transparent;
 }
@@ -133,9 +133,9 @@
 .dayRangeStart,
 .dayRangeEnd {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--primary-strong);
-  box-shadow: 0 8px 18px rgba(91, 141, 239, 0.25);
+  box-shadow: 0 8px 18px var(--shadow-primary-25);
 }
 
 .dayToday {
@@ -163,7 +163,7 @@
   padding: 10px 8px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--color-white);
   color: var(--text);
   font-weight: 700;
   transition: all 0.2s ease;
@@ -174,7 +174,7 @@
 .monthButton:hover,
 .yearButton:hover {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: #fff;
+  color: var(--color-white);
   border-color: var(--primary);
-  box-shadow: 0 8px 18px rgba(91, 141, 239, 0.18);
+  box-shadow: 0 8px 18px var(--shadow-primary-18);
 }
