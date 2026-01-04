@@ -213,7 +213,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                     },
                     '& .MuiToggleButton-root.Mui-selected': {
                       background: 'var(--color-blue-600)',
-                      color: 'var(--color-white)',
+                      color: 'var(--text-inverse)',
                       borderColor: 'var(--color-blue-600)',
                     },
                     '& .MuiToggleButton-root.Mui-selected:hover': {

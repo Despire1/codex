@@ -15,7 +15,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   background: linear-gradient(120deg, var(--primary-weak), var(--primary));
-  color: var(--color-white);
+  color: var(--text-inverse);
   padding: 12px 10px;
   text-align: center;
   font-weight: 700;

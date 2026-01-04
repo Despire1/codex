@@ -88,7 +88,7 @@
 
 .toggleActive {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-600);
   box-shadow: 0 8px 20px var(--shadow-sky-500-20);
 }
@@ -141,7 +141,7 @@
 
 .monthNavButton:hover {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-600);
   box-shadow: 0 6px 18px var(--shadow-sky-500-20);
 }
@@ -401,7 +401,7 @@
 
 .monthLesson:hover {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-600);
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
 }
@@ -505,7 +505,7 @@
 
 .closeButton:hover {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-600);
   box-shadow: 0 8px 16px var(--shadow-blue-600-18);
 }
@@ -817,7 +817,7 @@
   top: -18px;
   right: 8px;
   background: var(--color-blue-700);
-  color: var(--color-white);
+  color: var(--text-inverse);
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 12px;
@@ -923,7 +923,7 @@
 
 .weekDayButtonActive {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-600);
   box-shadow: 0 6px 14px var(--shadow-blue-600-18);
 }
@@ -1028,7 +1028,7 @@
   .addLessonMobile {
     display: flex;
     background: var(--color-blue-600);
-    color: var(--color-white);
+    color: var(--text-inverse);
   }
 
   .headerActionLabel {

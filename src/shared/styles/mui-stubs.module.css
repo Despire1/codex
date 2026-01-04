@@ -77,7 +77,7 @@
 
 .toggleButton.selected {
   background: var(--color-blue-600);
-  color: var(--color-white);
+  color: var(--text-inverse);
   border-color: var(--color-blue-700);
 }
 
