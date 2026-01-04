@@ -7,14 +7,14 @@
   font-weight: 700;
   font-size: 12px;
   border: 1px solid transparent;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
   cursor: default;
   line-height: 1.2;
 }
 
 .badge:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-blue-600);
   outline-offset: 2px;
 }
 
@@ -49,7 +49,7 @@
 }
 
 .groupUnpaid {
-  background: #fff4e5;
+  background: var(--color-white)4e5;
   color: #b15e09;
   border-color: #f5d9b0;
 }

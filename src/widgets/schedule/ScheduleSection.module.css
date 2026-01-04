@@ -8,7 +8,7 @@
 .sectionTitle {
   font-size: 20px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
 }
 
 .periodSwitcherInline,
@@ -35,9 +35,9 @@
 }
 
 .calendarCreateButton {
-  border: 1px solid #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid var(--color-blue-600);
+  background: var(--color-blue-50);
+  color: var(--color-blue-700);
   font-weight: 700;
 }
 
@@ -52,13 +52,13 @@
 .viewToggleButton {
   padding: 10px 14px;
   border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-900);
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px var(--shadow-slate-900-08);
   transition: all 0.2s ease;
   font-weight: 600;
   font-size: 14px;
@@ -69,7 +69,7 @@
 }
 
 .viewToggleButton:hover {
-  border-color: #bae6fd;
+  border-color: var(--color-sky-200);
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
 }
 
@@ -87,10 +87,10 @@
 }
 
 .toggleActive {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.2);
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 8px 20px var(--shadow-sky-500-20);
 }
 
 .headerAction {
@@ -113,20 +113,20 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
   padding: 8px 12px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 18px var(--shadow-slate-900-08);
 }
 
 .monthNavButton {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-900);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -140,10 +140,10 @@
 }
 
 .monthNavButton:hover {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 6px 18px var(--shadow-sky-500-20);
 }
 
 .daySwitcherWrapper {
@@ -167,10 +167,10 @@
 }
 
 .dayPickerCard {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 10px 24px var(--shadow-slate-900-14);
   min-width: 260px;
 }
 
@@ -189,7 +189,7 @@
 
 .dayPickerWeekdays {
   margin-bottom: 4px;
-  color: #475569;
+  color: var(--color-slate-600);
 }
 
 .dayPickerWeekday {
@@ -198,7 +198,7 @@
 }
 
 .dayPickerNavButton {
-  border-color: #e2e8f0;
+  border-color: var(--color-slate-200);
 }
 
 .dayPickerGrid {
@@ -210,32 +210,32 @@
 }
 
 .dayPickerSelected {
-  border-color: #2563eb;
+  border-color: var(--color-blue-600);
 }
 
 .dayPickerOutside {
-  color: #cbd5e1;
+  color: var(--color-slate-300);
 }
 
 .dayPickerToday {
-  border-color: #cbd5e1;
+  border-color: var(--color-slate-300);
 }
 
 .dateInput {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 12px;
   padding: 8px 10px;
   font-size: 14px;
-  color: #0f172a;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  color: var(--color-slate-900);
+  background: var(--color-white);
+  box-shadow: 0 6px 18px var(--shadow-slate-900-06);
 }
 
 .monthName {
   width: 180px;
   text-align: center;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
   font-size: 15px;
   animation: monthFade 240ms ease;
 }
@@ -261,11 +261,11 @@
 }
 
 .monthSection {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 16px;
-  background: #f8fafc;
+  background: var(--color-slate-50);
   padding: 12px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 22px var(--shadow-slate-900-08);
 }
 
 .monthHeader {
@@ -279,12 +279,12 @@
 
 .monthTitle {
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
   font-size: 16px;
 }
 
 .monthSubtitle {
-  color: #64748b;
+  color: var(--color-slate-500);
   font-size: 13px;
 }
 
@@ -314,7 +314,7 @@
 .monthWeekday {
   text-align: center;
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--color-slate-400);
   font-weight: 700;
 }
 
@@ -322,8 +322,8 @@
   min-height: 92px;
   border-radius: 12px;
   padding: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
   cursor: pointer;
   transition: all 0.15s ease;
   display: flex;
@@ -332,12 +332,12 @@
 }
 
 .monthCell:hover {
-  border-color: #2563eb;
+  border-color: var(--color-blue-600);
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.14);
 }
 
 .activeDay {
-  border-color: #2563eb;
+  border-color: var(--color-blue-600);
   box-shadow: 0 10px 22px rgba(37, 99, 235, 0.16);
 }
 
@@ -346,8 +346,8 @@
 }
 
 .todayCell {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-50);
 }
 
 .monthDateRow {
@@ -363,7 +363,7 @@
 .todayDateNumber {
   color: #0b172f;
   background: #dbeafe;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--color-blue-200);
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
   padding: 4px 8px;
   border-radius: 10px;
@@ -375,12 +375,12 @@
   justify-content: center;
   min-width: 28px;
   padding: 4px 8px;
-  background: #e0f2fe;
-  color: #0f172a;
+  background: var(--color-sky-100);
+  color: var(--color-slate-900);
   border-radius: 999px;
   font-weight: 700;
   font-size: 12px;
-  border: 1px solid #bae6fd;
+  border: 1px solid var(--color-sky-200);
   box-shadow: 0 6px 16px rgba(14, 165, 233, 0.18);
 }
 
@@ -391,18 +391,18 @@
   gap: 8px;
   padding: 10px 10px 10px 12px;
   border-radius: 10px;
-  background: #e0f2fe;
-  color: #0f172a;
-  border: 1px solid #bae6fd;
+  background: var(--color-sky-100);
+  color: var(--color-slate-900);
+  border: 1px solid var(--color-sky-200);
   cursor: pointer;
   transition: all 0.12s ease;
   position: relative;
 }
 
 .monthLesson:hover {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-color: var(--color-blue-600);
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
 }
 
@@ -425,19 +425,19 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
   border-radius: 10px;
   font-size: 13px;
-  color: #0f172a;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  color: var(--color-slate-900);
+  box-shadow: 0 6px 16px var(--shadow-slate-900-06);
 }
 
 .legendDot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--color-blue-600);
 }
 
 .dayPanel { 
@@ -461,8 +461,8 @@
   flex: 1;
   width: 100%;
   height: 100%;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
   padding: 12px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
@@ -481,33 +481,33 @@
 
 .dayPanelTitle {
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
   font-size: 16px;
 }
 
 .dayPanelSubtitle {
-  color: #64748b;
+  color: var(--color-slate-500);
   font-size: 13px;
 }
 
 .closeButton {
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-slate-50);
   border-radius: 10px;
   width: 32px;
   height: 32px;
   font-size: 18px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .closeButton:hover {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 8px 16px var(--shadow-blue-600-18);
 }
 
 .dayPanelList {
@@ -518,9 +518,9 @@
 
 .emptyDayState {
   padding: 16px;
-  border: 1px dashed #e2e8f0;
+  border: 1px dashed var(--color-slate-200);
   border-radius: 12px;
-  color: #94a3b8;
+  color: var(--color-slate-400);
   text-align: center;
 }
 
@@ -547,9 +547,9 @@
   right: 0;
   bottom: 0;
   height: clamp(320px, calc(var(--drawer-base-height, 50vh) + var(--drawer-dh, 0px)), 640px);
-  background: #fff;
+  background: var(--color-white);
   border-radius: 16px 16px 0 0;
-  box-shadow: 0 -10px 26px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 -10px 26px var(--shadow-slate-900-18);
   transform: translate3d(0, 100%, 0);
   transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), height 0.24s ease;
   z-index: 30;
@@ -604,7 +604,7 @@
   width: 84px;
   height: 5px;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: var(--color-slate-300);
   display: inline-block;
   margin: 0 auto;
 }
@@ -615,26 +615,26 @@
 }
 
 .dayCard {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
   padding: 10px;
-  background: #f8fafc;
+  background: var(--color-slate-50);
 }
 
 .dayHeader {
   display: flex;
   justify-content: space-between;
-  color: #334155;
+  color: var(--color-slate-700);
   margin-bottom: 6px;
 }
 
 .weekView {
   display: flex;
   flex-direction: column;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
   overflow: hidden;
-  background: #f8fafc;
+  background: var(--color-slate-50);
   flex: 1;
   min-height: 0;
 }
@@ -650,8 +650,8 @@
   grid-template-columns: 64px repeat(7, minmax(120px, 1fr));
   gap: 0;
   padding: 8px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #fff;
+  border-bottom: 1px solid var(--color-slate-200);
+  background: var(--color-white);
 }
 
 .timeColumnSpacer {
@@ -660,13 +660,13 @@
 
 .weekDayHeader {
   text-align: center;
-  color: #0f172a;
+  color: var(--color-slate-900);
   font-weight: 700;
   text-transform: capitalize;
 }
 
 .todayHeader {
-  color: #2563eb;
+  color: var(--color-blue-600);
 }
 
 .weekDayName {
@@ -675,7 +675,7 @@
 
 .weekDayDate {
   font-size: 12px;
-  color: #64748b;
+  color: var(--color-slate-500);
 }
 
 .weekGrid {
@@ -685,8 +685,8 @@
 }
 
 .timeColumn {
-  border-right: 1px solid #e2e8f0;
-  background: #fff;
+  border-right: 1px solid var(--color-slate-200);
+  background: var(--color-white);
 }
 
 .timeSlot {
@@ -694,31 +694,31 @@
   padding: 8px 6px;
   font-size: 12px;
   text-align: center;
-  color: #64748b;
-  border-bottom: 1px dashed #e2e8f0;
+  color: var(--color-slate-500);
+  border-bottom: 1px dashed var(--color-slate-200);
   box-sizing: border-box;
 }
 
 .weekColumns {
   display: grid;
   grid-template-columns: repeat(7, minmax(140px, 1fr));
-  background: #f8fafc;
+  background: var(--color-slate-50);
 }
 
 .weekDayColumn {
   position: relative;
-  border-left: 1px solid #e2e8f0;
-  background: #fff;
+  border-left: 1px solid var(--color-slate-200);
+  background: var(--color-white);
 }
 
 .weekDayBody {
   position: relative;
-  background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+  background-image: linear-gradient(to bottom, var(--color-slate-200) 1px, transparent 1px);
   background-size: 100% 52px;
 }
 
 .weekDayBody:hover {
-  background-color: #f8fbff;
+  background-color: var(--color-sky-25);
   transition: background-color 0.2s ease;
 }
 
@@ -728,9 +728,9 @@
   right: 8px;
   border-radius: 12px;
   padding: 10px 12px;
-  background: #e0f2fe;
-  border: 1px solid #2563eb;
-  color: #0f172a;
+  background: var(--color-sky-100);
+  border: 1px solid var(--color-blue-600);
+  color: var(--color-slate-900);
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
   overflow: hidden;
   cursor: pointer;
@@ -744,7 +744,7 @@
   top: 6px;
   right: 11px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--color-slate-400);
   padding: 0;
   font-size: 11px;
   font-weight: 800;
@@ -754,10 +754,10 @@
 .dayView {
   display: flex;
   flex-direction: column;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  background: var(--color-white);
+  box-shadow: 0 10px 20px var(--shadow-slate-900-06);
   overflow: hidden;
   flex: 1;
   min-height: 0;
@@ -765,7 +765,7 @@
 
 .dayHeading {
   padding: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-slate-200);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -773,7 +773,7 @@
 
 .dayTitle {
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
   font-size: 16px;
 }
 
@@ -790,13 +790,13 @@
 
 .dayColumn {
   position: relative;
-  background-image: linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+  background-image: linear-gradient(to bottom, var(--color-slate-200) 1px, transparent 1px);
   background-size: 100% 52px;
-  background-color: #f8fafc;
+  background-color: var(--color-slate-50);
 }
 
 .dayColumn:hover {
-  background-color: #f8fbff;
+  background-color: var(--color-sky-25);
 }
 
 .hoverIndicator {
@@ -805,9 +805,9 @@
   right: 0;
   top: 0;
   height: 2px;
-  background: #2563eb;
+  background: var(--color-blue-600);
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px var(--shadow-blue-600-30);
   transition: transform 80ms ease;
   z-index: 2;
 }
@@ -816,8 +816,8 @@
   position: absolute;
   top: -18px;
   right: 8px;
-  background: #1d4ed8;
-  color: #fff;
+  background: var(--color-blue-700);
+  color: var(--color-white);
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 12px;
@@ -833,14 +833,14 @@
 
 .canceledLesson {
   border-style: dashed;
-  background: #f8fafc;
-  color: #94a3b8;
+  background: var(--color-slate-50);
+  color: var(--color-slate-400);
   opacity: 0.6;
 }
 
 .weekLessonMeta {
   font-size: 12px;
-  color: #0f172a;
+  color: var(--color-slate-900);
   line-height: 1.4;
 }
 
@@ -856,12 +856,12 @@
 
 .lessonLabel {
   font-weight: 800;
-  color: #0f172a;
+  color: var(--color-slate-900);
 }
 
 .lessonDate {
   font-size: 12px;
-  color: #334155;
+  color: var(--color-slate-700);
   font-weight: 600;
 }
 
@@ -885,9 +885,9 @@
   display: flex;
   gap: 6px;
   padding: 6px 4px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 12px;
-  background: #fff;
+  background: var(--color-white);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -906,7 +906,7 @@
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: #475569;
+  color: var(--color-slate-600);
   font-weight: 600;
   min-width: 44px;
   cursor: pointer;
@@ -922,10 +922,10 @@
 }
 
 .weekDayButtonActive {
-  background: #2563eb;
-  color: #fff;
-  border-color: #2563eb;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.18);
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-color: var(--color-blue-600);
+  box-shadow: 0 6px 14px var(--shadow-blue-600-18);
 }
 
 .weekDayButtonToday {
@@ -981,7 +981,7 @@
 
   .toggleActive {
     background: transparent;
-    color: #2563eb;
+    color: var(--color-blue-600);
     border-color: transparent;
     box-shadow: none;
   }
@@ -1018,7 +1018,7 @@
     border: none;
     background: transparent;
     box-shadow: none;
-    color: #2563eb;
+    color: var(--color-blue-600);
   }
 
   .addLessonComputer {
@@ -1027,8 +1027,8 @@
 
   .addLessonMobile {
     display: flex;
-    background: #2563eb;
-    color: #fff;
+    background: var(--color-blue-600);
+    color: var(--color-white);
   }
 
   .headerActionLabel {
