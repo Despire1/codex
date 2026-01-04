@@ -1,4 +1,5 @@
 import { type FC, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Homework,
   HomeworkStatus,
@@ -96,6 +97,18 @@ const getLessonStatusLabel = (status: Lesson['status']) => {
   return 'Запланирован';
 };
 
+type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';
+const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
+const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
+
+const resolveStudentTab = (params: URLSearchParams): StudentTabId => {
+  const tab = params.get('tab');
+  if (tab && studentTabs.includes(tab as StudentTabId)) {
+    return tab as StudentTabId;
+  }
+  return DEFAULT_STUDENT_TAB;
+};
+
 export const StudentsSection: FC<StudentsSectionProps> = ({
   studentListItems,
   studentListCounts,
@@ -156,13 +169,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onDeleteLesson,
   newHomeworkDraft,
 }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
   const selectedStudentStats = selectedStudentEntry?.stats ?? null;
 
-  const [activeTab, setActiveTab] = useState<'homework' | 'overview' | 'lessons' | 'payments'>('homework');
+  const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(searchParams));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
@@ -206,6 +220,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [selectedStudentId]);
 
   useEffect(() => {
+    const nextTab = resolveStudentTab(searchParams);
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+  }, [searchParams]);
+
+  useEffect(() => {
     const target = studentLoadMoreRef.current;
     if (!target || !studentListHasMore) return;
     const observer = new IntersectionObserver(
@@ -238,6 +257,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     if (isMobile) {
       setMobileView('details');
     }
+  };
+
+  const handleTabChange = (tab: StudentTabId) => {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', tab);
+    setSearchParams(nextParams, { replace: true });
   };
 
   const handleBackToList = () => {
@@ -294,7 +320,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   selectedStudent={selectedStudent}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
-                  onTabChange={setActiveTab}
+                  onTabChange={handleTabChange}
                   onStartEditPrice={onStartEditPrice}
                   onPriceChange={onPriceChange}
                   onSavePrice={onSavePrice}
