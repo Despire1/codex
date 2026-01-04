@@ -1,5 +1,5 @@
 import { type FC, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Homework,
   HomeworkStatus,
@@ -101,7 +101,8 @@ type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';
 const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
 const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
 
-const resolveStudentTab = (params: URLSearchParams): StudentTabId => {
+const resolveStudentTab = (search: string): StudentTabId => {
+  const params = new URLSearchParams(search);
   const tab = params.get('tab');
   if (tab && studentTabs.includes(tab as StudentTabId)) {
     return tab as StudentTabId;
@@ -169,14 +170,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onDeleteLesson,
   newHomeworkDraft,
 }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
   const selectedStudentStats = selectedStudentEntry?.stats ?? null;
 
-  const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(searchParams));
+  const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
@@ -220,9 +222,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [selectedStudentId]);
 
   useEffect(() => {
-    const nextTab = resolveStudentTab(searchParams);
+    const nextTab = resolveStudentTab(location.search);
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
-  }, [searchParams]);
+  }, [location.search]);
 
   useEffect(() => {
     const target = studentLoadMoreRef.current;
@@ -261,9 +263,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const handleTabChange = (tab: StudentTabId) => {
     setActiveTab(tab);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('tab', tab);
-    setSearchParams(nextParams, { replace: true });
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tab);
+    const nextSearch = params.toString();
+    const nextUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`;
+    navigate(nextUrl, { replace: true });
   };
 
   const handleBackToList = () => {
