@@ -1833,7 +1833,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       }
     </script>
   </body>
-</html>`);
+        </html>`);
+    }
+
+    if (req.method === 'GET' && pathname === '/auth/session') {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
+      return sendJson(res, 200, { user });
     }
 
     if (req.method === 'POST' && pathname === '/auth/telegram/webapp') {
@@ -1968,6 +1974,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       }
       res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0 }));
       return sendJson(res, 200, { status: 'ok' });
+    }
+
+    if (pathname.startsWith('/api/')) {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
     }
 
     if (req.method === 'GET' && pathname === '/api/bootstrap') {

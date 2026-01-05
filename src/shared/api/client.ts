@@ -47,6 +47,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ token }),
     }),
+  getSession: () => apiFetch<{ user: unknown }>('/auth/session'),
   logout: () =>
     apiFetch<{ status: string }>('/auth/logout', {
       method: 'POST',

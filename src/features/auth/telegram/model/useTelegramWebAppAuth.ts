@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-export const useTelegramWebAppAuth = () => {
+export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
   const { showToast } = useToast();
   const [state, setState] = useState<AuthState>('idle');
 
@@ -34,6 +34,7 @@ export const useTelegramWebAppAuth = () => {
       .then(() => {
         if (cancelled) return;
         setState('authenticated');
+        onAuthenticated?.();
       })
       .catch(() => {
         if (cancelled) return;
@@ -47,7 +48,7 @@ export const useTelegramWebAppAuth = () => {
     return () => {
       cancelled = true;
     };
-  }, [showToast]);
+  }, [onAuthenticated, showToast]);
 
   return { state };
 };

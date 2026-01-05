@@ -27,6 +27,7 @@ import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
 import { AppModals, DialogState } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
+import { SessionFallback, useSessionStatus } from '../features/auth/session';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -50,7 +51,8 @@ export const AppPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  useTelegramWebAppAuth();
+  const { state: sessionState, refresh: refreshSession } = useSessionStatus();
+  const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
@@ -127,6 +129,7 @@ export const AppPage = () => {
     setDialogState({ type: 'info', title, message, confirmText });
 
   useEffect(() => {
+    if (sessionState !== 'authenticated') return;
     const loadInitial = async () => {
       try {
         const data = await api.bootstrap();
@@ -151,7 +154,7 @@ export const AppPage = () => {
     };
 
     loadInitial();
-  }, []);
+  }, [sessionState]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -1097,6 +1100,11 @@ export const AppPage = () => {
     setWeekLabelKey((key) => key + 1);
     setMonthLabelKey((key) => key + 1);
   };
+
+  if (sessionState !== 'authenticated') {
+    const fallbackState = sessionState === 'checking' || telegramState === 'pending' ? 'checking' : 'unauthenticated';
+    return <SessionFallback state={fallbackState} />;
+  }
 
   return (
     <div className={layoutStyles.page}>
