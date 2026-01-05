@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { type FC, type Ref, useState } from 'react';
 import { Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
@@ -7,11 +7,11 @@ import {
 import styles from '../StudentsSection.module.css';
 
 interface StudentHeroProps {
+  headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
   isMobile: boolean;
-  isHeaderCompact: boolean;
   onBackToList: () => void;
   onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;
   onStartEditPrice: (student: Student) => void;
@@ -25,11 +25,11 @@ interface StudentHeroProps {
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
+  headerRef,
   selectedStudent,
   priceEditState,
   activeTab,
   isMobile,
-  isHeaderCompact,
   onBackToList,
   onTabChange,
   onStartEditPrice,
@@ -45,9 +45,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
   return (
     <div
-      className={`${styles.card} ${styles.headerCard} ${isMobile ? styles.mobileHeaderCard : ''} ${
-        isHeaderCompact ? styles.mobileHeaderCompact : ''
-      }`}
+      ref={headerRef}
+      className={`${styles.card} ${styles.headerCard} ${isMobile ? styles.mobileHeaderCard : ''}`}
     >
       <div className={styles.heroHeader}>
         <div className={styles.heroNameBlock}>
