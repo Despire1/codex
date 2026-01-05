@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import crypto from 'node:crypto';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
