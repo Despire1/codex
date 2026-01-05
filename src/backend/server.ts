@@ -1789,6 +1789,39 @@ const autoSettleUnpaidLessons = async () => {
   }
 };
 
+const cleanupSessions = async () => {
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: {
+      OR: [{ expiresAt: { lte: now } }, { revokedAt: { not: null } }],
+    },
+  });
+};
+
+const scheduleDailySessionCleanup = () => {
+  const now = new Date();
+  const nextRun = new Date(now);
+  nextRun.setHours(3, 0, 0, 0);
+  if (nextRun <= now) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  const delayMs = nextRun.getTime() - now.getTime();
+
+  setTimeout(() => {
+    cleanupSessions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Не удалось очистить сессии', error);
+    });
+
+    setInterval(() => {
+      cleanupSessions().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось очистить сессии', error);
+      });
+    }, 24 * 60 * 60 * 1000);
+  }, delayMs);
+};
+
 const handle = async (req: IncomingMessage, res: ServerResponse) => {
   if (!req.url) return notFound(res);
 
@@ -2293,6 +2326,8 @@ setInterval(() => {
 }, AUTO_PAYMENT_INTERVAL_MS);
 
 void autoSettleUnpaidLessons();
+
+scheduleDailySessionCleanup();
 
 const server = http.createServer((req, res) => {
   handle(req, res);
