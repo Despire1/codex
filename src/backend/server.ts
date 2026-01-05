@@ -1773,6 +1773,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
+    if (pathname.startsWith('/api/')) {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
+    }
+
     if (req.method === 'GET' && pathname === '/transfer') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1974,11 +1979,6 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       }
       res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0 }));
       return sendJson(res, 200, { status: 'ok' });
-    }
-
-    if (pathname.startsWith('/api/')) {
-      const user = await getSessionUser(req);
-      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
     }
 
     if (req.method === 'GET' && pathname === '/api/bootstrap') {

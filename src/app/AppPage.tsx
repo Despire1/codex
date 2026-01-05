@@ -176,6 +176,13 @@ export const AppPage = () => {
 
   const loadStudentList = useCallback(
     async (options?: { offset?: number; append?: boolean }) => {
+      if (sessionState !== 'authenticated') {
+        setStudentListItems([]);
+        setStudentListCounts({ withDebt: 0, overdue: 0 });
+        setStudentListTotal(0);
+        setStudentListHasMore(false);
+        return;
+      }
       const offset = options?.offset ?? 0;
       const append = options?.append ?? false;
       setStudentListLoading(true);
@@ -205,11 +212,16 @@ export const AppPage = () => {
         setStudentListLoading(false);
       }
     },
-    [studentFilter, studentQuery],
+    [sessionState, studentFilter, studentQuery],
   );
 
   const loadStudentHomeworks = useCallback(
     async (options?: { offset?: number; append?: boolean; studentIdOverride?: number | null }) => {
+      if (sessionState !== 'authenticated') {
+        setStudentHomeworks([]);
+        setStudentHomeworkHasMore(false);
+        return;
+      }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentHomeworks([]);
@@ -236,11 +248,15 @@ export const AppPage = () => {
         setStudentHomeworkLoading(false);
       }
     },
-    [selectedStudentId, studentHomeworkFilter],
+    [selectedStudentId, sessionState, studentHomeworkFilter],
   );
 
   const loadStudentLessons = useCallback(
     async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
+      if (sessionState !== 'authenticated') {
+        setStudentLessons([]);
+        return;
+      }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
@@ -280,6 +296,7 @@ export const AppPage = () => {
     },
     [
       selectedStudentId,
+      sessionState,
       studentLessonDateRange.from,
       studentLessonDateRange.fromTime,
       studentLessonDateRange.to,
@@ -291,19 +308,22 @@ export const AppPage = () => {
   );
 
   useEffect(() => {
+    if (sessionState !== 'authenticated') return;
     loadStudentList();
-  }, [loadStudentList]);
+  }, [loadStudentList, sessionState]);
 
   useEffect(() => {
+    if (sessionState !== 'authenticated') return;
     loadStudentHomeworks();
-  }, [loadStudentHomeworks]);
+  }, [loadStudentHomeworks, sessionState]);
 
   useEffect(() => {
+    if (sessionState !== 'authenticated') return;
     if (skipNextLessonLoadRef.current) {
       skipNextLessonLoadRef.current = false;
     }
     loadStudentLessons();
-  }, [loadStudentLessons]);
+  }, [loadStudentLessons, sessionState]);
 
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
@@ -333,6 +353,7 @@ export const AppPage = () => {
 
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
+      if (sessionState !== 'authenticated') return;
       try {
         const filter = options?.filter ?? paymentFilterRef.current;
         const date = options?.date ?? paymentDateRef.current;
@@ -343,14 +364,15 @@ export const AppPage = () => {
         console.error('Failed to load payment events', error);
       }
     },
-    [],
+    [sessionState],
   );
 
   useEffect(() => {
+    if (sessionState !== 'authenticated') return;
     if (selectedStudentId) {
       refreshPayments(selectedStudentId);
     }
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments]);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, sessionState]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
