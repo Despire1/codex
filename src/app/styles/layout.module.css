@@ -24,3 +24,9 @@
   overflow-y: auto;
   min-height: 0;
 }
+
+@media (max-width: 859px) {
+  .pageInner {
+    padding: 8px;
+  }
+}
