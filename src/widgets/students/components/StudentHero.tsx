@@ -10,6 +10,9 @@ interface StudentHeroProps {
   selectedStudent: Student & { link: TeacherStudent };
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
+  isMobile: boolean;
+  isHeaderCompact: boolean;
+  onBackToList: () => void;
   onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;
   onStartEditPrice: (student: Student) => void;
   onPriceChange: (value: string) => void;
@@ -25,6 +28,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
   selectedStudent,
   priceEditState,
   activeTab,
+  isMobile,
+  isHeaderCompact,
+  onBackToList,
   onTabChange,
   onStartEditPrice,
   onPriceChange,
@@ -38,12 +44,28 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
 
   return (
-    <div className={`${styles.card} ${styles.headerCard}`}>
+    <div
+      className={`${styles.card} ${styles.headerCard} ${isMobile ? styles.mobileHeaderCard : ''} ${
+        isHeaderCompact ? styles.mobileHeaderCompact : ''
+      }`}
+    >
       <div className={styles.heroHeader}>
         <div className={styles.heroNameBlock}>
-          <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
-          <div className={styles.studentMetaRow}>
-            <span>Telegram: @{selectedStudent.username || 'нет'}</span>
+          {isMobile && (
+            <button
+              className={styles.backIconButton}
+              type="button"
+              aria-label="Назад"
+              onClick={onBackToList}
+            >
+              ←
+            </button>
+          )}
+          <div className={styles.heroTitleStack}>
+            <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
+            <div className={styles.studentMetaRow}>
+              <span>Telegram: @{selectedStudent.username || 'нет'}</span>
+            </div>
           </div>
         </div>
         <div className={styles.heroActions}>

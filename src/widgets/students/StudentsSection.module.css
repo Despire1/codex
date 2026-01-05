@@ -498,18 +498,6 @@
   max-height: 100%;
 }
 
-.backButton {
-  border: none;
-  background: none;
-  color: var(--color-blue-600);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 6px 0;
-  cursor: pointer;
-  align-self: flex-start;
-  flex: 0 0 auto;
-}
-
 .mobileScrollArea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -518,6 +506,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
 }
 
 .card {
@@ -548,6 +537,53 @@
   gap: 12px;
 }
 
+.mobileHeaderCard {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  transition: padding 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mobileHeaderCard .summaryRow,
+.mobileHeaderCard .tabs,
+.mobileHeaderCard .studentMetaRow {
+  transition: max-height 0.2s ease, opacity 0.2s ease, padding 0.2s ease, margin 0.2s ease;
+  overflow: hidden;
+}
+
+.mobileHeaderCard .summaryRow {
+  max-height: 160px;
+}
+
+.mobileHeaderCard .tabs {
+  max-height: 64px;
+}
+
+.mobileHeaderCard .studentMetaRow {
+  max-height: 36px;
+}
+
+.mobileHeaderCompact {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  gap: 6px;
+  box-shadow: 0 8px 20px var(--shadow-slate-900-08);
+}
+
+.mobileHeaderCompact .summaryRow,
+.mobileHeaderCompact .tabs,
+.mobileHeaderCompact .studentMetaRow {
+  max-height: 0;
+  opacity: 0;
+  padding: 0;
+  margin: 0;
+  border-width: 0;
+}
+
+.mobileHeaderCompact .heroHeader {
+  align-items: center;
+}
+
 .heroHeader {
   display: flex;
   justify-content: space-between;
@@ -559,6 +595,32 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.heroTitleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backIconButton {
+  border: none;
+  background: none;
+  color: var(--color-blue-600);
+  font-size: 18px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.backIconButton:hover {
+  background: var(--color-blue-50);
 }
 
 .profileName {
