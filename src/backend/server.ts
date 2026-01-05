@@ -96,10 +96,10 @@ const getBaseUrl = (req: IncomingMessage) => {
   const configured = process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL;
   if (configured) return configured.replace(/\/$/, '');
   const host = req.headers.host ?? `localhost:${PORT}`;
+  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
-  const protocol =
-    forwardedProto.split(',')[0] ||
-    (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const forwardedProtocol = forwardedProto.split(',')[0];
+  const protocol = isLocalhost ? 'http' : forwardedProtocol || 'https';
   return `${protocol}://${host}`;
 };
 
@@ -296,20 +296,28 @@ const listStudents = async (
 ) => {
   const teacher = await ensureTeacher(user);
   const normalizedQuery = query?.trim();
+  const normalizedQueryLower = normalizedQuery?.toLowerCase();
   const where: any = { teacherId: teacher.chatId };
 
   if (normalizedQuery) {
     where.OR = [
-      { customName: { contains: normalizedQuery, mode: 'insensitive' } },
-      { student: { username: { contains: normalizedQuery, mode: 'insensitive' } } },
+      { customName: { contains: normalizedQuery } },
+      { student: { username: { contains: normalizedQuery } } },
     ];
   }
 
-  const links = await prisma.teacherStudent.findMany({
+  let links = await prisma.teacherStudent.findMany({
     where,
     include: { student: true },
     orderBy: { customName: 'asc' },
   });
+  if (normalizedQueryLower) {
+    links = links.filter((link) => {
+      const customName = link.customName?.toLowerCase() ?? '';
+      const username = link.student?.username?.toLowerCase() ?? '';
+      return customName.includes(normalizedQueryLower) || username.includes(normalizedQueryLower);
+    });
+  }
 
   const studentIds = links.map((link) => link.studentId);
   const homeworks = studentIds.length
@@ -1970,7 +1978,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         },
       });
       const baseUrl = getBaseUrl(req);
-      const url = `${baseUrl}/transfer?t=${token}`;
+      const transferBaseUrl = baseUrl.replace(/^https:/, 'http:');
+      const url = `${transferBaseUrl}/transfer?t=${token}`;
       return sendJson(res, 200, { url, expires_in: ttlSeconds });
     }
 
