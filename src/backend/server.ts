@@ -96,10 +96,10 @@ const getBaseUrl = (req: IncomingMessage) => {
   const configured = process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL;
   if (configured) return configured.replace(/\/$/, '');
   const host = req.headers.host ?? `localhost:${PORT}`;
+  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
-  const protocol =
-    forwardedProto.split(',')[0] ||
-    (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const forwardedProtocol = forwardedProto.split(',')[0];
+  const protocol = isLocalhost ? 'http' : forwardedProtocol || 'https';
   return `${protocol}://${host}`;
 };
 
