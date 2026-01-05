@@ -31,8 +31,15 @@ export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
 
     api
       .telegramWebappAuth({ initData: webApp.initData })
-      .then(() => {
+      .then((response) => {
         if (cancelled) return;
+        if (response?.isNewUser) {
+          showToast({
+            message: 'Добро пожаловать!',
+            variant: 'success',
+            durationMs: 1600,
+          });
+        }
         setState('authenticated');
         onAuthenticated?.();
       })
