@@ -81,6 +81,12 @@
   height: 18px;
 }
 
+@media (max-width: 859px) {
+  .topbar {
+    display: none;
+  }
+}
+
 @media (min-width: 860px) {
   .topbarNav {
     display: flex;
