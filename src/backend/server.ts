@@ -296,20 +296,28 @@ const listStudents = async (
 ) => {
   const teacher = await ensureTeacher(user);
   const normalizedQuery = query?.trim();
+  const normalizedQueryLower = normalizedQuery?.toLowerCase();
   const where: any = { teacherId: teacher.chatId };
 
   if (normalizedQuery) {
     where.OR = [
-      { customName: { contains: normalizedQuery, mode: 'insensitive' } },
-      { student: { username: { contains: normalizedQuery, mode: 'insensitive' } } },
+      { customName: { contains: normalizedQuery } },
+      { student: { username: { contains: normalizedQuery } } },
     ];
   }
 
-  const links = await prisma.teacherStudent.findMany({
+  let links = await prisma.teacherStudent.findMany({
     where,
     include: { student: true },
     orderBy: { customName: 'asc' },
   });
+  if (normalizedQueryLower) {
+    links = links.filter((link) => {
+      const customName = link.customName?.toLowerCase() ?? '';
+      const username = link.student?.username?.toLowerCase() ?? '';
+      return customName.includes(normalizedQueryLower) || username.includes(normalizedQueryLower);
+    });
+  }
 
   const studentIds = links.map((link) => link.studentId);
   const homeworks = studentIds.length
@@ -1970,7 +1978,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         },
       });
       const baseUrl = getBaseUrl(req);
-      const url = `${baseUrl}/transfer?t=${token}`;
+      const transferBaseUrl = baseUrl.replace(/^https:/, 'http:');
+      const url = `${transferBaseUrl}/transfer?t=${token}`;
       return sendJson(res, 200, { url, expires_in: ttlSeconds });
     }
 
