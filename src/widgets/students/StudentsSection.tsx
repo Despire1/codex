@@ -182,6 +182,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
   const studentListRef = useRef<HTMLDivElement | null>(null);
   const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
