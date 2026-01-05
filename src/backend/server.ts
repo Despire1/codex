@@ -1979,7 +1979,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       });
       const baseUrl = getBaseUrl(req);
       const transferBaseUrl = baseUrl.replace(/^https:/, 'http:');
-      const url = `${transferBaseUrl}/transfer?t=${token}`;
+      const transferUrl = new URL(transferBaseUrl);
+      if (transferUrl.hostname === 'localhost' || transferUrl.hostname === '127.0.0.1') {
+        transferUrl.port = '5173';
+      }
+      const url = `${transferUrl.toString().replace(/\/$/, '')}/transfer?t=${token}`;
       return sendJson(res, 200, { url, expires_in: ttlSeconds });
     }
 
