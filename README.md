@@ -30,6 +30,58 @@
    ```
 6. Откройте http://localhost:5173. Все запросы `/api/*` уйдут на локальный сервер.
 
+## Запуск Telegram Mini App (локально через ngrok)
+Ниже — полный сценарий, чтобы открыть приложение внутри Telegram Mini App, сохранив локальный запуск.
+
+### 1. Подготовьте переменные окружения
+1. Скопируйте `.env.example` в `.env`, если ещё не сделали:
+   ```bash
+   cp .env.example .env
+   ```
+2. Откройте `.env` и заполните:
+   - `TELEGRAM_BOT_TOKEN` — токен из BotFather.
+   - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда (будет от ngrok).
+
+### 2. Запустите API и фронтенд
+В отдельных терминалах:
+```bash
+npm run api
+```
+```bash
+npm run dev
+```
+
+### 3. Поднимите ngrok для фронтенда
+В отдельном терминале:
+```bash
+ngrok http 5173
+```
+Скопируйте выданный HTTPS-адрес и вставьте его в `.env` как `TELEGRAM_WEBAPP_URL`.
+
+> Если меняете `TELEGRAM_WEBAPP_URL` — перезапустите `npm run bot`.
+
+### 4. Запустите Telegram-бота
+В отдельном терминале:
+```bash
+npm run bot
+```
+Скрипт читает переменные окружения из `.env`.
+Бот автоматически:
+- установит кнопку меню “Открыть приложение”;
+- будет отвечать на `/start` или `/app` кнопкой открытия мини-приложения.
+
+### 5. Настройте домен Mini App в BotFather
+В BotFather выполните:
+1. `/setdomain` → выберите бота → укажите домен из ngrok (без пути).
+2. (Опционально) `/setmenubutton` → выбрать “Web App” → указать `TELEGRAM_WEBAPP_URL`.
+
+После этого откройте бота в Telegram и нажмите кнопку меню — откроется ваше приложение.
+
+### Примечания
+- Telegram Mini App требует HTTPS URL. Локально это решается через ngrok.
+- Авторизация внутри Mini App работает через `/auth/telegram/webapp`.
+- Если ngrok URL меняется, обновите `TELEGRAM_WEBAPP_URL` и перезапустите `npm run bot`.
+
 ## Диагностика ошибки 500 при `/api/bootstrap`
 - Убедитесь, что API запущен (`npm run api`), а консоль показывает `API server running on http://localhost:4000`.
 - Проверьте, что Prisma клиент сгенерирован и база создана (`npm run prisma:migrate && npm run prisma:generate`).
