@@ -33,7 +33,7 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
 
 export const api = {
   telegramWebappAuth: (payload: { initData: string }) =>
-    apiFetch<{ user: unknown; session?: { expiresAt: string } }>('/auth/telegram/webapp', {
+    apiFetch<{ user: unknown; session?: { expiresAt: string }; isNewUser?: boolean }>('/auth/telegram/webapp', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
