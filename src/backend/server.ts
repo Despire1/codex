@@ -14,7 +14,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
 const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 60);
-const SESSION_CLEANUP_INTERVAL_MS = Number(process.env.SESSION_CLEANUP_INTERVAL_MS ?? 60 * 60 * 1000);
 const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
 const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
@@ -1799,6 +1798,30 @@ const cleanupSessions = async () => {
   });
 };
 
+const scheduleDailySessionCleanup = () => {
+  const now = new Date();
+  const nextRun = new Date(now);
+  nextRun.setHours(3, 0, 0, 0);
+  if (nextRun <= now) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  const delayMs = nextRun.getTime() - now.getTime();
+
+  setTimeout(() => {
+    cleanupSessions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Не удалось очистить сессии', error);
+    });
+
+    setInterval(() => {
+      cleanupSessions().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось очистить сессии', error);
+      });
+    }, 24 * 60 * 60 * 1000);
+  }, delayMs);
+};
+
 const handle = async (req: IncomingMessage, res: ServerResponse) => {
   if (!req.url) return notFound(res);
 
@@ -2304,14 +2327,7 @@ setInterval(() => {
 
 void autoSettleUnpaidLessons();
 
-setInterval(() => {
-  cleanupSessions().catch((error) => {
-    // eslint-disable-next-line no-console
-    console.error('Не удалось очистить сессии', error);
-  });
-}, SESSION_CLEANUP_INTERVAL_MS);
-
-void cleanupSessions();
+scheduleDailySessionCleanup();
 
 const server = http.createServer((req, res) => {
   handle(req, res);
