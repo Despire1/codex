@@ -82,6 +82,40 @@ declare module '@prisma/client' {
     reason: string | null;
   };
 
+  export type User = {
+    id: number;
+    telegramUserId: bigint;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    photoUrl: string | null;
+    lastAuthDate: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+
+  export type Session = {
+    id: number;
+    userId: number;
+    tokenHash: string;
+    createdAt: Date;
+    expiresAt: Date;
+    revokedAt: Date | null;
+    ip: string | null;
+    userAgent: string | null;
+  };
+
+  export type TransferToken = {
+    id: number;
+    userId: number;
+    tokenHash: string;
+    createdAt: Date;
+    expiresAt: Date;
+    usedAt: Date | null;
+    createdIp: string | null;
+    createdUserAgent: string | null;
+  };
+
   export class PrismaClient {
     constructor(options?: any);
     teacher: {
@@ -127,6 +161,21 @@ declare module '@prisma/client' {
       findFirst(args: any): PrismaPromise<PaymentEvent | null>;
       create(args: any): PrismaPromise<PaymentEvent>;
       createMany(args: any): PrismaPromise<any>;
+    };
+    user: {
+      upsert(args: any): PrismaPromise<User>;
+      update(args: any): PrismaPromise<User>;
+      findFirst(args: any): PrismaPromise<User | null>;
+    };
+    session: {
+      create(args: any): PrismaPromise<Session>;
+      findFirst(args: any): PrismaPromise<Session | null>;
+      updateMany(args: any): PrismaPromise<any>;
+    };
+    transferToken: {
+      create(args: any): PrismaPromise<TransferToken>;
+      findFirst(args: any): PrismaPromise<TransferToken | null>;
+      updateMany(args: any): PrismaPromise<any>;
     };
     $transaction<T>(promises: PrismaPromise<T>[]): PrismaPromise<T[]>;
   }

@@ -26,6 +26,7 @@ import { Tabbar } from '../widgets/layout/Tabbar';
 import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
 import { AppModals, DialogState } from './components/AppModals';
+import { useTelegramWebAppAuth } from '../features/auth/telegram';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -49,6 +50,7 @@ export const AppPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+  useTelegramWebAppAuth();
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);

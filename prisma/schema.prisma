@@ -155,3 +155,49 @@ model TeacherAuth {
   teacher      Teacher @relation(fields: [teacherId], references: [chatId])
   createdAt    DateTime @default(now())
 }
+
+model User {
+  id              Int             @id @default(autoincrement())
+  telegramUserId  BigInt          @unique
+  username        String?
+  firstName       String?
+  lastName        String?
+  photoUrl        String?
+  lastAuthDate    Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @default(now()) @updatedAt
+  sessions        Session[]
+  transferTokens  TransferToken[]
+}
+
+model Session {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model TransferToken {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  tokenHash       String    @unique
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdIp       String?
+  createdUserAgent String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([usedAt])
+}
