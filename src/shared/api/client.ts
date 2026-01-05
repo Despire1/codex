@@ -19,6 +19,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
+    credentials: 'include',
     ...options,
   });
 
@@ -31,6 +32,26 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 
 export const api = {
+  telegramWebappAuth: (payload: { initData: string }) =>
+    apiFetch<{ user: unknown; session?: { expiresAt: string } }>('/auth/telegram/webapp', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createTransferLink: () =>
+    apiFetch<{ url: string; expires_in: number }>('/auth/transfer/create', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  consumeTransferToken: (token: string) =>
+    apiFetch<{ redirect_url: string }>('/auth/transfer/consume', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+  getSession: () => apiFetch<{ user: unknown }>('/auth/session'),
+  logout: () =>
+    apiFetch<{ status: string }>('/auth/logout', {
+      method: 'POST',
+    }),
   bootstrap: () =>
     apiFetch<{
       teacher: Teacher;

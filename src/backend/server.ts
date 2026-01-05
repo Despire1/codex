@@ -9,6 +9,20 @@ const PORT = Number(process.env.API_PORT ?? 4000);
 const DEMO_TEACHER_ID = BigInt(process.env.DEMO_TEACHER_ID ?? '111222333');
 const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 50;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
+const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
+const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
+const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 60);
+const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
+const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
+const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
+const TRANSFER_REDIRECT_URL = process.env.TRANSFER_REDIRECT_URL ?? '/dashboard';
+const SESSION_COOKIE_NAME = 'session_id';
+const RATE_LIMIT_WEBAPP_PER_MIN = Number(process.env.RATE_LIMIT_WEBAPP_PER_MIN ?? 30);
+const RATE_LIMIT_TRANSFER_CREATE_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_PER_MIN ?? 3);
+const RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN ?? 10);
+const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN ?? 10);
+const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status;
@@ -42,6 +56,126 @@ const readBody = async (req: IncomingMessage) => {
     throw new Error('Invalid JSON body');
   }
 };
+
+const parseCookies = (header?: string) => {
+  const cookies: Record<string, string> = {};
+  if (!header) return cookies;
+  header.split(';').forEach((part) => {
+    const [rawKey, ...rawValue] = part.trim().split('=');
+    if (!rawKey) return;
+    cookies[rawKey] = decodeURIComponent(rawValue.join('='));
+  });
+  return cookies;
+};
+
+const buildCookie = (name: string, value: string, options: { maxAgeSeconds?: number } = {}) => {
+  const segments = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'Secure', 'SameSite=Lax'];
+  if (options.maxAgeSeconds !== undefined) {
+    segments.push(`Max-Age=${options.maxAgeSeconds}`);
+  }
+  return segments.join('; ');
+};
+
+const getRequestIp = (req: IncomingMessage) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0]?.trim() ?? '';
+  }
+  if (Array.isArray(forwarded)) {
+    return forwarded[0] ?? '';
+  }
+  return req.socket.remoteAddress ?? '';
+};
+
+const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+
+const randomToken = (lengthBytes = 32) => crypto.randomBytes(lengthBytes).toString('base64url');
+
+const getBaseUrl = (req: IncomingMessage) => {
+  const configured = process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  const host = req.headers.host ?? `localhost:${PORT}`;
+  const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
+  const protocol =
+    forwardedProto.split(',')[0] ||
+    (host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  return `${protocol}://${host}`;
+};
+
+const verifyTelegramInitData = (initData: string) => {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { ok: false, reason: 'signature_invalid' as const };
+  }
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) {
+    return { ok: false, reason: 'signature_invalid' as const };
+  }
+  params.delete('hash');
+  const dataCheckString = Array.from(params.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(TELEGRAM_BOT_TOKEN).digest();
+  const expectedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  const expectedBuffer = Buffer.from(expectedHash, 'hex');
+  const actualBuffer = Buffer.from(hash, 'hex');
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return { ok: false, reason: 'signature_invalid' as const };
+  }
+  if (!crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+    return { ok: false, reason: 'signature_invalid' as const };
+  }
+  return { ok: true as const, params };
+};
+
+const getSessionUser = async (req: IncomingMessage) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (!token) return null;
+  const tokenHash = hashToken(token);
+  const now = new Date();
+  const session = await prisma.session.findFirst({
+    where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
+    include: { user: true },
+  });
+  return session?.user ?? null;
+};
+
+const createSession = async (userId: number, req: IncomingMessage, res: ServerResponse) => {
+  const ttlMinutes = Number.isFinite(SESSION_TTL_MINUTES) ? SESSION_TTL_MINUTES : 60;
+  const token = randomToken(32);
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  await prisma.session.create({
+    data: {
+      userId,
+      tokenHash,
+      expiresAt,
+      ip: getRequestIp(req) || null,
+      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
+    },
+  });
+  res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, token, { maxAgeSeconds: ttlMinutes * 60 }));
+  return { expiresAt };
+};
+
+type RateLimitEntry = { count: number; resetAt: number };
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+const isRateLimited = (key: string, limit: number, windowMs: number) => {
+  const now = Date.now();
+  const existing = rateLimitStore.get(key);
+  if (!existing || existing.resetAt <= now) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return false;
+  }
+  if (existing.count >= limit) return true;
+  existing.count += 1;
+  return false;
+};
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const ensureTeacher = async () =>
   prisma.teacher.upsert({
@@ -1639,6 +1773,214 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
+    if (req.method === 'GET' && pathname === '/transfer') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      return res.end(`<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Вход в аккаунт</title>
+    <style>
+      body { font-family: sans-serif; background: #f5f6fa; margin: 0; padding: 32px; color: #101828; }
+      .card { max-width: 520px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      p { margin: 0 0 16px; color: #475467; }
+      button { background: #3b82f6; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Подтверждаем вход…</h1>
+      <p id="status">Проверяем ссылку и открываем кабинет.</p>
+      <button id="retry" style="display:none;">Запросить новую ссылку</button>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('t');
+      const statusEl = document.getElementById('status');
+      const retryBtn = document.getElementById('retry');
+      const showError = (message) => {
+        statusEl.textContent = message;
+        retryBtn.style.display = 'inline-block';
+        retryBtn.addEventListener('click', () => {
+          window.location.href = '/';
+        });
+      };
+      if (!token) {
+        showError('Ссылка недействительна. Откройте Mini App и создайте новую ссылку.');
+      } else {
+        fetch('/auth/transfer/consume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ token }),
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(data.message || 'Не удалось подтвердить вход.');
+            }
+            const redirectUrl = data.redirect_url || '/';
+            window.location.replace(redirectUrl);
+          })
+          .catch(() => {
+            showError('Ссылка устарела или уже использована. Создайте новую в Telegram.');
+          });
+      }
+    </script>
+  </body>
+        </html>`);
+    }
+
+    if (req.method === 'GET' && pathname === '/auth/session') {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
+      return sendJson(res, 200, { user });
+    }
+
+    if (req.method === 'POST' && pathname === '/auth/telegram/webapp') {
+      const body = await readBody(req);
+      const initData = typeof body.initData === 'string' ? body.initData : '';
+      if (!initData) return badRequest(res, 'invalid_init_data');
+      if (isRateLimited(`webapp:${getRequestIp(req)}`, RATE_LIMIT_WEBAPP_PER_MIN, 60_000)) {
+        return sendJson(res, 429, { message: 'rate_limited' });
+      }
+      const verification = verifyTelegramInitData(initData);
+      if (!verification.ok) {
+        return sendJson(res, 401, { message: verification.reason });
+      }
+      const authDateRaw = verification.params.get('auth_date');
+      const userRaw = verification.params.get('user');
+      const authDate = authDateRaw ? Number(authDateRaw) : NaN;
+      if (!userRaw || !Number.isFinite(authDate)) {
+        return badRequest(res, 'invalid_init_data');
+      }
+      const nowSec = Math.floor(Date.now() / 1000);
+      const initDataTtlSec = Number.isFinite(TELEGRAM_INITDATA_TTL_SEC) ? TELEGRAM_INITDATA_TTL_SEC : 300;
+      if (nowSec - authDate > initDataTtlSec) {
+        return sendJson(res, 401, { message: 'auth_date_expired' });
+      }
+      let telegramUser: any;
+      try {
+        telegramUser = JSON.parse(userRaw);
+      } catch (error) {
+        return badRequest(res, 'invalid_init_data');
+      }
+      if (!telegramUser?.id) {
+        return badRequest(res, 'invalid_init_data');
+      }
+      const telegramUserId = BigInt(telegramUser.id);
+      const userRecord = await prisma.user.upsert({
+        where: { telegramUserId },
+        update: {
+          username: telegramUser.username ?? null,
+          firstName: telegramUser.first_name ?? null,
+          lastName: telegramUser.last_name ?? null,
+          photoUrl: telegramUser.photo_url ?? null,
+        },
+        create: {
+          telegramUserId,
+          username: telegramUser.username ?? null,
+          firstName: telegramUser.first_name ?? null,
+          lastName: telegramUser.last_name ?? null,
+          photoUrl: telegramUser.photo_url ?? null,
+        },
+      });
+      if (userRecord.lastAuthDate && authDate + TELEGRAM_REPLAY_SKEW_SEC < userRecord.lastAuthDate) {
+        return badRequest(res, 'invalid_init_data');
+      }
+      await prisma.user.update({
+        where: { id: userRecord.id },
+        data: { lastAuthDate: authDate },
+      });
+      const session = await createSession(userRecord.id, req, res);
+      return sendJson(res, 200, {
+        user: userRecord,
+        session: { expiresAt: session.expiresAt },
+      });
+    }
+
+    if (req.method === 'POST' && pathname === '/auth/transfer/create') {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
+      const ip = getRequestIp(req);
+      if (isRateLimited(`transfer:create:ip:${ip}`, RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN, 60_000)) {
+        return sendJson(res, 429, { message: 'rate_limited' });
+      }
+      if (isRateLimited(`transfer:create:${user.id}`, RATE_LIMIT_TRANSFER_CREATE_PER_MIN, 60_000)) {
+        return sendJson(res, 429, { message: 'rate_limited' });
+      }
+      const token = randomToken(32);
+      const tokenHash = hashToken(token);
+      const configuredTtlSec = Number.isFinite(TRANSFER_TOKEN_TTL_SEC) ? TRANSFER_TOKEN_TTL_SEC : 120;
+      const ttlSeconds = clampNumber(configuredTtlSec, TRANSFER_TOKEN_MIN_TTL_SEC, TRANSFER_TOKEN_MAX_TTL_SEC);
+      const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+      await prisma.transferToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          createdIp: getRequestIp(req) || null,
+          createdUserAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
+        },
+      });
+      const baseUrl = getBaseUrl(req);
+      const url = `${baseUrl}/transfer?t=${token}`;
+      return sendJson(res, 200, { url, expires_in: ttlSeconds });
+    }
+
+    if (req.method === 'POST' && pathname === '/auth/transfer/consume') {
+      const body = await readBody(req);
+      const token = typeof body.token === 'string' ? body.token : '';
+      if (!token) return badRequest(res, 'invalid_token');
+      const ip = getRequestIp(req);
+      if (isRateLimited(`transfer:consume:ip:${ip}`, RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN, 60_000)) {
+        return sendJson(res, 429, { message: 'rate_limited' });
+      }
+      if (isRateLimited(`transfer:consume:token:${token}`, RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN, 60_000)) {
+        return sendJson(res, 429, { message: 'rate_limited' });
+      }
+      const tokenHash = hashToken(token);
+      const record = await prisma.transferToken.findFirst({ where: { tokenHash } });
+      if (!record) {
+        return badRequest(res, 'invalid_token');
+      }
+      if (record.usedAt || record.expiresAt.getTime() < Date.now()) {
+        return sendJson(res, 410, { message: 'token_expired_or_used' });
+      }
+      const updateResult = await prisma.transferToken.updateMany({
+        where: { id: record.id, usedAt: null, expiresAt: { gte: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (updateResult.count === 0) {
+        return sendJson(res, 410, { message: 'token_expired_or_used' });
+      }
+      const session = await createSession(record.userId, req, res);
+      return sendJson(res, 200, { redirect_url: TRANSFER_REDIRECT_URL, session: { expiresAt: session.expiresAt } });
+    }
+
+    if (req.method === 'POST' && pathname === '/auth/logout') {
+      const cookies = parseCookies(req.headers.cookie);
+      const token = cookies[SESSION_COOKIE_NAME];
+      if (token) {
+        await prisma.session.updateMany({
+          where: { tokenHash: hashToken(token), revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0 }));
+      return sendJson(res, 200, { status: 'ok' });
+    }
+
+    if (pathname.startsWith('/api/')) {
+      const user = await getSessionUser(req);
+      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
+    }
+
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
       const data = await bootstrap();
       const filteredStudents =

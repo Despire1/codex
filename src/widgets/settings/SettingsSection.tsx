@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
+import { TransferLinkCard } from '../../features/auth/transfer';
 import controls from '../../shared/styles/controls.module.css';
 import styles from './SettingsSection.module.css';
 
@@ -13,7 +14,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
     <section className={styles.card}>
       <div className={styles.sectionHeader}>
         <h2>Профиль и настройки</h2>
-        <span className={styles.muted}>Email/пароль + Telegram chatId</span>
+        <span className={styles.muted}>Авторизация через Telegram</span>
       </div>
       <div className={styles.settingsGrid}>
         <div>
@@ -47,9 +48,9 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
           />
         </div>
       </div>
+      <TransferLinkCard />
       <div className={styles.helperBox}>
-        Telegram-бот и сайт используют единую базу. Авторизация учителя хранится в таблице TeacherAuth, а все данные, связанные
-        с учениками и уроками, проверяются по teacherId.
+        Вход доступен только через Telegram. Для доступа с компьютера создайте одноразовую ссылку в Mini App.
       </div>
     </section>
   );
