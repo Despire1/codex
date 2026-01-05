@@ -73,8 +73,13 @@ const configureMenuButton = async () => {
   });
 };
 
+const clearWebhook = async () => {
+  await callTelegram('deleteWebhook', { drop_pending_updates: true });
+};
+
 const startPolling = async () => {
   ensureEnv();
+  await clearWebhook();
   await configureMenuButton();
   let offset = 0;
 
