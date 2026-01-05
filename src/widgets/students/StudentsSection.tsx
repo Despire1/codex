@@ -1,4 +1,4 @@
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Homework,
@@ -182,6 +182,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
   const studentListRef = useRef<HTMLDivElement | null>(null);
   const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -274,6 +275,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setMobileView('list');
   };
 
+  const handleDetailsScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    const nextCompact = event.currentTarget.scrollTop > 12;
+    setIsHeaderCompact((prev) => (prev === nextCompact ? prev : nextCompact));
+  };
+
   const handleOpenBalanceTopup = () => {
     if (!selectedStudent) return;
     setIsBalanceTopupOpen(true);
@@ -311,19 +318,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
         {showDetails && (
           <div className={`${styles.content} ${isMobile ? styles.mobileContent : ''}`}>
-            {isMobile && (
-              <button className={styles.backButton} type="button" onClick={handleBackToList}>
-                ← Назад
-              </button>
-            )}
             <div
               className={`${styles.contentGrid} ${isMobile ? styles.mobileContentGrid : ''}`}
             >
-              <div className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}>
+              <div
+                className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
+                onScroll={handleDetailsScroll}
+              >
                 <StudentHero
                   selectedStudent={selectedStudent}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
+                  isMobile={isMobile}
+                  isHeaderCompact={isHeaderCompact}
+                  onBackToList={handleBackToList}
                   onTabChange={handleTabChange}
                   onStartEditPrice={onStartEditPrice}
                   onPriceChange={onPriceChange}
