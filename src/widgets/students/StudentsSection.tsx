@@ -1,4 +1,4 @@
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Homework,
@@ -185,6 +185,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
   const studentListRef = useRef<HTMLDivElement | null>(null);
   const studentLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
+  const scrollProgressRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -214,6 +217,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       setMobileView('list');
     }
   }, [selectedStudentId, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    headerRef.current?.style.setProperty('--header-collapse', '0');
+    scrollProgressRef.current = 0;
+  }, [isMobile, mobileView, selectedStudentId]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedStudentId) {
@@ -274,6 +291,23 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     setMobileView('list');
   };
 
+  const handleDetailsScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    const scrollTop = event.currentTarget.scrollTop;
+    const collapseDistance = 120;
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+    }
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const progress = Math.min(Math.max(scrollTop / collapseDistance, 0), 1);
+      if (Math.abs(progress - scrollProgressRef.current) < 0.01) {
+        return;
+      }
+      scrollProgressRef.current = progress;
+      headerRef.current?.style.setProperty('--header-collapse', progress.toFixed(3));
+    });
+  };
+
   const handleOpenBalanceTopup = () => {
     if (!selectedStudent) return;
     setIsBalanceTopupOpen(true);
@@ -311,19 +345,20 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
         {showDetails && (
           <div className={`${styles.content} ${isMobile ? styles.mobileContent : ''}`}>
-            {isMobile && (
-              <button className={styles.backButton} type="button" onClick={handleBackToList}>
-                ← Назад
-              </button>
-            )}
             <div
               className={`${styles.contentGrid} ${isMobile ? styles.mobileContentGrid : ''}`}
             >
-              <div className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}>
+              <div
+                className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
+                onScroll={handleDetailsScroll}
+              >
                 <StudentHero
+                  headerRef={headerRef}
                   selectedStudent={selectedStudent}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
+                  isMobile={isMobile}
+                  onBackToList={handleBackToList}
                   onTabChange={handleTabChange}
                   onStartEditPrice={onStartEditPrice}
                   onPriceChange={onPriceChange}

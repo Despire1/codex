@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { type FC, type Ref, useState } from 'react';
 import { Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
@@ -7,9 +7,12 @@ import {
 import styles from '../StudentsSection.module.css';
 
 interface StudentHeroProps {
+  headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
+  isMobile: boolean;
+  onBackToList: () => void;
   onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;
   onStartEditPrice: (student: Student) => void;
   onPriceChange: (value: string) => void;
@@ -22,9 +25,12 @@ interface StudentHeroProps {
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
+  headerRef,
   selectedStudent,
   priceEditState,
   activeTab,
+  isMobile,
+  onBackToList,
   onTabChange,
   onStartEditPrice,
   onPriceChange,
@@ -38,12 +44,27 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
 
   return (
-    <div className={`${styles.card} ${styles.headerCard}`}>
+    <div
+      ref={headerRef}
+      className={`${styles.card} ${styles.headerCard} ${isMobile ? styles.mobileHeaderCard : ''}`}
+    >
       <div className={styles.heroHeader}>
         <div className={styles.heroNameBlock}>
-          <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
-          <div className={styles.studentMetaRow}>
-            <span>Telegram: @{selectedStudent.username || 'нет'}</span>
+          {isMobile && (
+            <button
+              className={styles.backIconButton}
+              type="button"
+              aria-label="Назад"
+              onClick={onBackToList}
+            >
+              ←
+            </button>
+          )}
+          <div className={styles.heroTitleStack}>
+            <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
+            <div className={styles.studentMetaRow}>
+              <span>Telegram: @{selectedStudent.username || 'нет'}</span>
+            </div>
           </div>
         </div>
         <div className={styles.heroActions}>

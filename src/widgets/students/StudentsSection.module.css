@@ -498,18 +498,6 @@
   max-height: 100%;
 }
 
-.backButton {
-  border: none;
-  background: none;
-  color: var(--color-blue-600);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 6px 0;
-  cursor: pointer;
-  align-self: flex-start;
-  flex: 0 0 auto;
-}
-
 .mobileScrollArea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -518,6 +506,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
 }
 
 .card {
@@ -548,6 +537,43 @@
   gap: 12px;
 }
 
+.mobileHeaderCard {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  transition: box-shadow 0.2s ease;
+  --header-collapse: 0;
+}
+
+.mobileHeaderCard .summaryRow,
+.mobileHeaderCard .tabs,
+.mobileHeaderCard .studentMetaRow {
+  transition: max-height 0.2s ease, opacity 0.2s ease, padding 0.2s ease, margin 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
+}
+
+.mobileHeaderCard .summaryRow {
+  max-height: calc(160px * (1 - var(--header-collapse)));
+  opacity: calc(1 - var(--header-collapse));
+  transform: translateY(calc(-6px * var(--header-collapse)));
+  padding: calc(12px * (1 - var(--header-collapse)))
+    calc(16px * (1 - var(--header-collapse)));
+  border-width: calc(1px * (1 - var(--header-collapse)));
+}
+
+.mobileHeaderCard .tabs {
+  max-height: calc(64px * (1 - var(--header-collapse)));
+  opacity: calc(1 - var(--header-collapse));
+  transform: translateY(calc(-4px * var(--header-collapse)));
+  margin-top: calc(4px * (1 - var(--header-collapse)));
+  gap: calc(8px * (1 - var(--header-collapse)));
+}
+
+.mobileHeaderCard .studentMetaRow {
+  max-height: calc(36px * (1 - var(--header-collapse)));
+  opacity: calc(1 - var(--header-collapse));
+}
+
 .heroHeader {
   display: flex;
   justify-content: space-between;
@@ -559,6 +585,32 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.heroTitleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backIconButton {
+  border: none;
+  background: none;
+  color: var(--color-blue-600);
+  font-size: 18px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.backIconButton:hover {
+  background: var(--color-blue-50);
 }
 
 .profileName {
