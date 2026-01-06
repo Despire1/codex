@@ -109,13 +109,6 @@ body.telegram-webapp a {
   text-decoration: none;
 }
 
-body.telegram-webapp button,
-body.telegram-webapp input,
-body.telegram-webapp textarea,
-body.telegram-webapp select {
-  color: inherit !important;
-}
-
 body.telegram-webapp svg {
   fill: currentColor !important;
 }
