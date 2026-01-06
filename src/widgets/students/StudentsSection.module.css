@@ -652,9 +652,6 @@
 }
 
 .actionsMenu {
-  position: absolute;
-  right: 0;
-  top: 36px;
   background: var(--color-white);
   border: 1px solid var(--color-gray-200);
   border-radius: 12px;

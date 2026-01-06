@@ -22,6 +22,7 @@ export interface TeacherStudent {
   customName: string;
   autoRemindHomework: boolean;
   balanceLessons: number;
+  isArchived?: boolean;
 }
 
 export type HomeworkStatus = 'DRAFT' | 'ASSIGNED' | 'IN_PROGRESS' | 'DONE';

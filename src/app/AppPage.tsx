@@ -518,6 +518,56 @@ export const AppPage = () => {
     }
   };
 
+  const performDeleteStudent = useCallback(
+    async (studentId: number) => {
+      try {
+        await api.deleteStudent(studentId);
+        const remainingItems = studentListItems.filter((item) => item.student.id !== studentId);
+        setLinks((prev) => prev.filter((link) => link.studentId !== studentId));
+        setStudentListItems(remainingItems);
+        setStudentListTotal((prev) => Math.max(prev - 1, 0));
+        setPaymentEventsByStudent((prev) => {
+          if (!prev[studentId]) return prev;
+          const next = { ...prev };
+          delete next[studentId];
+          return next;
+        });
+        if (selectedStudentId === studentId) {
+          setSelectedStudentId(remainingItems[0]?.student.id ?? null);
+        }
+        loadStudentList();
+        showToast({ message: 'Ученик удалён из списка', variant: 'success' });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Не удалось удалить ученика';
+        showInfoDialog('Ошибка', message);
+        // eslint-disable-next-line no-console
+        console.error('Failed to delete student', error);
+      }
+    },
+    [loadStudentList, selectedStudentId, showInfoDialog, showToast, studentListItems],
+  );
+
+  const requestDeleteStudent = useCallback(
+    (studentId: number) => {
+      const studentEntry = studentListItems.find((item) => item.student.id === studentId);
+      const studentName = studentEntry?.link.customName ?? 'ученика';
+      setDialogState({
+        type: 'confirm',
+        title: `Удалить ${studentName}?`,
+        message:
+          'Связь с учеником будет удалена из вашего списка. Данные ученика сохранятся и восстановятся при повторном добавлении.',
+        confirmText: 'Удалить',
+        cancelText: 'Отмена',
+        onConfirm: () => {
+          closeDialog();
+          performDeleteStudent(studentId);
+        },
+        onCancel: closeDialog,
+      });
+    },
+    [closeDialog, performDeleteStudent, studentListItems],
+  );
+
   const startEditPrice = (student: Student) => {
     setPriceEditState({ id: student.id, value: String(student.pricePerLesson ?? '') });
   };
@@ -1195,6 +1245,7 @@ export const AppPage = () => {
               onToggleHomework: toggleHomeworkDone,
               onUpdateHomework: updateHomework,
               onOpenStudentModal: () => setStudentModalOpen(true),
+              onRequestDeleteStudent: requestDeleteStudent,
               studentLessons,
               lessonPaymentFilter: studentLessonPaymentFilter,
               lessonStatusFilter: studentLessonStatusFilter,
