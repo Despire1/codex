@@ -522,6 +522,9 @@ const addStudent = async (user: User, body: any) => {
   if (!customName || typeof customName !== 'string' || !customName.trim()) {
     throw new Error('Имя ученика обязательно');
   }
+  if (!Number.isFinite(Number(pricePerLesson)) || Number(pricePerLesson) < 0) {
+    throw new Error('Цена занятия обязательна и должна быть неотрицательной');
+  }
 
   const teacher = await ensureTeacher(user);
   const existingStudent =
@@ -534,7 +537,7 @@ const addStudent = async (user: User, body: any) => {
     (await prisma.student.create({
       data: {
         username: username || null,
-        pricePerLesson: typeof pricePerLesson === 'number' ? pricePerLesson : 0,
+        pricePerLesson: Math.round(Number(pricePerLesson)),
       },
     }));
 
@@ -564,6 +567,42 @@ const addStudent = async (user: User, body: any) => {
   });
 
   return { student, link };
+};
+
+const updateStudent = async (user: User, studentId: number, body: any) => {
+  const { customName, username, pricePerLesson } = body ?? {};
+  if (!customName || typeof customName !== 'string' || !customName.trim()) {
+    throw new Error('Имя ученика обязательно');
+  }
+  const numericPrice = Number(pricePerLesson);
+  if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+    throw new Error('Цена занятия обязательна и должна быть неотрицательной');
+  }
+
+  const teacher = await ensureTeacher(user);
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+
+  const normalizedUsername =
+    typeof username === 'string' && username.trim() ? username.trim() : null;
+
+  const [student, updatedLink] = await prisma.$transaction([
+    prisma.student.update({
+      where: { id: studentId },
+      data: {
+        username: normalizedUsername,
+        pricePerLesson: Math.round(numericPrice),
+      },
+    }),
+    prisma.teacherStudent.update({
+      where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+      data: { customName: customName.trim() },
+    }),
+  ]);
+
+  return { student, link: updatedLink };
 };
 
 const archiveStudentLink = async (user: User, studentId: number) => {
@@ -2181,6 +2220,14 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const data = await addStudent(requireApiUser(), body);
       return sendJson(res, 201, data);
+    }
+
+    const studentUpdateMatch = pathname.match(/^\/api\/students\/(\d+)$/);
+    if ((req.method === 'PATCH' || req.method === 'PUT') && studentUpdateMatch) {
+      const studentId = Number(studentUpdateMatch[1]);
+      const body = await readBody(req);
+      const data = await updateStudent(requireApiUser(), studentId, body);
+      return sendJson(res, 200, data);
     }
 
     const studentDeleteMatch = pathname.match(/^\/api\/students\/(\d+)$/);

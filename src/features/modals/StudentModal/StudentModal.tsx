@@ -5,12 +5,20 @@ import modalStyles from '../modal.module.css';
 interface StudentModalProps {
   open: boolean;
   onClose: () => void;
-  draft: { customName: string; username: string };
-  onDraftChange: (draft: { customName: string; username: string }) => void;
+  draft: { customName: string; username: string; pricePerLesson: string };
+  isEditing: boolean;
+  onDraftChange: (draft: { customName: string; username: string; pricePerLesson: string }) => void;
   onSubmit: () => void;
 }
 
-export const StudentModal: FC<StudentModalProps> = ({ open, onClose, draft, onDraftChange, onSubmit }) => {
+export const StudentModal: FC<StudentModalProps> = ({
+  open,
+  onClose,
+  draft,
+  isEditing,
+  onDraftChange,
+  onSubmit,
+}) => {
   if (!open) return null;
 
   return (
@@ -18,8 +26,12 @@ export const StudentModal: FC<StudentModalProps> = ({ open, onClose, draft, onDr
       <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={modalStyles.modalHeader}>
           <div>
-            <div className={modalStyles.modalLabel}>Добавление ученика</div>
-            <div className={modalStyles.modalTitle}>Создать связь Teacher ↔ Student</div>
+            <div className={modalStyles.modalLabel}>
+              {isEditing ? 'Редактирование ученика' : 'Добавление ученика'}
+            </div>
+            <div className={modalStyles.modalTitle}>
+              {isEditing ? 'Обновить данные ученика' : 'Создать связь Teacher ↔ Student'}
+            </div>
           </div>
           <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
             ×
@@ -30,6 +42,7 @@ export const StudentModal: FC<StudentModalProps> = ({ open, onClose, draft, onDr
             <input
               className={controls.input}
               placeholder="Имя ученика"
+              required
               value={draft.customName}
               onChange={(e) => onDraftChange({ ...draft, customName: e.target.value })}
             />
@@ -40,13 +53,24 @@ export const StudentModal: FC<StudentModalProps> = ({ open, onClose, draft, onDr
               onChange={(e) => onDraftChange({ ...draft, username: e.target.value })}
             />
           </div>
+          <div className={controls.formRow}>
+            <input
+              className={controls.input}
+              placeholder="Цена занятия"
+              type="number"
+              min={0}
+              required
+              value={draft.pricePerLesson}
+              onChange={(e) => onDraftChange({ ...draft, pricePerLesson: e.target.value })}
+            />
+          </div>
         </div>
         <div className={modalStyles.modalActions}>
           <button className={controls.secondaryButton} onClick={onClose}>
             Отмена
           </button>
           <button className={controls.primaryButton} onClick={onSubmit}>
-            Сохранить ученика
+            {isEditing ? 'Сохранить изменения' : 'Сохранить ученика'}
           </button>
         </div>
       </div>

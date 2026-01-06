@@ -91,7 +91,8 @@ export const AppPage = () => {
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
-  const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '' });
+  const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '', pricePerLesson: '' });
+  const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const [newLessonDraft, setNewLessonDraft] = useState({
     studentId: undefined as number | undefined,
@@ -421,13 +422,57 @@ export const AppPage = () => {
     setPaymentDate(nextDate);
   };
 
+  const resetStudentDraft = () => setNewStudentDraft({ customName: '', username: '', pricePerLesson: '' });
+
+  const openCreateStudentModal = () => {
+    resetStudentDraft();
+    setEditingStudentId(null);
+    setStudentModalOpen(true);
+  };
+
+  const openEditStudentModal = () => {
+    if (!selectedStudentId) return;
+    const student = students.find((entry) => entry.id === selectedStudentId);
+    const link = links.find((entry) => entry.studentId === selectedStudentId && !entry.isArchived);
+    if (!student || !link) return;
+    setNewStudentDraft({
+      customName: link.customName,
+      username: student.username ?? '',
+      pricePerLesson:
+        typeof student.pricePerLesson === 'number' ? String(student.pricePerLesson) : '',
+    });
+    setEditingStudentId(selectedStudentId);
+    setStudentModalOpen(true);
+  };
+
+  const closeStudentModal = () => {
+    setStudentModalOpen(false);
+    setEditingStudentId(null);
+  };
+
+  const parseStudentPrice = (value: string) => {
+    if (!value.trim()) return null;
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+    return Math.round(numericValue);
+  };
+
   const handleAddStudent = async () => {
-    if (!newStudentDraft.customName.trim()) return;
+    if (!newStudentDraft.customName.trim()) {
+      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
+      return;
+    }
+    const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
+    if (pricePerLesson === null) {
+      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
+      return;
+    }
 
     try {
       const data = await api.addStudent({
         customName: newStudentDraft.customName,
         username: newStudentDraft.username || undefined,
+        pricePerLesson,
       });
 
       const { student, link } = data;
@@ -445,14 +490,60 @@ export const AppPage = () => {
         return [...prev, link];
       });
 
-      setNewStudentDraft({ customName: '', username: '' });
+      resetStudentDraft();
       setSelectedStudentId(student.id);
       navigate(tabPathById.students);
-      setStudentModalOpen(false);
+      closeStudentModal();
       loadStudentList();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add student', error);
+    }
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editingStudentId) return;
+    if (!newStudentDraft.customName.trim()) {
+      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
+      return;
+    }
+    const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
+    if (pricePerLesson === null) {
+      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
+      return;
+    }
+    try {
+      const data = await api.updateStudent(editingStudentId, {
+        customName: newStudentDraft.customName,
+        username: newStudentDraft.username || undefined,
+        pricePerLesson,
+      });
+
+      setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
+      setLinks((prev) =>
+        prev.map((l) =>
+          l.studentId === data.link.studentId && l.teacherId === data.link.teacherId ? data.link : l,
+        ),
+      );
+      setStudentListItems((prev) =>
+        prev.map((item) =>
+          item.student.id === data.student.id ? { ...item, student: data.student, link: data.link } : item,
+        ),
+      );
+      resetStudentDraft();
+      closeStudentModal();
+      loadStudentList();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update student', error);
+    }
+  };
+
+  const handleSubmitStudent = () => {
+    if (editingStudentId) {
+      void handleUpdateStudent();
+    } else {
+      void handleAddStudent();
     }
   };
 
@@ -1193,7 +1284,7 @@ export const AppPage = () => {
               pendingHomeworks: homeworks,
               onAddStudent: () => {
                 navigate(tabPathById.students);
-                setStudentModalOpen(true);
+                openCreateStudentModal();
               },
               onCreateLesson: () => {
                 navigate(tabPathById.schedule);
@@ -1244,7 +1335,8 @@ export const AppPage = () => {
                 }),
               onToggleHomework: toggleHomeworkDone,
               onUpdateHomework: updateHomework,
-              onOpenStudentModal: () => setStudentModalOpen(true),
+              onAddStudent: openCreateStudentModal,
+              onEditStudent: openEditStudentModal,
               onRequestDeleteStudent: requestDeleteStudent,
               studentLessons,
               lessonPaymentFilter: studentLessonPaymentFilter,
@@ -1297,10 +1389,11 @@ export const AppPage = () => {
 
       <AppModals
         studentModalOpen={studentModalOpen}
-        onCloseStudentModal={() => setStudentModalOpen(false)}
+        onCloseStudentModal={closeStudentModal}
         newStudentDraft={newStudentDraft}
+        isEditingStudent={Boolean(editingStudentId)}
         onStudentDraftChange={setNewStudentDraft}
-        onSubmitStudent={handleAddStudent}
+        onSubmitStudent={handleSubmitStudent}
         lessonModalOpen={lessonModalOpen}
         onCloseLessonModal={closeLessonModal}
         editingLessonId={editingLessonId}

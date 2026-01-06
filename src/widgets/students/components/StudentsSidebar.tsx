@@ -19,7 +19,7 @@ interface StudentsSidebarProps {
   onSelectStudent: (id: number) => void;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
-  onOpenStudentModal: () => void;
+  onAddStudent: () => void;
 }
 
 export const StudentsSidebar: FC<StudentsSidebarProps> = ({
@@ -36,7 +36,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
   onSelectStudent,
   onSearchChange,
   onFilterChange,
-  onOpenStudentModal,
+  onAddStudent,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const isFilterActive = activeFilter !== 'all';
@@ -51,7 +51,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
               <span className={styles.counter}>{totalCount}</span>
             </div>
           </div>
-          <button className={controls.secondaryButton} onClick={onOpenStudentModal}>
+          <button className={controls.secondaryButton} onClick={onAddStudent}>
             + Добавить
           </button>
         </div>

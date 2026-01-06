@@ -56,8 +56,9 @@ type LessonDraft = {
 interface AppModalsProps {
   studentModalOpen: boolean;
   onCloseStudentModal: () => void;
-  newStudentDraft: { customName: string; username: string };
-  onStudentDraftChange: (draft: { customName: string; username: string }) => void;
+  newStudentDraft: { customName: string; username: string; pricePerLesson: string };
+  isEditingStudent: boolean;
+  onStudentDraftChange: (draft: { customName: string; username: string; pricePerLesson: string }) => void;
   onSubmitStudent: () => void;
   lessonModalOpen: boolean;
   onCloseLessonModal: () => void;
@@ -78,6 +79,7 @@ export const AppModals: FC<AppModalsProps> = ({
   studentModalOpen,
   onCloseStudentModal,
   newStudentDraft,
+  isEditingStudent,
   onStudentDraftChange,
   onSubmitStudent,
   lessonModalOpen,
@@ -100,6 +102,7 @@ export const AppModals: FC<AppModalsProps> = ({
         open={studentModalOpen}
         onClose={onCloseStudentModal}
         draft={newStudentDraft}
+        isEditing={isEditingStudent}
         onDraftChange={onStudentDraftChange}
         onSubmit={onSubmitStudent}
       />

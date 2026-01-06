@@ -60,9 +60,14 @@ export const api = {
       homeworks: Homework[];
       lessons: Lesson[];
     }>('/api/bootstrap'),
-  addStudent: (payload: { customName: string; username?: string; pricePerLesson?: number }) =>
+  addStudent: (payload: { customName: string; username?: string; pricePerLesson: number }) =>
     apiFetch<{ student: Student; link: TeacherStudent }>('/api/students', {
       method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStudent: (studentId: number, payload: { customName: string; username?: string; pricePerLesson: number }) =>
+    apiFetch<{ student: Student; link: TeacherStudent }>(`/api/students/${studentId}`, {
+      method: 'PATCH',
       body: JSON.stringify(payload),
     }),
   deleteStudent: (studentId: number) =>
