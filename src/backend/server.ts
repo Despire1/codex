@@ -69,8 +69,11 @@ const parseCookies = (header?: string) => {
   return cookies;
 };
 
-const buildCookie = (name: string, value: string, options: { maxAgeSeconds?: number } = {}) => {
-  const segments = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'Secure', 'SameSite=Lax'];
+const buildCookie = (name: string, value: string, options: { maxAgeSeconds?: number; secure?: boolean } = {}) => {
+  const segments = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+  if (options.secure ?? true) {
+    segments.push('Secure');
+  }
   if (options.maxAgeSeconds !== undefined) {
     segments.push(`Max-Age=${options.maxAgeSeconds}`);
   }
@@ -101,6 +104,16 @@ const getBaseUrl = (req: IncomingMessage) => {
   const forwardedProtocol = forwardedProto.split(',')[0];
   const protocol = isLocalhost ? 'http' : forwardedProtocol || 'https';
   return `${protocol}://${host}`;
+};
+
+const isSecureRequest = (req: IncomingMessage) => {
+  const host = req.headers.host ?? '';
+  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
+  if (isLocalhost) return false;
+  const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
+  const forwardedProtocol = forwardedProto.split(',')[0]?.trim();
+  if (forwardedProtocol) return forwardedProtocol === 'https';
+  return true;
 };
 
 const verifyTelegramInitData = (initData: string) => {
@@ -157,7 +170,10 @@ const createSession = async (userId: number, req: IncomingMessage, res: ServerRe
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
     },
   });
-  res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, token, { maxAgeSeconds: ttlMinutes * 60 }));
+  res.setHeader(
+    'Set-Cookie',
+    buildCookie(SESSION_COOKIE_NAME, token, { maxAgeSeconds: ttlMinutes * 60, secure: isSecureRequest(req) }),
+  );
   return { expiresAt };
 };
 
@@ -2103,7 +2119,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           data: { revokedAt: new Date() },
         });
       }
-      res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0 }));
+      res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0, secure: isSecureRequest(req) }));
       return sendJson(res, 200, { status: 'ok' });
     }
 
