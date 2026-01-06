@@ -11,6 +11,7 @@ import {
   PaymentEvent,
   PaymentEventType,
   Student,
+  StudentDebtItem,
   StudentListItem,
 } from '../../entities/types';
 import styles from './StudentsSection.module.css';
@@ -71,6 +72,8 @@ interface StudentsSectionProps {
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
   studentLessons: Lesson[];
+  studentDebtItems: StudentDebtItem[];
+  studentDebtTotal: number;
   lessonPaymentFilter: LessonPaymentFilter;
   lessonStatusFilter: LessonStatusFilter;
   lessonDateRange: LessonDateRange;
@@ -154,6 +157,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onEditStudent,
   onRequestDeleteStudent,
   studentLessons,
+  studentDebtItems,
+  studentDebtTotal,
   lessonPaymentFilter,
   lessonStatusFilter,
   lessonDateRange,
@@ -363,6 +368,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   headerRef={headerRef}
                   selectedStudent={selectedStudent}
                   studentLessons={studentLessons}
+                  studentDebtItems={studentDebtItems}
+                  studentDebtTotal={studentDebtTotal}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
                   isMobile={isMobile}

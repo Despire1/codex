@@ -79,6 +79,18 @@ export interface Lesson {
   participants?: LessonParticipant[];
 }
 
+export interface StudentDebtItem {
+  id: number;
+  startAt: string;
+  price: number | null;
+  status: LessonStatus;
+}
+
+export interface StudentDebtSummary {
+  total: number;
+  items: StudentDebtItem[];
+}
+
 export type LessonPaymentFilter = 'all' | 'paid' | 'unpaid';
 export type LessonStatusFilter = 'all' | 'completed' | 'not_completed';
 export type LessonSortOrder = 'asc' | 'desc';

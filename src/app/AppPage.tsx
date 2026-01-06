@@ -13,6 +13,7 @@ import {
   PaymentCancelBehavior,
   PaymentEvent,
   Student,
+  StudentDebtItem,
   StudentListItem,
   Teacher,
   TeacherStudent,
@@ -178,6 +179,8 @@ export const AppPage = () => {
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
+  const [studentDebtItems, setStudentDebtItems] = useState<StudentDebtItem[]>([]);
+  const [studentDebtTotal, setStudentDebtTotal] = useState(0);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
     storedStudentCardFilters.lessonPaymentFilter ?? 'all',
   );
@@ -368,11 +371,15 @@ export const AppPage = () => {
     async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
       if (sessionState !== 'authenticated') {
         setStudentLessons([]);
+        setStudentDebtItems([]);
+        setStudentDebtTotal(0);
         return;
       }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
+        setStudentDebtItems([]);
+        setStudentDebtTotal(0);
         return;
       }
 
@@ -398,6 +405,8 @@ export const AppPage = () => {
         });
         if (lessonLoadRequestId.current !== requestId) return;
         setStudentLessons(data.items.map(normalizeLesson));
+        setStudentDebtItems(data.debt.items);
+        setStudentDebtTotal(data.debt.total);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
@@ -1510,6 +1519,8 @@ export const AppPage = () => {
               onEditStudent: openEditStudentModal,
               onRequestDeleteStudent: requestDeleteStudent,
               studentLessons,
+              studentDebtItems,
+              studentDebtTotal,
               lessonPaymentFilter: studentLessonPaymentFilter,
               lessonStatusFilter: studentLessonStatusFilter,
               lessonDateRange: studentLessonDateRange,
