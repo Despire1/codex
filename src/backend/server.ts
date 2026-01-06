@@ -2055,9 +2055,9 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         },
       });
       const baseUrl = getBaseUrl(req);
-      const transferBaseUrl = baseUrl.replace(/^https:/, 'http:');
-      const transferUrl = new URL(transferBaseUrl);
+      const transferUrl = new URL(baseUrl);
       if (transferUrl.hostname === 'localhost' || transferUrl.hostname === '127.0.0.1') {
+        transferUrl.protocol = 'http:';
         transferUrl.port = '5173';
       }
       const url = `${transferUrl.toString().replace(/\/$/, '')}/transfer?t=${token}`;
