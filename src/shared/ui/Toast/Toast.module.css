@@ -51,3 +51,14 @@
   font-weight: 600;
   line-height: 1.4;
 }
+
+@media (max-width: 720px) {
+  .container {
+    top: 16px;
+    bottom: auto;
+  }
+
+  .toast {
+    transform: translateY(-12px);
+  }
+}

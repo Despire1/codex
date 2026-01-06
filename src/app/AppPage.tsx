@@ -1058,16 +1058,34 @@ export const AppPage = () => {
   const markLessonCompleted = async (lessonId: number) => {
     try {
       const data = await api.markLessonCompleted(lessonId);
-      setLessons(
-        lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
+      setLessons((prev) =>
+        prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
       );
 
       if (data.link) {
-        setLinks(
-          links.map((link) =>
+        const previousLink = links.find(
+          (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+        );
+        const balanceDelta = previousLink ? data.link.balanceLessons - previousLink.balanceLessons : 0;
+        const studentName = data.link.customName || previousLink?.customName || 'ученика';
+
+        setLinks((prev) =>
+          prev.map((link) =>
             link.studentId === data.link.studentId && link.teacherId === data.link.teacherId ? data.link : link,
           ),
         );
+        setStudentListItems((prev) =>
+          prev.map((item) =>
+            item.student.id === data.link.studentId ? { ...item, link: data.link } : item,
+          ),
+        );
+
+        if (balanceDelta < 0) {
+          showToast({
+            message: `С баланса ${studentName} списано занятие`,
+            variant: 'success',
+          });
+        }
       }
 
       await loadStudentLessons();
@@ -1083,10 +1101,31 @@ export const AppPage = () => {
       setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
 
       if (data.links && data.links.length > 0) {
+        const previousLinks = new Map(
+          links.map((link) => [`${link.teacherId}_${link.studentId}`, link]),
+        );
+        const chargedLinks = data.links.filter((link) => {
+          const previous = previousLinks.get(`${link.teacherId}_${link.studentId}`);
+          return previous ? link.balanceLessons < previous.balanceLessons : false;
+        });
+
         setLinks((prev) => {
           const map = new Map(prev.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
           data.links!.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
           return Array.from(map.values());
+        });
+        setStudentListItems((prev) =>
+          prev.map((item) => {
+            const updatedLink = data.links!.find((link) => link.studentId === item.student.id);
+            return updatedLink ? { ...item, link: updatedLink } : item;
+          }),
+        );
+
+        chargedLinks.forEach((link) => {
+          showToast({
+            message: `С баланса ${link.customName} списано занятие`,
+            variant: 'success',
+          });
         });
       }
 
