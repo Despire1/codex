@@ -344,6 +344,11 @@
   position: relative;
 }
 
+.studentCard:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
 .studentStripe {
   background: transparent;
   transition: background 0.2s ease;
@@ -446,6 +451,18 @@
 
 .studentMeta {
   color: var(--color-gray-500);
+}
+
+.studentUsernameLink {
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.studentUsernameLink:hover,
+.studentUsernameLink:focus-visible {
+  color: var(--color-blue-700);
+  border-color: var(--color-blue-200);
 }
 
 .emptyState {
