@@ -426,6 +426,43 @@ const parseDateFilter = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const resolveStudentDebtSummary = async (teacherId: number, studentId: number) => {
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  const now = new Date();
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      teacherId,
+      status: { not: 'CANCELED' },
+      OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
+      participants: {
+        some: {
+          studentId,
+          isPaid: false,
+        },
+      },
+    },
+    include: {
+      participants: true,
+    },
+    orderBy: { startAt: 'asc' },
+  });
+
+  const items = lessons.map((lesson) => {
+    const participant = lesson.participants.find((item) => item.studentId === studentId);
+    const price = participant?.price ?? student?.pricePerLesson ?? lesson.price ?? null;
+    return {
+      id: lesson.id,
+      startAt: lesson.startAt,
+      status: lesson.status,
+      price,
+    };
+  });
+
+  const total = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+
+  return { items, total };
+};
+
 const listStudentLessons = async (
   user: User,
   studentId: number,
@@ -486,7 +523,9 @@ const listStudentLessons = async (
     orderBy: { startAt: filters.sort === 'asc' ? 'asc' : 'desc' },
   });
 
-  return { items };
+  const debt = await resolveStudentDebtSummary(teacher.chatId, studentId);
+
+  return { items, debt };
 };
 
 const bootstrap = async (user: User) => {
@@ -1673,12 +1712,8 @@ const togglePaymentForStudent = async (
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
-      data: { isPaid: false, price: 0 },
+      data: { isPaid: false },
     });
-
-    if (studentId === lesson.studentId) {
-      await prisma.lesson.update({ where: { id: lessonId }, data: { price: 0 } });
-    }
   } else {
     const amount =
       [link.student?.pricePerLesson, participant.price, lesson.price].find(
