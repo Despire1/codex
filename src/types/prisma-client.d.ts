@@ -73,6 +73,7 @@ declare module '@prisma/client' {
   export type PaymentEvent = {
     id: number;
     studentId: number;
+    teacherId: bigint | null;
     lessonId: number | null;
     type: string;
     lessonsDelta: number;

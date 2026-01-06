@@ -97,6 +97,7 @@ export type PaymentCancelBehavior = 'refund' | 'writeoff';
 export interface PaymentEvent {
   id: number;
   studentId: number;
+  teacherId?: number | null;
   lessonId?: number | null;
   type: PaymentEventType;
   lessonsDelta: number;

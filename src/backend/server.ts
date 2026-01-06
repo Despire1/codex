@@ -619,6 +619,7 @@ const adjustBalance = async (
     await prisma.paymentEvent.create({
       data: {
         studentId,
+        teacherId: teacher.chatId,
         lessonId: null,
         type,
         lessonsDelta: delta,
@@ -647,7 +648,13 @@ const listPaymentEventsForStudent = async (
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const filter = options?.filter ?? 'all';
-  const where: Record<string, any> = { studentId };
+  const where: Record<string, any> = {
+    studentId,
+    OR: [
+      { teacherId: teacher.chatId },
+      { teacherId: null, lesson: { teacherId: teacher.chatId } },
+    ],
+  };
 
   if (filter === 'topup') {
     where.type = { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] };
@@ -785,6 +792,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
       if (!eventStudentIds.has(participant.studentId)) {
         await createPaymentEvent(tx, {
           studentId: participant.studentId,
+          teacherId,
           lessonId: lesson.id,
           type: 'AUTO_CHARGE',
           lessonsDelta: -1,
@@ -1038,6 +1046,7 @@ const createLesson = async (user: User, body: any) => {
     await prisma.paymentEvent.createMany({
       data: lesson.participants.map((participant: any) => ({
         studentId: participant.studentId,
+        teacherId: teacher.chatId,
         lessonId: lesson.id,
         type: 'MANUAL_PAID',
         lessonsDelta: 0,
@@ -1200,6 +1209,7 @@ const createRecurringLessons = async (user: User, body: any) => {
       await prisma.paymentEvent.createMany({
         data: lesson.participants.map((participant: any) => ({
           studentId: participant.studentId,
+          teacherId: teacher.chatId,
           lessonId: lesson.id,
           type: 'MANUAL_PAID',
           lessonsDelta: 0,
@@ -1556,12 +1566,14 @@ const togglePaymentForStudent = async (
           moneyAmount: null,
           createdBy: 'TEACHER',
           reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+          teacherId: teacher.chatId,
         },
       });
     } else {
       await prisma.paymentEvent.create({
         data: {
           studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'ADJUSTMENT',
           lessonsDelta: deltaChange,
@@ -1598,10 +1610,17 @@ const togglePaymentForStudent = async (
     const existingManualEvent = await prisma.paymentEvent.findFirst({
       where: { studentId, lessonId, type: 'MANUAL_PAID' },
     });
+    if (existingManualEvent && !existingManualEvent.teacherId) {
+      await prisma.paymentEvent.update({
+        where: { id: existingManualEvent.id },
+        data: { teacherId: teacher.chatId },
+      });
+    }
     if (!existingManualEvent) {
       await prisma.paymentEvent.create({
         data: {
           studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'MANUAL_PAID',
           lessonsDelta: 0,
@@ -1708,6 +1727,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
         });
         await createPaymentEvent(tx, {
           studentId: event.studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'ADJUSTMENT',
           lessonsDelta: 1,

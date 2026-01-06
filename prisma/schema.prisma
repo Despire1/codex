@@ -113,6 +113,7 @@ model Payment {
 model PaymentEvent {
   id            Int                    @id @default(autoincrement())
   studentId     Int
+  teacherId     BigInt?
   lessonId      Int?
   type          String
   lessonsDelta  Int
@@ -127,6 +128,7 @@ model PaymentEvent {
   lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
+  @@index([teacherId])
   @@index([lessonId])
   @@index([createdAt])
   @@unique([studentId, lessonId, type])
