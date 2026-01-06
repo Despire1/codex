@@ -94,7 +94,8 @@ interface AppRoutesProps {
     }) => void;
     onToggleHomework: (homeworkId: number) => void;
     onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
-    onOpenStudentModal: () => void;
+    onAddStudent: () => void;
+    onEditStudent: () => void;
     onRequestDeleteStudent: (studentId: number) => void;
     studentLessons: Lesson[];
     lessonPaymentFilter: LessonPaymentFilter;

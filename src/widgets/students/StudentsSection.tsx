@@ -67,7 +67,8 @@ interface StudentsSectionProps {
   onHomeworkDraftChange: (draft: NewHomeworkDraft) => void;
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
-  onOpenStudentModal: () => void;
+  onAddStudent: () => void;
+  onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
   studentLessons: Lesson[];
   lessonPaymentFilter: LessonPaymentFilter;
@@ -149,7 +150,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onHomeworkDraftChange,
   onToggleHomework,
   onUpdateHomework,
-  onOpenStudentModal,
+  onAddStudent,
+  onEditStudent,
   onRequestDeleteStudent,
   studentLessons,
   lessonPaymentFilter,
@@ -344,7 +346,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             onSelectStudent={handleSelectStudent}
             onSearchChange={onStudentSearchChange}
             onFilterChange={onStudentFilterChange}
-            onOpenStudentModal={onOpenStudentModal}
+            onAddStudent={onAddStudent}
           />
         )}
 
@@ -372,7 +374,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onToggleAutoReminder={onToggleAutoReminder}
                   onAdjustBalance={onAdjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
-                  onOpenStudentModal={onOpenStudentModal}
+                  onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
                 />
 

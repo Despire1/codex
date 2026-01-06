@@ -23,7 +23,7 @@ interface StudentHeroProps {
   onToggleAutoReminder: (studentId: number) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onOpenBalanceTopup: () => void;
-  onOpenStudentModal: () => void;
+  onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
 }
 
@@ -42,7 +42,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onToggleAutoReminder,
   onAdjustBalance,
   onOpenBalanceTopup,
-  onOpenStudentModal,
+  onEditStudent,
   onRequestDeleteStudent,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -112,7 +112,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
               offset={6}
               className={styles.actionsMenu}
             >
-              <button onClick={() => handleMenuAction(onOpenStudentModal)}>Редактировать ученика</button>
+              <button onClick={() => handleMenuAction(onEditStudent)}>Редактировать ученика</button>
               <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
                 Напомнить про оплату
               </button>
