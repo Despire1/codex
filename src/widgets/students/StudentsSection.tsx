@@ -362,6 +362,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <StudentHero
                   headerRef={headerRef}
                   selectedStudent={selectedStudent}
+                  studentLessons={studentLessons}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
                   isMobile={isMobile}
@@ -376,6 +377,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
+                  onTogglePaid={onTogglePaid}
                 />
 
                 {/*
