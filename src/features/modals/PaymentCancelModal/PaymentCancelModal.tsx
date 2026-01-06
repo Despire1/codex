@@ -2,6 +2,7 @@ import { FC } from 'react';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import modalStyles from '../../../shared/ui/Modal/Modal.module.css';
 import controls from '../../../shared/styles/controls.module.css';
+import styles from './PaymentCancelModal.module.css';
 
 interface PaymentCancelModalProps {
   open: boolean;
@@ -26,14 +27,14 @@ export const PaymentCancelModal: FC<PaymentCancelModalProps> = ({
       <p className={modalStyles.message}>
         Если вернуть, баланс увеличится на 1 урок. Если нет — оплата будет отменена без возврата на баланс.
       </p>
-      <div className={modalStyles.actions}>
-        <button type="button" className={controls.secondaryButton} onClick={onClose}>
+      <div className={styles.actions}>
+        <button type="button" className={`${controls.secondaryButton} ${styles.button}`} onClick={onClose}>
           Отмена
         </button>
-        <button type="button" className={controls.secondaryButton} onClick={onWriteOff}>
+        <button type="button" className={`${controls.secondaryButton} ${styles.button}`} onClick={onWriteOff}>
           Списать без возврата
         </button>
-        <button type="button" className={controls.primaryButton} onClick={onRefund}>
+        <button type="button" className={`${controls.primaryButton} ${styles.button}`} onClick={onRefund}>
           Вернуть на баланс
         </button>
       </div>
