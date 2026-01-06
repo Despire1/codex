@@ -81,6 +81,12 @@
   height: 20px;
 }
 
+.viewToggleIcon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .viewToggleText {
   display: inline-flex;
   align-items: center;
@@ -103,6 +109,12 @@
 .headerActionIcon {
   width: 20px;
   height: 20px;
+}
+
+.headerActionIcon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .headerActionLabel {
@@ -137,6 +149,12 @@
 .monthNavIcon {
   width: 18px;
   height: 18px;
+}
+
+.monthNavIcon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .monthNavButton:hover {
