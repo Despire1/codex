@@ -2317,6 +2317,10 @@
     align-items: flex-start;
   }
 
+  .summaryList {
+    width: 100%;
+  }
+
   .summaryLine {
     flex-direction: column;
     align-items: flex-start;

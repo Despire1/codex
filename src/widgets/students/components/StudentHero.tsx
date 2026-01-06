@@ -472,6 +472,57 @@ export const StudentHero: FC<StudentHeroProps> = ({
         </BottomSheet>
       )}
 
+      {!isMobile && (
+        <Modal
+          open={isReminderSettingsOpen}
+          title="Напоминания"
+          onClose={() => setIsReminderSettingsOpen(false)}
+        >
+          <p className={styles.reminderStatus}>
+            Автонапоминания: {reminderStatusLabel}
+          </p>
+          <div className={styles.reminderActions}>
+            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+              Закрыть
+            </button>
+            <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+              {reminderActionLabel}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
+          <div className={styles.reminderSheet}>
+            <h3 className={styles.reminderTitle}>Напоминания</h3>
+            <p className={styles.reminderStatus}>
+              Автонапоминания: {reminderStatusLabel}
+            </p>
+            <div className={styles.reminderActions}>
+              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+                Закрыть
+              </button>
+              <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+                {reminderActionLabel}
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
+          <StudentDebtPopoverContent
+            items={debtItems}
+            pendingIds={pendingPaymentIds}
+            onMarkPaid={handleMarkPaid}
+            showCloseButton
+            onClose={() => setIsDebtPopoverOpen(false)}
+          />
+        </BottomSheet>
+      )}
+
       <div className={styles.tabs}>
         {/*
         <button
