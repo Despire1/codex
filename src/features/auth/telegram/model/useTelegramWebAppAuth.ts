@@ -23,7 +23,13 @@ export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp;
-    if (!webApp?.initData) return;
+    if (!webApp) return;
+    document.body.classList.add('telegram-webapp');
+    if (!webApp.initData) {
+      return () => {
+        document.body.classList.remove('telegram-webapp');
+      };
+    }
     let cancelled = false;
 
     webApp.ready?.();
@@ -54,6 +60,7 @@ export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
 
     return () => {
       cancelled = true;
+      document.body.classList.remove('telegram-webapp');
     };
   }, [onAuthenticated, showToast]);
 
