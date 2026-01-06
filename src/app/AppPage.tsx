@@ -38,7 +38,25 @@ const initialTeacher: Teacher = {
 };
 
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
+const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 type TabPath = (typeof tabs)[number]['path'];
+
+type StudentCardFiltersState = {
+  homeworkFilter?: 'all' | HomeworkStatus | 'overdue';
+  lessonPaymentFilter?: LessonPaymentFilter;
+  lessonStatusFilter?: LessonStatusFilter;
+  lessonDateRange?: LessonDateRange;
+  lessonSortOrder?: LessonSortOrder;
+  paymentFilter?: 'all' | 'topup' | 'charges' | 'manual';
+  paymentDate?: string;
+};
+
+const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
+  from: '',
+  to: '',
+  fromTime: '00:00',
+  toTime: '23:59',
+};
 
 const parseTimeSpentMinutes = (value: string): number | null => {
   if (!value.trim()) return null;
@@ -47,12 +65,99 @@ const parseTimeSpentMinutes = (value: string): number | null => {
   return Math.round(numericValue);
 };
 
+const isHomeworkFilter = (value: unknown): value is 'all' | HomeworkStatus | 'overdue' =>
+  typeof value === 'string' &&
+  (value === 'all' ||
+    value === 'overdue' ||
+    value === 'DRAFT' ||
+    value === 'ASSIGNED' ||
+    value === 'IN_PROGRESS' ||
+    value === 'DONE');
+
+const isLessonPaymentFilter = (value: unknown): value is LessonPaymentFilter =>
+  value === 'all' || value === 'paid' || value === 'unpaid';
+
+const isLessonStatusFilter = (value: unknown): value is LessonStatusFilter =>
+  value === 'all' || value === 'completed' || value === 'not_completed';
+
+const isLessonSortOrder = (value: unknown): value is LessonSortOrder => value === 'asc' || value === 'desc';
+
+const isPaymentFilter = (value: unknown): value is 'all' | 'topup' | 'charges' | 'manual' =>
+  value === 'all' || value === 'topup' || value === 'charges' || value === 'manual';
+
+const parseLessonDateRange = (value: unknown): LessonDateRange | null => {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.from !== 'string' ||
+    typeof record.to !== 'string' ||
+    typeof record.fromTime !== 'string' ||
+    typeof record.toTime !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    from: record.from,
+    to: record.to,
+    fromTime: record.fromTime,
+    toTime: record.toTime,
+  };
+};
+
+const loadStudentCardFilters = (): StudentCardFiltersState => {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STUDENT_CARD_FILTERS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const result: StudentCardFiltersState = {};
+    if (isHomeworkFilter(parsed.homeworkFilter)) {
+      result.homeworkFilter = parsed.homeworkFilter;
+    }
+    if (isLessonPaymentFilter(parsed.lessonPaymentFilter)) {
+      result.lessonPaymentFilter = parsed.lessonPaymentFilter;
+    }
+    if (isLessonStatusFilter(parsed.lessonStatusFilter)) {
+      result.lessonStatusFilter = parsed.lessonStatusFilter;
+    }
+    const parsedDateRange = parseLessonDateRange(parsed.lessonDateRange);
+    if (parsedDateRange) {
+      result.lessonDateRange = parsedDateRange;
+    }
+    if (isLessonSortOrder(parsed.lessonSortOrder)) {
+      result.lessonSortOrder = parsed.lessonSortOrder;
+    }
+    if (isPaymentFilter(parsed.paymentFilter)) {
+      result.paymentFilter = parsed.paymentFilter;
+    }
+    if (typeof parsed.paymentDate === 'string') {
+      result.paymentDate = parsed.paymentDate;
+    }
+    return result;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load student card filters', error);
+    return {};
+  }
+};
+
+const saveStudentCardFilters = (state: StudentCardFiltersState) => {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(STUDENT_CARD_FILTERS_KEY, JSON.stringify(state));
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to save student card filters', error);
+  }
+};
+
 export const AppPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
   const { state: sessionState, refresh: refreshSession } = useSessionStatus();
   const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
+  const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
@@ -67,25 +172,32 @@ export const AppPage = () => {
   const [studentListHasMore, setStudentListHasMore] = useState(false);
   const [studentListLoading, setStudentListLoading] = useState(false);
   const [studentHomeworks, setStudentHomeworks] = useState<Homework[]>([]);
-  const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>('all');
+  const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>(
+    storedStudentCardFilters.homeworkFilter ?? 'all',
+  );
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
-  const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
-  const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
-  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('asc');
-  const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
-    from: '',
-    to: '',
-    fromTime: '00:00',
-    toTime: '23:59',
-  });
+  const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
+    storedStudentCardFilters.lessonPaymentFilter ?? 'all',
+  );
+  const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>(
+    storedStudentCardFilters.lessonStatusFilter ?? 'all',
+  );
+  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>(
+    storedStudentCardFilters.lessonSortOrder ?? 'asc',
+  );
+  const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>(
+    storedStudentCardFilters.lessonDateRange ?? DEFAULT_LESSON_DATE_RANGE,
+  );
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
   const lessonLoadRequestId = useRef(0);
   const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>('all');
-  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
+    storedStudentCardFilters.paymentFilter ?? 'all',
+  );
+  const [paymentDate, setPaymentDate] = useState(storedStudentCardFilters.paymentDate ?? '');
   const paymentFilterRef = useRef(paymentFilter);
   const paymentDateRef = useRef(paymentDate);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
@@ -351,6 +463,26 @@ export const AppPage = () => {
   useEffect(() => {
     paymentDateRef.current = paymentDate;
   }, [paymentDate]);
+
+  useEffect(() => {
+    saveStudentCardFilters({
+      homeworkFilter: studentHomeworkFilter,
+      lessonPaymentFilter: studentLessonPaymentFilter,
+      lessonStatusFilter: studentLessonStatusFilter,
+      lessonDateRange: studentLessonDateRange,
+      lessonSortOrder: studentLessonSortOrder,
+      paymentFilter,
+      paymentDate,
+    });
+  }, [
+    paymentDate,
+    paymentFilter,
+    studentHomeworkFilter,
+    studentLessonDateRange,
+    studentLessonPaymentFilter,
+    studentLessonSortOrder,
+    studentLessonStatusFilter,
+  ]);
 
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
