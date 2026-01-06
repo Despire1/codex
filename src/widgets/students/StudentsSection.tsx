@@ -14,7 +14,7 @@ import {
   StudentListItem,
 } from '../../entities/types';
 import styles from './StudentsSection.module.css';
-import { HomeworkPanel } from './components/HomeworkPanel';
+// import { HomeworkPanel } from './components/HomeworkPanel';
 import { LessonsTab } from './components/LessonsTab';
 import { OverviewTab } from './components/OverviewTab';
 import { PaymentsTab } from './components/PaymentsTab';
@@ -98,8 +98,10 @@ const getLessonStatusLabel = (status: Lesson['status']) => {
 };
 
 type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';
-const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
-const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
+// const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
+const DEFAULT_STUDENT_TAB: StudentTabId = 'overview';
+// const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
+const studentTabs: StudentTabId[] = ['overview', 'lessons', 'payments'];
 
 const resolveStudentTab = (search: string): StudentTabId => {
   const params = new URLSearchParams(search);
@@ -371,6 +373,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onOpenStudentModal={onOpenStudentModal}
                 />
 
+                {/*
                 {activeTab === 'homework' ? (
                   <HomeworkPanel
                     selectedStudent={selectedStudent}
@@ -391,7 +394,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onHomeworkDraftChange={onHomeworkDraftChange}
                     newHomeworkDraft={newHomeworkDraft}
                   />
-                ) : activeTab === 'lessons' ? (
+                ) : */}
+                {activeTab === 'lessons' ? (
                   <LessonsTab
                     studentLessons={studentLessons}
                     selectedStudent={selectedStudent}

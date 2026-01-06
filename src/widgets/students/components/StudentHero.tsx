@@ -147,12 +147,14 @@ export const StudentHero: FC<StudentHeroProps> = ({
       </div>
 
       <div className={styles.tabs}>
+        {/*
         <button
           className={`${styles.tab} ${activeTab === 'homework' ? styles.tabActive : ''}`}
           onClick={() => onTabChange('homework')}
         >
           Домашка
         </button>
+        */}
         <button
           className={`${styles.tab} ${activeTab === 'lessons' ? styles.tabActive : ''}`}
           onClick={() => onTabChange('lessons')}
