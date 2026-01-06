@@ -1712,12 +1712,8 @@ const togglePaymentForStudent = async (
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
-      data: { isPaid: false, price: 0 },
+      data: { isPaid: false },
     });
-
-    if (studentId === lesson.studentId) {
-      await prisma.lesson.update({ where: { id: lessonId }, data: { price: 0 } });
-    }
   } else {
     const amount =
       [link.student?.pricePerLesson, participant.price, lesson.price].find(
