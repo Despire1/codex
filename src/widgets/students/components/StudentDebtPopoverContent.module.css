@@ -1,0 +1,127 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--color-slate-500);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-slate-50);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-white);
+}
+
+.itemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemDate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.itemStatus {
+  font-size: 12px;
+  color: var(--color-slate-500);
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.itemAmount {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+  white-space: nowrap;
+}
+
+.payButton {
+  border: none;
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.payButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-top-color: var(--color-white);
+  animation: spin 0.9s linear infinite;
+}
+
+.closeButton {
+  width: 100%;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .container {
+    min-width: unset;
+  }
+
+  .item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .itemActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .payButton {
+    min-width: 0;
+    width: auto;
+  }
+}
