@@ -672,6 +672,46 @@
   align-items: center;
 }
 
+.remindersBadge {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-slate-50);
+  color: var(--color-slate-700);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.remindersBadge:hover {
+  background: var(--color-slate-100);
+}
+
+.reminderSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reminderTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.reminderStatus {
+  margin: 0;
+  color: var(--color-slate-600);
+  font-size: 14px;
+}
+
+.reminderActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .actionsMenuWrapper {
   position: relative;
 }
@@ -742,6 +782,34 @@
   flex-wrap: wrap;
 }
 
+.summaryDesktopLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summaryItemLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.summaryMobileStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.summaryMobileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .balanceRow {
   display: flex;
   align-items: center;
@@ -773,6 +841,36 @@
   gap: 6px;
 }
 
+.summaryValueButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-blue-700);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.summaryValueButton:hover {
+  color: #1e40af;
+  text-decoration: underline;
+}
+
+.summaryValueText {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.summarySuccessText {
+  font-size: 14px;
+  font-weight: 700;
+  color: #188542;
+}
+
 .balanceButton {
   border: none;
   background: transparent;
@@ -794,6 +892,14 @@
 .summaryDivider {
   color: var(--color-slate-300);
   font-weight: 700;
+}
+
+.debtPopover {
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px var(--shadow-slate-900-16);
+  padding: 14px;
 }
 
 .inlinePopover {

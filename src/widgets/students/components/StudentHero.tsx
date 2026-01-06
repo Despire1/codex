@@ -1,16 +1,21 @@
-import { type FC, type Ref, useState } from 'react';
-import { Student, TeacherStudent } from '../../../entities/types';
+import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import { Lesson, Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   EditOutlinedIcon,
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
+import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '../../../shared/ui/Modal/Modal';
+import { StudentDebtPopoverContent } from './StudentDebtPopoverContent';
 
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
+  studentLessons: Lesson[];
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
   isMobile: boolean;
@@ -25,11 +30,13 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
   headerRef,
   selectedStudent,
+  studentLessons,
   priceEditState,
   activeTab,
   isMobile,
@@ -44,9 +51,15 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onTogglePaid,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
+  const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
+  const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
+  const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
+  const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
@@ -57,6 +70,82 @@ export const StudentHero: FC<StudentHeroProps> = ({
     setIsTelegramModalOpen(false);
     window.location.href = `tg://resolve?domain=${telegramUsername}`;
   };
+
+  const { debtItems, debtTotal } = useMemo(() => {
+    const now = new Date();
+    const items = studentLessons
+      .map((lesson) => {
+        const participant = lesson.participants?.find((item) => item.studentId === selectedStudent.id);
+        const resolvedPrice = participant?.price ?? selectedStudent.pricePerLesson ?? lesson.price ?? null;
+        const isPaid = participant?.isPaid ?? lesson.isPaid;
+        const lessonDate = parseISO(lesson.startAt);
+        const isPastLesson = lessonDate < now;
+        const isEligible =
+          !isPaid && lesson.status !== 'CANCELED' && (lesson.status === 'COMPLETED' || isPastLesson);
+
+        if (!isEligible) return null;
+        return {
+          id: lesson.id,
+          startAt: lesson.startAt,
+          status: lesson.status,
+          price: resolvedPrice,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+
+    const total = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+
+    return { debtItems: items, debtTotal: total };
+  }, [selectedStudent.id, selectedStudent.pricePerLesson, studentLessons]);
+
+  const nextLessonLabel = useMemo(() => {
+    const now = new Date();
+    const nextLesson = studentLessons
+      .filter((lesson) => {
+        if (lesson.status === 'CANCELED') return false;
+        const lessonDate = parseISO(lesson.startAt);
+        return lessonDate > now;
+      })
+      .sort((a, b) => a.startAt.localeCompare(b.startAt))[0];
+
+    if (!nextLesson) return 'не запланирован';
+    return format(parseISO(nextLesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru });
+  }, [studentLessons]);
+
+  useEffect(() => {
+    if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && debtTotal === 0) {
+      setIsDebtPopoverOpen(false);
+      setShouldAutoCloseDebt(false);
+    } else if (shouldAutoCloseDebt && debtTotal > 0 && pendingPaymentIds.length === 0) {
+      setShouldAutoCloseDebt(false);
+    }
+    previousDebtTotal.current = debtTotal;
+  }, [debtTotal, pendingPaymentIds.length, shouldAutoCloseDebt]);
+
+  const handleMarkPaid = async (lessonId: number) => {
+    if (pendingPaymentIds.includes(lessonId)) return;
+    setPendingPaymentIds((prev) => [...prev, lessonId]);
+    setShouldAutoCloseDebt(true);
+    try {
+      await onTogglePaid(lessonId, selectedStudent.id);
+    } finally {
+      setPendingPaymentIds((prev) => prev.filter((id) => id !== lessonId));
+    }
+  };
+
+  const handleOpenReminderSettings = () => {
+    setIsReminderSettingsOpen(true);
+  };
+
+  const handleToggleReminderSettings = () => {
+    onToggleAutoReminder(selectedStudent.id);
+    setIsReminderSettingsOpen(false);
+  };
+
+  const hasDebt = debtItems.length > 0;
+  const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
+  const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
 
   return (
     <div
@@ -94,6 +183,15 @@ export const StudentHero: FC<StudentHeroProps> = ({
           </div>
         </div>
         <div className={styles.heroActions}>
+          {!selectedStudent.link.autoRemindHomework && (
+            <button
+              type="button"
+              className={styles.remindersBadge}
+              onClick={handleOpenReminderSettings}
+            >
+              Напоминания выкл.
+            </button>
+          )}
           <div className={styles.actionsMenuWrapper}>
             <AdaptivePopover
               isOpen={isActionsMenuOpen}
@@ -113,6 +211,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
               className={styles.actionsMenu}
             >
               <button onClick={() => handleMenuAction(onEditStudent)}>Редактировать ученика</button>
+              <button onClick={() => handleMenuAction(handleOpenReminderSettings)}>Напоминания</button>
               <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
                 Напомнить про оплату
               </button>
@@ -149,62 +248,229 @@ export const StudentHero: FC<StudentHeroProps> = ({
       </Modal>
 
       <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
-        <div className={styles.summaryLine}>
-          <div className={styles.balanceRow}>
-            <span className={styles.summaryLabel}>Баланс:</span>
-            <button
-              type="button"
-              className={styles.balanceButton}
-              onClick={onOpenBalanceTopup}
-              title="Нажмите, чтобы пополнить баланс"
-              aria-label="Нажмите, чтобы пополнить баланс"
-            >
-              {selectedStudent.link.balanceLessons}
-              {selectedStudent.link.balanceLessons < 0 && (
-                <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-              )}
-            </button>
-          </div>
-          <span className={styles.summaryDivider}>|</span>
-          <div className={styles.priceInline}>
-            <span className={styles.summaryLabel}>Цена:</span>
-            {priceEditState.id === selectedStudent.id ? (
-              <div className={styles.priceEditorInline}>
-                <input
-                  className={controls.input}
-                  type="number"
-                  value={priceEditState.value}
-                  onChange={(e) => onPriceChange(e.target.value)}
-                />
-                <div className={styles.priceButtons}>
-                  <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
-                  <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
-                </div>
-              </div>
-            ) : (
-              <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
-                <span className={styles.summaryValueInline}>
-                  {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                    ? `${selectedStudent.pricePerLesson} ₽`
-                    : 'Не задана'}
-                </span>
-                <EditOutlinedIcon width={16} height={16} />
+        {!isMobile && (
+          <div className={styles.summaryDesktopLine}>
+            <div className={styles.balanceRow}>
+              <span className={styles.summaryLabel}>Баланс:</span>
+              <button
+                type="button"
+                className={styles.balanceButton}
+                onClick={onOpenBalanceTopup}
+                title="Нажмите, чтобы пополнить баланс"
+                aria-label="Нажмите, чтобы пополнить баланс"
+              >
+                {selectedStudent.link.balanceLessons}
+                {selectedStudent.link.balanceLessons < 0 && (
+                  <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
+                )}
               </button>
-            )}
+            </div>
+            <span className={styles.summaryDivider}>|</span>
+            <div className={styles.priceInline}>
+              <span className={styles.summaryLabel}>Цена:</span>
+              {priceEditState.id === selectedStudent.id ? (
+                <div className={styles.priceEditorInline}>
+                  <input
+                    className={controls.input}
+                    type="number"
+                    value={priceEditState.value}
+                    onChange={(e) => onPriceChange(e.target.value)}
+                  />
+                  <div className={styles.priceButtons}>
+                    <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
+                    <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
+                  </div>
+                </div>
+              ) : (
+                <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
+                  <span className={styles.summaryValueInline}>
+                    {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                      ? `${selectedStudent.pricePerLesson} ₽`
+                      : 'Не задана'}
+                  </span>
+                  <EditOutlinedIcon width={16} height={16} />
+                </button>
+              )}
+            </div>
+            <span className={styles.summaryDivider}>|</span>
+            <div className={styles.summaryItemLine}>
+              {hasDebt ? (
+                <>
+                  <span className={styles.summaryLabel}>Не оплачено:</span>
+                  <AdaptivePopover
+                    isOpen={isDebtPopoverOpen}
+                    onClose={() => setIsDebtPopoverOpen(false)}
+                    trigger={(
+                      <button
+                        type="button"
+                        className={styles.summaryValueButton}
+                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                      >
+                        {`${debtTotal} ₽`}
+                      </button>
+                    )}
+                    side="bottom"
+                    align="start"
+                    offset={6}
+                    className={styles.debtPopover}
+                  >
+                    <StudentDebtPopoverContent
+                      items={debtItems}
+                      pendingIds={pendingPaymentIds}
+                      onMarkPaid={handleMarkPaid}
+                    />
+                  </AdaptivePopover>
+                </>
+              ) : (
+                <span className={styles.summarySuccessText}>Все занятия оплачены</span>
+              )}
+            </div>
+            <span className={styles.summaryDivider}>|</span>
+            <div className={styles.summaryItemLine}>
+              <span className={styles.summaryLabel}>Следующий урок:</span>
+              {nextLessonLabel === 'не запланирован' ? (
+                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.summaryValueButton}
+                  onClick={() => onTabChange('lessons')}
+                >
+                  {nextLessonLabel}
+                </button>
+              )}
+            </div>
           </div>
-          <span className={styles.summaryDivider}>|</span>
-          <div className={styles.toggleRow}>
-            <span className={styles.summaryLabel}>Автонапоминания:</span>
-            <button
-              className={`${styles.toggleButton} ${selectedStudent.link.autoRemindHomework ? styles.toggleOn : styles.toggleOff}`}
-              onClick={() => onToggleAutoReminder(selectedStudent.id)}
-              type="button"
-            >
-              {selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены'}
+        )}
+        {isMobile && (
+          <div className={styles.summaryMobileStack}>
+            <div className={styles.summaryMobileRow}>
+              <div className={styles.balanceRow}>
+                <span className={styles.summaryLabel}>Баланс:</span>
+                <button
+                  type="button"
+                  className={styles.balanceButton}
+                  onClick={onOpenBalanceTopup}
+                  title="Нажмите, чтобы пополнить баланс"
+                  aria-label="Нажмите, чтобы пополнить баланс"
+                >
+                  {selectedStudent.link.balanceLessons}
+                  {selectedStudent.link.balanceLessons < 0 && (
+                    <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
+                  )}
+                </button>
+              </div>
+              <div className={styles.priceInline}>
+                <span className={styles.summaryLabel}>Цена:</span>
+                {priceEditState.id === selectedStudent.id ? (
+                  <div className={styles.priceEditorInline}>
+                    <input
+                      className={controls.input}
+                      type="number"
+                      value={priceEditState.value}
+                      onChange={(e) => onPriceChange(e.target.value)}
+                    />
+                    <div className={styles.priceButtons}>
+                      <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
+                      <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
+                    <span className={styles.summaryValueInline}>
+                      {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                        ? `${selectedStudent.pricePerLesson} ₽`
+                        : 'Не задана'}
+                    </span>
+                    <EditOutlinedIcon width={16} height={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className={styles.summaryMobileRow}>
+              {hasDebt ? (
+                <>
+                  <span className={styles.summaryLabel}>Не оплачено:</span>
+                  <button
+                    type="button"
+                    className={styles.summaryValueButton}
+                    onClick={() => setIsDebtPopoverOpen(true)}
+                  >
+                    {`${debtTotal} ₽`}
+                  </button>
+                </>
+              ) : (
+                <span className={styles.summarySuccessText}>Все занятия оплачены</span>
+              )}
+            </div>
+            <div className={styles.summaryMobileRow}>
+              <span className={styles.summaryLabel}>Следующий урок:</span>
+              {nextLessonLabel === 'не запланирован' ? (
+                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.summaryValueButton}
+                  onClick={() => onTabChange('lessons')}
+                >
+                  {nextLessonLabel}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!isMobile && (
+        <Modal
+          open={isReminderSettingsOpen}
+          title="Напоминания"
+          onClose={() => setIsReminderSettingsOpen(false)}
+        >
+          <p className={styles.reminderStatus}>
+            Автонапоминания: {reminderStatusLabel}
+          </p>
+          <div className={styles.reminderActions}>
+            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+              Закрыть
+            </button>
+            <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+              {reminderActionLabel}
             </button>
           </div>
-        </div>
-      </div>
+        </Modal>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
+          <div className={styles.reminderSheet}>
+            <h3 className={styles.reminderTitle}>Напоминания</h3>
+            <p className={styles.reminderStatus}>
+              Автонапоминания: {reminderStatusLabel}
+            </p>
+            <div className={styles.reminderActions}>
+              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+                Закрыть
+              </button>
+              <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+                {reminderActionLabel}
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
+          <StudentDebtPopoverContent
+            items={debtItems}
+            pendingIds={pendingPaymentIds}
+            onMarkPaid={handleMarkPaid}
+            showCloseButton
+            onClose={() => setIsDebtPopoverOpen(false)}
+          />
+        </BottomSheet>
+      )}
 
       <div className={styles.tabs}>
         {/*
