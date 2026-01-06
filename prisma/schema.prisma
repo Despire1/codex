@@ -41,6 +41,7 @@ model TeacherStudent {
   customName         String
   autoRemindHomework Boolean @default(false)
   balanceLessons     Int     @default(0)
+  isArchived         Boolean @default(false)
   payments           Payment[]
 
   teacher Teacher @relation(fields: [teacherId], references: [chatId])
