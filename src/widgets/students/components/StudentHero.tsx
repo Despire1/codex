@@ -248,8 +248,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
       </Modal>
 
       <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
-        <div className={styles.summaryList}>
-          <div className={styles.summaryItem}>
+        {!isMobile && (
+          <div className={styles.summaryDesktopLine}>
             <div className={styles.balanceRow}>
               <span className={styles.summaryLabel}>Баланс:</span>
               <button
@@ -265,8 +265,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 )}
               </button>
             </div>
-          </div>
-          <div className={styles.summaryItem}>
+            <span className={styles.summaryDivider}>|</span>
             <div className={styles.priceInline}>
               <span className={styles.summaryLabel}>Цена:</span>
               {priceEditState.id === selectedStudent.id ? (
@@ -293,63 +292,185 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 </button>
               )}
             </div>
-          </div>
-          <div className={styles.summaryItem}>
-            {isMobile ? (
-              hasDebt ? (
-                <button
-                  type="button"
-                  className={styles.summaryActionButton}
-                  onClick={() => setIsDebtPopoverOpen(true)}
-                >
-                  {`Не оплачено: ${debtTotal} ₽`}
-                </button>
+            <span className={styles.summaryDivider}>|</span>
+            <div className={styles.summaryItemLine}>
+              {hasDebt ? (
+                <>
+                  <span className={styles.summaryLabel}>Не оплачено:</span>
+                  <AdaptivePopover
+                    isOpen={isDebtPopoverOpen}
+                    onClose={() => setIsDebtPopoverOpen(false)}
+                    trigger={(
+                      <button
+                        type="button"
+                        className={styles.summaryValueButton}
+                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                      >
+                        {`${debtTotal} ₽`}
+                      </button>
+                    )}
+                    side="bottom"
+                    align="start"
+                    offset={6}
+                    className={styles.debtPopover}
+                  >
+                    <StudentDebtPopoverContent
+                      items={debtItems}
+                      pendingIds={pendingPaymentIds}
+                      onMarkPaid={handleMarkPaid}
+                    />
+                  </AdaptivePopover>
+                </>
               ) : (
                 <span className={styles.summarySuccessText}>Все занятия оплачены</span>
-              )
-            ) : (
-              <AdaptivePopover
-                isOpen={isDebtPopoverOpen}
-                onClose={() => setIsDebtPopoverOpen(false)}
-                trigger={hasDebt ? (
+              )}
+            </div>
+            <span className={styles.summaryDivider}>|</span>
+            <div className={styles.summaryItemLine}>
+              <span className={styles.summaryLabel}>Следующий урок:</span>
+              {nextLessonLabel === 'не запланирован' ? (
+                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.summaryValueButton}
+                  onClick={() => onTabChange('lessons')}
+                >
+                  {nextLessonLabel}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {isMobile && (
+          <div className={styles.summaryMobileStack}>
+            <div className={styles.summaryMobileRow}>
+              <div className={styles.balanceRow}>
+                <span className={styles.summaryLabel}>Баланс:</span>
+                <button
+                  type="button"
+                  className={styles.balanceButton}
+                  onClick={onOpenBalanceTopup}
+                  title="Нажмите, чтобы пополнить баланс"
+                  aria-label="Нажмите, чтобы пополнить баланс"
+                >
+                  {selectedStudent.link.balanceLessons}
+                  {selectedStudent.link.balanceLessons < 0 && (
+                    <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
+                  )}
+                </button>
+              </div>
+              <div className={styles.priceInline}>
+                <span className={styles.summaryLabel}>Цена:</span>
+                {priceEditState.id === selectedStudent.id ? (
+                  <div className={styles.priceEditorInline}>
+                    <input
+                      className={controls.input}
+                      type="number"
+                      value={priceEditState.value}
+                      onChange={(e) => onPriceChange(e.target.value)}
+                    />
+                    <div className={styles.priceButtons}>
+                      <button className={controls.primaryButton} onClick={onSavePrice}>Сохранить</button>
+                      <button className={controls.secondaryButton} onClick={onCancelPriceEdit}>Отмена</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
+                    <span className={styles.summaryValueInline}>
+                      {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
+                        ? `${selectedStudent.pricePerLesson} ₽`
+                        : 'Не задана'}
+                    </span>
+                    <EditOutlinedIcon width={16} height={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className={styles.summaryMobileRow}>
+              {hasDebt ? (
+                <>
+                  <span className={styles.summaryLabel}>Не оплачено:</span>
                   <button
                     type="button"
-                    className={styles.summaryActionButton}
-                    onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                    className={styles.summaryValueButton}
+                    onClick={() => setIsDebtPopoverOpen(true)}
                   >
-                    {`Не оплачено: ${debtTotal} ₽`}
+                    {`${debtTotal} ₽`}
                   </button>
-                ) : (
-                  <span className={styles.summarySuccessText}>Все занятия оплачены</span>
-                )}
-                side="bottom"
-                align="start"
-                offset={6}
-                className={styles.debtPopover}
-              >
-                <StudentDebtPopoverContent
-                  items={debtItems}
-                  pendingIds={pendingPaymentIds}
-                  onMarkPaid={handleMarkPaid}
-                />
-              </AdaptivePopover>
-            )}
+                </>
+              ) : (
+                <span className={styles.summarySuccessText}>Все занятия оплачены</span>
+              )}
+            </div>
+            <div className={styles.summaryMobileRow}>
+              <span className={styles.summaryLabel}>Следующий урок:</span>
+              {nextLessonLabel === 'не запланирован' ? (
+                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.summaryValueButton}
+                  onClick={() => onTabChange('lessons')}
+                >
+                  {nextLessonLabel}
+                </button>
+              )}
+            </div>
           </div>
-          <div className={styles.summaryItem}>
-            {nextLessonLabel === 'не запланирован' ? (
-              <span className={styles.summaryText}>{`Следующий урок: ${nextLessonLabel}`}</span>
-            ) : (
-              <button
-                type="button"
-                className={styles.summaryActionButton}
-                onClick={() => onTabChange('lessons')}
-              >
-                {`Следующий урок: ${nextLessonLabel}`}
-              </button>
-            )}
-          </div>
-        </div>
+        )}
       </div>
+
+      {!isMobile && (
+        <Modal
+          open={isReminderSettingsOpen}
+          title="Напоминания"
+          onClose={() => setIsReminderSettingsOpen(false)}
+        >
+          <p className={styles.reminderStatus}>
+            Автонапоминания: {reminderStatusLabel}
+          </p>
+          <div className={styles.reminderActions}>
+            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+              Закрыть
+            </button>
+            <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+              {reminderActionLabel}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
+          <div className={styles.reminderSheet}>
+            <h3 className={styles.reminderTitle}>Напоминания</h3>
+            <p className={styles.reminderStatus}>
+              Автонапоминания: {reminderStatusLabel}
+            </p>
+            <div className={styles.reminderActions}>
+              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+                Закрыть
+              </button>
+              <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
+                {reminderActionLabel}
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {isMobile && (
+        <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
+          <StudentDebtPopoverContent
+            items={debtItems}
+            pendingIds={pendingPaymentIds}
+            onMarkPaid={handleMarkPaid}
+            showCloseButton
+            onClose={() => setIsDebtPopoverOpen(false)}
+          />
+        </BottomSheet>
+      )}
 
       {!isMobile && (
         <Modal

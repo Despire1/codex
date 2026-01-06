@@ -782,17 +782,31 @@
   flex-wrap: wrap;
 }
 
-.summaryList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
-
-.summaryItem {
+.summaryDesktopLine {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summaryItemLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.summaryMobileStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.summaryMobileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -827,7 +841,7 @@
   gap: 6px;
 }
 
-.summaryActionButton {
+.summaryValueButton {
   border: none;
   background: transparent;
   padding: 0;
@@ -840,12 +854,12 @@
   font-size: 14px;
 }
 
-.summaryActionButton:hover {
+.summaryValueButton:hover {
   color: #1e40af;
   text-decoration: underline;
 }
 
-.summaryText {
+.summaryValueText {
   font-size: 14px;
   font-weight: 700;
   color: var(--color-slate-900);

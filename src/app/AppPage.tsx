@@ -73,7 +73,7 @@ export const AppPage = () => {
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>('all');
   const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>('all');
-  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('desc');
+  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>('asc');
   const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>({
     from: '',
     to: '',
