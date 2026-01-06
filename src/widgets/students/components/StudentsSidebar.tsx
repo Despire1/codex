@@ -1,4 +1,4 @@
-import { FC, useState, type RefObject } from 'react';
+import { FC, useState, type KeyboardEvent, type RefObject } from 'react';
 import { StudentListItem } from '../../../entities/types';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
@@ -126,12 +126,22 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
             studentListItems.map((item) => {
               const { student, link, stats } = item;
               const status = link.balanceLessons < 0 ? 'debt' : link.balanceLessons > 0 ? 'prepaid' : 'neutral';
+              const username = student.username?.trim();
+
+              const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onSelectStudent(student.id);
+              };
 
               return (
-                <button
+                <div
                   key={student.id}
                   className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
                   onClick={() => onSelectStudent(student.id)}
+                  onKeyDown={handleCardKeyDown}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className={styles.studentStripe} aria-hidden />
                   <div className={styles.studentCardBody}>
@@ -148,7 +158,19 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
                       </div>
                     </div>
                     <div className={styles.studentSecondaryRow}>
-                      <span className={styles.studentMeta}>@{student.username || 'нет'}</span>
+                      {username ? (
+                        <a
+                          className={`${styles.studentMeta} ${styles.studentUsernameLink}`}
+                          href={`tg://resolve?domain=${username}`}
+                          aria-label={`Открыть чат с @${username}`}
+                          title="Открыть чат в Telegram"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          @{username}
+                        </a>
+                      ) : (
+                        <span className={styles.studentMeta}>@нет</span>
+                      )}
                       <span className={styles.metaDivider}>•</span>
                       <span className={styles.studentMeta}>
                         автонапоминания: {link.autoRemindHomework ? 'вкл' : 'выкл'}
@@ -157,7 +179,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
                       <span className={styles.studentMeta}>баланс: {link.balanceLessons}</span>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })
           )}
