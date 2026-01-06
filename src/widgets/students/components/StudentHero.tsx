@@ -5,6 +5,7 @@ import {
   EditOutlinedIcon,
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
+import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
@@ -22,6 +23,7 @@ interface StudentHeroProps {
   onAdjustBalance: (studentId: number, delta: number) => void;
   onOpenBalanceTopup: () => void;
   onOpenStudentModal: () => void;
+  onRequestDeleteStudent: (studentId: number) => void;
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
@@ -40,8 +42,13 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onAdjustBalance,
   onOpenBalanceTopup,
   onOpenStudentModal,
+  onRequestDeleteStudent,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const handleMenuAction = (action: () => void) => {
+    setIsActionsMenuOpen(false);
+    action();
+  };
 
   return (
     <div
@@ -69,21 +76,37 @@ export const StudentHero: FC<StudentHeroProps> = ({
         </div>
         <div className={styles.heroActions}>
           <div className={styles.actionsMenuWrapper}>
-            <button
-              className={controls.iconButton}
-              aria-label="Дополнительные действия"
-              onClick={() => setIsActionsMenuOpen((prev) => !prev)}
+            <AdaptivePopover
+              isOpen={isActionsMenuOpen}
+              onClose={() => setIsActionsMenuOpen(false)}
+              trigger={
+                <button
+                  className={controls.iconButton}
+                  aria-label="Дополнительные действия"
+                  onClick={() => setIsActionsMenuOpen((prev) => !prev)}
+                >
+                  ⋯
+                </button>
+              }
+              side="bottom"
+              align="end"
+              offset={6}
+              className={styles.actionsMenu}
             >
-              ⋯
-            </button>
-            {isActionsMenuOpen && (
-              <div className={styles.actionsMenu}>
-                <button onClick={onOpenStudentModal}>Редактировать ученика</button>
-                <button onClick={() => onAdjustBalance(selectedStudent.id, -1)}>Напомнить про оплату</button>
-                <button onClick={() => navigator.clipboard?.writeText('Правила и памятка')}>Скопировать памятку</button>
-                <button className={styles.dangerButton}>Удалить ученика</button>
-              </div>
-            )}
+              <button onClick={() => handleMenuAction(onOpenStudentModal)}>Редактировать ученика</button>
+              <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
+                Напомнить про оплату
+              </button>
+              <button onClick={() => handleMenuAction(() => navigator.clipboard?.writeText('Правила и памятка'))}>
+                Скопировать памятку
+              </button>
+              <button
+                className={styles.dangerButton}
+                onClick={() => handleMenuAction(() => onRequestDeleteStudent(selectedStudent.id))}
+              >
+                Удалить ученика
+              </button>
+            </AdaptivePopover>
           </div>
         </div>
       </div>

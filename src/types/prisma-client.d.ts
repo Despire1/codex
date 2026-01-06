@@ -28,6 +28,7 @@ declare module '@prisma/client' {
     customName: string;
     autoRemindHomework: boolean;
     balanceLessons: number;
+    isArchived: boolean;
   };
 
   export type Homework = {
@@ -72,6 +73,7 @@ declare module '@prisma/client' {
   export type PaymentEvent = {
     id: number;
     studentId: number;
+    teacherId: bigint | null;
     lessonId: number | null;
     type: string;
     lessonsDelta: number;

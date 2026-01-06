@@ -9,4 +9,5 @@
 .popover {
   position: fixed;
   z-index: 50;
+  overflow: hidden;
 }

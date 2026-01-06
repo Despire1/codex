@@ -68,6 +68,7 @@ interface StudentsSectionProps {
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onOpenStudentModal: () => void;
+  onRequestDeleteStudent: (studentId: number) => void;
   studentLessons: Lesson[];
   lessonPaymentFilter: LessonPaymentFilter;
   lessonStatusFilter: LessonStatusFilter;
@@ -149,6 +150,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onToggleHomework,
   onUpdateHomework,
   onOpenStudentModal,
+  onRequestDeleteStudent,
   studentLessons,
   lessonPaymentFilter,
   lessonStatusFilter,
@@ -371,6 +373,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onAdjustBalance={onAdjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onOpenStudentModal={onOpenStudentModal}
+                  onRequestDeleteStudent={onRequestDeleteStudent}
                 />
 
                 {/*

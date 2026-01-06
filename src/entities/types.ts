@@ -22,6 +22,7 @@ export interface TeacherStudent {
   customName: string;
   autoRemindHomework: boolean;
   balanceLessons: number;
+  isArchived?: boolean;
 }
 
 export type HomeworkStatus = 'DRAFT' | 'ASSIGNED' | 'IN_PROGRESS' | 'DONE';
@@ -96,6 +97,7 @@ export type PaymentCancelBehavior = 'refund' | 'writeoff';
 export interface PaymentEvent {
   id: number;
   studentId: number;
+  teacherId?: number | null;
   lessonId?: number | null;
   type: PaymentEventType;
   lessonsDelta: number;

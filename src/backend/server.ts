@@ -201,12 +201,13 @@ const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pend
   const teacher = await ensureTeacher(user);
   const normalizedQuery = query?.trim().toLowerCase();
 
-  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
+  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } });
   const students = await prisma.student.findMany({
     where: {
       teacherLinks: {
         some: {
           teacherId: teacher.chatId,
+          isArchived: false,
         },
       },
     },
@@ -297,7 +298,7 @@ const listStudents = async (
   const teacher = await ensureTeacher(user);
   const normalizedQuery = query?.trim();
   const normalizedQueryLower = normalizedQuery?.toLowerCase();
-  const where: any = { teacherId: teacher.chatId };
+  const where: any = { teacherId: teacher.chatId, isArchived: false };
 
   if (normalizedQuery) {
     where.OR = [
@@ -379,7 +380,7 @@ const listStudentHomeworks = async (
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const where: any = { teacherId: teacher.chatId, studentId };
   if (filter === 'overdue') {
@@ -424,7 +425,7 @@ const listStudentLessons = async (
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const participantWhere: Record<string, any> = { studentId };
   if (filters.payment === 'paid') {
@@ -474,12 +475,13 @@ const listStudentLessons = async (
 
 const bootstrap = async (user: User) => {
   const teacher = await ensureTeacher(user);
-  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
+  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } });
   const students = await prisma.student.findMany({
     where: {
       teacherLinks: {
         some: {
           teacherId: teacher.chatId,
+          isArchived: false,
         },
       },
     },
@@ -525,6 +527,13 @@ const addStudent = async (user: User, body: any) => {
   });
 
   if (existingLink) {
+    if (existingLink.isArchived) {
+      const restoredLink = await prisma.teacherStudent.update({
+        where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
+        data: { isArchived: false, customName },
+      });
+      return { student, link: restoredLink };
+    }
     return { student, link: existingLink };
   }
 
@@ -541,12 +550,25 @@ const addStudent = async (user: User, body: any) => {
   return { student, link };
 };
 
+const archiveStudentLink = async (user: User, studentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+
+  return prisma.teacherStudent.update({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+    data: { isArchived: true },
+  });
+};
+
 const toggleAutoReminder = async (user: User, studentId: number, value: boolean) => {
   const teacher = await ensureTeacher(user);
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
-  if (!link) throw new Error('Student link not found');
+  if (!link || link.isArchived) throw new Error('Student link not found');
   return prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { autoRemindHomework: value },
@@ -561,7 +583,7 @@ const updatePricePerLesson = async (user: User, studentId: number, value: number
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   return prisma.student.update({
     where: { id: studentId },
@@ -579,7 +601,7 @@ const adjustBalance = async (
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     include: { student: true },
   });
-  if (!link) throw new Error('Student link not found');
+  if (!link || link.isArchived) throw new Error('Student link not found');
   const delta = Number(payload.delta ?? 0);
   if (!Number.isFinite(delta)) {
     throw new Error('Некорректное значение баланса');
@@ -597,6 +619,7 @@ const adjustBalance = async (
     await prisma.paymentEvent.create({
       data: {
         studentId,
+        teacherId: teacher.chatId,
         lessonId: null,
         type,
         lessonsDelta: delta,
@@ -622,10 +645,16 @@ const listPaymentEventsForStudent = async (
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
 
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const filter = options?.filter ?? 'all';
-  const where: Record<string, any> = { studentId };
+  const where: Record<string, any> = {
+    studentId,
+    OR: [
+      { teacherId: teacher.chatId },
+      { teacherId: null, lesson: { teacherId: teacher.chatId } },
+    ],
+  };
 
   if (filter === 'topup') {
     where.type = { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] };
@@ -720,7 +749,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
   const participantIds = (lesson.participants ?? []).map((participant: any) => participant.studentId);
   const links = participantIds.length
     ? await prisma.teacherStudent.findMany({
-        where: { teacherId, studentId: { in: participantIds } },
+        where: { teacherId, studentId: { in: participantIds }, isArchived: false },
         include: { student: true },
       })
     : [];
@@ -763,6 +792,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
       if (!eventStudentIds.has(participant.studentId)) {
         await createPaymentEvent(tx, {
           studentId: participant.studentId,
+          teacherId,
           lessonId: lesson.id,
           type: 'AUTO_CHARGE',
           lessonsDelta: -1,
@@ -808,7 +838,7 @@ const createHomework = async (user: User, body: any) => {
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: Number(studentId) } },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const normalizedStatus = normalizeTeacherStatus(status ?? 'DRAFT');
   const normalizedAttachments = Array.isArray(attachments) ? attachments : [];
@@ -946,6 +976,7 @@ const validateLessonPayload = async (user: User, body: any) => {
     where: {
       teacherId: teacher.chatId,
       studentId: { in: ids },
+      isArchived: false,
     },
   });
 
@@ -1015,6 +1046,7 @@ const createLesson = async (user: User, body: any) => {
     await prisma.paymentEvent.createMany({
       data: lesson.participants.map((participant: any) => ({
         studentId: participant.studentId,
+        teacherId: teacher.chatId,
         lessonId: lesson.id,
         type: 'MANUAL_PAID',
         lessonsDelta: 0,
@@ -1177,6 +1209,7 @@ const createRecurringLessons = async (user: User, body: any) => {
       await prisma.paymentEvent.createMany({
         data: lesson.participants.map((participant: any) => ({
           studentId: participant.studentId,
+          teacherId: teacher.chatId,
           lessonId: lesson.id,
           type: 'MANUAL_PAID',
           lessonsDelta: 0,
@@ -1230,6 +1263,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     where: {
       teacherId: teacher.chatId,
       studentId: { in: ids },
+      isArchived: false,
     },
   });
 
@@ -1492,7 +1526,7 @@ const togglePaymentForStudent = async (
     include: { student: true },
   });
 
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const participant = lesson.participants.find((entry: any) => entry.studentId === studentId);
   if (!participant) throw new Error('Участник урока не найден');
@@ -1532,12 +1566,14 @@ const togglePaymentForStudent = async (
           moneyAmount: null,
           createdBy: 'TEACHER',
           reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+          teacherId: teacher.chatId,
         },
       });
     } else {
       await prisma.paymentEvent.create({
         data: {
           studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'ADJUSTMENT',
           lessonsDelta: deltaChange,
@@ -1574,10 +1610,17 @@ const togglePaymentForStudent = async (
     const existingManualEvent = await prisma.paymentEvent.findFirst({
       where: { studentId, lessonId, type: 'MANUAL_PAID' },
     });
+    if (existingManualEvent && !existingManualEvent.teacherId) {
+      await prisma.paymentEvent.update({
+        where: { id: existingManualEvent.id },
+        data: { teacherId: teacher.chatId },
+      });
+    }
     if (!existingManualEvent) {
       await prisma.paymentEvent.create({
         data: {
           studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'MANUAL_PAID',
           lessonsDelta: 0,
@@ -1668,7 +1711,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
       const autoChargeStudentIds = Array.from(new Set(autoChargeEvents.map((event: any) => event.studentId)));
       const links = autoChargeStudentIds.length
         ? await tx.teacherStudent.findMany({
-            where: { teacherId: teacher.chatId, studentId: { in: autoChargeStudentIds } },
+            where: { teacherId: teacher.chatId, studentId: { in: autoChargeStudentIds }, isArchived: false },
           })
         : [];
       const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
@@ -1684,6 +1727,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
         });
         await createPaymentEvent(tx, {
           studentId: event.studentId,
+          teacherId: teacher.chatId,
           lessonId,
           type: 'ADJUSTMENT',
           lessonsDelta: 1,
@@ -1730,7 +1774,7 @@ const remindHomework = async (user: User, studentId: number) => {
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
-  if (!link) throw new Error('Ученик не найден у текущего преподавателя');
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
@@ -2121,6 +2165,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const data = await addStudent(requireApiUser(), body);
       return sendJson(res, 201, data);
+    }
+
+    const studentDeleteMatch = pathname.match(/^\/api\/students\/(\d+)$/);
+    if (req.method === 'DELETE' && studentDeleteMatch) {
+      const studentId = Number(studentDeleteMatch[1]);
+      const link = await archiveStudentLink(requireApiUser(), studentId);
+      return sendJson(res, 200, { link });
     }
 
     const studentHomeworkListMatch = pathname.match(/^\/api\/students\/(\d+)\/homeworks$/);

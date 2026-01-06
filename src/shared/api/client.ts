@@ -65,6 +65,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  deleteStudent: (studentId: number) =>
+    apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}`, {
+      method: 'DELETE',
+    }),
   toggleAutoRemind: (studentId: number, value: boolean) =>
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/auto-remind`, {
       method: 'POST',
