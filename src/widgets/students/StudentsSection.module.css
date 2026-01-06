@@ -541,8 +541,10 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, padding 0.2s ease, gap 0.2s ease;
   --header-collapse: 0;
+  padding: calc(16px * (1 - var(--header-collapse))) 16px;
+  gap: calc(12px * (1 - var(--header-collapse)));
 }
 
 .mobileHeaderCard .summaryRow,
@@ -553,7 +555,7 @@
 }
 
 .mobileHeaderCard .summaryRow {
-  max-height: calc(160px * (1 - var(--header-collapse)));
+  max-height: calc(360px * (1 - var(--header-collapse)));
   opacity: calc(1 - var(--header-collapse));
   transform: translateY(calc(-6px * var(--header-collapse)));
   padding: calc(12px * (1 - var(--header-collapse)))
@@ -562,7 +564,7 @@
 }
 
 .mobileHeaderCard .tabs {
-  max-height: calc(64px * (1 - var(--header-collapse)));
+  max-height: calc(160px * (1 - var(--header-collapse)));
   opacity: calc(1 - var(--header-collapse));
   transform: translateY(calc(-4px * var(--header-collapse)));
   margin-top: calc(4px * (1 - var(--header-collapse)));
@@ -570,8 +572,17 @@
 }
 
 .mobileHeaderCard .studentMetaRow {
-  max-height: calc(36px * (1 - var(--header-collapse)));
+  max-height: calc(120px * (1 - var(--header-collapse)));
   opacity: calc(1 - var(--header-collapse));
+}
+
+.mobileScrollArea .tabCard {
+  flex: none;
+}
+
+.mobileScrollArea .tabContentScroll {
+  flex: none;
+  overflow: visible;
 }
 
 .heroHeader {
