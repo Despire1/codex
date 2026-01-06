@@ -120,6 +120,16 @@ export const StudentHero: FC<StudentHeroProps> = ({
   };
 
   const hasDebt = studentDebtItems.length > 0;
+  const debtCount = studentDebtItems.length;
+  const formatLessonCount = (count: number) => {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    if (lastTwo >= 11 && lastTwo <= 14) return `${count} занятий`;
+    if (last === 1) return `${count} занятие`;
+    if (last >= 2 && last <= 4) return `${count} занятия`;
+    return `${count} занятий`;
+  };
+  const debtLabel = `${studentDebtTotal} ₽ (${formatLessonCount(debtCount)})`;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
 
@@ -282,7 +292,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                         className={styles.summaryValueButton}
                         onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
                       >
-                        {`${studentDebtTotal} ₽`}
+                        {debtLabel}
                       </button>
                     )}
                     side="bottom"
@@ -372,7 +382,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                     className={styles.summaryValueButton}
                     onClick={() => setIsDebtPopoverOpen(true)}
                   >
-                    {`${studentDebtTotal} ₽`}
+                    {debtLabel}
                   </button>
                 </>
               ) : (

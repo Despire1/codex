@@ -828,6 +828,7 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
+  color: var(--color-slate-900);
 }
 
 .summaryButton {
