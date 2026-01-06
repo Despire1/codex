@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MoreHorizIcon } from '../../../icons/MaterialIcons';
@@ -174,7 +174,9 @@ export const LessonsTab: FC<LessonsTabProps> = ({
       const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
       const resolvedPrice = participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price;
       const isPaid = participant?.isPaid ?? lesson.isPaid;
-      const isPastLesson = parseISO(lesson.startAt) < new Date();
+      const lessonDate = startOfDay(parseISO(lesson.startAt));
+      const today = startOfDay(new Date());
+      const isPastLesson = lessonDate.getTime() < today.getTime();
       return { participant, resolvedPrice, isPaid, isPastLesson };
     },
     [selectedStudent?.pricePerLesson, selectedStudentId],
