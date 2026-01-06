@@ -6,6 +6,7 @@ import {
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
+import { Modal } from '../../../shared/ui/Modal/Modal';
 
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
@@ -45,9 +46,16 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onRequestDeleteStudent,
 }) => {
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const telegramUsername = selectedStudent.username?.trim();
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
     action();
+  };
+  const handleTelegramConfirm = () => {
+    if (!telegramUsername) return;
+    setIsTelegramModalOpen(false);
+    window.location.href = `tg://resolve?domain=${telegramUsername}`;
   };
 
   return (
@@ -70,7 +78,18 @@ export const StudentHero: FC<StudentHeroProps> = ({
           <div className={styles.heroTitleStack}>
             <h2 className={styles.profileName}>{selectedStudent.link.customName}</h2>
             <div className={styles.studentMetaRow}>
-              <span>Telegram: @{selectedStudent.username || 'нет'}</span>
+              <span>Telegram:</span>
+              {telegramUsername ? (
+                <button
+                  type="button"
+                  className={`${styles.studentMeta} ${styles.studentUsernameLink} ${styles.studentUsernameButton}`}
+                  onClick={() => setIsTelegramModalOpen(true)}
+                >
+                  @{telegramUsername}
+                </button>
+              ) : (
+                <span className={styles.studentMeta}>@нет</span>
+              )}
             </div>
           </div>
         </div>
@@ -110,6 +129,24 @@ export const StudentHero: FC<StudentHeroProps> = ({
           </div>
         </div>
       </div>
+
+      <Modal
+        open={isTelegramModalOpen}
+        title="Открыть Telegram?"
+        onClose={() => setIsTelegramModalOpen(false)}
+      >
+        <p className={styles.telegramModalText}>
+          Мы откроем чат с учеником @{telegramUsername}. Продолжить?
+        </p>
+        <div className={styles.telegramModalActions}>
+          <button type="button" className={controls.secondaryButton} onClick={() => setIsTelegramModalOpen(false)}>
+            Отмена
+          </button>
+          <button type="button" className={controls.primaryButton} onClick={handleTelegramConfirm}>
+            Открыть чат
+          </button>
+        </div>
+      </Modal>
 
       <div className={`${styles.summaryRow} ${styles.summaryInline}`}>
         <div className={styles.summaryLine}>

@@ -159,15 +159,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
                     </div>
                     <div className={styles.studentSecondaryRow}>
                       {username ? (
-                        <a
-                          className={`${styles.studentMeta} ${styles.studentUsernameLink}`}
-                          href={`tg://resolve?domain=${username}`}
-                          aria-label={`Открыть чат с @${username}`}
-                          title="Открыть чат в Telegram"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          @{username}
-                        </a>
+                        <span className={styles.studentMeta}>@{username}</span>
                       ) : (
                         <span className={styles.studentMeta}>@нет</span>
                       )}
