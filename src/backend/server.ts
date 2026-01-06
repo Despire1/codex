@@ -13,7 +13,7 @@ const MAX_PAGE_SIZE = 50;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
-const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 60);
+const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 1440);
 const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
 const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
@@ -157,7 +157,7 @@ const getSessionUser = async (req: IncomingMessage) => {
 };
 
 const createSession = async (userId: number, req: IncomingMessage, res: ServerResponse) => {
-  const ttlMinutes = Number.isFinite(SESSION_TTL_MINUTES) ? SESSION_TTL_MINUTES : 60;
+  const ttlMinutes = Number.isFinite(SESSION_TTL_MINUTES) ? SESSION_TTL_MINUTES : 1440;
   const token = randomToken(32);
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
