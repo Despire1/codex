@@ -543,7 +543,7 @@
   z-index: 2;
   transition: box-shadow 0.2s ease, padding 0.2s ease, gap 0.2s ease;
   --header-collapse: 0;
-  padding: calc(16px * (1 - var(--header-collapse))) 16px;
+  padding: calc(6px + (10px * (1 - var(--header-collapse)))) 16px;
   gap: calc(12px * (1 - var(--header-collapse)));
 }
 
