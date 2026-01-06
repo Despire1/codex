@@ -783,10 +783,18 @@ const normalizeLessonStatus = (status: any): 'SCHEDULED' | 'COMPLETED' | 'CANCEL
 const normalizeCancelBehavior = (value: any): PaymentCancelBehavior =>
   value === 'writeoff' ? 'writeoff' : 'refund';
 
+const normalizeLessonPriceValue = (value: any): number => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return 0;
+  return Math.round(numeric);
+};
+
 const calcLessonPaymentAmount = (participant: any, lesson: any, link: any) =>
   [participant.price, lesson.price, link.student?.pricePerLesson].find(
     (value) => typeof value === 'number' && value > 0,
   ) ?? 0;
+
+const resolveProfileLessonPrice = (link: any) => normalizeLessonPriceValue(link?.student?.pricePerLesson);
 
 const createPaymentEvent = async (tx: any, payload: any) => {
   return tx.paymentEvent.create({ data: payload });
@@ -813,6 +821,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
 
   return prisma.$transaction(async (tx) => {
     const updatedLinks: any[] = [];
+    const participantPriceMap = new Map<number, number>();
     const existingPayments = await tx.payment.findMany({ where: { lessonId: lesson.id } });
     const paymentTeacherStudentIds = new Set(existingPayments.map((payment) => payment.teacherStudentId));
     const existingEvents = await tx.paymentEvent.findMany({ where: { lessonId: lesson.id, type: 'AUTO_CHARGE' } });
@@ -820,11 +829,33 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
 
     for (const participant of lesson.participants ?? []) {
       const link = linksByStudentId.get(participant.studentId);
+      if (!link) continue;
+
+      const profilePrice = resolveProfileLessonPrice(link);
+      participantPriceMap.set(participant.studentId, profilePrice);
+
+      if (participant.price !== profilePrice) {
+        await tx.lessonParticipant.update({
+          where: { lessonId_studentId: { lessonId: lesson.id, studentId: participant.studentId } },
+          data: { price: profilePrice },
+        });
+      }
+
+      if (participant.studentId === lesson.studentId && lesson.price !== profilePrice) {
+        await tx.lesson.update({
+          where: { id: lesson.id },
+          data: { price: profilePrice },
+        });
+      }
+    }
+
+    for (const participant of lesson.participants ?? []) {
+      const link = linksByStudentId.get(participant.studentId);
       if (!link || participant.isPaid) continue;
       if (link.balanceLessons <= 0) continue;
 
       const nextBalance = link.balanceLessons - 1;
-      const priceSnapshot = calcLessonPaymentAmount(participant, lesson, link);
+      const priceSnapshot = participantPriceMap.get(participant.studentId) ?? resolveProfileLessonPrice(link);
 
       const savedLink = await tx.teacherStudent.update({
         where: { id: link.id },
