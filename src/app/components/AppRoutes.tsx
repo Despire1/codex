@@ -11,6 +11,7 @@ import {
   LinkedStudent,
   PaymentEvent,
   Student,
+  StudentDebtItem,
   StudentListItem,
   Teacher,
 } from '../../entities/types';
@@ -98,6 +99,8 @@ interface AppRoutesProps {
     onEditStudent: () => void;
     onRequestDeleteStudent: (studentId: number) => void;
     studentLessons: Lesson[];
+    studentDebtItems: StudentDebtItem[];
+    studentDebtTotal: number;
     lessonPaymentFilter: LessonPaymentFilter;
     lessonStatusFilter: LessonStatusFilter;
     lessonDateRange: LessonDateRange;

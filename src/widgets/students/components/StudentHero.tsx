@@ -1,7 +1,7 @@
 import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Lesson, Student, TeacherStudent } from '../../../entities/types';
+import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   EditOutlinedIcon,
@@ -16,6 +16,8 @@ interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
   studentLessons: Lesson[];
+  studentDebtItems: StudentDebtItem[];
+  studentDebtTotal: number;
   priceEditState: { id: number | null; value: string };
   activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
   isMobile: boolean;
@@ -37,6 +39,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
   headerRef,
   selectedStudent,
   studentLessons,
+  studentDebtItems,
+  studentDebtTotal,
   priceEditState,
   activeTab,
   isMobile,
@@ -71,34 +75,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
     window.location.href = `tg://resolve?domain=${telegramUsername}`;
   };
 
-  const { debtItems, debtTotal } = useMemo(() => {
-    const now = new Date();
-    const items = studentLessons
-      .map((lesson) => {
-        const participant = lesson.participants?.find((item) => item.studentId === selectedStudent.id);
-        const resolvedPrice = participant?.price ?? selectedStudent.pricePerLesson ?? lesson.price ?? null;
-        const isPaid = participant?.isPaid ?? lesson.isPaid;
-        const lessonDate = parseISO(lesson.startAt);
-        const isPastLesson = lessonDate < now;
-        const isEligible =
-          !isPaid && lesson.status !== 'CANCELED' && (lesson.status === 'COMPLETED' || isPastLesson);
-
-        if (!isEligible) return null;
-        return {
-          id: lesson.id,
-          startAt: lesson.startAt,
-          status: lesson.status,
-          price: resolvedPrice,
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .sort((a, b) => a.startAt.localeCompare(b.startAt));
-
-    const total = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
-
-    return { debtItems: items, debtTotal: total };
-  }, [selectedStudent.id, selectedStudent.pricePerLesson, studentLessons]);
-
   const nextLessonLabel = useMemo(() => {
     const now = new Date();
     const nextLesson = studentLessons
@@ -114,14 +90,14 @@ export const StudentHero: FC<StudentHeroProps> = ({
   }, [studentLessons]);
 
   useEffect(() => {
-    if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && debtTotal === 0) {
+    if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && studentDebtTotal === 0) {
       setIsDebtPopoverOpen(false);
       setShouldAutoCloseDebt(false);
-    } else if (shouldAutoCloseDebt && debtTotal > 0 && pendingPaymentIds.length === 0) {
+    } else if (shouldAutoCloseDebt && studentDebtTotal > 0 && pendingPaymentIds.length === 0) {
       setShouldAutoCloseDebt(false);
     }
-    previousDebtTotal.current = debtTotal;
-  }, [debtTotal, pendingPaymentIds.length, shouldAutoCloseDebt]);
+    previousDebtTotal.current = studentDebtTotal;
+  }, [pendingPaymentIds.length, shouldAutoCloseDebt, studentDebtTotal]);
 
   const handleMarkPaid = async (lessonId: number) => {
     if (pendingPaymentIds.includes(lessonId)) return;
@@ -143,7 +119,17 @@ export const StudentHero: FC<StudentHeroProps> = ({
     setIsReminderSettingsOpen(false);
   };
 
-  const hasDebt = debtItems.length > 0;
+  const hasDebt = studentDebtItems.length > 0;
+  const debtCount = studentDebtItems.length;
+  const formatLessonCount = (count: number) => {
+    const lastTwo = count % 100;
+    const last = count % 10;
+    if (lastTwo >= 11 && lastTwo <= 14) return `${count} занятий`;
+    if (last === 1) return `${count} занятие`;
+    if (last >= 2 && last <= 4) return `${count} занятия`;
+    return `${count} занятий`;
+  };
+  const debtLabel = `${studentDebtTotal} ₽ (${formatLessonCount(debtCount)})`;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
 
@@ -306,7 +292,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                         className={styles.summaryValueButton}
                         onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
                       >
-                        {`${debtTotal} ₽`}
+                        {debtLabel}
                       </button>
                     )}
                     side="bottom"
@@ -315,7 +301,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                     className={styles.debtPopover}
                   >
                     <StudentDebtPopoverContent
-                      items={debtItems}
+                      items={studentDebtItems}
                       pendingIds={pendingPaymentIds}
                       onMarkPaid={handleMarkPaid}
                     />
@@ -396,7 +382,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                     className={styles.summaryValueButton}
                     onClick={() => setIsDebtPopoverOpen(true)}
                   >
-                    {`${debtTotal} ₽`}
+                    {debtLabel}
                   </button>
                 </>
               ) : (
@@ -463,7 +449,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
       {isMobile && (
         <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
           <StudentDebtPopoverContent
-            items={debtItems}
+            items={studentDebtItems}
             pendingIds={pendingPaymentIds}
             onMarkPaid={handleMarkPaid}
             showCloseButton
@@ -514,7 +500,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
       {isMobile && (
         <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
           <StudentDebtPopoverContent
-            items={debtItems}
+            items={studentDebtItems}
             pendingIds={pendingPaymentIds}
             onMarkPaid={handleMarkPaid}
             showCloseButton

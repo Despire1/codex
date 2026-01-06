@@ -9,6 +9,7 @@ import {
   PaymentCancelBehavior,
   PaymentEvent,
   Student,
+  StudentDebtSummary,
   StudentListItem,
   Teacher,
   TeacherStudent,
@@ -232,7 +233,7 @@ export const api = {
     const suffix = query.toString();
     const path = suffix ? `/api/students/${studentId}/lessons?${suffix}` : `/api/students/${studentId}/lessons`;
 
-    return apiFetch<{ items: Lesson[] }>(path);
+    return apiFetch<{ items: Lesson[]; debt: StudentDebtSummary }>(path);
   },
 };
 
