@@ -1,15 +1,8 @@
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Lesson } from '../../../entities/types';
+import { Lesson, StudentDebtItem } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './StudentDebtPopoverContent.module.css';
-
-export interface StudentDebtItem {
-  id: number;
-  startAt: string;
-  price: number | null;
-  status: Lesson['status'];
-}
 
 interface StudentDebtPopoverContentProps {
   items: StudentDebtItem[];
