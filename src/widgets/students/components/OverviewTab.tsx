@@ -1,16 +1,18 @@
 import { FC } from 'react';
 import styles from '../StudentsSection.module.css';
-import { Lesson } from '../../../entities/types';
+import { Lesson, StudentDebtItem } from '../../../entities/types';
 import { SelectedStudent } from '../types';
 
 interface OverviewTabProps {
   selectedStudent: SelectedStudent;
   studentLessonsSummary: Lesson[];
+  studentDebtItems: StudentDebtItem[];
 }
 
 export const OverviewTab: FC<OverviewTabProps> = ({
   selectedStudent,
   studentLessonsSummary,
+  studentDebtItems,
 }) => {
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
@@ -20,11 +22,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     .filter(({ startAt }) => startAt > now)
     .sort((a, b) => a.startAt - b.startAt)[0]?.lesson ?? null;
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
-  const unpaidLessonsCount = studentLessonsSummary.reduce(
-    (count, lesson) =>
-      lesson.status === 'COMPLETED' && !lesson.isPaid ? count + 1 : count,
-    0,
-  );
+  const unpaidLessonsCount = studentDebtItems.length;
   const paymentsLast30Days = studentLessonsSummary.reduce((total, lesson) => {
     if (!lesson.isPaid) return total;
     const startAt = new Date(lesson.startAt).getTime();
