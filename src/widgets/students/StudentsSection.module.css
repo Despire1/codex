@@ -2258,43 +2258,43 @@
   font-weight: 600;
 }
 
-.paymentChipPayment {
+.paymentChip.paymentChipPayment {
   background-color: #eaf7ef;
 }
 
-.paymentChipPayment :global(.MuiChip-label) {
+.paymentChip.paymentChipPayment :global(.MuiChip-label) {
   color: #2f8f4e;
 }
 
-.paymentChipCharge {
+.paymentChip.paymentChipCharge {
   background-color: #eef4ff;
 }
 
-.paymentChipCharge :global(.MuiChip-label) {
+.paymentChip.paymentChipCharge :global(.MuiChip-label) {
   color: #2f5aff;
 }
 
-.paymentChipRefund {
+.paymentChip.paymentChipRefund {
   background-color: #fff4e5;
 }
 
-.paymentChipRefund :global(.MuiChip-label) {
+.paymentChip.paymentChipRefund :global(.MuiChip-label) {
   color: #c77700;
 }
 
-.paymentChipAdjustment {
+.paymentChip.paymentChipAdjustment {
   background-color: #f3eeff;
 }
 
-.paymentChipAdjustment :global(.MuiChip-label) {
+.paymentChip.paymentChipAdjustment :global(.MuiChip-label) {
   color: #6b4eff;
 }
 
-.paymentChipFallback {
+.paymentChip.paymentChipFallback {
   background-color: var(--color-slate-100);
 }
 
-.paymentChipFallback :global(.MuiChip-label) {
+.paymentChip.paymentChipFallback :global(.MuiChip-label) {
   color: var(--color-gray-600);
 }
 
