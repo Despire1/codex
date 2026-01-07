@@ -2259,6 +2259,43 @@
   font-weight: 600;
 }
 
+.paymentMobileContent {
+  display: none;
+}
+
+.paymentMobileHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.paymentMobileTitle {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.paymentMobileAmount {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.paymentMobileChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paymentMobileMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .paymentAmount {
   margin-left: auto;
   font-weight: 800;
@@ -2484,6 +2521,31 @@
 }
 
 @media (max-width: 768px) {
+  .paymentItem,
+  .paymentItem:global(.MuiButtonBase-root) {
+    width: 100%;
+    border: 1px solid var(--color-gray-200);
+    background: var(--color-white);
+    box-shadow: 0 6px 18px var(--shadow-slate-900-06);
+    box-sizing: border-box;
+  }
+
+  .paymentDesktopOnly {
+    display: none;
+  }
+
+  .paymentMobileContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .paymentMobileAmount {
+    margin-left: auto;
+    align-items: flex-end;
+  }
+
   .lessonQuickActionsSheet {
     top: auto !important;
     bottom: 0 !important;
