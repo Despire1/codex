@@ -99,6 +99,7 @@ interface AppRoutesProps {
     onEditStudent: () => void;
     onRequestDeleteStudent: (studentId: number) => void;
     studentLessons: Lesson[];
+    studentLessonsSummary: Lesson[];
     studentDebtItems: StudentDebtItem[];
     studentDebtTotal: number;
     lessonPaymentFilter: LessonPaymentFilter;

@@ -5,18 +5,18 @@ import { SelectedStudent } from '../types';
 
 interface OverviewTabProps {
   selectedStudent: SelectedStudent;
-  studentLessons: Lesson[];
+  studentLessonsSummary: Lesson[];
   payments: PaymentEvent[];
 }
 
 export const OverviewTab: FC<OverviewTabProps> = ({
   selectedStudent,
-  studentLessons,
+  studentLessonsSummary,
   payments,
 }) => {
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-  const nextLesson = studentLessons
+  const nextLesson = studentLessonsSummary
     .filter((lesson) => lesson.status !== 'COMPLETED')
     .map((lesson) => ({ lesson, startAt: new Date(lesson.startAt).getTime() }))
     .filter(({ startAt }) => startAt > now)
@@ -24,6 +24,8 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
   const paymentsLast30Days = payments.reduce((total, event) => {
     if (event.studentId !== selectedStudent.id) return total;
+    if (event.type !== 'AUTO_CHARGE' && event.type !== 'MANUAL_PAID') return total;
+    if (!event.lessonId) return total;
     const createdAt = Date.parse(event.createdAt);
     if (Number.isNaN(createdAt) || createdAt < thirtyDaysAgo) return total;
     const amount = typeof event.moneyAmount === 'number' ? event.moneyAmount : event.priceSnapshot;
