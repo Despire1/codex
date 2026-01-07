@@ -2354,7 +2354,7 @@
 
 @media (max-width: 720px) {
   .section {
-    padding: 8px 0 16px;
+    padding: 0;
     height: 100%;
     max-height: 100%;
   }
@@ -2528,6 +2528,7 @@
     background: var(--color-white);
     box-shadow: 0 6px 18px var(--shadow-slate-900-06);
     box-sizing: border-box;
+    padding: 12px!important;
   }
 
   .paymentDesktopOnly {
@@ -2542,8 +2543,10 @@
   }
 
   .paymentMobileAmount {
-    margin-left: auto;
+    flex-direction: row;
     align-items: flex-end;
+    justify-content: end;
+    gap: 4px;
   }
 
   .lessonQuickActionsSheet {

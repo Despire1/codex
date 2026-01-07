@@ -150,9 +150,9 @@ export const PaymentList: FC<PaymentListProps> = ({
                     );
                     const listItemContent = (
                       <>
-                        <ListItemIcon className={`${styles.paymentIcon} ${styles.paymentDesktopOnly}`}>
-                          <IconComponent width={20} height={20} />
-                        </ListItemIcon>
+                        {/*<ListItemIcon className={`${styles.paymentIcon} ${styles.paymentDesktopOnly}`}>*/}
+                        {/*  <IconComponent width={20} height={20} />*/}
+                        {/*</ListItemIcon>*/}
                         <ListItemText
                           className={styles.paymentDesktopOnly}
                           primary={
@@ -196,13 +196,13 @@ export const PaymentList: FC<PaymentListProps> = ({
 
                     if (isClickable) {
                       return (
-                        <ListItemButton
+                        <ListItem
                           key={event.id}
                           className={styles.paymentItem}
                           onClick={() => event.lesson && onOpenLesson?.(event.lesson)}
                         >
                           {listItemContent}
-                        </ListItemButton>
+                        </ListItem>
                       );
                     }
 

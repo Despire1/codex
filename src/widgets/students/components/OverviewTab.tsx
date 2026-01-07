@@ -79,7 +79,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
           </p>
         </div>
         <div className={styles.statCard}>
-          <p className={styles.statLabel}>Оплаты за 30 дней</p>
+          <p className={styles.statLabel}>Доход за последние 30 дней</p>
           <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>
             {paymentsLast30DaysRounded} ₽
           </p>
