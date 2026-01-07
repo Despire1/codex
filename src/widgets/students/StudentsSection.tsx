@@ -13,6 +13,7 @@ import {
   Student,
   StudentDebtItem,
   StudentListItem,
+  TeacherStudent,
 } from '../../entities/types';
 import styles from './StudentsSection.module.css';
 // import { HomeworkPanel } from './components/HomeworkPanel';
@@ -55,7 +56,7 @@ interface StudentsSectionProps {
       createdAt?: string;
     },
   ) => Promise<void>;
-  onStartEditPrice: (student: Student) => void;
+  onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
   onPriceChange: (value: string) => void;
   onSavePrice: () => void;
   onCancelPriceEdit: () => void;

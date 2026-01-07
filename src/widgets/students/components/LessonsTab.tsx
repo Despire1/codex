@@ -172,14 +172,14 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const getLessonDerivedData = useCallback(
     (lesson: Lesson) => {
       const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
-      const resolvedPrice = participant?.price ?? selectedStudent?.pricePerLesson ?? lesson.price;
+      const resolvedPrice = participant?.price ?? selectedStudent?.link.pricePerLesson ?? lesson.price;
       const isPaid = participant?.isPaid ?? lesson.isPaid;
       const lessonDate = startOfDay(parseISO(lesson.startAt));
       const today = startOfDay(new Date());
       const isPastLesson = lessonDate.getTime() < today.getTime();
       return { participant, resolvedPrice, isPaid, isPastLesson };
     },
-    [selectedStudent?.pricePerLesson, selectedStudentId],
+    [selectedStudent?.link.pricePerLesson, selectedStudentId],
   );
 
   const activeLessonDerived = useMemo(

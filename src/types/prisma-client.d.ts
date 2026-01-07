@@ -28,6 +28,7 @@ declare module '@prisma/client' {
     customName: string;
     autoRemindHomework: boolean;
     balanceLessons: number;
+    pricePerLesson: number;
     isArchived: boolean;
   };
 

@@ -14,6 +14,7 @@ import {
   StudentDebtItem,
   StudentListItem,
   Teacher,
+  TeacherStudent,
 } from '../../entities/types';
 import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
@@ -74,7 +75,7 @@ interface AppRoutesProps {
         createdAt?: string;
       },
     ) => Promise<void>;
-    onStartEditPrice: (student: Student) => void;
+    onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
     onPriceChange: (value: string) => void;
     onSavePrice: () => void;
     onCancelPriceEdit: () => void;

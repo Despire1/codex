@@ -22,6 +22,7 @@ export interface TeacherStudent {
   customName: string;
   autoRemindHomework: boolean;
   balanceLessons: number;
+  pricePerLesson: number;
   isArchived?: boolean;
 }
 
