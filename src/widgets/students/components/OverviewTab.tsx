@@ -20,6 +20,10 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     .filter(({ startAt }) => startAt > now)
     .sort((a, b) => a.startAt - b.startAt)[0]?.lesson ?? null;
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
+  const unpaidLessonsCount = studentLessonsSummary.reduce(
+    (count, lesson) => (lesson.isPaid ? count : count + 1),
+    0,
+  );
   const paymentsLast30Days = studentLessonsSummary.reduce((total, lesson) => {
     if (!lesson.isPaid) return total;
     const startAt = new Date(lesson.startAt).getTime();
@@ -30,6 +34,13 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   }, 0);
   const paymentsLast30DaysRounded = Math.round(paymentsLast30Days);
   const statusContent = (() => {
+    if (unpaidLessonsCount > 0) {
+      return {
+        title: 'Есть неоплаченные занятия',
+        subtitle: 'Проверьте оплаты',
+        tone: 'alert',
+      };
+    }
     if (!nextLesson) {
       return {
         title: 'Нет запланированных уроков',
