@@ -1,22 +1,24 @@
 import { FC } from 'react';
 import styles from '../StudentsSection.module.css';
 import controls from '../../../shared/styles/controls.module.css';
-import { Lesson } from '../../../entities/types';
+import { Lesson, StudentDebtItem } from '../../../entities/types';
 import { SelectedStudent } from '../types';
 
 interface OverviewTabProps {
   selectedStudent: SelectedStudent;
+  studentDebtItems: StudentDebtItem[];
   studentLessons: Lesson[];
   onRemindHomework: (studentId: number) => void;
 }
 
 export const OverviewTab: FC<OverviewTabProps> = ({
   selectedStudent,
+  studentDebtItems,
   studentLessons,
   onRemindHomework,
 }) => {
-  const sumDebt = studentLessons
-    .filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid)
+  const sumDebt = studentDebtItems
+    .filter((lesson) => lesson.status === 'COMPLETED')
     .reduce((total, lesson) => total + (lesson.price ?? 0), 0);
   const now = Date.now();
   const nextLesson = studentLessons
@@ -30,23 +32,27 @@ export const OverviewTab: FC<OverviewTabProps> = ({
       return {
         title: 'Есть неоплаченные занятия',
         subtitle: 'Стоит отметить оплату',
+        tone: 'alert',
       };
     }
     if (!nextLesson) {
       return {
         title: 'Нет запланированных уроков',
         subtitle: 'Запланируйте следующий урок',
+        tone: 'warning',
       };
     }
     if (!remindersEnabled) {
       return {
         title: 'Напоминания выключены',
         subtitle: 'Можно забыть про урок',
+        tone: 'warning',
       };
     }
     return {
       title: 'Всё под контролем',
       subtitle: 'Оплаты в порядке, уроки запланированы',
+      tone: 'ok',
     };
   })();
 
@@ -60,7 +66,15 @@ export const OverviewTab: FC<OverviewTabProps> = ({
           Напомнить про ДЗ
         </button>
       </div>
-      <div className={`${styles.statCard} ${styles['overview-statusCard']}`}>
+      <div
+        className={`${styles.statCard} ${styles['overview-statusCard']} ${
+          statusContent.tone === 'ok'
+            ? styles['overview-statusCardOk']
+            : statusContent.tone === 'warning'
+              ? styles['overview-statusCardWarning']
+              : styles['overview-statusCardAlert']
+        }`}
+      >
         <p className={styles.statLabel}>Состояние</p>
         <p className={styles.statValueLarge}>{statusContent.title}</p>
         <p className={styles['overview-statusSubtitle']}>{statusContent.subtitle}</p>

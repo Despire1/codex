@@ -1235,6 +1235,21 @@
   width: 100%;
 }
 
+.overview-statusCardOk {
+  background: var(--color-emerald-50);
+  border-color: var(--color-emerald-200);
+}
+
+.overview-statusCardWarning {
+  background: var(--color-orange-50);
+  border-color: var(--color-orange-200);
+}
+
+.overview-statusCardAlert {
+  background: var(--color-rose-50);
+  border-color: var(--color-rose-200);
+}
+
 .overview-statusSubtitle {
   margin: 6px 0 0;
   color: var(--color-gray-500);

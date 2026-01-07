@@ -446,6 +446,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   selectedStudent && (
                     <OverviewTab
                       selectedStudent={selectedStudent}
+                      studentDebtItems={studentDebtItems}
                       studentLessons={studentLessons}
                       onRemindHomework={onRemindHomework}
                     />
