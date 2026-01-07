@@ -1,18 +1,16 @@
 import { FC } from 'react';
 import styles from '../StudentsSection.module.css';
-import { Lesson, PaymentEvent } from '../../../entities/types';
+import { Lesson } from '../../../entities/types';
 import { SelectedStudent } from '../types';
 
 interface OverviewTabProps {
   selectedStudent: SelectedStudent;
   studentLessonsSummary: Lesson[];
-  payments: PaymentEvent[];
 }
 
 export const OverviewTab: FC<OverviewTabProps> = ({
   selectedStudent,
   studentLessonsSummary,
-  payments,
 }) => {
   const now = Date.now();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
@@ -22,14 +20,12 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     .filter(({ startAt }) => startAt > now)
     .sort((a, b) => a.startAt - b.startAt)[0]?.lesson ?? null;
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
-  const paymentsLast30Days = payments.reduce((total, event) => {
-    if (event.studentId !== selectedStudent.id) return total;
-    if (event.type !== 'AUTO_CHARGE' && event.type !== 'MANUAL_PAID') return total;
-    if (!event.lessonId) return total;
-    const createdAt = Date.parse(event.createdAt);
-    if (Number.isNaN(createdAt) || createdAt < thirtyDaysAgo) return total;
-    const amount = typeof event.moneyAmount === 'number' ? event.moneyAmount : event.priceSnapshot;
-    if (typeof amount !== 'number' || Number.isNaN(amount) || amount <= 0) return total;
+  const paymentsLast30Days = studentLessonsSummary.reduce((total, lesson) => {
+    if (!lesson.isPaid) return total;
+    const startAt = new Date(lesson.startAt).getTime();
+    if (Number.isNaN(startAt) || startAt < thirtyDaysAgo || startAt > now) return total;
+    const amount = lesson.price ?? selectedStudent.pricePerLesson ?? 0;
+    if (amount <= 0) return total;
     return total + amount;
   }, 0);
   const paymentsLast30DaysRounded = Math.round(paymentsLast30Days);

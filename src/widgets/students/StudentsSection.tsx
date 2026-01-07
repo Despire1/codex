@@ -449,7 +449,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     <OverviewTab
                       selectedStudent={selectedStudent}
                       studentLessonsSummary={studentLessonsSummary}
-                      payments={payments}
                     />
                   )
                 )}
