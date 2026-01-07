@@ -2258,6 +2258,46 @@
   font-weight: 600;
 }
 
+.paymentChip.paymentChipPayment {
+  background-color: #eaf7ef;
+}
+
+.paymentChip.paymentChipPayment :global(.MuiChip-label) {
+  color: #2f8f4e;
+}
+
+.paymentChip.paymentChipCharge {
+  background-color: #eef4ff;
+}
+
+.paymentChip.paymentChipCharge :global(.MuiChip-label) {
+  color: #2f5aff;
+}
+
+.paymentChip.paymentChipRefund {
+  background-color: #fff4e5;
+}
+
+.paymentChip.paymentChipRefund :global(.MuiChip-label) {
+  color: #c77700;
+}
+
+.paymentChip.paymentChipAdjustment {
+  background-color: #f3eeff;
+}
+
+.paymentChip.paymentChipAdjustment :global(.MuiChip-label) {
+  color: #6b4eff;
+}
+
+.paymentChip.paymentChipFallback {
+  background-color: var(--color-slate-100);
+}
+
+.paymentChip.paymentChipFallback :global(.MuiChip-label) {
+  color: var(--color-gray-600);
+}
+
 .paymentMobileContent {
   display: none;
 }
