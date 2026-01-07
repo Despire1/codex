@@ -27,7 +27,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     if (!lesson.isPaid) return total;
     const startAt = new Date(lesson.startAt).getTime();
     if (Number.isNaN(startAt) || startAt < thirtyDaysAgo || startAt > now) return total;
-    const amount = lesson.price ?? selectedStudent.pricePerLesson ?? 0;
+    const amount = lesson.price ?? selectedStudent.link.pricePerLesson ?? 0;
     if (amount <= 0) return total;
     return total + amount;
   }, 0);

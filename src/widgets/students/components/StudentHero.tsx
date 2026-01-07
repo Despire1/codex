@@ -23,7 +23,7 @@ interface StudentHeroProps {
   isMobile: boolean;
   onBackToList: () => void;
   onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;
-  onStartEditPrice: (student: Student) => void;
+  onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
   onPriceChange: (value: string) => void;
   onSavePrice: () => void;
   onCancelPriceEdit: () => void;
@@ -324,8 +324,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
               ) : (
                 <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
                   <span className={styles.summaryValueInline}>
-                    {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                      ? `${selectedStudent.pricePerLesson} ₽`
+                    {selectedStudent.link.pricePerLesson && selectedStudent.link.pricePerLesson > 0
+                      ? `${selectedStudent.link.pricePerLesson} ₽`
                       : 'Не задана'}
                   </span>
                   <EditOutlinedIcon width={16} height={16} />
@@ -406,8 +406,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 ) : (
                   <button className={styles.summaryButton} onClick={() => onStartEditPrice(selectedStudent)}>
                     <span className={styles.summaryValueInline}>
-                      {selectedStudent.pricePerLesson && selectedStudent.pricePerLesson > 0
-                        ? `${selectedStudent.pricePerLesson} ₽`
+                      {selectedStudent.link.pricePerLesson && selectedStudent.link.pricePerLesson > 0
+                        ? `${selectedStudent.link.pricePerLesson} ₽`
                         : 'Не задана'}
                     </span>
                     <EditOutlinedIcon width={16} height={16} />

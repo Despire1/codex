@@ -427,7 +427,9 @@ const parseDateFilter = (value?: string | null) => {
 };
 
 const resolveStudentDebtSummary = async (teacherId: number, studentId: number) => {
-  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId, studentId } },
+  });
   const now = new Date();
   const lessons = await prisma.lesson.findMany({
     where: {
@@ -449,7 +451,7 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
 
   const items = lessons.map((lesson) => {
     const participant = lesson.participants.find((item) => item.studentId === studentId);
-    const price = participant?.price ?? student?.pricePerLesson ?? lesson.price ?? null;
+    const price = participant?.price ?? link?.pricePerLesson ?? lesson.price ?? null;
     return {
       id: lesson.id,
       startAt: lesson.startAt,
@@ -571,12 +573,13 @@ const addStudent = async (user: User, body: any) => {
       ? await prisma.student.findFirst({ where: { username } })
       : null;
 
+  const normalizedPrice = Math.round(Number(pricePerLesson));
   const student =
     existingStudent ||
     (await prisma.student.create({
       data: {
         username: username || null,
-        pricePerLesson: Math.round(Number(pricePerLesson)),
+        pricePerLesson: normalizedPrice,
       },
     }));
 
@@ -588,7 +591,7 @@ const addStudent = async (user: User, body: any) => {
     if (existingLink.isArchived) {
       const restoredLink = await prisma.teacherStudent.update({
         where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
-        data: { isArchived: false, customName },
+        data: { isArchived: false, customName, pricePerLesson: normalizedPrice },
       });
       return { student, link: restoredLink };
     }
@@ -602,6 +605,7 @@ const addStudent = async (user: User, body: any) => {
       customName,
       autoRemindHomework: true,
       balanceLessons: 0,
+      pricePerLesson: normalizedPrice,
     },
   });
 
@@ -632,12 +636,11 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
       where: { id: studentId },
       data: {
         username: normalizedUsername,
-        pricePerLesson: Math.round(numericPrice),
       },
     }),
     prisma.teacherStudent.update({
       where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-      data: { customName: customName.trim() },
+      data: { customName: customName.trim(), pricePerLesson: Math.round(numericPrice) },
     }),
   ]);
 
@@ -679,8 +682,8 @@ const updatePricePerLesson = async (user: User, studentId: number, value: number
   });
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
-  return prisma.student.update({
-    where: { id: studentId },
+  return prisma.teacherStudent.update({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { pricePerLesson: Math.round(value) },
   });
 };
@@ -717,7 +720,7 @@ const adjustBalance = async (
         lessonId: null,
         type,
         lessonsDelta: delta,
-        priceSnapshot: link.student?.pricePerLesson ?? 0,
+        priceSnapshot: link.pricePerLesson ?? 0,
         moneyAmount: null,
         createdAt: resolvedDate,
         createdBy: 'TEACHER',
@@ -829,11 +832,11 @@ const normalizeLessonPriceValue = (value: any): number => {
 };
 
 const calcLessonPaymentAmount = (participant: any, lesson: any, link: any) =>
-  [participant.price, lesson.price, link.student?.pricePerLesson].find(
+  [participant.price, lesson.price, link.pricePerLesson].find(
     (value) => typeof value === 'number' && value > 0,
   ) ?? 0;
 
-const resolveProfileLessonPrice = (link: any) => normalizeLessonPriceValue(link?.student?.pricePerLesson);
+const resolveProfileLessonPrice = (link: any) => normalizeLessonPriceValue(link?.pricePerLesson);
 
 const createPaymentEvent = async (tx: any, payload: any) => {
   return tx.paymentEvent.create({ data: payload });
@@ -1117,10 +1120,10 @@ const createLesson = async (user: User, body: any) => {
   if (!startAt) throw new Error('Заполните дату и время урока');
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
 
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
+  const links = await prisma.teacherStudent.findMany({
+    where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
   });
-  const basePrice = students[0]?.pricePerLesson ?? 0;
+  const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
 
   const lesson = await prisma.lesson.create({
@@ -1133,8 +1136,8 @@ const createLesson = async (user: User, body: any) => {
       status: 'SCHEDULED',
       isPaid: false,
       participants: {
-        create: students.map((student) => ({
-          studentId: student.id,
+        create: studentIds.map((id) => ({
+          studentId: id,
           price: 0,
           isPaid: false,
         })),
@@ -1229,11 +1232,11 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
 
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
+  const links = await prisma.teacherStudent.findMany({
+    where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
   });
 
-  const basePrice = students[0]?.pricePerLesson ?? 0;
+  const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
 
   const maxEndDate = addYears(startDate, 1);
@@ -1297,8 +1300,8 @@ const createRecurringLessons = async (user: User, body: any) => {
         recurrenceGroupId,
         recurrenceWeekdays: weekdaysPayload,
         participants: {
-          create: students.map((student) => ({
-            studentId: student.id,
+          create: studentIds.map((id) => ({
+            studentId: id,
             price: 0,
             isPaid: false,
           })),
@@ -1667,7 +1670,7 @@ const togglePaymentForStudent = async (
     const shouldRefund = cancelBehavior === 'refund';
     const deltaChange = shouldRefund ? 1 : 0;
     const priceSnapshot =
-      [link.student?.pricePerLesson, participant.price, lesson.price].find(
+      [link.pricePerLesson, participant.price, lesson.price].find(
         (value) => typeof value === 'number' && value > 0,
       ) ?? 0;
     if (existingPayment) {
@@ -1716,7 +1719,7 @@ const togglePaymentForStudent = async (
     });
   } else {
     const amount =
-      [link.student?.pricePerLesson, participant.price, lesson.price].find(
+      [link.pricePerLesson, participant.price, lesson.price].find(
         (value) => typeof value === 'number' && value > 0,
       ) ?? 0;
     await prisma.payment.create({
@@ -2339,8 +2342,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if ((req.method === 'POST' || req.method === 'PATCH') && priceMatch) {
       const studentId = Number(priceMatch[1]);
       const body = await readBody(req);
-      const student = await updatePricePerLesson(requireApiUser(), studentId, Number(body.value));
-      return sendJson(res, 200, { student });
+      const link = await updatePricePerLesson(requireApiUser(), studentId, Number(body.value));
+      return sendJson(res, 200, { link });
     }
 
     const balanceMatch = pathname.match(/^\/api\/students\/(\d+)\/balance$/);

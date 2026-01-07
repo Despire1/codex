@@ -620,7 +620,7 @@ export const AppPage = () => {
       customName: link.customName,
       username: student.username ?? '',
       pricePerLesson:
-        typeof student.pricePerLesson === 'number' ? String(student.pricePerLesson) : '',
+        typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
     });
     setEditingStudentId(selectedStudentId);
     setStudentModalOpen(true);
@@ -840,8 +840,8 @@ export const AppPage = () => {
     [closeDialog, performDeleteStudent, studentListItems],
   );
 
-  const startEditPrice = (student: Student) => {
-    setPriceEditState({ id: student.id, value: String(student.pricePerLesson ?? '') });
+  const startEditPrice = (student: Student & { link: TeacherStudent }) => {
+    setPriceEditState({ id: student.id, value: String(student.link.pricePerLesson ?? '') });
   };
 
   const savePrice = async () => {
@@ -850,9 +850,13 @@ export const AppPage = () => {
     if (Number.isNaN(numeric) || numeric < 0) return;
     try {
       const data = await api.updatePrice(priceEditState.id, numeric);
-      setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
+      setLinks((prev) =>
+        prev.map((link) => (link.id === data.link.id ? data.link : link)),
+      );
       setStudentListItems((prev) =>
-        prev.map((item) => (item.student.id === data.student.id ? { ...item, student: data.student } : item)),
+        prev.map((item) =>
+          item.link.id === data.link.id ? { ...item, link: data.link } : item,
+        ),
       );
       setPriceEditState({ id: null, value: '' });
     } catch (error) {

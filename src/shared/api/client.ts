@@ -89,7 +89,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   updatePrice: (studentId: number, value: number) =>
-    apiFetch<{ student: Student }>(`/api/students/${studentId}/price`, {
+    apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/price`, {
       method: 'POST',
       body: JSON.stringify({ value }),
     }),
