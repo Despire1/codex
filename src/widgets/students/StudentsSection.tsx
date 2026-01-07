@@ -187,7 +187,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
-  const selectedStudentStats = selectedStudentEntry?.stats ?? null;
 
   const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
@@ -447,7 +446,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   selectedStudent && (
                     <OverviewTab
                       selectedStudent={selectedStudent}
-                      selectedStudentStats={selectedStudentStats}
+                      studentDebtItems={studentDebtItems}
+                      studentLessons={studentLessons}
                       onRemindHomework={onRemindHomework}
                     />
                   )
