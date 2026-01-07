@@ -135,14 +135,26 @@ export const PaymentList: FC<PaymentListProps> = ({
                     const IconComponent = getEventIcon(event);
                     const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });
                     const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson) : 'Без привязки к занятию';
+                    const lessonTimestamp = event.lesson?.startAt
+                      ? format(parseISO(event.lesson.startAt), 'd MMM, HH:mm', { locale: ru })
+                      : 'Без привязки к занятию';
                     const isClickable = Boolean(event.lessonId && event.lesson && onOpenLesson);
                     const valueMeta = formatEventValue(event);
+                    const amountNode = (
+                      <Box className={`${styles.paymentAmount} ${styles.paymentDesktopOnly}`}>
+                        <span>{valueMeta.value}</span>
+                        {valueMeta.withSuffix && (
+                          <span className={styles.paymentAmountSuffix}>ур.</span>
+                        )}
+                      </Box>
+                    );
                     const listItemContent = (
                       <>
-                        <ListItemIcon className={styles.paymentIcon}>
+                        <ListItemIcon className={`${styles.paymentIcon} ${styles.paymentDesktopOnly}`}>
                           <IconComponent width={20} height={20} />
                         </ListItemIcon>
                         <ListItemText
+                          className={styles.paymentDesktopOnly}
                           primary={
                             <Stack direction="row" spacing={1} alignItems="center" className={styles.paymentTitleRow}>
                               <span className={styles.paymentTitle}>{getEventTitle(event)}</span>
@@ -157,12 +169,28 @@ export const PaymentList: FC<PaymentListProps> = ({
                             </Stack>
                           }
                         />
-                        <Box className={styles.paymentAmount}>
-                          <span>{valueMeta.value}</span>
-                          {valueMeta.withSuffix && (
-                            <span className={styles.paymentAmountSuffix}>ур.</span>
-                          )}
-                        </Box>
+                        {amountNode}
+                        <div className={styles.paymentMobileContent}>
+                          <div className={styles.paymentMobileHeader}>
+                            <span className={`${styles.paymentTitle} ${styles.paymentMobileTitle}`}>
+                              {getEventTitle(event)}
+                            </span>
+                            <Box className={`${styles.paymentAmount} ${styles.paymentMobileAmount}`}>
+                              <span>{valueMeta.value}</span>
+                              {valueMeta.withSuffix && (
+                                <span className={styles.paymentAmountSuffix}>ур.</span>
+                              )}
+                            </Box>
+                          </div>
+                          <div className={styles.paymentMobileChips}>
+                            <Chip label={getEventChipLabel(event)} size="small" className={styles.paymentChip} />
+                          </div>
+                          <div className={`${styles.paymentMeta} ${styles.paymentMobileMeta}`}>
+                            <span>{`Оплата: ${timestamp}`}</span>
+                            <span>{`Занятие: ${lessonTimestamp}`}</span>
+                            {event.comment && <span className={styles.paymentComment}>{event.comment}</span>}
+                          </div>
+                        </div>
                       </>
                     );
 
