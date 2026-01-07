@@ -1292,6 +1292,14 @@
   word-break: break-word;
 }
 
+.overview-statValuePaid {
+  color: #188542;
+}
+
+.overview-statValueUnpaid {
+  color: #c73939;
+}
+
 .statCard {
   padding: 12px;
   border-radius: 12px;

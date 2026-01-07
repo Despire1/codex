@@ -78,7 +78,15 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         }`}
       >
         <p className={styles.statLabel}>Состояние</p>
-        <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>{statusContent.title}</p>
+        <p
+          className={`${styles.statValueLarge} ${styles['overview-statValue']} ${
+            statusContent.tone === 'ok'
+              ? styles['overview-statValuePaid']
+              : styles['overview-statValueUnpaid']
+          }`}
+        >
+          {statusContent.title}
+        </p>
         <p className={styles['overview-statusSubtitle']}>{statusContent.subtitle}</p>
       </div>
       <div className={styles.overviewGrid}>
