@@ -1,5 +1,5 @@
 import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
@@ -75,7 +75,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
     window.location.href = `tg://resolve?domain=${telegramUsername}`;
   };
 
-  const nextLessonLabel = useMemo(() => {
+  const nextLessonInfo = useMemo(() => {
     const now = new Date();
     const nextLesson = studentLessonsSummary
       .filter((lesson) => {
@@ -85,9 +85,63 @@ export const StudentHero: FC<StudentHeroProps> = ({
       })
       .sort((a, b) => a.startAt.localeCompare(b.startAt))[0];
 
-    if (!nextLesson) return 'не запланирован';
-    return format(parseISO(nextLesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru });
+    if (!nextLesson) {
+      return {
+        label: 'не запланирован',
+        variant: 'empty' as const,
+      };
+    }
+
+    const lessonDate = parseISO(nextLesson.startAt);
+    const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
+
+    if (isToday(lessonDate)) {
+      return {
+        label: `Сегодня, ${timeLabel}`,
+        variant: 'badge' as const,
+      };
+    }
+
+    if (isTomorrow(lessonDate)) {
+      return {
+        label: `Завтра, ${timeLabel}`,
+        variant: 'badge' as const,
+      };
+    }
+
+    return {
+      label: format(lessonDate, 'd MMM yyyy, HH:mm', { locale: ru }),
+      variant: 'text' as const,
+    };
   }, [studentLessonsSummary]);
+
+  const renderNextLessonValue = () => {
+    if (nextLessonInfo.variant === 'empty') {
+      return <span className={styles.summaryValueText}>{nextLessonInfo.label}</span>;
+    }
+
+    if (nextLessonInfo.variant === 'badge') {
+      return (
+        <button
+          type="button"
+          className={styles.summaryInfoBadge}
+          onClick={() => onTabChange('lessons')}
+        >
+          {nextLessonInfo.label}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className={styles.summaryValueButton}
+        onClick={() => onTabChange('lessons')}
+      >
+        {nextLessonInfo.label}
+      </button>
+    );
+  };
 
   useEffect(() => {
     if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && studentDebtTotal === 0) {
@@ -312,17 +366,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
             )}
             <div className={styles.summaryItemLine}>
               <span className={styles.summaryLabel}>Следующий урок:</span>
-              {nextLessonLabel === 'не запланирован' ? (
-                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.summaryValueButton}
-                  onClick={() => onTabChange('lessons')}
-                >
-                  {nextLessonLabel}
-                </button>
-              )}
+              {renderNextLessonValue()}
             </div>
           </div>
         )}
@@ -385,17 +429,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
             )}
             <div className={styles.summaryMobileRow}>
               <span className={styles.summaryLabel}>Следующий урок:</span>
-              {nextLessonLabel === 'не запланирован' ? (
-                <span className={styles.summaryValueText}>{nextLessonLabel}</span>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.summaryValueButton}
-                  onClick={() => onTabChange('lessons')}
-                >
-                  {nextLessonLabel}
-                </button>
-              )}
+              {renderNextLessonValue()}
             </div>
           </div>
         )}
