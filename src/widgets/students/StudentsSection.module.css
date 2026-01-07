@@ -2258,6 +2258,31 @@
   font-weight: 600;
 }
 
+.paymentChipPayment {
+  background: #eaf7ef;
+  color: #2f8f4e;
+}
+
+.paymentChipCharge {
+  background: #eef4ff;
+  color: #2f5aff;
+}
+
+.paymentChipRefund {
+  background: #fff4e5;
+  color: #c77700;
+}
+
+.paymentChipAdjustment {
+  background: #f3eeff;
+  color: #6b4eff;
+}
+
+.paymentChipFallback {
+  background: var(--color-slate-100);
+  color: var(--color-gray-600);
+}
+
 .paymentMobileContent {
   display: none;
 }

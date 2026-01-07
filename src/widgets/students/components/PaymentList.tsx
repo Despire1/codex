@@ -82,6 +82,31 @@ const getEventChipLabel = (event: PaymentEvent) => {
   }
 };
 
+const getEventChipClass = (event: PaymentEvent) => {
+  if (event.type === 'TOP_UP' || event.type === 'MANUAL_PAID') {
+    return styles.paymentChipPayment;
+  }
+
+  if (event.type === 'AUTO_CHARGE') {
+    return styles.paymentChipCharge;
+  }
+
+  if (event.type === 'ADJUSTMENT') {
+    if (
+      event.reason === 'LESSON_CANCELED' ||
+      event.reason === 'PAYMENT_REVERT_REFUND' ||
+      event.reason === 'PAYMENT_REVERT' ||
+      event.reason === 'PAYMENT_REVERT_WRITE_OFF'
+    ) {
+      return styles.paymentChipRefund;
+    }
+
+    return styles.paymentChipAdjustment;
+  }
+
+  return styles.paymentChipFallback;
+};
+
 const getEventIcon = (event: PaymentEvent) => {
   if (event.type === 'TOP_UP' || event.type === 'SUBSCRIPTION' || event.type === 'OTHER') return AddOutlinedIcon;
   if (event.type === 'AUTO_CHARGE') return RemoveOutlinedIcon;
@@ -148,6 +173,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                         )}
                       </Box>
                     );
+                    const chipClassName = `${styles.paymentChip} ${getEventChipClass(event)}`;
                     const listItemContent = (
                       <>
                         {/*<ListItemIcon className={`${styles.paymentIcon} ${styles.paymentDesktopOnly}`}>*/}
@@ -158,7 +184,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                           primary={
                             <Stack direction="row" spacing={1} alignItems="center" className={styles.paymentTitleRow}>
                               <span className={styles.paymentTitle}>{getEventTitle(event)}</span>
-                              <Chip label={getEventChipLabel(event)} size="small" className={styles.paymentChip} />
+                              <Chip label={getEventChipLabel(event)} size="small" className={chipClassName} />
                             </Stack>
                           }
                           secondary={
@@ -183,7 +209,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                             </Box>
                           </div>
                           <div className={styles.paymentMobileChips}>
-                            <Chip label={getEventChipLabel(event)} size="small" className={styles.paymentChip} />
+                            <Chip label={getEventChipLabel(event)} size="small" className={chipClassName} />
                           </div>
                           <div className={`${styles.paymentMeta} ${styles.paymentMobileMeta}`}>
                             <span>{`Оплата: ${timestamp}`}</span>
