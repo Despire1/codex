@@ -2521,10 +2521,12 @@
 }
 
 @media (max-width: 768px) {
-  .paymentItem {
+  .paymentItem,
+  .paymentItem:global(.MuiButtonBase-root) {
     width: 100%;
     border: 1px solid var(--color-gray-200);
-    box-shadow: none;
+    background: var(--color-white);
+    box-shadow: 0 6px 18px var(--shadow-slate-900-06);
     box-sizing: border-box;
   }
 
