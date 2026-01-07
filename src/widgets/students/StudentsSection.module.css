@@ -2259,27 +2259,42 @@
 }
 
 .paymentChipPayment {
-  background: #eaf7ef;
+  background-color: #eaf7ef;
+}
+
+.paymentChipPayment :global(.MuiChip-label) {
   color: #2f8f4e;
 }
 
 .paymentChipCharge {
-  background: #eef4ff;
+  background-color: #eef4ff;
+}
+
+.paymentChipCharge :global(.MuiChip-label) {
   color: #2f5aff;
 }
 
 .paymentChipRefund {
-  background: #fff4e5;
+  background-color: #fff4e5;
+}
+
+.paymentChipRefund :global(.MuiChip-label) {
   color: #c77700;
 }
 
 .paymentChipAdjustment {
-  background: #f3eeff;
+  background-color: #f3eeff;
+}
+
+.paymentChipAdjustment :global(.MuiChip-label) {
   color: #6b4eff;
 }
 
 .paymentChipFallback {
-  background: var(--color-slate-100);
+  background-color: var(--color-slate-100);
+}
+
+.paymentChipFallback :global(.MuiChip-label) {
   color: var(--color-gray-600);
 }
 
