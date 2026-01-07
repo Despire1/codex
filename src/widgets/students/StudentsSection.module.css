@@ -1235,6 +1235,19 @@
   width: 100%;
 }
 
+.overview-statusSubtitle {
+  margin: 6px 0 0;
+  color: var(--color-gray-500);
+  font-size: 13px;
+}
+
+.statCard {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+}
+
 .overview-statusCardOk {
   background: var(--color-emerald-50);
   border-color: var(--color-emerald-200);
@@ -1248,19 +1261,6 @@
 .overview-statusCardAlert {
   background: var(--color-rose-50);
   border-color: var(--color-rose-200);
-}
-
-.overview-statusSubtitle {
-  margin: 6px 0 0;
-  color: var(--color-gray-500);
-  font-size: 13px;
-}
-
-.statCard {
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--color-gray-50);
-  border: 1px solid var(--color-gray-200);
 }
 
 .statLabel {
