@@ -21,7 +21,8 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     .sort((a, b) => a.startAt - b.startAt)[0]?.lesson ?? null;
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
   const unpaidLessonsCount = studentLessonsSummary.reduce(
-    (count, lesson) => (lesson.isPaid ? count : count + 1),
+    (count, lesson) =>
+      lesson.status === 'COMPLETED' && !lesson.isPaid ? count + 1 : count,
     0,
   );
   const paymentsLast30Days = studentLessonsSummary.reduce((total, lesson) => {
