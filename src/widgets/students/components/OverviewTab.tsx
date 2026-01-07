@@ -1,40 +1,39 @@
 import { FC } from 'react';
 import styles from '../StudentsSection.module.css';
-import controls from '../../../shared/styles/controls.module.css';
-import { Lesson, StudentDebtItem } from '../../../entities/types';
+import { Lesson, PaymentEvent } from '../../../entities/types';
 import { SelectedStudent } from '../types';
 
 interface OverviewTabProps {
   selectedStudent: SelectedStudent;
-  studentDebtItems: StudentDebtItem[];
-  studentLessons: Lesson[];
-  onRemindHomework: (studentId: number) => void;
+  studentLessonsSummary: Lesson[];
+  payments: PaymentEvent[];
 }
 
 export const OverviewTab: FC<OverviewTabProps> = ({
   selectedStudent,
-  studentDebtItems,
-  studentLessons,
-  onRemindHomework,
+  studentLessonsSummary,
+  payments,
 }) => {
-  const sumDebt = studentDebtItems
-    .filter((lesson) => lesson.status === 'COMPLETED')
-    .reduce((total, lesson) => total + (lesson.price ?? 0), 0);
   const now = Date.now();
-  const nextLesson = studentLessons
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const nextLesson = studentLessonsSummary
     .filter((lesson) => lesson.status !== 'COMPLETED')
     .map((lesson) => ({ lesson, startAt: new Date(lesson.startAt).getTime() }))
     .filter(({ startAt }) => startAt > now)
     .sort((a, b) => a.startAt - b.startAt)[0]?.lesson ?? null;
   const remindersEnabled = selectedStudent.link.autoRemindHomework;
+  const paymentsLast30Days = payments.reduce((total, event) => {
+    if (event.studentId !== selectedStudent.id) return total;
+    if (event.type !== 'AUTO_CHARGE' && event.type !== 'MANUAL_PAID') return total;
+    if (!event.lessonId) return total;
+    const createdAt = Date.parse(event.createdAt);
+    if (Number.isNaN(createdAt) || createdAt < thirtyDaysAgo) return total;
+    const amount = typeof event.moneyAmount === 'number' ? event.moneyAmount : event.priceSnapshot;
+    if (typeof amount !== 'number' || Number.isNaN(amount) || amount <= 0) return total;
+    return total + amount;
+  }, 0);
+  const paymentsLast30DaysRounded = Math.round(paymentsLast30Days);
   const statusContent = (() => {
-    if (sumDebt > 0) {
-      return {
-        title: 'Есть неоплаченные занятия',
-        subtitle: 'Стоит отметить оплату',
-        tone: 'alert',
-      };
-    }
     if (!nextLesson) {
       return {
         title: 'Нет запланированных уроков',
@@ -51,7 +50,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
     }
     return {
       title: 'Всё под контролем',
-      subtitle: 'Оплаты в порядке, уроки запланированы',
+      subtitle: 'Оплаты и расписание в порядке',
       tone: 'ok',
     };
   })();
@@ -62,9 +61,6 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         <div>
           <div className={styles.priceLabel}>Обзор</div>
         </div>
-        <button className={controls.secondaryButton} onClick={() => onRemindHomework(selectedStudent.id)}>
-          Напомнить про ДЗ
-        </button>
       </div>
       <div
         className={`${styles.statCard} ${styles['overview-statusCard']} ${
@@ -76,23 +72,25 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         }`}
       >
         <p className={styles.statLabel}>Состояние</p>
-        <p className={styles.statValueLarge}>{statusContent.title}</p>
+        <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>{statusContent.title}</p>
         <p className={styles['overview-statusSubtitle']}>{statusContent.subtitle}</p>
       </div>
       <div className={styles.overviewGrid}>
         <div className={styles.statCard}>
           <p className={styles.statLabel}>Баланс</p>
-          <p className={styles.statValueLarge}>{selectedStudent.link.balanceLessons} уроков</p>
+          <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>
+            {selectedStudent.link.balanceLessons} уроков
+          </p>
         </div>
         <div className={styles.statCard}>
-          <p className={styles.statLabel}>Оплаты</p>
-          <p className={styles.statValueLarge}>
-            {sumDebt > 0 ? 'Есть неоплаченные занятия' : 'Все занятия оплачены'}
+          <p className={styles.statLabel}>Оплаты за 30 дней</p>
+          <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>
+            {paymentsLast30DaysRounded} ₽
           </p>
         </div>
         <div className={styles.statCard}>
           <p className={styles.statLabel}>Напоминания</p>
-          <p className={styles.statValueLarge}>
+          <p className={`${styles.statValueLarge} ${styles['overview-statValue']}`}>
             {remindersEnabled ? 'Включены — ничего не забудете' : 'Выключены — возможны пропуски'}
           </p>
         </div>

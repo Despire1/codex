@@ -72,6 +72,7 @@ interface StudentsSectionProps {
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
   studentLessons: Lesson[];
+  studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   studentDebtTotal: number;
   lessonPaymentFilter: LessonPaymentFilter;
@@ -157,6 +158,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onEditStudent,
   onRequestDeleteStudent,
   studentLessons,
+  studentLessonsSummary,
   studentDebtItems,
   studentDebtTotal,
   lessonPaymentFilter,
@@ -366,7 +368,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <StudentHero
                   headerRef={headerRef}
                   selectedStudent={selectedStudent}
-                  studentLessons={studentLessons}
+                  studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
                   priceEditState={priceEditState}
@@ -446,9 +448,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   selectedStudent && (
                     <OverviewTab
                       selectedStudent={selectedStudent}
-                      studentDebtItems={studentDebtItems}
-                      studentLessons={studentLessons}
-                      onRemindHomework={onRemindHomework}
+                      studentLessonsSummary={studentLessonsSummary}
+                      payments={payments}
                     />
                   )
                 )}

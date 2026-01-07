@@ -15,7 +15,7 @@ import { StudentDebtPopoverContent } from './StudentDebtPopoverContent';
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
-  studentLessons: Lesson[];
+  studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   studentDebtTotal: number;
   priceEditState: { id: number | null; value: string };
@@ -38,7 +38,7 @@ interface StudentHeroProps {
 export const StudentHero: FC<StudentHeroProps> = ({
   headerRef,
   selectedStudent,
-  studentLessons,
+  studentLessonsSummary,
   studentDebtItems,
   studentDebtTotal,
   priceEditState,
@@ -77,7 +77,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
   const nextLessonLabel = useMemo(() => {
     const now = new Date();
-    const nextLesson = studentLessons
+    const nextLesson = studentLessonsSummary
       .filter((lesson) => {
         if (lesson.status === 'CANCELED') return false;
         const lessonDate = parseISO(lesson.startAt);
@@ -87,7 +87,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
     if (!nextLesson) return 'не запланирован';
     return format(parseISO(nextLesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru });
-  }, [studentLessons]);
+  }, [studentLessonsSummary]);
 
   useEffect(() => {
     if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && studentDebtTotal === 0) {

@@ -179,6 +179,7 @@ export const AppPage = () => {
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
+  const [studentLessonsSummary, setStudentLessonsSummary] = useState<Lesson[]>([]);
   const [studentDebtItems, setStudentDebtItems] = useState<StudentDebtItem[]>([]);
   const [studentDebtTotal, setStudentDebtTotal] = useState(0);
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
@@ -195,6 +196,7 @@ export const AppPage = () => {
   );
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
   const lessonLoadRequestId = useRef(0);
+  const lessonSummaryLoadRequestId = useRef(0);
   const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
@@ -429,6 +431,39 @@ export const AppPage = () => {
     ],
   );
 
+  const loadStudentLessonsSummary = useCallback(
+    async (options?: { studentIdOverride?: number | null }) => {
+      if (sessionState !== 'authenticated') {
+        setStudentLessonsSummary([]);
+        return;
+      }
+      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
+      if (!targetStudentId) {
+        setStudentLessonsSummary([]);
+        return;
+      }
+
+      const requestId = lessonSummaryLoadRequestId.current + 1;
+      lessonSummaryLoadRequestId.current = requestId;
+      try {
+        const data = await api.listStudentLessons(targetStudentId, {
+          payment: 'all',
+          status: 'all',
+          sort: 'asc',
+        });
+        if (lessonSummaryLoadRequestId.current !== requestId) return;
+        setStudentLessonsSummary(data.items.map(normalizeLesson));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load student lessons summary', error);
+        if (lessonSummaryLoadRequestId.current === requestId) {
+          setStudentLessonsSummary([]);
+        }
+      }
+    },
+    [selectedStudentId, sessionState],
+  );
+
   useEffect(() => {
     if (sessionState !== 'authenticated') return;
     loadStudentList();
@@ -446,6 +481,11 @@ export const AppPage = () => {
     }
     loadStudentLessons();
   }, [loadStudentLessons, sessionState]);
+
+  useEffect(() => {
+    if (sessionState !== 'authenticated') return;
+    loadStudentLessonsSummary();
+  }, [loadStudentLessonsSummary, sessionState]);
 
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
@@ -883,6 +923,7 @@ export const AppPage = () => {
         return prev.filter((lesson) => lesson.id !== editingLessonId);
       });
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
       closeLessonModal();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
@@ -1046,6 +1087,7 @@ export const AppPage = () => {
       }
 
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
       setLessonModalOpen(false);
       setEditingLessonId(null);
       navigate(tabPathById.schedule);
@@ -1098,6 +1140,7 @@ export const AppPage = () => {
       }
 
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to complete lesson', error);
@@ -1139,6 +1182,7 @@ export const AppPage = () => {
       }
 
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update lesson status', error);
@@ -1204,6 +1248,7 @@ export const AppPage = () => {
       }
 
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
     } catch (error) {
       showToast({
         message: 'Не удалось обновить оплату',
@@ -1258,6 +1303,7 @@ export const AppPage = () => {
       await api.deleteLesson(lessonId);
       setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
       await loadStudentLessons();
+      await loadStudentLessonsSummary();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete lesson', error);
@@ -1519,6 +1565,7 @@ export const AppPage = () => {
               onEditStudent: openEditStudentModal,
               onRequestDeleteStudent: requestDeleteStudent,
               studentLessons,
+              studentLessonsSummary,
               studentDebtItems,
               studentDebtTotal,
               lessonPaymentFilter: studentLessonPaymentFilter,

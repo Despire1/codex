@@ -1241,6 +1241,11 @@
   font-size: 13px;
 }
 
+.overview-statValue {
+  white-space: normal;
+  word-break: break-word;
+}
+
 .statCard {
   padding: 12px;
   border-radius: 12px;
