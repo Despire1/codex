@@ -859,6 +859,29 @@
   text-decoration: underline;
 }
 
+.summaryInfoBadge {
+  border: 1px solid #d6e4ff;
+  background: #eef4ff;
+  color: #2f5aff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.summaryInfoBadge:hover {
+  background: #e3edff;
+}
+
+.summaryInfoBadge:active {
+  background: #d8e5ff;
+}
+
 .summaryDebtBadge {
   border: 1px solid #f5d3a5;
   background: #fff4e5;
