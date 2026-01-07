@@ -859,6 +859,30 @@
   text-decoration: underline;
 }
 
+.summaryDebtBadge {
+  border: 1px solid #f5d3a5;
+  background: #fff4e5;
+  color: #c77700;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: background 0.15s ease;
+}
+
+.summaryDebtBadge:hover {
+  background: #ffead2;
+}
+
+.summaryDebtBadge:active {
+  background: #f5dcc0;
+}
+
 .summaryValueText {
   font-size: 14px;
   font-weight: 700;

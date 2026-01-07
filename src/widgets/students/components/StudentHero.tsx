@@ -279,9 +279,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
               )}
             </div>
             <span className={styles.summaryDivider}>|</span>
-            <div className={styles.summaryItemLine}>
-              {hasDebt ? (
-                <>
+            {hasDebt && (
+              <>
+                <div className={styles.summaryItemLine}>
                   <span className={styles.summaryLabel}>Не оплачено:</span>
                   <AdaptivePopover
                     isOpen={isDebtPopoverOpen}
@@ -289,7 +289,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                     trigger={(
                       <button
                         type="button"
-                        className={styles.summaryValueButton}
+                        className={styles.summaryDebtBadge}
                         onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
                       >
                         {debtLabel}
@@ -306,12 +306,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       onMarkPaid={handleMarkPaid}
                     />
                   </AdaptivePopover>
-                </>
-              ) : (
-                <span className={styles.summarySuccessText}>Все занятия оплачены</span>
-              )}
-            </div>
-            <span className={styles.summaryDivider}>|</span>
+                </div>
+                <span className={styles.summaryDivider}>|</span>
+              </>
+            )}
             <div className={styles.summaryItemLine}>
               <span className={styles.summaryLabel}>Следующий урок:</span>
               {nextLessonLabel === 'не запланирован' ? (
@@ -373,22 +371,18 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 )}
               </div>
             </div>
-            <div className={styles.summaryMobileRow}>
-              {hasDebt ? (
-                <>
-                  <span className={styles.summaryLabel}>Не оплачено:</span>
-                  <button
-                    type="button"
-                    className={styles.summaryValueButton}
-                    onClick={() => setIsDebtPopoverOpen(true)}
-                  >
-                    {debtLabel}
-                  </button>
-                </>
-              ) : (
-                <span className={styles.summarySuccessText}>Все занятия оплачены</span>
-              )}
-            </div>
+            {hasDebt && (
+              <div className={styles.summaryMobileRow}>
+                <span className={styles.summaryLabel}>Не оплачено:</span>
+                <button
+                  type="button"
+                  className={styles.summaryDebtBadge}
+                  onClick={() => setIsDebtPopoverOpen(true)}
+                >
+                  {debtLabel}
+                </button>
+              </div>
+            )}
             <div className={styles.summaryMobileRow}>
               <span className={styles.summaryLabel}>Следующий урок:</span>
               {nextLessonLabel === 'не запланирован' ? (
