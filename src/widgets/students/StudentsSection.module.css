@@ -1251,19 +1251,16 @@
 .overview-statusCardOk {
   background: var(--color-emerald-100);
   border-color: var(--color-emerald-500);
-  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.18);
 }
 
 .overview-statusCardWarning {
   background: var(--color-orange-100);
   border-color: var(--color-orange-500);
-  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.18);
 }
 
 .overview-statusCardAlert {
   background: var(--color-rose-100);
   border-color: var(--color-rose-500);
-  box-shadow: 0 8px 22px rgba(244, 63, 94, 0.18);
 }
 
 .statLabel {
