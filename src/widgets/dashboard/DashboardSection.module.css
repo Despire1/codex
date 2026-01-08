@@ -137,14 +137,6 @@
   display: block;
 }
 
-.unpaidCardWrapper {
-  width: 100%;
-}
-
-.unpaidTrigger {
-  width: 100%;
-}
-
 .unpaidSummary {
   color: var(--color-slate-500);
   font-size: 14px;

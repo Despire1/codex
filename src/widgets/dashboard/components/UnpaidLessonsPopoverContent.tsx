@@ -1,6 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { FC } from 'react';
+import { pluralizeRu } from '../../../shared/lib/pluralizeRu';
 import styles from './UnpaidLessonsPopoverContent.module.css';
 
 export interface UnpaidStudentGroup {
@@ -33,7 +34,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                 <div className={styles.groupHeader}>
                   <div className={styles.groupName}>{group.studentName}</div>
                   <div className={styles.groupMeta}>
-                    {lessonCount} занятий · {group.total} ₽
+                    {pluralizeRu(lessonCount, { one: 'занятие', few: 'занятия', many: 'занятий' })} · {group.total} ₽
                   </div>
                 </div>
                 <div className={styles.groupLessons}>

@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { FC } from 'react';
 import { Lesson } from '../../../entities/types';
+import { pluralizeRu } from '../../../shared/lib/pluralizeRu';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './AttentionCard.module.css';
 
@@ -43,7 +44,9 @@ export const AttentionCard: FC<AttentionCardProps> = ({
         </button>
       </div>
       <div className={styles.summary}>
-        <div className={styles.summaryMain}>{items.length} прошедших занятий без действий</div>
+        <div className={styles.summaryMain}>
+          {pluralizeRu(items.length, { one: 'занятие', few: 'занятия', many: 'занятий' })} без действий
+        </div>
         <div className={styles.summaryNote}>Не отмечено проведение или оплата</div>
       </div>
       {isOpen && (

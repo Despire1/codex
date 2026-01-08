@@ -8,6 +8,7 @@ import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import styles from './DashboardSection.module.css';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
+import { pluralizeRu } from '../../shared/lib/pluralizeRu';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -217,7 +218,9 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       <div className={`${styles.card} ${styles.todayCard} ${styles.todayArea}`}>
         <div className={styles.cardHeader}>Сегодня</div>
         <div className={styles.todaySummary}>
-          <div className={styles.todayCount}>{todayLessons.length} занятий</div>
+          <div className={styles.todayCount}>
+            {pluralizeRu(todayLessons.length, { one: 'занятие', few: 'занятия', many: 'занятий' })}
+          </div>
           <div className={styles.todayMeta}>
             {todayUpcomingLesson
               ? `Первое — в ${format(parseISO(todayUpcomingLesson.startAt), 'HH:mm')}`
@@ -276,7 +279,9 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
             >
               <div className={styles.cardHeader}>Неоплаченные занятия</div>
               <div className={styles.unpaidSummary}>
-                {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий · {unpaidSummary.total} ₽
+                {pluralizeRu(unpaidSummary.studentCount, { one: 'ученик', few: 'ученика', many: 'учеников' })} ·{' '}
+                {pluralizeRu(unpaidSummary.lessonCount, { one: 'занятие', few: 'занятия', many: 'занятий' })} ·{' '}
+                {unpaidSummary.total} ₽
               </div>
             </button>
           ) : (
@@ -296,7 +301,9 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 >
                   <div className={styles.cardHeader}>Неоплаченные занятия</div>
                   <div className={styles.unpaidSummary}>
-                    {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий · {unpaidSummary.total} ₽
+                    {pluralizeRu(unpaidSummary.studentCount, { one: 'ученик', few: 'ученика', many: 'учеников' })} ·{' '}
+                    {pluralizeRu(unpaidSummary.lessonCount, { one: 'занятие', few: 'занятия', many: 'занятий' })} ·{' '}
+                    {unpaidSummary.total} ₽
                   </div>
                 </button>
               }
