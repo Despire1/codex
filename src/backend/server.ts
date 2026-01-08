@@ -782,12 +782,26 @@ const listPaymentEventsForStudent = async (
   };
 
   if (filter === 'topup') {
-    where.type = { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] };
+    where.AND = [
+      {
+        OR: [
+          { type: { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] } },
+          { type: 'ADJUSTMENT', lessonsDelta: { gt: 0 } },
+        ],
+      },
+    ];
   } else if (filter === 'manual') {
     where.type = 'MANUAL_PAID';
   } else if (filter === 'charges') {
-    where.type = { in: ['AUTO_CHARGE', 'ADJUSTMENT'] };
-    where.lessonsDelta = { lt: 0 };
+    where.AND = [
+      {
+        OR: [
+          { type: 'AUTO_CHARGE' },
+          { type: 'ADJUSTMENT', lessonsDelta: { lt: 0 } },
+          { type: 'MANUAL_PAID', lessonsDelta: { lt: 0 } },
+        ],
+      },
+    ];
   }
 
   if (options?.date) {
@@ -1697,7 +1711,7 @@ const togglePaymentForStudent = async (
   user: User,
   lessonId: number,
   studentId: number,
-  options?: { cancelBehavior?: PaymentCancelBehavior },
+  options?: { cancelBehavior?: PaymentCancelBehavior; writeOffBalance?: boolean },
 ) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
@@ -1780,6 +1794,15 @@ const togglePaymentForStudent = async (
       [link.pricePerLesson, participant.price, lesson.price].find(
         (value) => typeof value === 'number' && value > 0,
       ) ?? 0;
+    const shouldWriteOffBalance = Boolean(options?.writeOffBalance && link.balanceLessons > 0);
+    const balanceDelta = shouldWriteOffBalance ? -1 : 0;
+    const paymentReason = shouldWriteOffBalance ? 'BALANCE_PAYMENT' : null;
+    if (shouldWriteOffBalance) {
+      updatedLink = await prisma.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: link.balanceLessons - 1 },
+      });
+    }
     await prisma.payment.create({
       data: {
         lessonId,
@@ -1792,24 +1815,29 @@ const togglePaymentForStudent = async (
     const existingManualEvent = await prisma.paymentEvent.findFirst({
       where: { studentId, lessonId, type: 'MANUAL_PAID' },
     });
-    if (existingManualEvent && !existingManualEvent.teacherId) {
+    if (existingManualEvent) {
       await prisma.paymentEvent.update({
         where: { id: existingManualEvent.id },
-        data: { teacherId: teacher.chatId },
+        data: {
+          teacherId: existingManualEvent.teacherId ?? teacher.chatId,
+          lessonsDelta: balanceDelta,
+          priceSnapshot: amount,
+          moneyAmount: shouldWriteOffBalance ? null : amount,
+          reason: paymentReason,
+        },
       });
-    }
-    if (!existingManualEvent) {
+    } else {
       await prisma.paymentEvent.create({
         data: {
           studentId,
           teacherId: teacher.chatId,
           lessonId,
           type: 'MANUAL_PAID',
-          lessonsDelta: 0,
+          lessonsDelta: balanceDelta,
           priceSnapshot: amount,
-          moneyAmount: amount,
+          moneyAmount: shouldWriteOffBalance ? null : amount,
           createdBy: 'TEACHER',
-          reason: null,
+          reason: paymentReason,
         },
       });
     }
@@ -1852,11 +1880,19 @@ const togglePaymentForStudent = async (
   return { lesson: normalizedLesson, participant: updatedParticipant, link: updatedLink };
 };
 
-const toggleLessonPaid = async (user: User, lessonId: number, cancelBehavior?: PaymentCancelBehavior) => {
+const toggleLessonPaid = async (
+  user: User,
+  lessonId: number,
+  cancelBehavior?: PaymentCancelBehavior,
+  writeOffBalance?: boolean,
+) => {
   const baseLesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!baseLesson) throw new Error('Урок не найден');
 
-  const { lesson, link } = await togglePaymentForStudent(user, lessonId, baseLesson.studentId, { cancelBehavior });
+  const { lesson, link } = await togglePaymentForStudent(user, lessonId, baseLesson.studentId, {
+    cancelBehavior,
+    writeOffBalance,
+  });
   return { lesson, link };
 };
 
@@ -1865,7 +1901,8 @@ const toggleParticipantPaid = async (
   lessonId: number,
   studentId: number,
   cancelBehavior?: PaymentCancelBehavior,
-) => togglePaymentForStudent(user, lessonId, studentId, { cancelBehavior });
+  writeOffBalance?: boolean,
+) => togglePaymentForStudent(user, lessonId, studentId, { cancelBehavior, writeOffBalance });
 
 const updateLessonStatus = async (user: User, lessonId: number, status: any) => {
   const teacher = await ensureTeacher(user);
@@ -2527,6 +2564,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         requireApiUser(),
         lessonId,
         normalizeCancelBehavior((body as any)?.cancelBehavior),
+        Boolean((body as any)?.writeOffBalance),
       );
       return sendJson(res, 200, { lesson: result.lesson, link: result.link });
     }
@@ -2541,6 +2579,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         lessonId,
         studentId,
         normalizeCancelBehavior((body as any)?.cancelBehavior),
+        Boolean((body as any)?.writeOffBalance),
       );
       return sendJson(res, 200, { participant: result.participant, lesson: result.lesson, link: result.link });
     }
