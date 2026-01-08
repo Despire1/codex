@@ -1,0 +1,11 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.button {
+  min-width: 140px;
+}
