@@ -752,7 +752,7 @@ const adjustBalance = async (
         moneyAmount: null,
         createdAt: resolvedDate,
         createdBy: 'TEACHER',
-        reason: type === 'ADJUSTMENT' ? 'BALANCE_ADJUSTMENT' : null,
+        reason: 'BALANCE_ADJUSTMENT',
         comment,
       },
     });
@@ -791,7 +791,11 @@ const listPaymentEventsForStudent = async (
       },
     ];
   } else if (filter === 'manual') {
-    where.type = 'MANUAL_PAID';
+    where.AND = [
+      {
+        OR: [{ type: 'MANUAL_PAID' }, { reason: 'BALANCE_ADJUSTMENT' }],
+      },
+    ];
   } else if (filter === 'charges') {
     where.AND = [
       {
