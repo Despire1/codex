@@ -43,6 +43,7 @@ interface AppRoutesProps {
     studentListHasMore: boolean;
     studentSearch: string;
     studentFilter: 'all' | 'debt' | 'overdue';
+    lessons: Lesson[];
     selectedStudentId: number | null;
     priceEditState: { id: number | null; value: string };
     studentHomeworks: Homework[];
