@@ -377,13 +377,40 @@ const listStudents = async (
     };
   });
 
+  const debtTotalsByStudent = new Map<number, number | null>();
+  const debtCandidates = pageItems.filter((item) => item.link.balanceLessons < 0);
+  if (debtCandidates.length) {
+    const debtResults = await Promise.all(
+      debtCandidates.map(async (item) => {
+        try {
+          const summary = await resolveStudentDebtSummary(teacher.chatId, item.student.id);
+          return { studentId: item.student.id, total: summary.total > 0 ? summary.total : null };
+        } catch {
+          return { studentId: item.student.id, total: null };
+        }
+      }),
+    );
+
+    debtResults.forEach((result) => {
+      debtTotalsByStudent.set(result.studentId, result.total);
+    });
+  }
+
+  const items = pageItems.map((item) => {
+    if (item.link.balanceLessons >= 0) return item;
+    return {
+      ...item,
+      debtRub: debtTotalsByStudent.get(item.student.id) ?? null,
+    };
+  });
+
   const nextOffset = offset + limit < total ? offset + limit : null;
   const counts = {
     withDebt: links.filter((link) => link.balanceLessons < 0).length,
     overdue: links.filter((link) => (statsByStudent.get(link.studentId)?.overdueHomeworkCount ?? 0) > 0).length,
   };
 
-  return { items: pageItems, total, nextOffset, counts };
+  return { items, total, nextOffset, counts };
 };
 
 const listStudentHomeworks = async (

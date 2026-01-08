@@ -374,7 +374,6 @@
 
 .studentCardHeader {
   display: flex;
-  justify-content: space-between;
   gap: 8px;
   align-items: center;
 }
@@ -382,6 +381,18 @@
 .studentName {
   font-weight: 800;
   font-size: 15px;
+}
+
+.studentTelegram {
+  font-size: 12px;
+  color: var(--color-gray-500);
+}
+
+.studentBadgesRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .badgeRow {
@@ -406,6 +417,12 @@
   border-color: var(--color-rose-200);
 }
 
+.badgeDebt {
+  background: var(--color-orange-50);
+  color: var(--color-orange-800);
+  border-color: var(--color-orange-200);
+}
+
 .badgeWarning {
   background: var(--color-white)7ed;
   color: var(--color-orange-700);
@@ -428,6 +445,18 @@
   background: var(--color-blue-50);
   color: var(--color-blue-700);
   border-color: var(--color-blue-200);
+}
+
+.badgeNextLesson {
+  background: #eef4ff;
+  color: #2f5aff;
+  border-color: #d6e4ff;
+}
+
+.badgeNextLessonToday {
+  background: var(--color-emerald-50);
+  color: var(--color-green-700);
+  border-color: var(--color-green-200);
 }
 
 .inlineChip {
