@@ -5,8 +5,16 @@ declare module '@prisma/client' {
     chatId: bigint;
     username: string | null;
     name: string | null;
+    timezone: string | null;
     defaultLessonDuration: number;
     reminderMinutesBefore: number;
+    lessonReminderEnabled: boolean;
+    lessonReminderMinutes: number;
+    unpaidReminderEnabled: boolean;
+    unpaidReminderFrequency: string;
+    unpaidReminderTime: string;
+    studentNotificationsEnabled: boolean;
+    studentPaymentRemindersEnabled: boolean;
     payments: Payment[];
     createdAt: Date;
   };

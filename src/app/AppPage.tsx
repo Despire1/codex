@@ -35,8 +35,16 @@ const initialTeacher: Teacher = {
   chatId: 111222333,
   name: 'Елена',
   username: 'teacher_fox',
+  timezone: null,
   defaultLessonDuration: 60,
   reminderMinutesBefore: 30,
+  lessonReminderEnabled: true,
+  lessonReminderMinutes: 30,
+  unpaidReminderEnabled: false,
+  unpaidReminderFrequency: 'daily',
+  unpaidReminderTime: '10:00',
+  studentNotificationsEnabled: true,
+  studentPaymentRemindersEnabled: true,
 };
 
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
@@ -560,7 +568,12 @@ export const AppPage = () => {
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
-  const activeTab = useMemo<TabId>(() => tabIdByPath[location.pathname] ?? 'dashboard', [location.pathname]);
+  const activeTab = useMemo<TabId>(() => {
+    const directMatch = tabIdByPath[location.pathname];
+    if (directMatch) return directMatch;
+    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
+    return matchedTab?.id ?? 'dashboard';
+  }, [location.pathname]);
 
   const resolveLastVisitedPath = useCallback(() => {
     const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;

@@ -11,8 +11,16 @@ model Teacher {
   chatId                BigInt          @id
   username              String?
   name                  String?
+  timezone              String?
   defaultLessonDuration Int             @default(60)
   reminderMinutesBefore Int             @default(30)
+  lessonReminderEnabled Boolean         @default(true)
+  lessonReminderMinutes Int             @default(30)
+  unpaidReminderEnabled Boolean         @default(false)
+  unpaidReminderFrequency String        @default("daily")
+  unpaidReminderTime    String          @default("10:00")
+  studentNotificationsEnabled Boolean   @default(true)
+  studentPaymentRemindersEnabled Boolean @default(true)
   students              TeacherStudent[]
   homeworks             Homework[]
   lessons               Lesson[]
