@@ -752,7 +752,7 @@ const adjustBalance = async (
         moneyAmount: null,
         createdAt: resolvedDate,
         createdBy: 'TEACHER',
-        reason: type === 'ADJUSTMENT' ? 'BALANCE_ADJUSTMENT' : null,
+        reason: 'BALANCE_ADJUSTMENT',
         comment,
       },
     });
@@ -791,7 +791,11 @@ const listPaymentEventsForStudent = async (
       },
     ];
   } else if (filter === 'manual') {
-    where.type = 'MANUAL_PAID';
+    where.AND = [
+      {
+        OR: [{ type: 'MANUAL_PAID' }, { reason: 'BALANCE_ADJUSTMENT' }],
+      },
+    ];
   } else if (filter === 'charges') {
     where.AND = [
       {
@@ -1754,36 +1758,19 @@ const togglePaymentForStudent = async (
         data: { balanceLessons: link.balanceLessons + 1 },
       });
     }
-    const existingAdjustment = await prisma.paymentEvent.findFirst({
-      where: { studentId, lessonId, type: 'ADJUSTMENT' },
+    await prisma.paymentEvent.create({
+      data: {
+        studentId,
+        teacherId: teacher.chatId,
+        lessonId,
+        type: 'ADJUSTMENT',
+        lessonsDelta: deltaChange,
+        priceSnapshot,
+        moneyAmount: null,
+        createdBy: 'TEACHER',
+        reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+      },
     });
-    if (existingAdjustment) {
-      await prisma.paymentEvent.update({
-        where: { id: existingAdjustment.id },
-        data: {
-          lessonsDelta: deltaChange,
-          priceSnapshot,
-          moneyAmount: null,
-          createdBy: 'TEACHER',
-          reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
-          teacherId: teacher.chatId,
-        },
-      });
-    } else {
-      await prisma.paymentEvent.create({
-        data: {
-          studentId,
-          teacherId: teacher.chatId,
-          lessonId,
-          type: 'ADJUSTMENT',
-          lessonsDelta: deltaChange,
-          priceSnapshot,
-          moneyAmount: null,
-          createdBy: 'TEACHER',
-          reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
-        },
-      });
-    }
 
     await prisma.lessonParticipant.update({
       where: { lessonId_studentId: { lessonId, studentId } },
@@ -1812,35 +1799,19 @@ const togglePaymentForStudent = async (
         comment: null,
       },
     });
-    const existingManualEvent = await prisma.paymentEvent.findFirst({
-      where: { studentId, lessonId, type: 'MANUAL_PAID' },
+    await prisma.paymentEvent.create({
+      data: {
+        studentId,
+        teacherId: teacher.chatId,
+        lessonId,
+        type: 'MANUAL_PAID',
+        lessonsDelta: balanceDelta,
+        priceSnapshot: amount,
+        moneyAmount: shouldWriteOffBalance ? null : amount,
+        createdBy: 'TEACHER',
+        reason: paymentReason,
+      },
     });
-    if (existingManualEvent) {
-      await prisma.paymentEvent.update({
-        where: { id: existingManualEvent.id },
-        data: {
-          teacherId: existingManualEvent.teacherId ?? teacher.chatId,
-          lessonsDelta: balanceDelta,
-          priceSnapshot: amount,
-          moneyAmount: shouldWriteOffBalance ? null : amount,
-          reason: paymentReason,
-        },
-      });
-    } else {
-      await prisma.paymentEvent.create({
-        data: {
-          studentId,
-          teacherId: teacher.chatId,
-          lessonId,
-          type: 'MANUAL_PAID',
-          lessonsDelta: balanceDelta,
-          priceSnapshot: amount,
-          moneyAmount: shouldWriteOffBalance ? null : amount,
-          createdBy: 'TEACHER',
-          reason: paymentReason,
-        },
-      });
-    }
 
     if (link.balanceLessons < 0) {
       updatedLink = await prisma.teacherStudent.update({

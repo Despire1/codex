@@ -133,7 +133,6 @@ model PaymentEvent {
   @@index([teacherId])
   @@index([lessonId])
   @@index([createdAt])
-  @@unique([studentId, lessonId, type])
 }
 
 model LessonParticipant {
