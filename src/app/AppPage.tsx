@@ -1267,6 +1267,27 @@ export const AppPage = () => {
     }
   };
 
+  const resolvePaymentTarget = useCallback(
+    (lessonId: number, studentId?: number) => {
+      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
+      const resolvedStudentId = studentId ?? targetLesson?.studentId;
+      const link = resolvedStudentId ? links.find((item) => item.studentId === resolvedStudentId) : undefined;
+      return { studentId: resolvedStudentId, link };
+    },
+    [lessons, links],
+  );
+
+  const markPaidWithBalance = useCallback(
+    async (lessonId: number, studentId: number | undefined, writeOffBalance: boolean) => {
+      await applyTogglePaid(lessonId, studentId);
+      if (!writeOffBalance) return;
+      const { studentId: resolvedStudentId } = resolvePaymentTarget(lessonId, studentId);
+      if (!resolvedStudentId) return;
+      await adjustBalance(resolvedStudentId, -1);
+    },
+    [adjustBalance, applyTogglePaid, resolvePaymentTarget],
+  );
+
   const togglePaid = async (lessonId: number, studentId?: number) => {
     const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
     const isCurrentlyPaid =
@@ -1292,7 +1313,28 @@ export const AppPage = () => {
       return;
     }
 
-    await applyTogglePaid(lessonId, studentId);
+    const { link } = resolvePaymentTarget(lessonId, studentId);
+    const hasBalance = (link?.balanceLessons ?? 0) > 0;
+
+    if (hasBalance) {
+      setDialogState({
+        type: 'payment-balance',
+        title: 'Отметить оплату',
+        message: 'У ученика есть занятия на балансе. Списать 1 занятие с баланса?',
+        onWriteOff: () => {
+          closeDialog();
+          void markPaidWithBalance(lessonId, studentId, true);
+        },
+        onSkip: () => {
+          closeDialog();
+          void markPaidWithBalance(lessonId, studentId, false);
+        },
+        onCancel: closeDialog,
+      });
+      return;
+    }
+
+    await markPaidWithBalance(lessonId, studentId, false);
   };
 
   const openCreateLessonForStudent = (studentId?: number) => {
