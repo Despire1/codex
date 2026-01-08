@@ -1,4 +1,4 @@
-import { addMinutes, format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, addMinutes, endOfDay, format, isSameDay, isToday, isTomorrow, parseISO } from 'date-fns';
 import { type FC, useEffect, useMemo, useState } from 'react';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
@@ -24,7 +24,6 @@ const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
   if (lesson.participants && lesson.participants.length > 1) {
     const names = lesson.participants
       .map((participant) =>
-        participant.student?.username ||
         linkedStudents.find((student) => student.id === participant.studentId)?.link.customName,
       )
       .filter(Boolean);
@@ -32,6 +31,9 @@ const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
   }
   return linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик';
 };
+
+const getLinkedStudentName = (studentId: number, linkedStudents: LinkedStudent[]) =>
+  linkedStudents.find((student) => student.id === studentId)?.link.customName || 'Ученик';
 
 export const DashboardSection: FC<DashboardSectionProps> = ({
   lessons,
@@ -81,10 +83,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         return lesson.participants
           .filter((participant) => lesson.status !== 'COMPLETED' || !participant.isPaid)
           .map((participant) => {
-            const studentName =
-              participant.student?.username ||
-              linkedStudents.find((student) => student.id === participant.studentId)?.link.customName ||
-              'Ученик';
+            const studentName = getLinkedStudentName(participant.studentId, linkedStudents);
             return {
               id: `${lesson.id}-${participant.studentId}`,
               lesson,
@@ -103,8 +102,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           id: `${lesson.id}`,
           lesson,
           studentId: lesson.studentId,
-          studentName:
-            linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик',
+          studentName: getLinkedStudentName(lesson.studentId, linkedStudents),
           needsCompletion: lesson.status !== 'COMPLETED',
           needsPayment: !lesson.isPaid,
         },
@@ -128,7 +126,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       .filter((lesson) => {
         if (lesson.status !== 'SCHEDULED') return false;
         const date = parseISO(lesson.startAt);
-        return date.getTime() >= now.getTime() && (isToday(date) || isTomorrow(date));
+        const windowEnd = endOfDay(addDays(now, 2));
+        return date.getTime() >= now.getTime() && date.getTime() <= windowEnd.getTime();
       })
       .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
   }, [lessons, now]);
@@ -144,10 +143,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           .map((participant) => ({
             lesson,
             studentId: participant.studentId,
-            studentName:
-              participant.student?.username ||
-              linkedStudents.find((student) => student.id === participant.studentId)?.link.customName ||
-              'Ученик',
+            studentName: getLinkedStudentName(participant.studentId, linkedStudents),
             price: participant.price,
           }));
       }
@@ -156,7 +152,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         {
           lesson,
           studentId: lesson.studentId,
-          studentName: linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик',
+          studentName: getLinkedStudentName(lesson.studentId, linkedStudents),
           price: typeof lesson.price === 'number' ? lesson.price : 0,
         },
       ];
@@ -237,7 +233,13 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           <div className={styles.lessonList}>
             {upcomingLessonCards.map((lesson) => {
               const date = parseISO(lesson.startAt);
-              const label = isToday(date) ? 'Сегодня' : 'Завтра';
+              const label = isToday(date)
+                ? 'Сегодня'
+                : isTomorrow(date)
+                  ? 'Завтра'
+                  : isSameDay(date, addDays(now, 2))
+                    ? 'Послезавтра'
+                    : 'Скоро';
               return (
                 <button
                   key={lesson.id}
@@ -283,17 +285,19 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
               side="bottom"
               className={styles.unpaidPopover}
               trigger={
-                <button
-                  type="button"
-                  className={`${styles.card} ${styles.unpaidCard}`}
-                  onClick={() => setIsUnpaidOpen((prev) => !prev)}
-                >
-                  <div className={styles.cardHeader}>Неоплаченные занятия</div>
-                  <div className={styles.unpaidSummary}>
-                    {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий · {unpaidSummary.total}{' '}
-                    ₽
-                  </div>
-                </button>
+                <div className={styles.unpaidTrigger}>
+                  <button
+                    type="button"
+                    className={`${styles.card} ${styles.unpaidCard}`}
+                    onClick={() => setIsUnpaidOpen((prev) => !prev)}
+                  >
+                    <div className={styles.cardHeader}>Неоплаченные занятия</div>
+                    <div className={styles.unpaidSummary}>
+                      {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий ·{' '}
+                      {unpaidSummary.total} ₽
+                    </div>
+                  </button>
+                </div>
               }
             >
               <UnpaidLessonsPopoverContent
