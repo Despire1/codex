@@ -7,6 +7,7 @@ import controls from '../../shared/styles/controls.module.css';
 import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
 import { LessonModal } from '../../features/modals/LessonModal/LessonModal';
 import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
+import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
 
 export type DialogState =
   | {
@@ -38,6 +39,14 @@ export type DialogState =
       message: string;
       onRefund: () => void;
       onWriteOff: () => void;
+      onCancel: () => void;
+    }
+  | {
+      type: 'payment-balance';
+      title: string;
+      message: string;
+      onWriteOff: () => void;
+      onSkip: () => void;
       onCancel: () => void;
     }
   | null;
@@ -121,7 +130,10 @@ export const AppModals: FC<AppModalsProps> = ({
         onSubmit={onSubmitLesson}
       />
 
-      {dialogState && dialogState.type !== 'recurring-delete' && dialogState.type !== 'payment-cancel' && (
+      {dialogState &&
+        dialogState.type !== 'recurring-delete' &&
+        dialogState.type !== 'payment-cancel' &&
+        dialogState.type !== 'payment-balance' && (
         <DialogModal
           open
           title={dialogState.title}
@@ -183,6 +195,16 @@ export const AppModals: FC<AppModalsProps> = ({
           onClose={dialogState.onCancel}
           onRefund={dialogState.onRefund}
           onWriteOff={dialogState.onWriteOff}
+        />
+      )}
+      {dialogState?.type === 'payment-balance' && (
+        <PaymentBalanceModal
+          open
+          title={dialogState.title}
+          message={dialogState.message}
+          onClose={dialogState.onCancel}
+          onWriteOff={dialogState.onWriteOff}
+          onSkip={dialogState.onSkip}
         />
       )}
     </>
