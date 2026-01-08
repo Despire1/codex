@@ -127,3 +127,11 @@ a {
 button {
   font: inherit;
 }
+
+body.telegram-webapp button,
+body.telegram-webapp input,
+body.telegram-webapp textarea,
+body.telegram-webapp select {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text);
+}
