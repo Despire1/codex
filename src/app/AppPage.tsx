@@ -1156,6 +1156,10 @@ export const AppPage = () => {
       await loadStudentLessons();
       await loadStudentLessonsSummary();
     } catch (error) {
+      showToast({
+        message: 'Не удалось отметить занятие проведённым',
+        variant: 'error',
+      });
       // eslint-disable-next-line no-console
       console.error('Failed to complete lesson', error);
     }
@@ -1568,8 +1572,13 @@ export const AppPage = () => {
                 openLessonModal(todayISO(), format(new Date(), 'HH:mm'));
               },
               onOpenSchedule: () => navigate(tabPathById.schedule),
-              onOpenStudents: () => navigate(tabPathById.students),
               onOpenLesson: (lesson) => openLessonModal(lesson.startAt.slice(0, 10), undefined, lesson),
+              onCompleteLesson: markLessonCompleted,
+              onTogglePaid: togglePaid,
+              onOpenStudent: (studentId) => {
+                setSelectedStudentId(studentId);
+                navigate(tabPathById.students);
+              },
             }}
             students={{
               studentListItems,
