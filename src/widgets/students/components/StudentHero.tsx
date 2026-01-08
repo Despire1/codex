@@ -289,7 +289,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
               </button>
               <button
                 type="button"
-                className={`${controls.iconButton} ${styles.actionDanger}`}
+                className={controls.iconButton}
                 aria-label="Удалить ученика"
                 onClick={() => onRequestDeleteStudent(selectedStudent.id)}
               >
