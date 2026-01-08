@@ -6,6 +6,7 @@ import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
 import type { User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
+import { normalizeLessonColor } from '../shared/lib/lessonColors';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -1119,6 +1120,7 @@ const createLesson = async (user: User, body: any) => {
   const { startAt } = body ?? {};
   if (!startAt) throw new Error('Заполните дату и время урока');
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
+  const lessonColor = normalizeLessonColor(body?.color);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1131,6 +1133,7 @@ const createLesson = async (user: User, body: any) => {
       teacherId: teacher.chatId,
       studentId: studentIds[0],
       price: 0,
+      color: lessonColor,
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
@@ -1233,6 +1236,7 @@ const createRecurringLessons = async (user: User, body: any) => {
   const seriesStart = startDate > now ? startDate : now;
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
+  const lessonColor = normalizeLessonColor(body?.color);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1295,6 +1299,7 @@ const createRecurringLessons = async (user: User, body: any) => {
         teacherId: teacher.chatId,
         studentId: studentIds[0],
         price: 0,
+        color: lessonColor,
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -1371,7 +1376,16 @@ const createRecurringLessons = async (user: User, body: any) => {
 };
 
 const updateLesson = async (user: User, lessonId: number, body: any) => {
-  const { studentId, studentIds, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
+  const {
+    studentId,
+    studentIds,
+    startAt,
+    durationMinutes,
+    applyToSeries,
+    detachFromSeries,
+    repeatWeekdays,
+    repeatUntil,
+  } = body ?? {};
   const teacher = await ensureTeacher(user);
   const now = new Date();
   const existing = await prisma.lesson.findUnique({
@@ -1410,6 +1424,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
 
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   const existingLesson = existing as any;
+  const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
 
@@ -1423,6 +1438,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       data: {
         studentId: ids[0],
         price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
+        color: normalizedColor,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -1480,6 +1496,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               teacherId: teacher.chatId,
               studentId: ids[0],
               price: 0,
+              color: normalizedColor,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -1558,6 +1575,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               teacherId: teacher.chatId,
               studentId: ids[0],
               price: 0,
+              color: normalizedColor,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -1604,6 +1622,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     data: {
       studentId: ids[0],
       price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
+      color: normalizedColor,
       startAt: targetStart,
       durationMinutes: nextDuration,
       participants: {

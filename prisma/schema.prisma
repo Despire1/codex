@@ -77,6 +77,7 @@ model Lesson {
   teacherId           BigInt
   studentId           Int
   price               Int                 @default(0)
+  color               String              @default("blue")
   startAt             DateTime
   durationMinutes     Int
   status              String              @default("SCHEDULED") // values: SCHEDULED, COMPLETED, CANCELED

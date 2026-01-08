@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { LinkedStudent } from '../../entities/types';
+import { LessonColor, LinkedStudent } from '../../entities/types';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { Modal } from '../../shared/ui/Modal/Modal';
 import modalStyles from '../../shared/ui/Modal/Modal.module.css';
@@ -48,6 +48,7 @@ type LessonDraft = {
   date: string;
   time: string;
   durationMinutes: number;
+  color: LessonColor;
   isRecurring: boolean;
   repeatWeekdays: number[];
   repeatUntil?: string;

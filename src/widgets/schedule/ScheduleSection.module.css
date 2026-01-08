@@ -409,19 +409,19 @@
   gap: 8px;
   padding: 10px 10px 10px 12px;
   border-radius: 10px;
-  background: var(--color-sky-100);
+  background: var(--lesson-bg, var(--color-sky-100));
   color: var(--color-slate-900);
-  border: 1px solid var(--color-sky-200);
+  border: 1px solid var(--lesson-border, var(--color-sky-200));
   cursor: pointer;
   transition: all 0.12s ease;
   position: relative;
 }
 
 .monthLesson:hover {
-  background: var(--color-blue-600);
-  color: var(--color-white);
-  border-color: var(--color-blue-600);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
+  background: var(--lesson-hover-bg, var(--color-blue-600));
+  color: var(--lesson-hover-text, var(--color-white));
+  border-color: var(--lesson-hover-border, var(--color-blue-600));
+  box-shadow: 0 6px 18px var(--lesson-hover-shadow, rgba(37, 99, 235, 0.24));
 }
 
 .monthLessonInfo {
@@ -746,10 +746,10 @@
   right: 8px;
   border-radius: 12px;
   padding: 10px 12px;
-  background: var(--color-sky-100);
-  border: 1px solid var(--color-blue-600);
+  background: var(--lesson-bg, var(--color-sky-100));
+  border: 1px solid var(--lesson-border, var(--color-blue-600));
   color: var(--color-slate-900);
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 8px 20px var(--lesson-shadow, rgba(14, 165, 233, 0.15));
   overflow: hidden;
   cursor: pointer;
   display: flex;

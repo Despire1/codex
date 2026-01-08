@@ -2,6 +2,9 @@ import { type FC, useMemo } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import {
   Autocomplete,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Checkbox,
   FormControlLabel,
@@ -10,9 +13,12 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import controls from '../../../shared/styles/controls.module.css';
 import modalStyles from '../modal.module.css';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
+import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
+import { LessonColor } from '../../../entities/types';
 
 interface LessonDraft {
   studentId: number | undefined;
@@ -20,6 +26,7 @@ interface LessonDraft {
   date: string;
   time: string;
   durationMinutes: number;
+  color: LessonColor;
   isRecurring: boolean;
   repeatWeekdays: number[];
   repeatUntil: string | undefined;
@@ -63,6 +70,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   if (!open) return null;
 
   const isEditing = Boolean(editingLessonId);
+  const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
   const startAt = useMemo(
     () => new Date(`${draft.date || ''}T${draft.time || '00:00'}`),
     [draft.date, draft.time],
@@ -112,6 +120,15 @@ export const LessonModal: FC<LessonModalProps> = ({
     },
     '& .MuiInputLabel-root.Mui-focused': {
       color: 'var(--muted)',
+    },
+  } as const;
+
+  const accordionSx = {
+    borderRadius: '12px',
+    border: '1px solid var(--border)',
+    boxShadow: 'none',
+    '&::before': {
+      display: 'none',
     },
   } as const;
 
@@ -257,6 +274,42 @@ export const LessonModal: FC<LessonModalProps> = ({
               )}
             </Box>
           )}
+          <Accordion sx={accordionSx} className={modalStyles.settingsAccordion}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} className={modalStyles.settingsSummary}>
+              <span className={modalStyles.settingsTitle}>Дополнительные настройки</span>
+            </AccordionSummary>
+            <AccordionDetails className={modalStyles.settingsDetails}>
+              <div className={modalStyles.field}>
+                <span className={modalStyles.fieldLabel}>Цвет занятия</span>
+                <div className={modalStyles.colorPicker} role="radiogroup" aria-label="Цвет занятия">
+                  {LESSON_COLOR_OPTIONS.map((option) => {
+                    const isActive = option.id === selectedColor;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        className={`${modalStyles.colorOption} ${isActive ? modalStyles.colorOptionActive : ''}`}
+                        onClick={() => onDraftChange({ ...draft, color: option.id })}
+                      >
+                        <span
+                          className={modalStyles.colorSwatch}
+                          style={{ background: option.background, borderColor: option.border }}
+                        >
+                          <span
+                            className={modalStyles.colorSwatchDot}
+                            style={{ background: option.hoverBackground }}
+                          />
+                        </span>
+                        <span className={modalStyles.colorLabel}>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </AccordionDetails>
+          </Accordion>
         </div>
         <div className={modalStyles.modalActions}>
           {isEditing && onDelete && (
