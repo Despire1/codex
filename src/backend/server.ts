@@ -1229,6 +1229,8 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const startDate = new Date(startAt);
   if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата начала');
+  const now = new Date();
+  const seriesStart = startDate > now ? startDate : now;
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
 
@@ -1239,7 +1241,7 @@ const createRecurringLessons = async (user: User, body: any) => {
   const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
 
-  const maxEndDate = addYears(startDate, 1);
+  const maxEndDate = addYears(seriesStart, 1);
   const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
   const endDate =
     requestedEndDate && !Number.isNaN(requestedEndDate.getTime())
@@ -1248,17 +1250,19 @@ const createRecurringLessons = async (user: User, body: any) => {
         : requestedEndDate
       : maxEndDate;
 
-  if (endDate < startDate) {
+  if (endDate < seriesStart) {
     throw new Error('Дата окончания повтора должна быть не раньше даты начала');
   }
   const occurrences: Date[] = [];
 
-  for (let cursor = new Date(startDate); cursor <= endDate; cursor = addDays(cursor, 1)) {
+  for (let cursor = new Date(seriesStart); cursor <= endDate; cursor = addDays(cursor, 1)) {
     if (weekdays.includes(cursor.getUTCDay())) {
       const withTime = new Date(
         Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), startDate.getUTCHours(), startDate.getUTCMinutes()),
       );
-      occurrences.push(withTime);
+      if (withTime > now) {
+        occurrences.push(withTime);
+      }
     }
     if (occurrences.length > 500) break;
   }
@@ -1269,7 +1273,7 @@ const createRecurringLessons = async (user: User, body: any) => {
     where: {
       teacherId: teacher.chatId,
       startAt: {
-        gte: startDate,
+        gte: seriesStart,
         lte: endDate,
       },
     },
@@ -1369,6 +1373,7 @@ const createRecurringLessons = async (user: User, body: any) => {
 const updateLesson = async (user: User, lessonId: number, body: any) => {
   const { studentId, studentIds, startAt, durationMinutes, applyToSeries, detachFromSeries, repeatWeekdays, repeatUntil } = body ?? {};
   const teacher = await ensureTeacher(user);
+  const now = new Date();
   const existing = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { participants: true },
@@ -1445,7 +1450,8 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   if (!existingLesson.isRecurring && weekdays.length > 0 && repeatWeekdays) {
     if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
 
-    const maxEnd = addYears(targetStart, 1);
+    const seriesStart = targetStart > now ? targetStart : now;
+    const maxEnd = addYears(seriesStart, 1);
     const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
     const recurrenceEnd =
       requestedEnd && !Number.isNaN(requestedEnd.getTime())
@@ -1454,7 +1460,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
           : requestedEnd
         : maxEnd;
 
-    if (recurrenceEnd < targetStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+    if (recurrenceEnd < seriesStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
 
     await (prisma.lesson as any).delete({ where: { id: lessonId } });
 
@@ -1462,42 +1468,44 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     const seriesLessons: any[] = [];
     const weekdaysPayload = JSON.stringify(weekdays);
 
-    for (let cursor = new Date(targetStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
+    for (let cursor = new Date(seriesStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
       if (weekdays.includes(cursor.getUTCDay())) {
         const start = new Date(
           Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
         );
 
-        const created = await prisma.lesson.create({
-          data: {
-            teacherId: teacher.chatId,
-            studentId: ids[0],
-            price: 0,
-            startAt: start,
-            durationMinutes: nextDuration,
-            status: 'SCHEDULED',
-            isPaid: false,
-            isRecurring: true,
-            recurrenceUntil: recurrenceEnd,
-            recurrenceGroupId,
-            recurrenceWeekdays: weekdaysPayload,
-            participants: {
-              create: students.map((student) => ({
-                studentId: student.id,
-                price: 0,
-                isPaid: false,
-              })),
-            },
-          },
-          include: {
-            participants: {
-              include: {
-                student: true,
+        if (start > now) {
+          const created = await prisma.lesson.create({
+            data: {
+              teacherId: teacher.chatId,
+              studentId: ids[0],
+              price: 0,
+              startAt: start,
+              durationMinutes: nextDuration,
+              status: 'SCHEDULED',
+              isPaid: false,
+              isRecurring: true,
+              recurrenceUntil: recurrenceEnd,
+              recurrenceGroupId,
+              recurrenceWeekdays: weekdaysPayload,
+              participants: {
+                create: students.map((student) => ({
+                  studentId: student.id,
+                  price: 0,
+                  isPaid: false,
+                })),
               },
             },
-          },
-        });
-        seriesLessons.push(created);
+            include: {
+              participants: {
+                include: {
+                  student: true,
+                },
+              },
+            },
+          });
+          seriesLessons.push(created);
+        }
       }
       if (seriesLessons.length > 500) break;
     }
@@ -1513,7 +1521,8 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
     if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
 
-    const maxEnd = addYears(targetStart, 1);
+    const seriesStart = now;
+    const maxEnd = addYears(seriesStart, 1);
     const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
     const recurrenceEnd =
       requestedEnd && !Number.isNaN(requestedEnd.getTime())
@@ -1522,56 +1531,59 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
           : requestedEnd
         : maxEnd;
 
-    if (recurrenceEnd < targetStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+    if (recurrenceEnd < seriesStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
 
-    const existingIds = (
-      await prisma.lesson.findMany({
-        where: { recurrenceGroupId: existingLesson.recurrenceGroupId, teacherId: teacher.chatId, status: 'SCHEDULED' },
-      })
-    ).map((lesson) => lesson.id);
-
-    if (existingIds.length) {
-      await (prisma.lesson as any).deleteMany({ where: { id: { in: existingIds } } });
-    }
+    await (prisma.lesson as any).deleteMany({
+      where: {
+        recurrenceGroupId: existingLesson.recurrenceGroupId,
+        teacherId: teacher.chatId,
+        status: 'SCHEDULED',
+        startAt: {
+          gte: seriesStart,
+        },
+      },
+    });
 
     const seriesLessons: any[] = [];
     const weekdaysPayload = JSON.stringify(weekdays);
-    for (let cursor = new Date(targetStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
+    for (let cursor = new Date(seriesStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
       if (weekdays.includes(cursor.getUTCDay())) {
         const start = new Date(
           Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
         );
 
-        const created = await prisma.lesson.create({
-          data: {
-            teacherId: teacher.chatId,
-            studentId: ids[0],
-            price: 0,
-            startAt: start,
-            durationMinutes: nextDuration,
-            status: 'SCHEDULED',
-            isPaid: false,
-            isRecurring: true,
-            recurrenceUntil: recurrenceEnd,
-            recurrenceGroupId: existingLesson.recurrenceGroupId,
-            recurrenceWeekdays: weekdaysPayload,
-            participants: {
-              create: students.map((student) => ({
-                studentId: student.id,
-                price: 0,
-                isPaid: false,
-              })),
-            },
-          },
-          include: {
-            participants: {
-              include: {
-                student: true,
+        if (start > now) {
+          const created = await prisma.lesson.create({
+            data: {
+              teacherId: teacher.chatId,
+              studentId: ids[0],
+              price: 0,
+              startAt: start,
+              durationMinutes: nextDuration,
+              status: 'SCHEDULED',
+              isPaid: false,
+              isRecurring: true,
+              recurrenceUntil: recurrenceEnd,
+              recurrenceGroupId: existingLesson.recurrenceGroupId,
+              recurrenceWeekdays: weekdaysPayload,
+              participants: {
+                create: students.map((student) => ({
+                  studentId: student.id,
+                  price: 0,
+                  isPaid: false,
+                })),
               },
             },
-          },
-        });
-        seriesLessons.push(created);
+            include: {
+              participants: {
+                include: {
+                  student: true,
+                },
+              },
+            },
+          });
+          seriesLessons.push(created);
+        }
       }
       if (seriesLessons.length > 500) break;
     }
