@@ -73,15 +73,17 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
   }, [lessons]);
 
   const formatNextLessonLabel = (lessonDate?: Date) => {
-    if (!lessonDate) return 'Нет занятий';
+    if (!lessonDate) {
+      return { label: 'Нет занятий', variant: 'empty' as const };
+    }
     const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
     if (isToday(lessonDate)) {
-      return `Сегодня, ${timeLabel}`;
+      return { label: `Сегодня, ${timeLabel}`, variant: 'today' as const };
     }
     if (isTomorrow(lessonDate)) {
-      return `Завтра, ${timeLabel}`;
+      return { label: `Завтра, ${timeLabel}`, variant: 'future' as const };
     }
-    return format(lessonDate, 'd MMM, HH:mm', { locale: ru });
+    return { label: format(lessonDate, 'd MMM, HH:mm', { locale: ru }), variant: 'future' as const };
   };
 
   return (
@@ -167,14 +169,15 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
             </div>
           ) : (
             studentListItems.map((item) => {
-              const nextLessonLabel = formatNextLessonLabel(nextLessonByStudent.get(item.student.id));
+              const nextLessonInfo = formatNextLessonLabel(nextLessonByStudent.get(item.student.id));
 
               return (
                 <StudentListCard
                   key={item.student.id}
                   item={item}
                   isActive={selectedStudentId === item.student.id}
-                  nextLessonLabel={nextLessonLabel}
+                  nextLessonLabel={nextLessonInfo.label}
+                  nextLessonVariant={nextLessonInfo.variant}
                   onSelect={onSelectStudent}
                 />
               );
