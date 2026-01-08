@@ -44,6 +44,8 @@ const DEFAULT_SCROLL_HOUR = 9;
 const DEFAULT_SCROLL_TOP = DEFAULT_SCROLL_HOUR * HOUR_BLOCK_HEIGHT;
 const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
+const WEEK_LESSON_INSET = 8;
+const DAY_LESSON_INSET = 12;
 
 interface ScheduleSectionProps {
   scheduleView: 'day' | 'week' | 'month';
@@ -275,6 +277,87 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return { top, height };
   };
 
+  const buildLessonLayout = (dayLessons: Lesson[]) => {
+    const sorted = dayLessons
+      .map((lesson) => {
+        const start = parseISO(lesson.startAt);
+        const startMinutes = start.getHours() * 60 + start.getMinutes();
+        const endMinutes = startMinutes + lesson.durationMinutes;
+        const position = lessonPosition(lesson);
+        return { lesson, startMinutes, endMinutes, position };
+      })
+      .sort((a, b) => a.startMinutes - b.startMinutes);
+
+    const clusters: Array<typeof sorted> = [];
+    let currentCluster: typeof sorted = [];
+    let clusterEnd = -Infinity;
+
+    sorted.forEach((entry) => {
+      if (currentCluster.length === 0 || entry.startMinutes < clusterEnd) {
+        currentCluster.push(entry);
+        clusterEnd = Math.max(clusterEnd, entry.endMinutes);
+      } else {
+        clusters.push(currentCluster);
+        currentCluster = [entry];
+        clusterEnd = entry.endMinutes;
+      }
+    });
+
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    const layouts: Array<{
+      lesson: Lesson;
+      top: number;
+      height: number;
+      column: number;
+      columns: number;
+    }> = [];
+
+    clusters.forEach((cluster) => {
+      const columnEnds: number[] = [];
+      const clusterLayouts = cluster.map((entry) => {
+        const columnIndex = columnEnds.findIndex((end) => entry.startMinutes >= end);
+        const resolvedColumn = columnIndex === -1 ? columnEnds.length : columnIndex;
+
+        if (columnIndex === -1) {
+          columnEnds.push(entry.endMinutes);
+        } else {
+          columnEnds[columnIndex] = entry.endMinutes;
+        }
+
+        return {
+          lesson: entry.lesson,
+          top: entry.position.top,
+          height: entry.position.height,
+          column: resolvedColumn,
+        };
+      });
+
+      const columnsCount = columnEnds.length;
+      clusterLayouts.forEach((layout) => {
+        layouts.push({ ...layout, columns: columnsCount });
+      });
+    });
+
+    return layouts;
+  };
+
+  const buildLessonStyle = (
+    layout: { top: number; height: number; column: number; columns: number },
+    inset: number,
+  ): CSSProperties => {
+    const widthPercent = 100 / layout.columns;
+    return {
+      top: layout.top,
+      height: layout.height,
+      left: `calc(${layout.column * widthPercent}% + ${inset}px)`,
+      width: `calc(${widthPercent}% - ${inset * 2}px)`,
+      right: 'auto',
+    };
+  };
+
   const formatMinutesToTime = (minutes: number) => {
     const hoursValue = Math.floor(minutes / 60)
       .toString()
@@ -426,6 +509,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               const dayLessons = lessons
                 .filter((lesson) => lesson.startAt.slice(0, 10) === day.iso)
                 .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+              const dayLessonLayouts = buildLessonLayout(dayLessons);
 
               return (
                 <div
@@ -440,8 +524,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onMouseMove={(event) => handleTimeHover(event, day.iso)}
                   >
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
-                    {dayLessons.map((lesson) => {
-                      const position = lessonPosition(lesson);
+                    {dayLessonLayouts.map((layout) => {
+                      const lesson = layout.lesson;
                       const startDate = parseISO(lesson.startAt);
                       const participants = buildParticipants(lesson);
                       const isGroupLesson = participants.length > 1;
@@ -457,7 +541,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         <div
                           key={lesson.id}
                           className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
-                          style={{ top: position.top, height: position.height }}
+                          style={buildLessonStyle(layout, WEEK_LESSON_INSET)}
                           onClick={() => onStartEditLesson(lesson)}
                           onMouseEnter={() => setHoverIndicator(null)}
                         >
@@ -492,6 +576,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           .slice()
           .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime())
       : [];
+    const selectedLessonLayouts = buildLessonLayout(selectedLessons);
     const selectedDayIso = format(selectedDate, 'yyyy-MM-dd');
 
     return (
@@ -513,8 +598,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === selectedDayIso && renderHoverIndicator(hoverIndicator.minutes)}
-              {selectedLessons.map((lesson) => {
-                const position = lessonPosition(lesson);
+              {selectedLessonLayouts.map((layout) => {
+                const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
                 const date = parseISO(lesson.startAt);
@@ -532,7 +617,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     className={`${styles.weekLesson} ${styles.dayLesson} ${
                       lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                     }`}
-                    style={{ top: position.top, height: position.height }}
+                    style={buildLessonStyle(layout, DAY_LESSON_INSET)}
                     onClick={() => onStartEditLesson(lesson)}
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
@@ -560,6 +645,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const dayLessons = lessons
       .filter((lesson) => lesson.startAt.slice(0, 10) === dayIso)
       .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+    const dayLessonLayouts = buildLessonLayout(dayLessons);
 
     return (
         <div className={styles.dayView}>
@@ -586,8 +672,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
-              {dayLessons.map((lesson) => {
-                const position = lessonPosition(lesson);
+              {dayLessonLayouts.map((layout) => {
+                const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
                 const date = parseISO(lesson.startAt);
@@ -605,7 +691,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     className={`${styles.weekLesson} ${styles.dayLesson} ${
                       lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                     }`}
-                    style={{ top: position.top, height: position.height }}
+                    style={buildLessonStyle(layout, DAY_LESSON_INSET)}
                     onClick={() => onStartEditLesson(lesson)}
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
