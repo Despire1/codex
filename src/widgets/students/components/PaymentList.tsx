@@ -28,6 +28,9 @@ const getEventTitle = (event: PaymentEvent) => {
     case 'AUTO_CHARGE':
       return 'Автосписание за занятие';
     case 'MANUAL_PAID':
+      if (event.reason === 'BALANCE_PAYMENT') {
+        return 'Оплата занятия с баланса';
+      }
       return 'Оплата занятия вручную';
     case 'OTHER':
       return `Другое: +${event.lessonsDelta} занятия`;
@@ -60,6 +63,9 @@ const getEventChipLabel = (event: PaymentEvent) => {
     case 'AUTO_CHARGE':
       return 'Списание';
     case 'MANUAL_PAID':
+      if (event.reason === 'BALANCE_PAYMENT') {
+        return 'Оплачено';
+      }
       return 'Ручная оплата';
     case 'SUBSCRIPTION':
       return 'Абонемент';

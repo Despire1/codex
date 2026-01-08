@@ -1203,9 +1203,11 @@ export const AppPage = () => {
     lessonId: number,
     studentId?: number,
     cancelBehavior?: PaymentCancelBehavior,
+    writeOffBalance?: boolean,
   ) => {
     try {
-      const payload = cancelBehavior ? { cancelBehavior } : undefined;
+      const payload =
+        cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
       if (studentId !== undefined) {
         const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
         setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
@@ -1279,13 +1281,9 @@ export const AppPage = () => {
 
   const markPaidWithBalance = useCallback(
     async (lessonId: number, studentId: number | undefined, writeOffBalance: boolean) => {
-      await applyTogglePaid(lessonId, studentId);
-      if (!writeOffBalance) return;
-      const { studentId: resolvedStudentId } = resolvePaymentTarget(lessonId, studentId);
-      if (!resolvedStudentId) return;
-      await adjustBalance(resolvedStudentId, -1);
+      await applyTogglePaid(lessonId, studentId, undefined, writeOffBalance);
     },
-    [adjustBalance, applyTogglePaid, resolvePaymentTarget],
+    [applyTogglePaid],
   );
 
   const togglePaid = async (lessonId: number, studentId?: number) => {

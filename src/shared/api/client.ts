@@ -136,12 +136,16 @@ export const api = {
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {
       method: 'POST',
     }),
-  togglePaid: (lessonId: number, payload?: { cancelBehavior?: PaymentCancelBehavior }) =>
+  togglePaid: (lessonId: number, payload?: { cancelBehavior?: PaymentCancelBehavior; writeOffBalance?: boolean }) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/toggle-paid`, {
       method: 'POST',
       body: payload ? JSON.stringify(payload) : undefined,
     }),
-  toggleParticipantPaid: (lessonId: number, studentId: number, payload?: { cancelBehavior?: PaymentCancelBehavior }) =>
+  toggleParticipantPaid: (
+    lessonId: number,
+    studentId: number,
+    payload?: { cancelBehavior?: PaymentCancelBehavior; writeOffBalance?: boolean },
+  ) =>
     apiFetch<{ participant: any; lesson: Lesson; link?: TeacherStudent }>(
       `/api/lessons/${lessonId}/participants/${studentId}/toggle-paid`,
       {
