@@ -100,6 +100,7 @@ body {
 }
 
 body.telegram-webapp {
+  --text: var(--color-ink-900);
   color: var(--text) !important;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
@@ -125,4 +126,37 @@ a {
 
 button {
   font: inherit;
+}
+
+body.telegram-webapp button,
+body.telegram-webapp input,
+body.telegram-webapp textarea,
+body.telegram-webapp select {
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text);
+}
+
+body.telegram-webapp button[class*='primaryButton'] {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+}
+
+body.telegram-webapp [class*='tabbar'] button {
+  color: var(--color-slate-300) !important;
+  -webkit-text-fill-color: var(--color-slate-300);
+}
+
+body.telegram-webapp [class*='tabbar'] [class*='tabActive'] {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+}
+
+body.telegram-webapp [class*='topNavActive'] {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+}
+
+body.telegram-webapp [class*='toggleActive'] {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
 }

@@ -1087,7 +1087,7 @@
 
 .tabActive {
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--color-slate-900);
   border-color: var(--color-blue-600);
 }
 
