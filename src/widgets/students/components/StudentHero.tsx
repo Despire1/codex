@@ -1,5 +1,5 @@
 import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
-import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, format, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
@@ -13,6 +13,8 @@ import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopo
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import { StudentDebtPopoverContent } from './StudentDebtPopoverContent';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
@@ -59,6 +61,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onRequestDeleteStudent,
   onTogglePaid,
 }) => {
+  const timeZone = useTimeZone();
+  const todayZoned = toZonedDate(new Date(), timeZone);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
@@ -82,7 +86,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
     const nextLesson = studentLessonsSummary
       .filter((lesson) => {
         if (lesson.status === 'CANCELED') return false;
-        const lessonDate = parseISO(lesson.startAt);
+        const lessonDate = new Date(lesson.startAt);
         return lessonDate > now;
       })
       .sort((a, b) => a.startAt.localeCompare(b.startAt))[0];
@@ -94,17 +98,17 @@ export const StudentHero: FC<StudentHeroProps> = ({
       };
     }
 
-    const lessonDate = parseISO(nextLesson.startAt);
+    const lessonDate = toZonedDate(nextLesson.startAt, timeZone);
     const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
 
-    if (isToday(lessonDate)) {
+    if (isSameDay(lessonDate, todayZoned)) {
       return {
         label: `Сегодня, ${timeLabel}`,
         variant: 'badge' as const,
       };
     }
 
-    if (isTomorrow(lessonDate)) {
+    if (isSameDay(lessonDate, addDays(todayZoned, 1))) {
       return {
         label: `Завтра, ${timeLabel}`,
         variant: 'badge' as const,
@@ -112,10 +116,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
     }
 
     return {
-      label: format(lessonDate, 'd MMM yyyy, HH:mm', { locale: ru }),
+      label: formatInTimeZone(nextLesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone }),
       variant: 'text' as const,
     };
-  }, [studentLessonsSummary]);
+  }, [studentLessonsSummary, timeZone, todayZoned]);
 
   const renderNextLessonValue = () => {
     if (nextLessonInfo.variant === 'empty') {

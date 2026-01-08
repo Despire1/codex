@@ -1,4 +1,4 @@
-import { addDays, addMinutes, endOfDay, format, isSameDay, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, format, isSameDay } from 'date-fns';
 import { type FC, useEffect, useMemo, useState } from 'react';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
@@ -10,6 +10,8 @@ import styles from './DashboardSection.module.css';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
 import { pluralizeRu } from '../../shared/lib/pluralizeRu';
 import { Badge } from '../../shared/ui/Badge/Badge';
+import { useTimeZone } from '../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '../../shared/lib/timezoneDates';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -49,7 +51,9 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   onTogglePaid,
   onOpenStudent,
 }) => {
+  const timeZone = useTimeZone();
   const now = new Date();
+  const todayZoned = toZonedDate(now, timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const [isDashboardMobile, setIsDashboardMobile] = useState(false);
@@ -77,9 +81,9 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     return lessons.flatMap((lesson) => {
-      const start = parseISO(lesson.startAt);
-      const end = addMinutes(start, lesson.durationMinutes);
-      const isPast = end.getTime() < now.getTime();
+      const startMs = new Date(lesson.startAt).getTime();
+      const endMs = startMs + lesson.durationMinutes * 60_000;
+      const isPast = endMs < now.getTime();
       if (!isPast) return [];
 
       if (lesson.participants && lesson.participants.length > 0) {
@@ -114,26 +118,29 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   }, [lessons, linkedStudents, now]);
 
   const todayLessons = useMemo(
-    () => lessons.filter((lesson) => isToday(parseISO(lesson.startAt)) && lesson.status !== 'CANCELED'),
-    [lessons],
+    () =>
+      lessons.filter(
+        (lesson) => isSameDay(toZonedDate(lesson.startAt, timeZone), todayZoned) && lesson.status !== 'CANCELED',
+      ),
+    [lessons, timeZone, todayZoned],
   );
 
   const todayUpcomingLesson = useMemo(() => {
     return todayLessons
-      .filter((lesson) => lesson.status === 'SCHEDULED' && parseISO(lesson.startAt).getTime() >= now.getTime())
-      .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime())[0];
+      .filter((lesson) => lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() >= now.getTime())
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
   }, [now, todayLessons]);
 
   const upcomingLessons = useMemo(() => {
+    const windowEnd = toUtcEndOfDay(format(addDays(todayZoned, 2), 'yyyy-MM-dd'), timeZone);
     return lessons
       .filter((lesson) => {
         if (lesson.status !== 'SCHEDULED') return false;
-        const date = parseISO(lesson.startAt);
-        const windowEnd = endOfDay(addDays(now, 2));
-        return date.getTime() >= now.getTime() && date.getTime() <= windowEnd.getTime();
+        const startAt = new Date(lesson.startAt);
+        return startAt.getTime() >= now.getTime() && startAt.getTime() <= windowEnd.getTime();
       })
-      .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
-  }, [lessons, now]);
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  }, [lessons, now, timeZone, todayZoned]);
 
   const upcomingLessonCards = upcomingLessons.slice(0, 5);
 
@@ -181,7 +188,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       studentId,
       studentName: data.studentName,
       total: data.total,
-      lessons: data.lessons.sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime()),
+      lessons: data.lessons.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
     }));
   }, [unpaidEntries]);
 
@@ -226,7 +233,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           />
           <div className={styles.todayMeta}>
             {todayUpcomingLesson
-              ? `Первое — в ${format(parseISO(todayUpcomingLesson.startAt), 'HH:mm')}`
+              ? `Первое — в ${formatInTimeZone(todayUpcomingLesson.startAt, 'HH:mm', { timeZone })}`
               : 'Все занятия на сегодня уже прошли'}
           </div>
         </div>
@@ -239,12 +246,12 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         ) : (
           <div className={styles.lessonList}>
             {upcomingLessonCards.map((lesson) => {
-              const date = parseISO(lesson.startAt);
-              const label = isToday(date)
+              const date = toZonedDate(lesson.startAt, timeZone);
+              const label = isSameDay(date, todayZoned)
                 ? 'Сегодня'
-                : isTomorrow(date)
+                : isSameDay(date, addDays(todayZoned, 1))
                   ? 'Завтра'
-                  : isSameDay(date, addDays(now, 2))
+                  : isSameDay(date, addDays(todayZoned, 2))
                     ? 'Послезавтра'
                     : 'Скоро';
               return (

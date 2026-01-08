@@ -9,6 +9,8 @@ import { EXPERIENCE_PER_TASK } from '@/entities/account/model/types';
 import { Modal } from '@/shared/ui/Modal/Modal';
 import { TaskForm } from '@/features/taskForm/ui/TaskForm';
 import styles from './WeekView.module.css';
+import { useTimeZone } from '@/shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate, toUtcDateFromTimeZone } from '@/shared/lib/timezoneDates';
 
 interface Props {
   baseDate: Date;
@@ -19,6 +21,7 @@ const hours = Array.from({ length: 14 }, (_, index) => index + 7); // 7:00 - 20:
 
 export const WeekView = ({ baseDate, tasks }: Props) => {
   const dispatch = useDispatch();
+  const timeZone = useTimeZone();
   const start = startOfWeek(baseDate, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
   const [modalOpen, setModalOpen] = useState(false);
@@ -27,9 +30,12 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
 
   const modalTitle = useMemo(() => {
     if (!selectedDate) return 'Новая задача';
-    const formattedDate = format(new Date(selectedDate), 'd MMMM', { locale: ru });
+    const formattedDate = formatInTimeZone(toUtcDateFromDate(selectedDate, timeZone), 'd MMMM', {
+      locale: ru,
+      timeZone,
+    });
     return `Новая задача • ${formattedDate}, ${selectedStart}`;
-  }, [selectedDate, selectedStart]);
+  }, [selectedDate, selectedStart, timeZone]);
 
   const tasksByDay: Record<string, Task[]> = days.reduce((acc, day) => {
     const iso = format(day, 'yyyy-MM-dd');
@@ -45,7 +51,7 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
         const [, minutes] = task.startTime.split(':').map(Number);
         const height = Math.max(36, (task.durationMinutes / 60) * 64);
         const top = (minutes / 60) * 64;
-        const end = addMinutes(new Date(`${task.date}T${task.startTime}`), task.durationMinutes);
+        const end = addMinutes(toUtcDateFromTimeZone(task.date, task.startTime, timeZone), task.durationMinutes);
 
         return (
           <div
@@ -68,7 +74,7 @@ export const WeekView = ({ baseDate, tasks }: Props) => {
               <div>
                 <p className={styles.taskTitle}>{task.title}</p>
                 <p className={styles.taskTime}>
-                  {task.startTime} — {format(end, 'HH:mm')}
+                  {task.startTime} — {formatInTimeZone(end, 'HH:mm', { timeZone })}
                 </p>
               </div>
             </label>

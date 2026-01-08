@@ -2,11 +2,12 @@ import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { TransferLinkCard } from '../../../features/auth/transfer';
 import { SessionSummary, api } from '../../../shared/api/client';
 import { useToast } from '../../../shared/lib/toast';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../SettingsSection.module.css';
 
-const formatSessionDate = (value: string) =>
-  new Date(value).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
+const formatSessionDate = (value: string, timeZone: string) =>
+  new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
 
 const formatSessionTitle = (session: SessionSummary) => {
   if (session.userAgent) return session.userAgent;
@@ -16,6 +17,7 @@ const formatSessionTitle = (session: SessionSummary) => {
 
 export const SecuritySettings: FC = () => {
   const { showToast } = useToast();
+  const timeZone = useTimeZone();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [actionLoading, setActionLoading] = useState(false);
@@ -88,7 +90,7 @@ export const SecuritySettings: FC = () => {
                   </div>
                   <div className={styles.helperText}>
                     {session.ip && <span>IP {session.ip} · </span>}
-                    {formatSessionDate(session.createdAt)}
+                    {formatSessionDate(session.createdAt, timeZone)}
                   </div>
                 </div>
                 {!session.isCurrent && (

@@ -50,6 +50,7 @@ export interface Homework {
   id: number;
   text: string;
   deadline: string | null;
+  deadlineAt?: string | null;
   status: HomeworkStatus;
   isDone: boolean;
   studentId: number;

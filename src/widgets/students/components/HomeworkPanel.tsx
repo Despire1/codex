@@ -1,11 +1,13 @@
 import { ClipboardEvent as ReactClipboardEvent, DragEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
-import { format, isBefore, parseISO } from 'date-fns';
+import { isBefore, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Homework, HomeworkAttachment, HomeworkStatus } from '../../../entities/types';
 import { HomeworkCreateModal } from './HomeworkCreateModal';
 import { HomeworkDrawer } from './HomeworkDrawer';
 import { HomeworkTab } from './HomeworkTab';
 import { HomeworkDraft, HomeworkStatusInfo, NewHomeworkDraft, SelectedStudent } from '../types';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface HomeworkPanelProps {
   selectedStudent: SelectedStudent | null;
@@ -27,11 +29,12 @@ interface HomeworkPanelProps {
   newHomeworkDraft: NewHomeworkDraft;
 }
 
-const getHomeworkStatusInfo = (homework: Homework): HomeworkStatusInfo => {
+const getHomeworkStatusInfo = (homework: Homework, timeZone: string): HomeworkStatusInfo => {
   const baseStatus = (homework.status as HomeworkStatus) ?? (homework.isDone ? 'DONE' : 'ASSIGNED');
   if (homework.deadline) {
-    const deadlineDate = parseISO(`${homework.deadline}T00:00:00`);
-    if (isBefore(deadlineDate, new Date()) && baseStatus !== 'DONE') {
+    const deadlineDate = toZonedDate(toUtcDateFromDate(homework.deadline, timeZone), timeZone);
+    const todayStart = startOfDay(toZonedDate(new Date(), timeZone));
+    if (isBefore(deadlineDate, todayStart) && baseStatus !== 'DONE') {
       return { status: baseStatus, isOverdue: true };
     }
   }
@@ -73,10 +76,10 @@ const formatTimeSpentMinutes = (minutes?: number | null) => {
   return `${hours} ч ${restMinutes} мин`;
 };
 
-const formatCompletionMoment = (completedAt?: string | null) => {
+const formatCompletionMoment = (completedAt: string | null | undefined, timeZone: string) => {
   if (!completedAt) return '';
   try {
-    return format(parseISO(completedAt), 'd MMM, HH:mm', { locale: ru });
+    return formatInTimeZone(completedAt, 'd MMM, HH:mm', { locale: ru, timeZone });
   } catch (error) {
     return '';
   }
@@ -124,6 +127,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
   const drawerAnimationTimeoutRef = useRef<number | null>(null);
   const homeworkListRef = useRef<HTMLDivElement | null>(null);
   const DRAWER_TRANSITION_MS = 250;
+  const timeZone = useTimeZone();
 
   const clearDrawerAnimationTimeout = () => {
     if (drawerAnimationTimeoutRef.current) {
@@ -166,12 +170,15 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
 
   const activeStatusInfo = useMemo(() => {
     if (!activeHomework) return null;
-    return getHomeworkStatusInfo({
-      ...activeHomework,
-      status: homeworkDraft.status,
-      deadline: homeworkDraft.deadline || activeHomework.deadline,
-    } as Homework);
-  }, [activeHomework, homeworkDraft.deadline, homeworkDraft.status]);
+    return getHomeworkStatusInfo(
+      {
+        ...activeHomework,
+        status: homeworkDraft.status,
+        deadline: homeworkDraft.deadline || activeHomework.deadline,
+      } as Homework,
+      timeZone,
+    );
+  }, [activeHomework, homeworkDraft.deadline, homeworkDraft.status, timeZone]);
 
   const shouldShowDescriptionToggle = useMemo(() => {
     if (!activeHomework?.text) return false;
@@ -421,7 +428,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
     if (!onUpdateHomework) return;
     const homework = studentHomeworks.find((item) => item.id === homeworkId);
     if (!homework) return;
-    const info = getHomeworkStatusInfo(homework);
+    const info = getHomeworkStatusInfo(homework, timeZone);
     if (info.status === 'DRAFT') {
       setOpenHomeworkMenuId(null);
       return;
@@ -500,10 +507,10 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
         onEditHomework={handleEditHomework}
         onMoveToDraft={handleMoveToDraft}
         onDeleteHomework={handleDeleteHomework}
-        getHomeworkStatusInfo={getHomeworkStatusInfo}
+        getHomeworkStatusInfo={(homework) => getHomeworkStatusInfo(homework, timeZone)}
         getHomeworkTitle={getHomeworkTitle}
         formatTimeSpentMinutes={formatTimeSpentMinutes}
-        formatCompletionMoment={formatCompletionMoment}
+        formatCompletionMoment={(value) => formatCompletionMoment(value, timeZone)}
       />
 
       {activeHomework && (
@@ -554,7 +561,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
           onKeepEditing={handleKeepEditing}
           onConfirmSaveAndClose={handleConfirmSaveAndClose}
           formatTimeSpentMinutes={formatTimeSpentMinutes}
-          formatCompletionMoment={formatCompletionMoment}
+          formatCompletionMoment={(value) => formatCompletionMoment(value, timeZone)}
           getStatusLabel={getStatusLabel}
         />
       )}

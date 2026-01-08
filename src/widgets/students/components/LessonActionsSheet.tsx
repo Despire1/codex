@@ -1,8 +1,9 @@
-import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { Lesson } from '../../../entities/types';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import styles from './LessonActionsSheet.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
 interface LessonActionsSheetProps {
   lesson: Lesson | null;
@@ -28,8 +29,9 @@ export const LessonActionsSheet = ({
   onDelete,
 }: LessonActionsSheetProps) => {
   if (!lesson) return null;
+  const timeZone = useTimeZone();
 
-  const lessonDate = format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru });
+  const lessonDate = formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
   const durationLabel = lesson.durationMinutes ? `${lesson.durationMinutes} мин` : '—';
   const priceLabel = resolvedPrice === undefined || resolvedPrice === null ? '—' : `${resolvedPrice} ₽`;
   const isCompleted = lesson.status === 'COMPLETED';

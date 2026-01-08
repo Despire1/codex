@@ -6,7 +6,6 @@ import {
   format,
   isSameDay,
   isSameMonth,
-  isToday,
   isWithinInterval,
   startOfMonth,
   startOfWeek,
@@ -15,6 +14,8 @@ import type { Locale } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
+import { useTimeZone } from '../lib/timezoneContext';
+import { toZonedDate } from '../lib/timezoneDates';
 
 type ClassNames = {
   root: string;
@@ -75,6 +76,8 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   numberOfMonths = 1,
   defaultMonth,
 }) => {
+  const timeZone = useTimeZone();
+  const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const isRangeMode = mode === 'range';
   const selectedRange = (isRangeMode ? selected : undefined) as DateRange | undefined;
   const selectedDate = (!isRangeMode ? selected : undefined) as Date | undefined;
@@ -83,8 +86,8 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     if (isRangeMode && selectedRange?.from) return startOfMonth(selectedRange.from);
     if (!isRangeMode && selectedDate) return startOfMonth(selectedDate);
     if (defaultMonth) return startOfMonth(defaultMonth);
-    return startOfMonth(new Date());
-  }, [defaultMonth, isRangeMode, selectedDate, selectedRange?.from]);
+    return startOfMonth(todayZoned);
+  }, [defaultMonth, isRangeMode, selectedDate, selectedRange?.from, todayZoned]);
 
   const [month, setMonth] = useState<Date>(() => initialMonth);
   const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
@@ -294,7 +297,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                       start: selectedRange!.from!,
                       end: selectedRange!.to!,
                     });
-                  const today = isToday(date);
+                  const today = isSameDay(date, todayZoned);
                   const classes = [styles.dayButton, classNames?.day];
                   if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
                   if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);

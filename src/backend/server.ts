@@ -7,6 +7,7 @@ import prisma from './prismaClient';
 import type { User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
+import { getTimeZoneStartOfDay } from '../shared/lib/timezoneDates';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -483,8 +484,7 @@ const listStudents = async (
     homeworksByStudent.set(homework.studentId, existing);
   });
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStart = getTimeZoneStartOfDay(new Date(), teacher.timezone);
 
   const statsByStudent = new Map<number, ReturnType<typeof buildHomeworkStats>>();
   links.forEach((link) => {
@@ -560,8 +560,7 @@ const listStudentHomeworks = async (
 
   const where: any = { teacherId: teacher.chatId, studentId };
   if (filter === 'overdue') {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStart = getTimeZoneStartOfDay(new Date(), teacher.timezone);
     where.deadline = { lt: todayStart };
     where.isDone = false;
     where.NOT = { status: 'DONE' };

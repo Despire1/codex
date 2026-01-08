@@ -1,8 +1,9 @@
-import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { Lesson, StudentDebtItem } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './StudentDebtPopoverContent.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
 interface StudentDebtPopoverContentProps {
   items: StudentDebtItem[];
@@ -25,6 +26,7 @@ export const StudentDebtPopoverContent = ({
   showCloseButton = false,
   onClose,
 }: StudentDebtPopoverContentProps) => {
+  const timeZone = useTimeZone();
   return (
     <div className={styles.container}>
       <div className={styles.title}>Неоплаченные занятия</div>
@@ -34,7 +36,7 @@ export const StudentDebtPopoverContent = ({
         <div className={styles.list}>
           {items.map((item) => {
             const isLoading = pendingIds.includes(item.id);
-            const dateLabel = format(parseISO(item.startAt), 'd MMM yyyy, HH:mm', { locale: ru });
+            const dateLabel = formatInTimeZone(item.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
             const priceLabel = item.price === null ? '—' : `${item.price} ₽`;
             const statusLabel = statusLabels[item.status];
 

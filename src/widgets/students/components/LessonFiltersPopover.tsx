@@ -1,5 +1,5 @@
 import { FC, useMemo, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import { LessonDateRange, LessonPaymentFilter, LessonStatusFilter } from '../../../entities/types';
@@ -7,6 +7,8 @@ import { DayPicker } from '../../../shared/day-picker';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface LessonFiltersPopoverProps {
   lessonPaymentFilter: LessonPaymentFilter;
@@ -17,12 +19,6 @@ interface LessonFiltersPopoverProps {
   onLessonDateRangeChange: (range: LessonDateRange) => void;
 }
 
-const parseDateValue = (value?: string) => {
-  if (!value) return undefined;
-  const parsed = parseISO(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-};
-
 export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
   lessonPaymentFilter,
   lessonStatusFilter,
@@ -31,8 +27,15 @@ export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
   onLessonStatusFilterChange,
   onLessonDateRangeChange,
 }) => {
+  const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  const parseDateValue = (value?: string) => {
+    if (!value) return undefined;
+    const parsed = toUtcDateFromDate(value, timeZone);
+    return Number.isNaN(parsed.getTime()) ? undefined : toZonedDate(parsed, timeZone);
+  };
 
   const selectedRange = useMemo(
     () => ({

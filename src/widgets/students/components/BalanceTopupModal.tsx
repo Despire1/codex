@@ -1,9 +1,10 @@
 import { FC, TouchEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { formatInTimeZone, toUtcDateFromTimeZone } from '../../../shared/lib/timezoneDates';
 import { PaymentEventType, Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { NumberInput } from '../../../shared/ui/NumberInput/NumberInput';
 import styles from '../StudentsSection.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
 const quickValues = [1, 2, 4, 8];
 
@@ -20,7 +21,7 @@ interface BalanceTopupModalProps {
   onSubmit: (payload: { delta: number; type: BalanceOperationType; comment?: string; createdAt?: string }) => Promise<void>;
 }
 
-const defaultDateTime = () => format(new Date(), "yyyy-MM-dd'T'HH:mm");
+const defaultDateTime = (timeZone: string) => formatInTimeZone(new Date(), "yyyy-MM-dd'T'HH:mm", { timeZone });
 
 export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   isOpen,
@@ -29,10 +30,11 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const timeZone = useTimeZone();
   const [lessonCount, setLessonCount] = useState(1);
   const [operationType, setOperationType] = useState<BalanceOperationType>('TOP_UP');
   const [comment, setComment] = useState('');
-  const [dateTime, setDateTime] = useState(defaultDateTime);
+  const [dateTime, setDateTime] = useState(() => defaultDateTime(timeZone));
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const touchStartY = useRef<number | null>(null);
@@ -47,9 +49,9 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
     setLessonCount(1);
     setOperationType('TOP_UP');
     setComment('');
-    setDateTime(defaultDateTime());
+    setDateTime(defaultDateTime(timeZone));
     setErrorMessage('');
-  }, [isOpen, student?.id]);
+  }, [isOpen, student?.id, timeZone]);
 
   useEffect(() => {
     if (isRemoval) {
@@ -79,11 +81,15 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage('');
     try {
+      const [datePart, timePart] = dateTime.split('T');
+      const createdAt = datePart && timePart
+        ? toUtcDateFromTimeZone(datePart, timePart, timeZone).toISOString()
+        : undefined;
       await onSubmit({
         delta: normalizedCount,
         type: operationType,
         comment: comment.trim() ? comment.trim() : undefined,
-        createdAt: dateTime || undefined,
+        createdAt,
       });
       onClose();
     } catch (error) {

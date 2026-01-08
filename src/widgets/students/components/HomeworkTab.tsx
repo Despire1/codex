@@ -1,5 +1,4 @@
 import { FC, useState, type RefObject } from 'react';
-import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { Homework, HomeworkStatus } from '../../../entities/types';
@@ -13,6 +12,8 @@ import {
   FilterAltOutlinedIcon,
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate } from '../../../shared/lib/timezoneDates';
 
 type HomeworkStatusInfo = { status: HomeworkStatus; isOverdue: boolean };
 
@@ -65,6 +66,7 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
   formatTimeSpentMinutes,
   formatCompletionMoment,
 }) => {
+  const timeZone = useTimeZone();
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const getStatusLabel = (status: HomeworkStatus) => {
@@ -158,7 +160,10 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
             const statusInfo = getHomeworkStatusInfo(hw);
             const title = getHomeworkTitle(hw.text);
             const deadlineLabel = hw.deadline
-              ? `Дедлайн: ${format(parseISO(`${hw.deadline}T00:00:00`), 'd MMM', { locale: ru })}`
+              ? `Дедлайн: ${formatInTimeZone(toUtcDateFromDate(hw.deadline, timeZone), 'd MMM', {
+                  locale: ru,
+                  timeZone,
+                })}`
               : 'Без дедлайна';
             const timeSpentLabel =
               hw.timeSpentMinutes !== null && hw.timeSpentMinutes !== undefined

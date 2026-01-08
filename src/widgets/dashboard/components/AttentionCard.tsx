@@ -1,10 +1,11 @@
-import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { FC } from 'react';
 import { Lesson } from '../../../entities/types';
 import { pluralizeRu } from '../../../shared/lib/pluralizeRu';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './AttentionCard.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
 export interface AttentionItem {
   id: string;
@@ -32,6 +33,7 @@ export const AttentionCard: FC<AttentionCardProps> = ({
   onTogglePaid,
   className,
 }) => {
+  const timeZone = useTimeZone();
   return (
     <div className={`${styles.root} ${className ?? ''}`.trim()}>
       <div className={styles.header}>
@@ -52,8 +54,7 @@ export const AttentionCard: FC<AttentionCardProps> = ({
       {isOpen && (
         <div className={styles.list}>
           {items.map((item) => {
-            const start = parseISO(item.lesson.startAt);
-            const timeLabel = format(start, 'd MMM, HH:mm', { locale: ru });
+            const timeLabel = formatInTimeZone(item.lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone });
             const shouldUseParticipant = (item.lesson.participants?.length ?? 0) > 0;
 
             return (
