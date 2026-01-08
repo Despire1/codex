@@ -27,7 +27,7 @@ const resolveBalanceBadge = (item: StudentListItem) => {
   if (balanceLessons > 0) {
     return {
       label: `Баланс: ${formatLessonCount(balanceLessons)}`,
-      className: styles.badgeInfo,
+      className: styles.badgeSuccess,
     };
   }
   if (balanceLessons < 0) {
