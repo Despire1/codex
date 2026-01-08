@@ -599,15 +599,6 @@ export const AppPage = () => {
       })),
     [links, students, homeworks],
   );
-  const upcomingLessons = useMemo(() => {
-    return lessons
-      .filter((lesson) => ['SCHEDULED'].includes(lesson.status))
-      .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime())
-      .slice(0, 3);
-  }, [lessons]);
-
-  const unpaidLessons = lessons.filter((lesson) => lesson.status === 'COMPLETED' && !lesson.isPaid).length;
-
   const paymentEvents = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
@@ -1567,21 +1558,18 @@ export const AppPage = () => {
           <AppRoutes
             resolveLastVisitedPath={resolveLastVisitedPath}
             dashboard={{
-              upcomingLessons,
+              lessons,
               linkedStudents,
-              unpaidLessons,
-              pendingHomeworks: homeworks,
               onAddStudent: () => {
                 navigate(tabPathById.students);
                 openCreateStudentModal();
               },
               onCreateLesson: () => {
-                navigate(tabPathById.schedule);
-                setLessonModalOpen(true);
+                openLessonModal(todayISO(), format(new Date(), 'HH:mm'));
               },
-              onRemindHomework: () => selectedStudentId && remindHomework(selectedStudentId),
-              onCompleteLesson: markLessonCompleted,
-              onTogglePaid: togglePaid,
+              onOpenSchedule: () => navigate(tabPathById.schedule),
+              onOpenStudents: () => navigate(tabPathById.students),
+              onOpenLesson: (lesson) => openLessonModal(lesson.startAt.slice(0, 10), undefined, lesson),
             }}
             students={{
               studentListItems,
