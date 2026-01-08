@@ -20,6 +20,7 @@ import {
 } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
+import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
 import { useToast } from '../shared/lib/toast';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
@@ -217,6 +218,7 @@ export const AppPage = () => {
     date: todayISO(),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
+    color: DEFAULT_LESSON_COLOR,
     isRecurring: false,
     repeatWeekdays: [] as number[],
     repeatUntil: undefined as string | undefined,
@@ -892,10 +894,11 @@ export const AppPage = () => {
           ? existingStudentIds
           : draft.studentIds.length > 0
             ? draft.studentIds
-            : selectedStudentId
+              : selectedStudentId
               ? [selectedStudentId]
               : [],
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      color: existing?.color ?? DEFAULT_LESSON_COLOR,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
       repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
       repeatUntil: existing?.recurrenceUntil ? existing.recurrenceUntil.slice(0, 10) : draft.repeatUntil,
@@ -1024,6 +1027,7 @@ export const AppPage = () => {
           studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
+          color: newLessonDraft.color,
           applyToSeries,
           detachFromSeries: shouldDetach,
           repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
@@ -1064,6 +1068,7 @@ export const AppPage = () => {
           studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
+          color: newLessonDraft.color,
           repeatWeekdays: newLessonDraft.repeatWeekdays,
           repeatUntil: resolvedRepeatUntil,
         });
@@ -1085,6 +1090,7 @@ export const AppPage = () => {
           studentIds: newLessonDraft.studentIds,
           startAt,
           durationMinutes,
+          color: newLessonDraft.color,
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);

@@ -31,6 +31,7 @@ import {
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
+import { getLessonColorVars } from '../../shared/lib/lessonColors';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
@@ -358,6 +359,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     };
   };
 
+  const buildLessonColorStyle = (lesson: Lesson): CSSProperties =>
+    getLessonColorVars(lesson.color) as CSSProperties;
+
   const formatMinutesToTime = (minutes: number) => {
     const hoursValue = Math.floor(minutes / 60)
       .toString()
@@ -541,7 +545,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         <div
                           key={lesson.id}
                           className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
-                          style={buildLessonStyle(layout, WEEK_LESSON_INSET)}
+                          style={{ ...buildLessonStyle(layout, WEEK_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
                           onClick={() => onStartEditLesson(lesson)}
                           onMouseEnter={() => setHoverIndicator(null)}
                         >
@@ -617,7 +621,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     className={`${styles.weekLesson} ${styles.dayLesson} ${
                       lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                     }`}
-                    style={buildLessonStyle(layout, DAY_LESSON_INSET)}
+                    style={{ ...buildLessonStyle(layout, DAY_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
                     onClick={() => onStartEditLesson(lesson)}
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
@@ -691,7 +695,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     className={`${styles.weekLesson} ${styles.dayLesson} ${
                       lesson.status === 'CANCELED' ? styles.canceledLesson : ''
                     }`}
-                    style={buildLessonStyle(layout, DAY_LESSON_INSET)}
+                    style={{ ...buildLessonStyle(layout, DAY_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
                     onClick={() => onStartEditLesson(lesson)}
                     onMouseEnter={() => setHoverIndicator(null)}
                   >
@@ -811,6 +815,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div
                 key={lesson.id}
                 className={`${styles.monthLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                style={buildLessonColorStyle(lesson)}
                 onClick={(event) => {
                   event.stopPropagation();
                   onStartEditLesson(lesson);

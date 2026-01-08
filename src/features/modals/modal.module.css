@@ -73,6 +73,72 @@
   color: var(--text) !important;
 }
 
+.settingsAccordion {
+  margin-top: 16px;
+  background: var(--color-white);
+}
+
+.settingsSummary {
+  padding: 0 12px;
+}
+
+.settingsTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-700);
+}
+
+.settingsDetails {
+  padding: 8px 12px 16px;
+}
+
+.colorPicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.colorOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--color-white);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  text-align: left;
+}
+
+.colorOptionActive {
+  border-color: var(--color-blue-600);
+  box-shadow: 0 0 0 2px var(--primary-weak);
+}
+
+.colorSwatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.colorSwatchDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.colorLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-slate-700);
+}
+
 .closeButton {
   border: none;
   background: var(--color-slate-100);

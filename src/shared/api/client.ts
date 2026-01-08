@@ -6,6 +6,7 @@ import {
   LessonPaymentFilter,
   LessonSortOrder,
   LessonStatusFilter,
+  LessonColor,
   PaymentCancelBehavior,
   PaymentEvent,
   Student,
@@ -93,13 +94,20 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ value }),
     }),
-  createLesson: (payload: { studentId?: number; studentIds?: number[]; startAt: string; durationMinutes: number }) =>
+  createLesson: (payload: {
+    studentId?: number;
+    studentIds?: number[];
+    startAt: string;
+    durationMinutes: number;
+    color?: LessonColor;
+  }) =>
     apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
   createRecurringLessons: (payload: {
     studentId?: number;
     studentIds?: number[];
     startAt: string;
     durationMinutes: number;
+    color?: LessonColor;
     repeatWeekdays: number[];
     repeatUntil?: string;
   }) => apiFetch<{ lessons: Lesson[] }>('/api/lessons/recurring', { method: 'POST', body: JSON.stringify(payload) }),
@@ -110,6 +118,7 @@ export const api = {
       studentIds?: number[];
       startAt: string;
       durationMinutes: number;
+      color?: LessonColor;
       applyToSeries?: boolean;
       detachFromSeries?: boolean;
       repeatWeekdays?: number[];

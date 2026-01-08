@@ -1,4 +1,5 @@
 export type LessonStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELED';
+export type LessonColor = 'blue' | 'peach' | 'rose' | 'mint' | 'sand' | 'lavender';
 
 export interface Teacher {
   chatId: number;
@@ -73,6 +74,7 @@ export interface Lesson {
   durationMinutes: number;
   status: LessonStatus;
   isPaid: boolean;
+  color?: LessonColor;
   isRecurring?: boolean;
   recurrenceUntil?: string | null;
   recurrenceGroupId?: string | null;
