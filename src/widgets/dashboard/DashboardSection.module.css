@@ -78,13 +78,19 @@
 
 .lessonCard {
   text-align: left;
-  background: var(--color-slate-50);
-  border: 1px solid var(--color-slate-200);
+  background: var(--lesson-bg, var(--color-slate-50));
+  border: 1px solid var(--lesson-border, var(--color-slate-200));
   border-radius: 12px;
   padding: 10px;
   display: grid;
   gap: 4px;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lessonCard:hover {
+  box-shadow: 0 8px 18px var(--lesson-shadow, var(--shadow-slate-900-08));
+  transform: translateY(-1px);
 }
 
 .lessonDay {
@@ -114,6 +120,21 @@
 .unpaidCard {
   text-align: left;
   cursor: pointer;
+  width: 100%;
+}
+
+.unpaidCardWrapper {
+  width: 100%;
+}
+
+.unpaidPopoverRoot {
+  width: 100%;
+  display: block;
+}
+
+.unpaidTrigger {
+  width: 100%;
+  display: block;
 }
 
 .unpaidCardWrapper {

@@ -7,6 +7,7 @@ import { BottomSheet } from '../../shared/ui/BottomSheet/BottomSheet';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import styles from './DashboardSection.module.css';
+import { getLessonColorVars } from '../../shared/lib/lessonColors';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -246,6 +247,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                   type="button"
                   className={styles.lessonCard}
                   onClick={() => onOpenLesson(lesson)}
+                  style={getLessonColorVars(lesson.color)}
                 >
                   <div className={styles.lessonDay}>{label}</div>
                   <div className={styles.lessonTimeRow}>
@@ -284,20 +286,19 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
               align="end"
               side="bottom"
               className={styles.unpaidPopover}
+              rootClassName={styles.unpaidPopoverRoot}
+              triggerClassName={styles.unpaidTrigger}
               trigger={
-                <div className={styles.unpaidTrigger}>
-                  <button
-                    type="button"
-                    className={`${styles.card} ${styles.unpaidCard}`}
-                    onClick={() => setIsUnpaidOpen((prev) => !prev)}
-                  >
-                    <div className={styles.cardHeader}>Неоплаченные занятия</div>
-                    <div className={styles.unpaidSummary}>
-                      {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий ·{' '}
-                      {unpaidSummary.total} ₽
-                    </div>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className={`${styles.card} ${styles.unpaidCard}`}
+                  onClick={() => setIsUnpaidOpen((prev) => !prev)}
+                >
+                  <div className={styles.cardHeader}>Неоплаченные занятия</div>
+                  <div className={styles.unpaidSummary}>
+                    {unpaidSummary.studentCount} учеников · {unpaidSummary.lessonCount} занятий · {unpaidSummary.total} ₽
+                  </div>
+                </button>
               }
             >
               <UnpaidLessonsPopoverContent
