@@ -782,7 +782,14 @@ const listPaymentEventsForStudent = async (
   };
 
   if (filter === 'topup') {
-    where.type = { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] };
+    where.AND = [
+      {
+        OR: [
+          { type: { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] } },
+          { type: 'ADJUSTMENT', lessonsDelta: { gt: 0 } },
+        ],
+      },
+    ];
   } else if (filter === 'manual') {
     where.type = 'MANUAL_PAID';
   } else if (filter === 'charges') {
