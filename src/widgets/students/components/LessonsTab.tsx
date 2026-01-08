@@ -330,6 +330,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
                         title="Отметить оплату"
                       />
+                      <span className={styles.lessonRecurrenceTag}>{getRecurrenceLabel(lesson)}</span>
                     </div>
                     <div className={styles.lessonCardMeta}>
                       <div className={styles.lessonCardMetaItem}>
