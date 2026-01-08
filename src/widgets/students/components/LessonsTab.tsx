@@ -190,6 +190,9 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const formatPriceLabel = (price?: number | null) =>
     price === undefined || price === null ? '—' : `${price} ₽`;
 
+  const getRecurrenceLabel = (lesson: Lesson) =>
+    lesson.isRecurring || lesson.recurrenceGroupId ? 'Повторяющееся' : 'Одиночное';
+
   const renderLessonActions = (lesson: Lesson, isPaid: boolean) => {
     if (isLessonsMobile) {
       return (
@@ -324,6 +327,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         label={isPaid ? 'Оплачено' : 'Не оплачено'}
                         variant={isPaid ? 'paid' : 'unpaid'}
                         className={styles.lessonPaymentChip}
+                        onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
+                        title="Отметить оплату"
                       />
                     </div>
                     <div className={styles.lessonCardMeta}>
@@ -334,6 +339,10 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       <div className={styles.lessonCardMetaItem}>
                         <span className={styles.lessonCardMetaLabel}>Цена</span>
                         <span className={styles.lessonCardMetaValue}>{formatPriceLabel(resolvedPrice)}</span>
+                      </div>
+                      <div className={styles.lessonCardMetaItem}>
+                        <span className={styles.lessonCardMetaLabel}>Тип занятия</span>
+                        <span className={styles.lessonCardMetaValue}>{getRecurrenceLabel(lesson)}</span>
                       </div>
                     </div>
                   </article>
@@ -363,6 +372,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                     </TableCell>
                     <TableCell>Длительность</TableCell>
                     <TableCell>Статус занятия</TableCell>
+                    <TableCell>Тип</TableCell>
                     <TableCell>Статус оплаты</TableCell>
                     <TableCell align="right">Цена</TableCell>
                     <TableCell align="right">Быстрые действия</TableCell>
@@ -411,10 +421,15 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           </div>
                         </TableCell>
                         <TableCell>
+                          <span className={styles.lessonRecurrenceTag}>{getRecurrenceLabel(lesson)}</span>
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             label={isPaid ? 'Оплачено' : 'Не оплачено'}
                             variant={isPaid ? 'paid' : 'unpaid'}
                             className={styles.paymentBadge}
+                            onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
+                            title="Отметить оплату"
                           />
                         </TableCell>
                         <TableCell align="right" className={styles.monoCell}>
