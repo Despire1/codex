@@ -14,6 +14,8 @@ interface AdaptivePopoverProps {
   align?: PopoverAlign;
   offset?: number;
   className?: string;
+  rootClassName?: string;
+  triggerClassName?: string;
 }
 
 const DEFAULT_OFFSET = 8;
@@ -45,6 +47,8 @@ export const AdaptivePopover = ({
   align = 'start',
   offset = DEFAULT_OFFSET,
   className = '',
+  rootClassName = '',
+  triggerClassName = '',
 }: AdaptivePopoverProps) => {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -184,8 +188,8 @@ export const AdaptivePopover = ({
   }, [isOpen, onClose]);
 
   return (
-    <span className={styles.root}>
-      <span ref={triggerRef} className={styles.trigger}>
+    <span className={`${styles.root} ${rootClassName}`.trim()}>
+      <span ref={triggerRef} className={`${styles.trigger} ${triggerClassName}`.trim()}>
         {trigger}
       </span>
       {isOpen &&
