@@ -9,6 +9,7 @@ import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverCo
 import styles from './DashboardSection.module.css';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
 import { pluralizeRu } from '../../shared/lib/pluralizeRu';
+import { Badge } from '../../shared/ui/Badge/Badge';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -218,9 +219,11 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       <div className={`${styles.card} ${styles.todayCard} ${styles.todayArea}`}>
         <div className={styles.cardHeader}>Сегодня</div>
         <div className={styles.todaySummary}>
-          <div className={styles.todayCount}>
-            {pluralizeRu(todayLessons.length, { one: 'занятие', few: 'занятия', many: 'занятий' })}
-          </div>
+          <Badge
+            variant="groupPaid"
+            label={pluralizeRu(todayLessons.length, { one: 'занятие', few: 'занятия', many: 'занятий' })}
+            className={styles.todayCount}
+          />
           <div className={styles.todayMeta}>
             {todayUpcomingLesson
               ? `Первое — в ${format(parseISO(todayUpcomingLesson.startAt), 'HH:mm')}`
