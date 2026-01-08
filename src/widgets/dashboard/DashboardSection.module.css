@@ -17,66 +17,97 @@
   margin-bottom: 8px;
 }
 
-.actionsRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin: 10px 0 6px;
-}
-
-.statsRow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.statCard {
-  background: var(--color-slate-50);
-  border: 1px solid var(--color-slate-200);
-  border-radius: 14px;
-  padding: 10px;
-}
-
-.statValue {
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.statLabel {
-  color: var(--color-slate-500);
-  font-size: 12px;
-}
-
-.lessonRow {
+.attentionCard {
+  background: rgba(255, 188, 96, 0.15);
+  border-color: rgba(255, 188, 96, 0.35);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--color-slate-200);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  background: var(--color-slate-50);
 }
 
-.lessonTitle {
+.attentionBody {
+  display: grid;
+  gap: 4px;
+}
+
+.attentionMain {
   font-weight: 600;
 }
 
-.lessonTime {
+.attentionNote {
+  color: var(--color-slate-500);
+  font-size: 13px;
+}
+
+.todaySummary {
+  display: grid;
+  gap: 4px;
+}
+
+.todayCount {
+  font-weight: 600;
+}
+
+.todayMeta {
+  color: var(--color-slate-500);
+  font-size: 13px;
+}
+
+.lessonList {
+  display: grid;
+  gap: 8px;
+}
+
+.lessonCard {
+  text-align: left;
+  background: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.lessonDay {
   color: var(--color-slate-400);
   font-size: 12px;
 }
 
-.lessonMeta {
-  color: var(--color-slate-400);
+.lessonTimeRow {
+  font-weight: 600;
+}
+
+.lessonStudent {
+  color: var(--color-slate-500);
   font-size: 13px;
 }
 
-.lessonActions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.inlineAction {
+  margin-top: 8px;
+  border: none;
+  background: none;
+  color: var(--color-slate-500);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.unpaidCard {
+  text-align: left;
+  cursor: pointer;
+}
+
+.unpaidSummary {
+  color: var(--color-slate-500);
+  font-size: 14px;
+}
+
+.actionsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .muted {

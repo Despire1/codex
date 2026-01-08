@@ -25,15 +25,13 @@ import { tabPathById } from '../tabs';
 interface AppRoutesProps {
   resolveLastVisitedPath: () => string;
   dashboard: {
-    upcomingLessons: Lesson[];
+    lessons: Lesson[];
     linkedStudents: LinkedStudent[];
-    unpaidLessons: number;
-    pendingHomeworks: Homework[];
     onAddStudent: () => void;
     onCreateLesson: () => void;
-    onRemindHomework: () => void;
-    onCompleteLesson: (lessonId: number) => void;
-    onTogglePaid: (lessonId: number, studentId?: number) => void;
+    onOpenSchedule: () => void;
+    onOpenStudents: () => void;
+    onOpenLesson: (lesson: Lesson) => void;
   };
   students: {
     studentListItems: StudentListItem[];
