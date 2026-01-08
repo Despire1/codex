@@ -821,7 +821,7 @@ const listPaymentEventsForStudent = async (
   const events = await prisma.paymentEvent.findMany({
     where,
     include: { lesson: true },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
 
   return events;
