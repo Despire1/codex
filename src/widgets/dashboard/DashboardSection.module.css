@@ -4,6 +4,41 @@
   gap: 12px;
 }
 
+.gridWithAttention {
+  grid-template-areas:
+    'attention'
+    'today'
+    'upcoming'
+    'unpaid'
+    'actions';
+}
+
+.gridNoAttention {
+  grid-template-areas:
+    'today'
+    'upcoming'
+    'unpaid'
+    'actions';
+}
+
+@media (min-width: 1024px) {
+  .gridWithAttention {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-areas:
+      'attention today'
+      'upcoming unpaid'
+      'upcoming actions';
+  }
+
+  .gridNoAttention {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-areas:
+      'upcoming today'
+      'upcoming unpaid'
+      'upcoming actions';
+  }
+}
+
 .card {
   background: var(--color-white);
   border: 1px solid var(--color-slate-200);
@@ -18,25 +53,8 @@
 }
 
 .attentionCard {
-  background: rgba(255, 188, 96, 0.15);
-  border-color: rgba(255, 188, 96, 0.35);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.attentionBody {
-  display: grid;
-  gap: 4px;
-}
-
-.attentionMain {
-  font-weight: 600;
-}
-
-.attentionNote {
-  color: var(--color-slate-500);
-  font-size: 13px;
+  border-left: 4px solid var(--color-orange-200);
+  padding-left: 12px;
 }
 
 .todaySummary {
@@ -98,9 +116,25 @@
   cursor: pointer;
 }
 
+.unpaidCardWrapper {
+  width: 100%;
+}
+
+.unpaidTrigger {
+  width: 100%;
+}
+
 .unpaidSummary {
   color: var(--color-slate-500);
   font-size: 14px;
+}
+
+.unpaidPopover {
+  width: min(360px, calc(100vw - 24px));
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px var(--shadow-slate-900-14);
 }
 
 .actionsRow {
@@ -113,4 +147,24 @@
 .muted {
   color: var(--color-slate-400);
   font-size: 13px;
+}
+
+.attentionArea {
+  grid-area: attention;
+}
+
+.todayArea {
+  grid-area: today;
+}
+
+.upcomingArea {
+  grid-area: upcoming;
+}
+
+.unpaidArea {
+  grid-area: unpaid;
+}
+
+.actionsArea {
+  grid-area: actions;
 }
