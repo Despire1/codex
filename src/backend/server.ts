@@ -793,8 +793,15 @@ const listPaymentEventsForStudent = async (
   } else if (filter === 'manual') {
     where.type = 'MANUAL_PAID';
   } else if (filter === 'charges') {
-    where.type = { in: ['AUTO_CHARGE', 'ADJUSTMENT'] };
-    where.lessonsDelta = { lt: 0 };
+    where.AND = [
+      {
+        OR: [
+          { type: 'AUTO_CHARGE' },
+          { type: 'ADJUSTMENT', lessonsDelta: { lt: 0 } },
+          { type: 'MANUAL_PAID', lessonsDelta: { lt: 0 } },
+        ],
+      },
+    ];
   }
 
   if (options?.date) {
