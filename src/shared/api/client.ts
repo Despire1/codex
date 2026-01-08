@@ -16,6 +16,27 @@ import {
   TeacherStudent,
 } from '../../entities/types';
 
+type SettingsPayload = Pick<
+  Teacher,
+  | 'timezone'
+  | 'defaultLessonDuration'
+  | 'lessonReminderEnabled'
+  | 'lessonReminderMinutes'
+  | 'unpaidReminderEnabled'
+  | 'unpaidReminderFrequency'
+  | 'unpaidReminderTime'
+  | 'studentNotificationsEnabled'
+  | 'studentPaymentRemindersEnabled'
+>;
+
+export type SessionSummary = {
+  id: number;
+  createdAt: string;
+  ip: string | null;
+  userAgent: string | null;
+  isCurrent: boolean;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
@@ -62,6 +83,17 @@ export const api = {
       homeworks: Homework[];
       lessons: Lesson[];
     }>('/api/bootstrap'),
+  getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
+  updateSettings: (payload: Partial<SettingsPayload>) =>
+    apiFetch<{ settings: SettingsPayload }>('/api/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  listSessions: () => apiFetch<{ sessions: SessionSummary[] }>('/api/sessions'),
+  revokeSession: (id: number) =>
+    apiFetch<{ status: string; sessionId: number }>(`/api/sessions/${id}/revoke`, { method: 'POST' }),
+  revokeOtherSessions: () =>
+    apiFetch<{ status: string; revoked: number }>(`/api/sessions/revoke-others`, { method: 'POST' }),
   addStudent: (payload: { customName: string; username?: string; pricePerLesson: number }) =>
     apiFetch<{ student: Student; link: TeacherStudent }>('/api/students', {
       method: 'POST',

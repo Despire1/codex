@@ -1,7 +1,16 @@
-import { type FC } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Teacher } from '../../entities/types';
-import { TransferLinkCard } from '../../features/auth/transfer';
+import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/MaterialIcons';
+import { api } from '../../shared/api/client';
+import { formatTimeZoneLabel, getResolvedTimeZone, getTimeZoneOptions } from '../../shared/lib/timezones';
+import { useToast } from '../../shared/lib/toast';
 import controls from '../../shared/styles/controls.module.css';
+import { SETTINGS_TABS, SettingsTabId } from './constants';
+import { NotificationsSettings } from './components/NotificationsSettings';
+import { ProfileSettings } from './components/ProfileSettings';
+import { ScheduleSettings } from './components/ScheduleSettings';
+import { SecuritySettings } from './components/SecuritySettings';
 import styles from './SettingsSection.module.css';
 
 interface SettingsSectionProps {
@@ -9,49 +18,260 @@ interface SettingsSectionProps {
   onTeacherChange: (teacher: Teacher) => void;
 }
 
+type SettingsPatch = Partial<
+  Pick<
+    Teacher,
+    | 'timezone'
+    | 'defaultLessonDuration'
+    | 'lessonReminderEnabled'
+    | 'lessonReminderMinutes'
+    | 'unpaidReminderEnabled'
+    | 'unpaidReminderFrequency'
+    | 'unpaidReminderTime'
+    | 'studentNotificationsEnabled'
+    | 'studentPaymentRemindersEnabled'
+  >
+>;
+
+const isSettingsTab = (value: string | null): value is SettingsTabId =>
+  SETTINGS_TABS.some((tab) => tab.id === value);
+
 export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherChange }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { showToast } = useToast();
+  const [isMobile, setIsMobile] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const teacherRef = useRef(teacher);
+  const pendingPatchRef = useRef<SettingsPatch>({});
+  const saveTimerRef = useRef<number | null>(null);
+  const autoTimeZoneRef = useRef(false);
+
+  useEffect(() => {
+    teacherRef.current = teacher;
+  }, [teacher]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 720px)');
+    const handleChange = () => setIsMobile(mediaQuery.matches);
+    handleChange();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+    return () => {
+      if (mediaQuery.addEventListener) {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, []);
+
+  const timeZoneOptions = useMemo(() => {
+    const options = getTimeZoneOptions();
+    if (teacher.timezone && !options.some((option) => option.value === teacher.timezone)) {
+      return [{ value: teacher.timezone, label: formatTimeZoneLabel(teacher.timezone) }, ...options];
+    }
+    return options;
+  }, [teacher.timezone]);
+
+  const applyTeacherPatch = useCallback(
+    (patch: SettingsPatch) => {
+      onTeacherChange({ ...teacherRef.current, ...patch });
+    },
+    [onTeacherChange],
+  );
+
+  const savePendingPatch = useCallback(async () => {
+    const patch = pendingPatchRef.current;
+    pendingPatchRef.current = {};
+    if (Object.keys(patch).length === 0) return;
+    setSaveStatus('saving');
+    try {
+      const data = await api.updateSettings(patch);
+      applyTeacherPatch(data.settings);
+      setSaveStatus('idle');
+      showToast({ message: 'Сохранено', variant: 'success' });
+    } catch (error) {
+      setSaveStatus('error');
+      showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
+    }
+  }, [applyTeacherPatch, showToast]);
+
+  const scheduleSave = useCallback(
+    (patch: SettingsPatch) => {
+      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = window.setTimeout(() => {
+        savePendingPatch();
+      }, 600);
+    },
+    [savePendingPatch],
+  );
+
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const handleSettingsChange = useCallback(
+    (patch: SettingsPatch) => {
+      applyTeacherPatch(patch);
+      scheduleSave(patch);
+    },
+    [applyTeacherPatch, scheduleSave],
+  );
+
+  const loadSettings = useCallback(async () => {
+    setLoadStatus('loading');
+    try {
+      const data = await api.getSettings();
+      applyTeacherPatch(data.settings);
+      setLoadStatus('ready');
+    } catch (error) {
+      setLoadStatus('error');
+    }
+  }, [applyTeacherPatch]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  useEffect(() => {
+    if (loadStatus !== 'ready') return;
+    if (autoTimeZoneRef.current) return;
+    if (teacher.timezone) return;
+    const resolved = getResolvedTimeZone();
+    if (!resolved) return;
+    autoTimeZoneRef.current = true;
+    handleSettingsChange({ timezone: resolved });
+  }, [handleSettingsChange, loadStatus, teacher.timezone]);
+
+  const tabFromQuery = new URLSearchParams(location.search).get('tab');
+  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const tabFromPath = pathSegments[0] === 'settings' && pathSegments[1] ? pathSegments[1] : null;
+  const activeTab: SettingsTabId = isSettingsTab(tabFromPath)
+    ? tabFromPath
+    : isSettingsTab(tabFromQuery)
+      ? tabFromQuery
+      : 'profile';
+
+  const showMobileList = isMobile && !tabFromPath && !tabFromQuery;
+
+  const activeTabLabel = SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label ?? 'Настройки';
+
+  const renderModule = () => {
+    if (loadStatus === 'loading') {
+      return <div className={styles.loadingState}>Загрузка…</div>;
+    }
+    if (loadStatus === 'error') {
+      return (
+        <div className={styles.errorState}>
+          Не удалось загрузить настройки.
+          <button className={controls.secondaryButton} type="button" onClick={loadSettings}>
+            Повторить
+          </button>
+        </div>
+      );
+    }
+
+    switch (activeTab) {
+      case 'profile':
+        return <ProfileSettings teacher={teacher} onChange={handleSettingsChange} timeZoneOptions={timeZoneOptions} />;
+      case 'schedule':
+        return (
+          <ScheduleSettings
+            teacher={teacher}
+            onChange={handleSettingsChange}
+            onComingSoonClick={() =>
+              showToast({ message: 'Скоро, в следующих обновлениях', variant: 'success' })
+            }
+          />
+        );
+      case 'notifications':
+        return <NotificationsSettings teacher={teacher} onChange={handleSettingsChange} />;
+      case 'security':
+        return <SecuritySettings />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeader}>
-        <h2>Профиль и настройки</h2>
-        <span className={styles.muted}>Авторизация через Telegram</span>
+    <section className={styles.page}>
+      <div className={styles.header}>
+        <h2 className={styles.title}>Настройки</h2>
+        <span className={styles.subtitle}>Авторизация через Telegram</span>
       </div>
-      <div className={styles.settingsGrid}>
-        <div>
-          <div className={styles.label}>Имя</div>
-          <div className={styles.settingValue}>{teacher.name}</div>
+
+      {showMobileList ? (
+        <div className={styles.moduleStack}>
+          <div className={`${styles.card} ${styles.mobileList}`}>
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                className={styles.mobileItem}
+                type="button"
+                onClick={() => navigate(`/settings/${tab.id}`)}
+              >
+                {tab.label}
+                <ChevronRightIcon width={20} height={20} />
+              </button>
+            ))}
+          </div>
+          {loadStatus === 'loading' && <div className={styles.loadingState}>Загрузка…</div>}
+          {loadStatus === 'error' && (
+            <div className={styles.errorState}>
+              Не удалось загрузить настройки.
+              <button className={controls.secondaryButton} type="button" onClick={loadSettings}>
+                Повторить
+              </button>
+            </div>
+          )}
         </div>
-        <div>
-          <div className={styles.label}>Telegram</div>
-          <div className={styles.settingValue}>@{teacher.username}</div>
+      ) : (
+        <div className={styles.layout}>
+          {!isMobile && (
+            <nav className={styles.card}>
+              <div className={styles.navList}>
+                {SETTINGS_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
+                    type="button"
+                    onClick={() => navigate(`/settings/${tab.id}`)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+          )}
+
+          <div className={`${styles.card} ${styles.moduleContent}`}>
+            <div className={styles.moduleHeader}>
+              {isMobile && (
+                <button className={styles.backButton} type="button" onClick={() => navigate('/settings')}>
+                  <ChevronLeftIcon width={20} height={20} />
+                </button>
+              )}
+              <h3>{activeTabLabel}</h3>
+              {saveStatus === 'saving' && <span className={styles.helperText}>Сохраняем…</span>}
+            </div>
+            {renderModule()}
+            {saveStatus === 'error' && <div className={styles.helperText}>Ошибка сохранения.</div>}
+          </div>
         </div>
-        <div>
-          <div className={styles.label}>Chat ID</div>
-          <div className={styles.settingValue}>{teacher.chatId}</div>
-        </div>
-        <div>
-          <div className={styles.label}>Длительность урока по умолчанию</div>
-          <input
-            className={controls.input}
-            type="number"
-            value={teacher.defaultLessonDuration}
-            onChange={(e) => onTeacherChange({ ...teacher, defaultLessonDuration: Number(e.target.value) })}
-          />
-        </div>
-        <div>
-          <div className={styles.label}>Напоминать за (мин)</div>
-          <input
-            className={controls.input}
-            type="number"
-            value={teacher.reminderMinutesBefore}
-            onChange={(e) => onTeacherChange({ ...teacher, reminderMinutesBefore: Number(e.target.value) })}
-          />
-        </div>
-      </div>
-      <TransferLinkCard />
-      <div className={styles.helperBox}>
-        Вход доступен только через Telegram. Для доступа с компьютера создайте одноразовую ссылку в Mini App.
-      </div>
+      )}
     </section>
   );
 };

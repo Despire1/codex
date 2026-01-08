@@ -25,6 +25,7 @@ const RATE_LIMIT_TRANSFER_CREATE_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFE
 const RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN ?? 10);
 const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN ?? 10);
 const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
+const ALLOWED_UNPAID_REMINDER_FREQUENCIES = new Set(['daily', 'every_two_days', 'weekly']);
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status;
@@ -157,6 +158,13 @@ const getSessionUser = async (req: IncomingMessage) => {
   return session?.user ?? null;
 };
 
+const getSessionTokenHash = (req: IncomingMessage) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (!token) return null;
+  return hashToken(token);
+};
+
 const createSession = async (userId: number, req: IncomingMessage, res: ServerResponse) => {
   const ttlMinutes = Number.isFinite(SESSION_TTL_MINUTES) ? SESSION_TTL_MINUTES : 1440;
   const token = randomToken(32);
@@ -195,6 +203,8 @@ const isRateLimited = (key: string, limit: number, windowMs: number) => {
 
 const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
+const isValidTimeString = (value: string) => /^\d{2}:\d{2}$/.test(value);
+
 const formatTeacherName = (user: User) => {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
   return fullName || user.username || 'Teacher';
@@ -213,6 +223,128 @@ const ensureTeacher = async (user: User) =>
       username: user.username ?? null,
     },
   });
+
+const pickTeacherSettings = (teacher: any) => ({
+  timezone: teacher.timezone ?? null,
+  defaultLessonDuration: teacher.defaultLessonDuration,
+  lessonReminderEnabled: teacher.lessonReminderEnabled,
+  lessonReminderMinutes: teacher.lessonReminderMinutes,
+  unpaidReminderEnabled: teacher.unpaidReminderEnabled,
+  unpaidReminderFrequency: teacher.unpaidReminderFrequency,
+  unpaidReminderTime: teacher.unpaidReminderTime,
+  studentNotificationsEnabled: teacher.studentNotificationsEnabled,
+  studentPaymentRemindersEnabled: teacher.studentPaymentRemindersEnabled,
+});
+
+const getSettings = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  return { settings: pickTeacherSettings(teacher) };
+};
+
+const updateSettings = async (user: User, body: any) => {
+  const teacher = await ensureTeacher(user);
+  const data: Record<string, any> = {};
+
+  if (typeof body.timezone === 'string') {
+    const trimmed = body.timezone.trim();
+    data.timezone = trimmed ? trimmed : null;
+  } else if (body.timezone === null) {
+    data.timezone = null;
+  }
+
+  if (body.defaultLessonDuration !== undefined) {
+    const numeric = Number(body.defaultLessonDuration);
+    if (Number.isFinite(numeric)) {
+      data.defaultLessonDuration = clampNumber(Math.round(numeric), 15, 240);
+    }
+  }
+
+  if (typeof body.lessonReminderEnabled === 'boolean') {
+    data.lessonReminderEnabled = body.lessonReminderEnabled;
+  }
+
+  if (body.lessonReminderMinutes !== undefined) {
+    const numeric = Number(body.lessonReminderMinutes);
+    if (Number.isFinite(numeric)) {
+      data.lessonReminderMinutes = clampNumber(Math.round(numeric), 5, 120);
+    }
+  }
+
+  if (typeof body.unpaidReminderEnabled === 'boolean') {
+    data.unpaidReminderEnabled = body.unpaidReminderEnabled;
+  }
+
+  if (typeof body.unpaidReminderFrequency === 'string' && ALLOWED_UNPAID_REMINDER_FREQUENCIES.has(body.unpaidReminderFrequency)) {
+    data.unpaidReminderFrequency = body.unpaidReminderFrequency;
+  }
+
+  if (typeof body.unpaidReminderTime === 'string' && isValidTimeString(body.unpaidReminderTime)) {
+    data.unpaidReminderTime = body.unpaidReminderTime;
+  }
+
+  if (typeof body.studentNotificationsEnabled === 'boolean') {
+    data.studentNotificationsEnabled = body.studentNotificationsEnabled;
+  }
+
+  if (typeof body.studentPaymentRemindersEnabled === 'boolean') {
+    data.studentPaymentRemindersEnabled = body.studentPaymentRemindersEnabled;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return { settings: pickTeacherSettings(teacher) };
+  }
+
+  const updatedTeacher = await prisma.teacher.update({
+    where: { chatId: teacher.chatId },
+    data,
+  });
+
+  return { settings: pickTeacherSettings(updatedTeacher) };
+};
+
+const listSessions = async (user: User, req: IncomingMessage) => {
+  const tokenHash = getSessionTokenHash(req);
+  const now = new Date();
+  const sessions = await prisma.session.findMany({
+    where: { userId: user.id, revokedAt: null, expiresAt: { gt: now } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return {
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      createdAt: session.createdAt,
+      ip: session.ip,
+      userAgent: session.userAgent,
+      isCurrent: tokenHash ? session.tokenHash === tokenHash : false,
+    })),
+  };
+};
+
+const revokeSession = async (user: User, sessionId: number) => {
+  const session = await prisma.session.findUnique({ where: { id: sessionId } });
+  if (!session || session.userId !== user.id) {
+    throw new Error('Сессия не найдена');
+  }
+  const updated = await prisma.session.update({
+    where: { id: sessionId },
+    data: { revokedAt: new Date() },
+  });
+  return { status: 'ok', sessionId: updated.id };
+};
+
+const revokeOtherSessions = async (user: User, req: IncomingMessage) => {
+  const tokenHash = getSessionTokenHash(req);
+  const result = await prisma.session.updateMany({
+    where: {
+      userId: user.id,
+      revokedAt: null,
+      ...(tokenHash ? { tokenHash: { not: tokenHash } } : {}),
+    },
+    data: { revokedAt: new Date() },
+  });
+  return { status: 'ok', revoked: result.count };
+};
 
 const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pendingHomework' | 'noReminder') => {
   const teacher = await ensureTeacher(user);
@@ -2323,6 +2455,35 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         lessons: filteredLessons,
         homeworks: filteredHomeworks,
       });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/settings') {
+      const data = await getSettings(requireApiUser());
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'PATCH' && pathname === '/api/settings') {
+      const body = await readBody(req);
+      const data = await updateSettings(requireApiUser(), body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/sessions') {
+      const data = await listSessions(requireApiUser(), req);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/sessions/revoke-others') {
+      const data = await revokeOtherSessions(requireApiUser(), req);
+      return sendJson(res, 200, data);
+    }
+
+    const sessionRevokeMatch = pathname.match(/^\/api\/sessions\/(\d+)\/revoke$/);
+    if (req.method === 'POST' && sessionRevokeMatch) {
+      const sessionId = Number(sessionRevokeMatch[1]);
+      if (!Number.isFinite(sessionId)) return badRequest(res, 'invalid_session_id');
+      const data = await revokeSession(requireApiUser(), sessionId);
+      return sendJson(res, 200, data);
     }
 
     if (req.method === 'GET' && pathname === '/api/students') {

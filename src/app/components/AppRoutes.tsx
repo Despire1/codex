@@ -164,7 +164,7 @@ export const AppRoutes: FC<AppRoutesProps> = ({
       <Route path={tabPathById.dashboard} element={<DashboardSection {...dashboard} />} />
       <Route path={tabPathById.students} element={<StudentsSection {...students} />} />
       <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
-      <Route path={tabPathById.settings} element={<SettingsSection {...settings} />} />
+      <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />
       <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
     </Routes>
   );
