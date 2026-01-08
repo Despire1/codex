@@ -4,7 +4,9 @@ import { ru } from 'date-fns/locale';
 import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
+  DeleteOutlineIcon,
   EditOutlinedIcon,
+  NotificationsNoneOutlinedIcon,
 } from '../../../icons/MaterialIcons';
 import styles from '../StudentsSection.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
@@ -232,40 +234,69 @@ export const StudentHero: FC<StudentHeroProps> = ({
               Напоминания выкл.
             </button>
           )}
-          <div className={styles.actionsMenuWrapper}>
-            <AdaptivePopover
-              isOpen={isActionsMenuOpen}
-              onClose={() => setIsActionsMenuOpen(false)}
-              trigger={
-                <button
-                  className={controls.iconButton}
-                  aria-label="Дополнительные действия"
-                  onClick={() => setIsActionsMenuOpen((prev) => !prev)}
-                >
-                  ⋯
+          {isMobile ? (
+            <div className={styles.actionsMenuWrapper}>
+              <AdaptivePopover
+                isOpen={isActionsMenuOpen}
+                onClose={() => setIsActionsMenuOpen(false)}
+                trigger={
+                  <button
+                    className={controls.iconButton}
+                    aria-label="Дополнительные действия"
+                    onClick={() => setIsActionsMenuOpen((prev) => !prev)}
+                  >
+                    ⋯
+                  </button>
+                }
+                side="bottom"
+                align="end"
+                offset={6}
+                className={styles.actionsMenu}
+              >
+                <button onClick={() => handleMenuAction(onEditStudent)}>Редактировать ученика</button>
+                <button onClick={() => handleMenuAction(handleOpenReminderSettings)}>Напоминания</button>
+                <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
+                  Напомнить про оплату
                 </button>
-              }
-              side="bottom"
-              align="end"
-              offset={6}
-              className={styles.actionsMenu}
-            >
-              <button onClick={() => handleMenuAction(onEditStudent)}>Редактировать ученика</button>
-              <button onClick={() => handleMenuAction(handleOpenReminderSettings)}>Напоминания</button>
-              <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
-                Напомнить про оплату
-              </button>
-              <button onClick={() => handleMenuAction(() => navigator.clipboard?.writeText('Правила и памятка'))}>
-                Скопировать памятку
+                <button onClick={() => handleMenuAction(() => navigator.clipboard?.writeText('Правила и памятка'))}>
+                  Скопировать памятку
+                </button>
+                <button
+                  className={styles.dangerButton}
+                  onClick={() => handleMenuAction(() => onRequestDeleteStudent(selectedStudent.id))}
+                >
+                  Удалить ученика
+                </button>
+              </AdaptivePopover>
+            </div>
+          ) : (
+            <div className={styles.actionsInline}>
+              <button
+                type="button"
+                className={controls.iconButton}
+                aria-label="Редактировать ученика"
+                onClick={onEditStudent}
+              >
+                <EditOutlinedIcon className={styles.actionIcon} />
               </button>
               <button
-                className={styles.dangerButton}
-                onClick={() => handleMenuAction(() => onRequestDeleteStudent(selectedStudent.id))}
+                type="button"
+                className={controls.iconButton}
+                aria-label="Настроить напоминания"
+                onClick={handleOpenReminderSettings}
               >
-                Удалить ученика
+                <NotificationsNoneOutlinedIcon className={styles.actionIcon} />
               </button>
-            </AdaptivePopover>
-          </div>
+              <button
+                type="button"
+                className={`${controls.iconButton} ${styles.actionDanger}`}
+                aria-label="Удалить ученика"
+                onClick={() => onRequestDeleteStudent(selectedStudent.id)}
+              >
+                <DeleteOutlineIcon className={styles.actionIcon} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
