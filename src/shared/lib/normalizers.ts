@@ -1,6 +1,6 @@
-import { format } from 'date-fns';
 import { Homework, HomeworkStatus, Lesson } from '../../entities/types';
 import { normalizeLessonColor } from './lessonColors';
+import { formatInTimeZone, todayISO as todayISOWithTimeZone } from './timezoneDates';
 
 export const normalizeLesson = (lesson: any): Lesson => ({
   ...lesson,
@@ -47,7 +47,7 @@ const normalizeTimeSpent = (value: any): number | null => {
   return Math.round(numericValue);
 };
 
-export const normalizeHomework = (homework: any): Homework => {
+export const normalizeHomework = (homework: any, timeZone?: string | null): Homework => {
   let attachments: any[] = [];
   if (Array.isArray(homework.attachments)) {
     attachments = homework.attachments;
@@ -67,9 +67,14 @@ export const normalizeHomework = (homework: any): Homework => {
     timeSpentMinutes: normalizeTimeSpent(homework.timeSpentMinutes),
     deadline: homework.deadline
       ? typeof homework.deadline === 'string'
-        ? homework.deadline.slice(0, 10)
-        : new Date(homework.deadline).toISOString().slice(0, 10)
+        ? formatInTimeZone(homework.deadline, 'yyyy-MM-dd', { timeZone })
+        : formatInTimeZone(homework.deadline, 'yyyy-MM-dd', { timeZone })
     : null,
+    deadlineAt: homework.deadline
+      ? typeof homework.deadline === 'string'
+        ? homework.deadline
+        : new Date(homework.deadline).toISOString()
+      : null,
     createdAt: typeof homework.createdAt === 'string' ? homework.createdAt : new Date(homework.createdAt).toISOString(),
     updatedAt: typeof homework.updatedAt === 'string' ? homework.updatedAt : new Date(homework.updatedAt).toISOString(),
     lastReminderAt: homework.lastReminderAt
@@ -91,4 +96,4 @@ export const normalizeHomework = (homework: any): Homework => {
   };
 };
 
-export const todayISO = () => format(new Date(), 'yyyy-MM-dd');
+export const todayISO = (timeZone?: string | null) => todayISOWithTimeZone(timeZone);

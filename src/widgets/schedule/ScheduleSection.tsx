@@ -1,14 +1,4 @@
-import {
-  addDays,
-  addMonths,
-  endOfMonth,
-  format,
-  isToday,
-  isSameDay,
-  parseISO,
-  startOfMonth,
-  startOfWeek,
-} from 'date-fns';
+import { addDays, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
   useEffect,
@@ -32,6 +22,8 @@ import {
 import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
+import { useTimeZone } from '../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
@@ -89,6 +81,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   onDayViewDateChange,
   onGoToToday,
 }) => {
+  const timeZone = useTimeZone();
+  const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const dayPickerRef = useRef<HTMLDivElement>(null);
@@ -108,12 +102,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
-      const day = lesson.startAt.slice(0, 10);
+      const day = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone });
       if (!acc[day]) acc[day] = [];
       acc[day].push(lesson);
       return acc;
     }, {});
-  }, [lessons]);
+  }, [lessons, timeZone]);
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -152,9 +146,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   );
 
   const defaultWeekDayIso = useMemo(() => {
-    const todayIso = format(new Date(), 'yyyy-MM-dd');
+    const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
     return weekDays.find((day) => day.iso === todayIso)?.iso ?? weekDays[0]?.iso ?? todayIso;
-  }, [weekDays]);
+  }, [timeZone, weekDays]);
 
   const capitalizedDayLabel = useMemo(
     () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
@@ -199,7 +193,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     if (scheduleView !== 'month' || selectedMonthDay) return;
 
     const daysInMonth = buildMonthDays(selectedMonth).filter((day) => day.inMonth);
-    const todayIso = format(new Date(), 'yyyy-MM-dd');
+    const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
 
     const defaultDay =
       daysInMonth.find((day) => day.iso === todayIso) ||
@@ -213,7 +207,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         setSelectedMonthDay(defaultDay.iso);
       }
     }
-  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange, isMobileViewport]);
+  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange, isMobileViewport, timeZone]);
 
   useEffect(() => {
     const handleResize = () => setIsMobileViewport(window.innerWidth <= 720);
@@ -230,7 +224,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
     const weekStart = startOfWeek(dayViewDate, { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
     const weekEnd = addDays(weekStart, 6);
-    const today = new Date();
+    const today = todayZoned;
     const todayIso = format(today, 'yyyy-MM-dd');
     const weekStartIso = format(weekStart, 'yyyy-MM-dd');
     const weekKey = weekStartIso;
@@ -244,9 +238,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const currentIso = format(dayViewDate, 'yyyy-MM-dd');
 
     if (currentIso !== targetIso) {
-      onDayViewDateChange(new Date(targetIso));
+      onDayViewDateChange(toZonedDate(toUtcDateFromDate(targetIso, timeZone), timeZone));
     }
-  }, [isMobileWeekView, dayViewDate, onDayViewDateChange]);
+  }, [isMobileWeekView, dayViewDate, onDayViewDateChange, timeZone, todayZoned]);
 
   useEffect(() => {
     if (selectedMonthDay) {
@@ -271,7 +265,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   };
 
   const lessonPosition = (lesson: Lesson) => {
-    const start = parseISO(lesson.startAt);
+    const start = toZonedDate(lesson.startAt, timeZone);
     const startMinutes = start.getHours() * 60 + start.getMinutes();
     const top = Math.max(0, ((startMinutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT);
     const height = Math.max(36, (lesson.durationMinutes * HOUR_BLOCK_HEIGHT) / 60);
@@ -281,7 +275,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const buildLessonLayout = (dayLessons: Lesson[]) => {
     const sorted = dayLessons
       .map((lesson) => {
-        const start = parseISO(lesson.startAt);
+        const start = toZonedDate(lesson.startAt, timeZone);
         const startMinutes = start.getHours() * 60 + start.getMinutes();
         const endMinutes = startMinutes + lesson.durationMinutes;
         const position = lessonPosition(lesson);
@@ -482,7 +476,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       .padStart(2, '0');
     const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
 
-    onDayViewDateChange(new Date(dayIso));
+    onDayViewDateChange(toZonedDate(toUtcDateFromDate(dayIso, timeZone), timeZone));
     onOpenLessonModal(dayIso, `${hoursValue}:${minutes}`);
   };
 
@@ -491,7 +485,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       <div className={styles.weekHeaderRow}>
         <div className={styles.timeColumnSpacer} />
         {weekDays.map((day) => (
-          <div key={day.iso} className={`${styles.weekDayHeader} ${isToday(day.date) ? styles.todayHeader : ''}`}>
+          <div
+            key={day.iso}
+            className={`${styles.weekDayHeader} ${isSameDay(day.date, todayZoned) ? styles.todayHeader : ''}`}
+          >
             <div className={styles.weekDayName}>{format(day.date, 'EEEE', { locale: ru })}</div>
             <div className={styles.weekDayDate}>{format(day.date, 'd MMM', { locale: ru })}</div>
           </div>
@@ -511,8 +508,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           <div className={styles.weekColumns}>
             {weekDays.map((day) => {
               const dayLessons = lessons
-                .filter((lesson) => lesson.startAt.slice(0, 10) === day.iso)
-                .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+                .filter((lesson) => formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone }) === day.iso)
+                .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
               const dayLessonLayouts = buildLessonLayout(dayLessons);
 
               return (
@@ -530,7 +527,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
                     {dayLessonLayouts.map((layout) => {
                       const lesson = layout.lesson;
-                      const startDate = parseISO(lesson.startAt);
+                      const startDate = toZonedDate(lesson.startAt, timeZone);
                       const participants = buildParticipants(lesson);
                       const isGroupLesson = participants.length > 1;
                       const dateTimeLabel = `${format(startDate, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
@@ -574,11 +571,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const renderMobileWeekView = () => {
     const selectedIso = format(dayViewDate, 'yyyy-MM-dd');
-    const selectedDate = selectedIso ? parseISO(selectedIso) : dayViewDate;
+    const selectedDate = selectedIso
+      ? toZonedDate(toUtcDateFromDate(selectedIso, timeZone), timeZone)
+      : dayViewDate;
     const selectedLessons = selectedIso
       ? (lessonsByDay[selectedIso] ?? [])
           .slice()
-          .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime())
+          .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
       : [];
     const selectedLessonLayouts = buildLessonLayout(selectedLessons);
     const selectedDayIso = format(selectedDate, 'yyyy-MM-dd');
@@ -606,7 +605,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
-                const date = parseISO(lesson.startAt);
+                const date = toZonedDate(lesson.startAt, timeZone);
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
                 }`;
@@ -647,8 +646,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderDayView = () => {
     const dayIso = format(dayViewDate, 'yyyy-MM-dd');
     const dayLessons = lessons
-      .filter((lesson) => lesson.startAt.slice(0, 10) === dayIso)
-      .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
+      .filter((lesson) => formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone }) === dayIso)
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
     const dayLessonLayouts = buildLessonLayout(dayLessons);
 
     return (
@@ -680,7 +679,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
-                const date = parseISO(lesson.startAt);
+                const date = toZonedDate(lesson.startAt, timeZone);
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
                 }`;
@@ -725,7 +724,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const selectedDayLessons = selectedMonthDay
       ? (lessonsByDay[selectedMonthDay] ?? []).slice().sort((a, b) => a.startAt.localeCompare(b.startAt))
       : [];
-    const selectedDayDate = selectedMonthDay ? parseISO(selectedMonthDay) : null;
+    const selectedDayDate = selectedMonthDay
+      ? toZonedDate(toUtcDateFromDate(selectedMonthDay, timeZone), timeZone)
+      : null;
 
     const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!isMobileMonthView || !selectedMonthDay) return;
@@ -806,7 +807,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         <div className={styles.dayPanelList}>
           {selectedDayLessons.map((lesson) => {
-            const date = parseISO(lesson.startAt);
+            const date = toZonedDate(lesson.startAt, timeZone);
             const participants = buildParticipants(lesson);
             const isGroupLesson = participants.length > 1;
             const lessonLabel = getLessonLabel(participants);
@@ -875,7 +876,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     setSelectedMonthDay(day.iso);
                     onDayViewDateChange(day.date);
                   };
-                  const isTodayCell = isToday(day.date);
+                  const isTodayCell = isSameDay(day.date, todayZoned);
 
                   return (
                     <div
@@ -1018,7 +1019,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div className={styles.weekDayPicker}>
                 {weekDays.map((day, index) => {
                   const isSelected = format(dayViewDate, 'yyyy-MM-dd') === day.iso;
-                  const isTodayCell = isToday(day.date);
+                  const isTodayCell = isSameDay(day.date, todayZoned);
 
                   return (
                     <button

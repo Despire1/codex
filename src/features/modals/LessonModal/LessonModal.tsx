@@ -19,6 +19,8 @@ import modalStyles from '../modal.module.css';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
 import { LessonColor } from '../../../entities/types';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface LessonDraft {
   studentId: number | undefined;
@@ -69,16 +71,17 @@ export const LessonModal: FC<LessonModalProps> = ({
 }) => {
   if (!open) return null;
 
+  const timeZone = useTimeZone();
   const isEditing = Boolean(editingLessonId);
   const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
   const startAt = useMemo(
-    () => new Date(`${draft.date || ''}T${draft.time || '00:00'}`),
-    [draft.date, draft.time],
+    () => toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone),
+    [draft.date, draft.time, timeZone],
   );
 
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceLocked && !checked) return;
-    const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getUTCDay();
+    const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getDay();
     onDraftChange({
       ...draft,
       isRecurring: checked,

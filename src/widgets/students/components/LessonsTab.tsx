@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format, parseISO, startOfDay } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MoreHorizIcon } from '../../../icons/MaterialIcons';
@@ -19,6 +19,8 @@ import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
 import { LessonFiltersPopover } from './LessonFiltersPopover';
 import { LessonActionsSheet } from './LessonActionsSheet';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface LessonsTabProps {
   studentLessons: Lesson[];
@@ -76,6 +78,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [activeLessonActions, setActiveLessonActions] = useState<Lesson | null>(null);
   const [isLessonSheetOpen, setIsLessonSheetOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const timeZone = useTimeZone();
 
   useEffect(() => {
     if (!datePickerOpen) return undefined;
@@ -125,8 +128,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
 
   const parseDateValue = (value?: string) => {
     if (!value) return undefined;
-    const parsed = parseISO(value);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    const parsed = toUtcDateFromDate(value, timeZone);
+    return Number.isNaN(parsed.getTime()) ? undefined : toZonedDate(parsed, timeZone);
   };
 
   const selectedRange = useMemo(
@@ -174,12 +177,12 @@ export const LessonsTab: FC<LessonsTabProps> = ({
       const participant = lesson.participants?.find((p) => p.studentId === selectedStudentId);
       const resolvedPrice = participant?.price ?? selectedStudent?.link.pricePerLesson ?? lesson.price;
       const isPaid = participant?.isPaid ?? lesson.isPaid;
-      const lessonDate = startOfDay(parseISO(lesson.startAt));
-      const today = startOfDay(new Date());
+      const lessonDate = startOfDay(toZonedDate(lesson.startAt, timeZone));
+      const today = startOfDay(toZonedDate(new Date(), timeZone));
       const isPastLesson = lessonDate.getTime() < today.getTime();
       return { participant, resolvedPrice, isPaid, isPastLesson };
     },
-    [selectedStudent?.link.pricePerLesson, selectedStudentId],
+    [selectedStudent?.link.pricePerLesson, selectedStudentId, timeZone],
   );
 
   const activeLessonDerived = useMemo(
@@ -295,7 +298,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                   <article key={lesson.id} className={styles.lessonCard}>
                     <div className={styles.lessonCardHeader}>
                       <div className={styles.lessonCardDate}>
-                        {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                        {formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}
                       </div>
                       <div className={styles.lessonCardActions}>{renderLessonActions(lesson, isPaid)}</div>
                     </div>
@@ -388,7 +391,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         <TableCell>
                           <div className={styles.lessonDateCell}>
                             <div className={styles.lessonTitle}>
-                              {format(parseISO(lesson.startAt), 'd MMM yyyy, HH:mm', { locale: ru })}
+                              {formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}
                             </div>
                           </div>
                         </TableCell>

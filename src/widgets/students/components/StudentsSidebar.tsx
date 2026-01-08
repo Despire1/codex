@@ -1,5 +1,5 @@
 import { FC, useMemo, useState, type RefObject } from 'react';
-import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { addDays, format, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Lesson, StudentListItem } from '../../../entities/types';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
@@ -7,6 +7,8 @@ import controls from '../../../shared/styles/controls.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from '../StudentsSection.module.css';
 import { StudentListCard } from './StudentListCard';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface StudentsSidebarProps {
   studentListItems: StudentListItem[];
@@ -45,6 +47,8 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const isFilterActive = activeFilter !== 'all';
+  const timeZone = useTimeZone();
+  const todayZoned = toZonedDate(new Date(), timeZone);
 
   const nextLessonByStudent = useMemo(() => {
     const now = new Date();
@@ -52,7 +56,7 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
 
     lessons.forEach((lesson) => {
       if (lesson.status !== 'SCHEDULED') return;
-      const lessonDate = parseISO(lesson.startAt);
+      const lessonDate = new Date(lesson.startAt);
       if (lessonDate < now) return;
 
       const studentIds = new Set<number>();
@@ -76,14 +80,15 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
     if (!lessonDate) {
       return { label: 'Нет занятий', variant: 'empty' as const };
     }
-    const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
-    if (isToday(lessonDate)) {
+    const zonedLessonDate = toZonedDate(lessonDate, timeZone);
+    const timeLabel = format(zonedLessonDate, 'HH:mm', { locale: ru });
+    if (isSameDay(zonedLessonDate, todayZoned)) {
       return { label: `Сегодня, ${timeLabel}`, variant: 'today' as const };
     }
-    if (isTomorrow(lessonDate)) {
+    if (isSameDay(zonedLessonDate, addDays(todayZoned, 1))) {
       return { label: `Завтра, ${timeLabel}`, variant: 'future' as const };
     }
-    return { label: format(lessonDate, 'd MMM, HH:mm', { locale: ru }), variant: 'future' as const };
+    return { label: formatInTimeZone(lessonDate, 'd MMM, HH:mm', { locale: ru, timeZone }), variant: 'future' as const };
   };
 
   return (

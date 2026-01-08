@@ -5,6 +5,8 @@ import { Task, ViewMode } from '@/entities/task/model/types';
 import { WeekView } from '@/widgets/WeekView/WeekView';
 import { MonthView } from '@/widgets/MonthView/MonthView';
 import styles from './Calendar.module.css';
+import { useTimeZone } from '@/shared/lib/timezoneContext';
+import { toZonedDate } from '@/shared/lib/timezoneDates';
 
 interface Props {
   tasks: Task[];
@@ -12,7 +14,8 @@ interface Props {
 
 export const Calendar = ({ tasks }: Props) => {
   const [mode, setMode] = useState<ViewMode>('week');
-  const today = useMemo(() => new Date(), []);
+  const timeZone = useTimeZone();
+  const today = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
 
   const weekLabel = useMemo(() => {
     const start = startOfWeek(today, { weekStartsOn: 1 });

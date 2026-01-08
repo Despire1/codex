@@ -1,23 +1,18 @@
 import { FC, useMemo } from 'react';
-import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import { addDays, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Box, Chip, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack } from '@mui/material';
 
 import { AddOutlinedIcon, HistoryOutlinedIcon, RemoveOutlinedIcon } from '../../../icons/MaterialIcons';
 import { Lesson, PaymentEvent } from '../../../entities/types';
 import styles from '../StudentsSection.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface PaymentListProps {
   payments: PaymentEvent[];
   onOpenLesson?: (lesson: Lesson) => void;
 }
-
-const getDateLabel = (value: string) => {
-  const date = parseISO(value);
-  if (isToday(date)) return 'Сегодня';
-  if (isYesterday(date)) return 'Вчера';
-  return format(date, 'd MMMM', { locale: ru });
-};
 
 const getEventTitle = (event: PaymentEvent) => {
   switch (event.type) {
@@ -119,8 +114,10 @@ const getEventIcon = (event: PaymentEvent) => {
   return HistoryOutlinedIcon;
 };
 
-const formatLessonLabel = (lesson?: Lesson | null) =>
-  lesson?.startAt ? `Занятие ${format(parseISO(lesson.startAt), 'd MMM, HH:mm', { locale: ru })}` : 'Без привязки к занятию';
+const formatLessonLabel = (lesson: Lesson | null | undefined, timeZone: string) =>
+  lesson?.startAt
+    ? `Занятие ${formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone })}`
+    : 'Без привязки к занятию';
 
 const formatEventValue = (event: PaymentEvent) => {
   if (event.type === 'ADJUSTMENT' && event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
@@ -137,13 +134,23 @@ export const PaymentList: FC<PaymentListProps> = ({
   payments,
   onOpenLesson,
 }) => {
+  const timeZone = useTimeZone();
+  const todayZoned = toZonedDate(new Date(), timeZone);
+
+  const getDateLabel = (value: string) => {
+    const date = toZonedDate(value, timeZone);
+    if (isSameDay(date, todayZoned)) return 'Сегодня';
+    if (isSameDay(date, addDays(todayZoned, -1))) return 'Вчера';
+    return formatInTimeZone(value, 'd MMMM', { locale: ru, timeZone });
+  };
+
   const groupedEvents = useMemo(() => {
     return payments.reduce<Record<string, PaymentEvent[]>>((acc, event) => {
       const key = getDateLabel(event.createdAt);
       acc[key] = acc[key] ? [...acc[key], event] : [event];
       return acc;
     }, {});
-  }, [payments]);
+  }, [payments, timeZone, todayZoned]);
 
   const groupEntries = Object.entries(groupedEvents);
 
@@ -164,10 +171,13 @@ export const PaymentList: FC<PaymentListProps> = ({
                   </div>
                   {events.map((event) => {
                     const IconComponent = getEventIcon(event);
-                    const timestamp = format(parseISO(event.createdAt), 'd MMM yyyy, HH:mm', { locale: ru });
-                    const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson) : 'Без привязки к занятию';
+                    const timestamp = formatInTimeZone(event.createdAt, 'd MMM yyyy, HH:mm', {
+                      locale: ru,
+                      timeZone,
+                    });
+                    const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson, timeZone) : 'Без привязки к занятию';
                     const lessonTimestamp = event.lesson?.startAt
-                      ? format(parseISO(event.lesson.startAt), 'd MMM, HH:mm', { locale: ru })
+                      ? formatInTimeZone(event.lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone })
                       : 'Без привязки к занятию';
                     const isClickable = Boolean(event.lessonId && event.lesson && onOpenLesson);
                     const valueMeta = formatEventValue(event);

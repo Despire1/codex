@@ -1,8 +1,9 @@
-import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { FC } from 'react';
 import { pluralizeRu } from '../../../shared/lib/pluralizeRu';
 import styles from './UnpaidLessonsPopoverContent.module.css';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
 export interface UnpaidStudentGroup {
   studentId: number;
@@ -17,6 +18,7 @@ interface UnpaidLessonsPopoverContentProps {
 }
 
 export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> = ({ groups, onOpenStudent }) => {
+  const timeZone = useTimeZone();
   return (
     <div className={styles.root}>
       <div className={styles.title}>Неоплаченные занятия</div>
@@ -40,7 +42,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                 <div className={styles.groupLessons}>
                   {visibleLessons.map((lesson) => (
                     <div key={lesson.id} className={styles.lessonRow}>
-                      {format(parseISO(lesson.startAt), 'd MMM, HH:mm', { locale: ru })}
+                      {formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone })}
                     </div>
                   ))}
                   {remaining > 0 && <div className={styles.lessonMore}>и ещё {remaining}</div>}

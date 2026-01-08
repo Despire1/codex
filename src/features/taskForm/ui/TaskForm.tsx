@@ -3,10 +3,11 @@ import { useDispatch } from 'react-redux';
 import { addTask } from '@/entities/task/model/taskSlice';
 import { Button } from '@/shared/ui/Button/Button';
 import { Select } from '@/shared/ui/Select/Select';
-import { formatISO } from 'date-fns';
 import styles from './TaskForm.module.css';
 import { Input } from '@/shared/ui/Input/Input';
 import { DatePickerField } from '@/shared/ui/DatePickerField';
+import { useTimeZone } from '@/shared/lib/timezoneContext';
+import { todayISO } from '@/shared/lib/timezoneDates';
 
 const durationOptions = [30, 45, 60, 90, 120];
 
@@ -18,7 +19,8 @@ interface TaskFormProps {
 
 export const TaskForm = ({ initialDate, initialStartTime, onSuccess }: TaskFormProps) => {
   const dispatch = useDispatch();
-  const today = useMemo(() => formatISO(new Date(), { representation: 'date' }), []);
+  const timeZone = useTimeZone();
+  const today = useMemo(() => todayISO(timeZone), [timeZone]);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(initialDate ?? today);
   const [startTime, setStartTime] = useState(initialStartTime ?? '09:00');

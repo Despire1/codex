@@ -1,5 +1,4 @@
 import { DragEvent, FC } from 'react';
-import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
   AddOutlinedIcon,
@@ -14,6 +13,8 @@ import { Homework, HomeworkAttachment, HomeworkStatus } from '../../../entities/
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
 import { HomeworkDraft, HomeworkStatusInfo, SelectedStudent } from '../types';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromDate } from '../../../shared/lib/timezoneDates';
 
 interface HomeworkDrawerProps {
   activeHomework: Homework;
@@ -94,6 +95,7 @@ export const HomeworkDrawer: FC<HomeworkDrawerProps> = ({
   formatCompletionMoment,
   getStatusLabel,
 }) => {
+  const timeZone = useTimeZone();
   return (
     <>
       <button
@@ -171,7 +173,10 @@ export const HomeworkDrawer: FC<HomeworkDrawerProps> = ({
             )}
             <span className={styles.drawerBadge}>
               {homeworkDraft.deadline
-                ? `Дедлайн: ${format(parseISO(`${homeworkDraft.deadline}T00:00:00`), 'd MMM', { locale: ru })}`
+                ? `Дедлайн: ${formatInTimeZone(toUtcDateFromDate(homeworkDraft.deadline, timeZone), 'd MMM', {
+                    locale: ru,
+                    timeZone,
+                  })}`
                 : 'Без дедлайна'}
             </span>
             <span className={styles.drawerBadge}>

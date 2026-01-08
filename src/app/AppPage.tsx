@@ -1,4 +1,4 @@
-import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
+import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -22,6 +22,15 @@ import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
 import { useToast } from '../shared/lib/toast';
+import { TimeZoneProvider } from '../shared/lib/timezoneContext';
+import {
+  formatInTimeZone,
+  resolveTimeZone,
+  toUtcEndOfDay,
+  toUtcDateFromDate,
+  toUtcDateFromTimeZone,
+  toZonedDate,
+} from '../shared/lib/timezoneDates';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
@@ -73,6 +82,13 @@ const parseTimeSpentMinutes = (value: string): number | null => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) return null;
   return Math.round(numericValue);
+};
+
+const resolveDeadlinePayload = (deadline: string | null | undefined, timeZone: string) => {
+  if (!deadline) return undefined;
+  const resolved = toUtcDateFromDate(deadline, timeZone);
+  if (Number.isNaN(resolved.getTime())) return undefined;
+  return resolved.toISOString();
 };
 
 const isHomeworkFilter = (value: unknown): value is 'all' | HomeworkStatus | 'overdue' =>
@@ -169,6 +185,7 @@ export const AppPage = () => {
   const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
+  const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
@@ -223,7 +240,7 @@ export const AppPage = () => {
   const [newLessonDraft, setNewLessonDraft] = useState({
     studentId: undefined as number | undefined,
     studentIds: [] as number[],
-    date: todayISO(),
+    date: todayISO(resolvedTimeZone),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
     color: DEFAULT_LESSON_COLOR,
@@ -243,12 +260,12 @@ export const AppPage = () => {
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
-  const [monthAnchor] = useState<Date>(startOfMonth(new Date()));
+  const [monthAnchor, setMonthAnchor] = useState<Date>(() => startOfMonth(toZonedDate(new Date(), resolvedTimeZone)));
   const [monthOffset, setMonthOffset] = useState(0);
   const [monthLabelKey, setMonthLabelKey] = useState(0);
   const [weekLabelKey, setWeekLabelKey] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);
-  const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
+  const [dayViewDate, setDayViewDate] = useState<Date>(() => toZonedDate(new Date(), resolvedTimeZone));
   const [dialogState, setDialogState] = useState<DialogState>(null);
 
   const closeDialog = () => setDialogState(null);
@@ -265,7 +282,7 @@ export const AppPage = () => {
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
         setLinks(data.links ?? []);
-        setHomeworks((data.homeworks ?? []).map(normalizeHomework));
+        setHomeworks((data.homeworks ?? []).map((homework) => normalizeHomework(homework, resolvedTimeZone)));
         setLessons((data.lessons ?? []).map(normalizeLesson));
 
         const firstStudentId = data.students?.[0]?.id ?? null;
@@ -295,6 +312,25 @@ export const AppPage = () => {
   useEffect(() => {
     setNewLessonDraft((draft) => ({ ...draft, durationMinutes: teacher.defaultLessonDuration }));
   }, [teacher.defaultLessonDuration]);
+
+  useEffect(() => {
+    const today = toZonedDate(new Date(), resolvedTimeZone);
+    setDayViewDate((current) => {
+      const currentIso = format(current, 'yyyy-MM-dd');
+      return toZonedDate(toUtcDateFromDate(currentIso, resolvedTimeZone), resolvedTimeZone);
+    });
+    setMonthAnchor(startOfMonth(today));
+    setHomeworks((prev) =>
+      prev.map((homework) =>
+        normalizeHomework({ ...homework, deadline: homework.deadlineAt ?? homework.deadline }, resolvedTimeZone),
+      ),
+    );
+    setStudentHomeworks((prev) =>
+      prev.map((homework) =>
+        normalizeHomework({ ...homework, deadline: homework.deadlineAt ?? homework.deadline }, resolvedTimeZone),
+      ),
+    );
+  }, [resolvedTimeZone]);
 
   useEffect(() => {
     if (selectedStudentId) {
@@ -367,7 +403,9 @@ export const AppPage = () => {
         });
         setStudentHomeworkHasMore(data.nextOffset !== null);
         setStudentHomeworks((prev) =>
-          append ? [...prev, ...data.items.map(normalizeHomework)] : data.items.map(normalizeHomework),
+          append
+            ? [...prev, ...data.items.map((homework) => normalizeHomework(homework, resolvedTimeZone))]
+            : data.items.map((homework) => normalizeHomework(homework, resolvedTimeZone)),
         );
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -376,7 +414,7 @@ export const AppPage = () => {
         setStudentHomeworkLoading(false);
       }
     },
-    [selectedStudentId, sessionState, studentHomeworkFilter],
+    [resolvedTimeZone, selectedStudentId, sessionState, studentHomeworkFilter],
   );
 
   const loadStudentLessons = useCallback(
@@ -399,14 +437,20 @@ export const AppPage = () => {
       lessonLoadRequestId.current = requestId;
       setStudentLessonLoading(true);
       try {
-        const startFrom =
-          studentLessonDateRange.from
-            ? new Date(`${studentLessonDateRange.from}T${studentLessonDateRange.fromTime || '00:00'}`).toISOString()
-            : undefined;
-        const startTo =
-          studentLessonDateRange.to
-            ? new Date(`${studentLessonDateRange.to}T${studentLessonDateRange.toTime || '23:59'}`).toISOString()
-            : undefined;
+        const startFrom = studentLessonDateRange.from
+          ? toUtcDateFromTimeZone(
+              studentLessonDateRange.from,
+              studentLessonDateRange.fromTime || '00:00',
+              resolvedTimeZone,
+            ).toISOString()
+          : undefined;
+        const startTo = studentLessonDateRange.to
+          ? toUtcDateFromTimeZone(
+              studentLessonDateRange.to,
+              studentLessonDateRange.toTime || '23:59',
+              resolvedTimeZone,
+            ).toISOString()
+          : undefined;
         const sortOrder = options?.sortOverride ?? studentLessonSortOrder;
         const data = await api.listStudentLessons(targetStudentId, {
           payment: studentLessonPaymentFilter,
@@ -438,6 +482,7 @@ export const AppPage = () => {
       studentLessonPaymentFilter,
       studentLessonStatusFilter,
       studentLessonSortOrder,
+      resolvedTimeZone,
     ],
   );
 
@@ -872,8 +917,8 @@ export const AppPage = () => {
   };
 
   const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
-    const startDate = existing ? parseISO(existing.startAt) : undefined;
-    const derivedDay = startDate ? startDate.getUTCDay() : undefined;
+    const startDate = existing ? toZonedDate(existing.startAt, resolvedTimeZone) : undefined;
+    const derivedDay = startDate ? startDate.getDay() : undefined;
     const recurrenceWeekdays =
       existing?.recurrenceWeekdays && existing.recurrenceWeekdays.length > 0
         ? existing.recurrenceWeekdays
@@ -905,13 +950,15 @@ export const AppPage = () => {
       color: existing?.color ?? DEFAULT_LESSON_COLOR,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
       repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
-      repeatUntil: existing?.recurrenceUntil ? existing.recurrenceUntil.slice(0, 10) : draft.repeatUntil,
+      repeatUntil: existing?.recurrenceUntil
+        ? formatInTimeZone(existing.recurrenceUntil, 'yyyy-MM-dd', { timeZone: resolvedTimeZone })
+        : draft.repeatUntil,
     }));
     setEditingLessonId(existing?.id ?? null);
     setEditingLessonOriginal(existing ?? null);
     setLessonModalOpen(true);
     navigate(tabPathById.schedule);
-    setDayViewDate(new Date(dateISO));
+    setDayViewDate(toZonedDate(toUtcDateFromDate(dateISO, resolvedTimeZone), resolvedTimeZone));
   };
 
   const closeLessonModal = () => {
@@ -990,14 +1037,16 @@ export const AppPage = () => {
       return;
     }
 
-    const startAtDate = new Date(`${newLessonDraft.date}T${newLessonDraft.time}:00`);
+    const startAtDate = toUtcDateFromTimeZone(newLessonDraft.date, newLessonDraft.time, resolvedTimeZone);
     const startAt = startAtDate.toISOString();
 
     try {
       if (editingLessonId) {
         const original = editingLessonOriginal;
         const originalWeekdays = original?.recurrenceWeekdays ?? [];
-        const originalUntil = original?.recurrenceUntil?.slice(0, 10) ?? '';
+        const originalUntil = original?.recurrenceUntil
+          ? formatInTimeZone(original.recurrenceUntil, 'yyyy-MM-dd', { timeZone: resolvedTimeZone })
+          : '';
         const repeatChanged =
           (newLessonDraft.repeatUntil ?? '') !== originalUntil ||
           newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
@@ -1037,7 +1086,7 @@ export const AppPage = () => {
           repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
           repeatUntil:
             newLessonDraft.isRecurring && newLessonDraft.repeatUntil
-              ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
+              ? toUtcEndOfDay(newLessonDraft.repeatUntil, resolvedTimeZone).toISOString()
               : undefined,
         });
 
@@ -1065,8 +1114,11 @@ export const AppPage = () => {
           return;
         }
         const resolvedRepeatUntil = newLessonDraft.repeatUntil
-          ? `${newLessonDraft.repeatUntil}T23:59:59.999Z`
-          : `${addYears(new Date(startAt), 1).toISOString().slice(0, 10)}T23:59:59.999Z`;
+          ? toUtcEndOfDay(newLessonDraft.repeatUntil, resolvedTimeZone).toISOString()
+          : toUtcEndOfDay(
+              formatInTimeZone(addYears(new Date(startAt), 1), 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+              resolvedTimeZone,
+            ).toISOString();
 
         const data = await api.createRecurringLessons({
           studentIds: newLessonDraft.studentIds,
@@ -1115,7 +1167,7 @@ export const AppPage = () => {
   };
 
   const startEditLesson = (lesson: Lesson) => {
-    const start = parseISO(lesson.startAt);
+    const start = toZonedDate(lesson.startAt, resolvedTimeZone);
     const time = format(start, 'HH:mm');
     openLessonModal(format(start, 'yyyy-MM-dd'), time, lesson);
   };
@@ -1344,7 +1396,7 @@ export const AppPage = () => {
   };
 
   const openCreateLessonForStudent = (studentId?: number) => {
-    const targetDate = newLessonDraft.date || todayISO();
+    const targetDate = newLessonDraft.date || todayISO(resolvedTimeZone);
     if (studentId) {
       setSelectedStudentId((prev) => prev ?? studentId);
       setNewLessonDraft((draft) => ({
@@ -1371,7 +1423,9 @@ export const AppPage = () => {
   const sendHomeworkToStudent = async (homeworkId: number) => {
     try {
       const result = await api.sendHomework(homeworkId);
-      setHomeworks((prev) => prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework) : hw)));
+      setHomeworks((prev) =>
+        prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework, resolvedTimeZone) : hw)),
+      );
       loadStudentHomeworks();
       loadStudentList();
       showInfoDialog('Отправлено ученику', 'Задание опубликовано и отправлено ученику.');
@@ -1403,12 +1457,12 @@ export const AppPage = () => {
       const data = await api.createHomework({
         studentId: selectedStudentId,
         text: newHomeworkDraft.text,
-        deadline: newHomeworkDraft.deadline || undefined,
+        deadline: resolveDeadlinePayload(newHomeworkDraft.deadline, resolvedTimeZone),
         status: targetStatus,
         timeSpentMinutes: parsedTimeSpent,
       });
 
-      const normalized = normalizeHomework(data.homework);
+      const normalized = normalizeHomework(data.homework, resolvedTimeZone);
       setHomeworks([...homeworks, normalized]);
       loadStudentHomeworks();
       loadStudentList();
@@ -1440,11 +1494,11 @@ export const AppPage = () => {
       const data = await api.createHomework({
         studentId: original.studentId,
         text: original.text,
-        deadline: original.deadline || undefined,
+        deadline: resolveDeadlinePayload(original.deadlineAt ?? original.deadline, resolvedTimeZone),
         status: 'DRAFT',
         attachments: original.attachments ?? [],
       });
-      const normalized = normalizeHomework(data.homework);
+      const normalized = normalizeHomework(data.homework, resolvedTimeZone);
       setHomeworks([...homeworks, normalized]);
       loadStudentHomeworks();
       loadStudentList();
@@ -1458,7 +1512,9 @@ export const AppPage = () => {
   const toggleHomeworkDone = async (homeworkId: number) => {
     try {
       const data = await api.toggleHomework(homeworkId);
-      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+      setHomeworks(
+        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
+      );
       loadStudentHomeworks();
       loadStudentList();
     } catch (error) {
@@ -1469,8 +1525,16 @@ export const AppPage = () => {
 
   const updateHomework = async (homeworkId: number, payload: Partial<Homework>) => {
     try {
-      const data = await api.updateHomework(homeworkId, payload);
-      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework) : hw)));
+      const resolvedPayload = { ...payload };
+      if ('deadline' in payload) {
+        resolvedPayload.deadline = payload.deadline
+          ? resolveDeadlinePayload(payload.deadline, resolvedTimeZone)
+          : null;
+      }
+      const data = await api.updateHomework(homeworkId, resolvedPayload);
+      setHomeworks(
+        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
+      );
       loadStudentHomeworks();
       loadStudentList();
     } catch (error) {
@@ -1505,7 +1569,9 @@ export const AppPage = () => {
   const remindHomeworkById = async (homeworkId: number) => {
     try {
       const result = await api.remindHomeworkById(homeworkId);
-      setHomeworks(homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework) : hw)));
+      setHomeworks(
+        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework, resolvedTimeZone) : hw)),
+      );
       showInfoDialog('Напоминание отправлено', 'Мы отправим ученику напоминание.');
     } catch (error) {
       showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
@@ -1540,7 +1606,7 @@ export const AppPage = () => {
   };
 
   const handleGoToToday = () => {
-    const today = new Date();
+    const today = toZonedDate(new Date(), resolvedTimeZone);
     setDayViewDate(today);
     setMonthOffset(0);
     setDayLabelKey((key) => key + 1);
@@ -1554,12 +1620,13 @@ export const AppPage = () => {
   }
 
   return (
-    <div className={layoutStyles.page}>
-      <div className={layoutStyles.pageInner}>
-        <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+    <TimeZoneProvider timeZone={resolvedTimeZone}>
+      <div className={layoutStyles.page}>
+        <div className={layoutStyles.pageInner}>
+          <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
-        <main className={layoutStyles.content}>
-          <AppRoutes
+          <main className={layoutStyles.content}>
+            <AppRoutes
             resolveLastVisitedPath={resolveLastVisitedPath}
             dashboard={{
               lessons,
@@ -1569,10 +1636,18 @@ export const AppPage = () => {
                 openCreateStudentModal();
               },
               onCreateLesson: () => {
-                openLessonModal(todayISO(), format(new Date(), 'HH:mm'));
+                openLessonModal(
+                  todayISO(resolvedTimeZone),
+                  formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                );
               },
               onOpenSchedule: () => navigate(tabPathById.schedule),
-              onOpenLesson: (lesson) => openLessonModal(lesson.startAt.slice(0, 10), undefined, lesson),
+              onOpenLesson: (lesson) =>
+                openLessonModal(
+                  formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                  undefined,
+                  lesson,
+                ),
               onCompleteLesson: markLessonCompleted,
               onTogglePaid: togglePaid,
               onOpenStudent: (studentId) => {
@@ -1671,33 +1746,34 @@ export const AppPage = () => {
               onGoToToday: handleGoToToday,
             }}
             settings={{ teacher, onTeacherChange: setTeacher }}
-          />
-        </main>
+            />
+          </main>
+        </div>
+
+        <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+
+        <AppModals
+          studentModalOpen={studentModalOpen}
+          onCloseStudentModal={closeStudentModal}
+          newStudentDraft={newStudentDraft}
+          isEditingStudent={Boolean(editingStudentId)}
+          onStudentDraftChange={setNewStudentDraft}
+          onSubmitStudent={handleSubmitStudent}
+          lessonModalOpen={lessonModalOpen}
+          onCloseLessonModal={closeLessonModal}
+          editingLessonId={editingLessonId}
+          defaultLessonDuration={teacher.defaultLessonDuration}
+          linkedStudents={linkedStudents}
+          lessonDraft={newLessonDraft}
+          recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
+          onLessonDraftChange={setNewLessonDraft}
+          onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
+          onSubmitLesson={saveLesson}
+          dialogState={dialogState}
+          onCloseDialog={closeDialog}
+          onDialogStateChange={setDialogState}
+        />
       </div>
-
-      <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
-
-      <AppModals
-        studentModalOpen={studentModalOpen}
-        onCloseStudentModal={closeStudentModal}
-        newStudentDraft={newStudentDraft}
-        isEditingStudent={Boolean(editingStudentId)}
-        onStudentDraftChange={setNewStudentDraft}
-        onSubmitStudent={handleSubmitStudent}
-        lessonModalOpen={lessonModalOpen}
-        onCloseLessonModal={closeLessonModal}
-        editingLessonId={editingLessonId}
-        defaultLessonDuration={teacher.defaultLessonDuration}
-        linkedStudents={linkedStudents}
-        lessonDraft={newLessonDraft}
-        recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
-        onLessonDraftChange={setNewLessonDraft}
-        onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
-        onSubmitLesson={saveLesson}
-        dialogState={dialogState}
-        onCloseDialog={closeDialog}
-        onDialogStateChange={setDialogState}
-      />
-    </div>
+    </TimeZoneProvider>
   );
 };

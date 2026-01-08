@@ -1,9 +1,11 @@
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import styles from './DatePickerField.module.css';
+import { useTimeZone } from '../../lib/timezoneContext';
+import { toUtcDateFromDate, toZonedDate } from '../../lib/timezoneDates';
 
 interface DatePickerFieldProps {
   label?: string;
@@ -16,12 +18,6 @@ interface DatePickerFieldProps {
   disabled?: boolean;
 }
 
-const parseDate = (value?: string) => {
-  if (!value) return null;
-  const parsed = parseISO(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
 export const DatePickerField = ({
   label,
   value,
@@ -32,6 +28,7 @@ export const DatePickerField = ({
   allowClear = false,
   disabled = false,
 }: DatePickerFieldProps) => {
+  const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLButtonElement>(null);
@@ -40,9 +37,14 @@ export const DatePickerField = ({
     { vertical: 'bottom', align: 'left' },
   );
 
-  const selectedDate = useMemo(() => parseDate(value), [value]);
-  const minDate = useMemo(() => parseDate(min), [min]);
-  const today = useMemo(() => new Date(), []);
+  const parseDate = (input?: string) => {
+    if (!input) return null;
+    const parsed = toUtcDateFromDate(input, timeZone);
+    return Number.isNaN(parsed.getTime()) ? null : toZonedDate(parsed, timeZone);
+  };
+  const selectedDate = useMemo(() => parseDate(value), [value, timeZone]);
+  const minDate = useMemo(() => parseDate(min), [min, timeZone]);
+  const today = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const initialMonth = useMemo(() => {
     if (selectedDate) return selectedDate;
     if (minDate && minDate > today) return minDate;

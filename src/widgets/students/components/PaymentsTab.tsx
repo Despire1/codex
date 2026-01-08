@@ -1,5 +1,5 @@
 import { FC, useMemo, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { PaymentEvent, Lesson } from '../../../entities/types';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
@@ -8,6 +8,8 @@ import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopo
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
 import { PaymentList } from './PaymentList';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface PaymentsTabProps {
   payments: PaymentEvent[];
@@ -26,13 +28,14 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   onPaymentDateChange,
   onOpenLesson,
 }) => {
+  const timeZone = useTimeZone();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const selectedDate = useMemo(() => {
     if (!paymentDate) return null;
-    const parsed = parseISO(paymentDate);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }, [paymentDate]);
+    const parsed = toUtcDateFromDate(paymentDate, timeZone);
+    return Number.isNaN(parsed.getTime()) ? null : toZonedDate(parsed, timeZone);
+  }, [paymentDate, timeZone]);
   const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : 'Все';
   const isFilterActive = paymentFilter !== 'all' || Boolean(paymentDate);
 
