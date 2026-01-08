@@ -1,12 +1,16 @@
-import { FC, useState, type KeyboardEvent, type RefObject } from 'react';
-import { StudentListItem } from '../../../entities/types';
+import { FC, useMemo, useState, type RefObject } from 'react';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import { Lesson, StudentListItem } from '../../../entities/types';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from '../StudentsSection.module.css';
+import { StudentListCard } from './StudentListCard';
 
 interface StudentsSidebarProps {
   studentListItems: StudentListItem[];
+  lessons: Lesson[];
   selectedStudentId: number | null;
   searchQuery: string;
   activeFilter: 'all' | 'debt' | 'overdue';
@@ -24,6 +28,7 @@ interface StudentsSidebarProps {
 
 export const StudentsSidebar: FC<StudentsSidebarProps> = ({
   studentListItems,
+  lessons,
   selectedStudentId,
   searchQuery,
   activeFilter,
@@ -40,6 +45,44 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const isFilterActive = activeFilter !== 'all';
+
+  const nextLessonByStudent = useMemo(() => {
+    const now = new Date();
+    const nextLessons = new Map<number, Date>();
+
+    lessons.forEach((lesson) => {
+      if (lesson.status !== 'SCHEDULED') return;
+      const lessonDate = parseISO(lesson.startAt);
+      if (lessonDate < now) return;
+
+      const studentIds = new Set<number>();
+      if (lesson.studentId) {
+        studentIds.add(lesson.studentId);
+      }
+      lesson.participants?.forEach((participant) => studentIds.add(participant.studentId));
+
+      studentIds.forEach((studentId) => {
+        const existing = nextLessons.get(studentId);
+        if (!existing || lessonDate < existing) {
+          nextLessons.set(studentId, lessonDate);
+        }
+      });
+    });
+
+    return nextLessons;
+  }, [lessons]);
+
+  const formatNextLessonLabel = (lessonDate?: Date) => {
+    if (!lessonDate) return 'Нет занятий';
+    const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
+    if (isToday(lessonDate)) {
+      return `Сегодня, ${timeLabel}`;
+    }
+    if (isTomorrow(lessonDate)) {
+      return `Завтра, ${timeLabel}`;
+    }
+    return format(lessonDate, 'd MMM, HH:mm', { locale: ru });
+  };
 
   return (
     <aside className={styles.sidebar}>
@@ -124,54 +167,16 @@ export const StudentsSidebar: FC<StudentsSidebarProps> = ({
             </div>
           ) : (
             studentListItems.map((item) => {
-              const { student, link, stats } = item;
-              const status = link.balanceLessons < 0 ? 'debt' : link.balanceLessons > 0 ? 'prepaid' : 'neutral';
-              const username = student.username?.trim();
-
-              const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                onSelectStudent(student.id);
-              };
+              const nextLessonLabel = formatNextLessonLabel(nextLessonByStudent.get(item.student.id));
 
               return (
-                <div
-                  key={student.id}
-                  className={`${styles.studentCard} ${selectedStudentId === student.id ? styles.activeStudent : ''}`}
-                  onClick={() => onSelectStudent(student.id)}
-                  onKeyDown={handleCardKeyDown}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className={styles.studentStripe} aria-hidden />
-                  <div className={styles.studentCardBody}>
-                    <div className={styles.studentCardHeader}>
-                      <div className={styles.studentName}>{link.customName}</div>
-                      <div className={styles.badgeRow}>
-                        {status === 'debt' && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
-                        {stats.overdueHomeworkCount > 0 && (
-                          <span className={`${styles.lozenge} ${styles.badgeWarning}`}>ДЗ: {stats.overdueHomeworkCount}</span>
-                        )}
-                        {stats.pendingHomeworkCount === 0 && stats.totalHomeworkCount > 0 && (
-                          <span className={`${styles.lozenge} ${styles.badgeSuccess}`}>ДЗ сделано</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className={styles.studentSecondaryRow}>
-                      {username ? (
-                        <span className={styles.studentMeta}>@{username}</span>
-                      ) : (
-                        <span className={styles.studentMeta}>@нет</span>
-                      )}
-                      <span className={styles.metaDivider}>•</span>
-                      <span className={styles.studentMeta}>
-                        автонапоминания: {link.autoRemindHomework ? 'вкл' : 'выкл'}
-                      </span>
-                      <span className={styles.metaDivider}>•</span>
-                      <span className={styles.studentMeta}>баланс: {link.balanceLessons}</span>
-                    </div>
-                  </div>
-                </div>
+                <StudentListCard
+                  key={item.student.id}
+                  item={item}
+                  isActive={selectedStudentId === item.student.id}
+                  nextLessonLabel={nextLessonLabel}
+                  onSelect={onSelectStudent}
+                />
               );
             })
           )}

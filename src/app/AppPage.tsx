@@ -1580,6 +1580,7 @@ export const AppPage = () => {
               studentListHasMore,
               studentSearch,
               studentFilter,
+              lessons,
               selectedStudentId,
               priceEditState,
               studentHomeworks,

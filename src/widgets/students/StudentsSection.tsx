@@ -33,6 +33,7 @@ interface StudentsSectionProps {
   studentListHasMore: boolean;
   studentSearch: string;
   studentFilter: 'all' | 'debt' | 'overdue';
+  lessons: Lesson[];
   selectedStudentId: number | null;
   priceEditState: { id: number | null; value: string };
   studentHomeworks: Homework[];
@@ -127,6 +128,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   studentListHasMore,
   studentSearch,
   studentFilter,
+  lessons,
   selectedStudentId,
   priceEditState,
   studentHomeworks,
@@ -341,6 +343,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         {showList && (
           <StudentsSidebar
             studentListItems={visibleStudents}
+            lessons={lessons}
             selectedStudentId={selectedStudentId}
             searchQuery={studentSearch}
             activeFilter={studentFilter}
