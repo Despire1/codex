@@ -150,3 +150,8 @@ body.telegram-webapp [class*='tabActive'] {
   color: var(--color-white) !important;
   -webkit-text-fill-color: var(--color-white);
 }
+
+body.telegram-webapp [class*='topNavActive'] {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+}
