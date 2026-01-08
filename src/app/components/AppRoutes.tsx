@@ -30,8 +30,10 @@ interface AppRoutesProps {
     onAddStudent: () => void;
     onCreateLesson: () => void;
     onOpenSchedule: () => void;
-    onOpenStudents: () => void;
     onOpenLesson: (lesson: Lesson) => void;
+    onCompleteLesson: (lessonId: number) => void;
+    onTogglePaid: (lessonId: number, studentId?: number) => void;
+    onOpenStudent: (studentId: number) => void;
   };
   students: {
     studentListItems: StudentListItem[];
