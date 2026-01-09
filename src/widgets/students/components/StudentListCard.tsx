@@ -79,6 +79,11 @@ export const StudentListCard: FC<StudentListCardProps> = ({
     >
       <div className={styles.studentStripe} aria-hidden />
       <div className={styles.studentCardBody}>
+        {hasDebtBadge && (
+          <span className={`${styles.lozenge} ${styles.badgeDebt} ${styles.studentDebtBadge}`}>
+            Долг: {debtRub} ₽
+          </span>
+        )}
         <div className={styles.studentCardHeader}>
           <div className={styles.studentName}>{item.link.customName}</div>
           {hasDebtBadge && (
