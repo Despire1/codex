@@ -40,6 +40,9 @@ const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRA
 const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
 const ALLOWED_UNPAID_REMINDER_FREQUENCIES = new Set(['daily', 'every_two_days', 'weekly']);
 const NOTIFICATION_TICK_MS = 60_000;
+const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 30);
+const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
+const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
 const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const nowMs = now.getTime();
   const scheduledMs = scheduledFor.getTime();
@@ -2383,6 +2386,23 @@ const cleanupSessions = async () => {
   });
 };
 
+const resolveNotificationLogRetentionDays = () => {
+  const normalized = Number.isFinite(NOTIFICATION_LOG_RETENTION_DAYS)
+    ? NOTIFICATION_LOG_RETENTION_DAYS
+    : MAX_NOTIFICATION_LOG_RETENTION_DAYS;
+  return Math.min(Math.max(normalized, MIN_NOTIFICATION_LOG_RETENTION_DAYS), MAX_NOTIFICATION_LOG_RETENTION_DAYS);
+};
+
+const cleanupNotificationLogs = async () => {
+  const retentionDays = resolveNotificationLogRetentionDays();
+  const cutoff = addDays(new Date(), -retentionDays);
+  await prisma.notificationLog.deleteMany({
+    where: {
+      createdAt: { lt: cutoff },
+    },
+  });
+};
+
 const scheduleDailySessionCleanup = () => {
   const now = new Date();
   const nextRun = new Date(now);
@@ -2397,11 +2417,19 @@ const scheduleDailySessionCleanup = () => {
       // eslint-disable-next-line no-console
       console.error('Не удалось очистить сессии', error);
     });
+    cleanupNotificationLogs().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Не удалось очистить логи уведомлений', error);
+    });
 
     setInterval(() => {
       cleanupSessions().catch((error) => {
         // eslint-disable-next-line no-console
         console.error('Не удалось очистить сессии', error);
+      });
+      cleanupNotificationLogs().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось очистить логи уведомлений', error);
       });
     }, 24 * 60 * 60 * 1000);
   }, delayMs);
