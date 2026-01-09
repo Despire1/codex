@@ -40,7 +40,11 @@ const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRA
 const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
 const ALLOWED_UNPAID_REMINDER_FREQUENCIES = new Set(['daily', 'every_two_days', 'weekly']);
 const NOTIFICATION_TICK_MS = 60_000;
-const NOTIFICATION_WINDOW_MINUTES = 2;
+const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
+  const nowMs = now.getTime();
+  const scheduledMs = scheduledFor.getTime();
+  return scheduledMs <= nowMs && nowMs < scheduledMs + NOTIFICATION_TICK_MS;
+};
 const MANUAL_PAYMENT_REMINDER_COOLDOWN_MINUTES = 10;
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
@@ -2273,22 +2277,21 @@ const runNotificationTick = async () => {
   for (const teacher of teachers) {
     if (teacher.lessonReminderEnabled) {
       const reminderMinutes = Number(teacher.lessonReminderMinutes ?? 0);
-      const windowStart = new Date(
-        now.getTime() + reminderMinutes * 60_000 - NOTIFICATION_WINDOW_MINUTES * 60_000,
-      );
-      const windowEnd = new Date(
-        now.getTime() + reminderMinutes * 60_000 + NOTIFICATION_WINDOW_MINUTES * 60_000,
-      );
+      const windowStart = new Date(now.getTime() + reminderMinutes * 60_000 - NOTIFICATION_TICK_MS);
+      const windowEnd = new Date(now.getTime() + reminderMinutes * 60_000);
       const lessons = await prisma.lesson.findMany({
         where: {
           teacherId: teacher.chatId,
           status: 'SCHEDULED',
-          startAt: { gte: windowStart, lte: windowEnd },
+          startAt: { gte: windowStart, lt: windowEnd },
         },
       });
 
       for (const lesson of lessons) {
         const scheduledFor = new Date(lesson.startAt.getTime() - reminderMinutes * 60_000);
+        if (!shouldSendLessonReminder(scheduledFor, now)) {
+          continue;
+        }
         const dedupeSuffix = formatDedupeTimeKey(scheduledFor, teacher.timezone);
         const teacherKey = `TEACHER_LESSON_REMINDER:${lesson.id}:${dedupeSuffix}`;
         const studentKey = `STUDENT_LESSON_REMINDER:${lesson.id}:${dedupeSuffix}`;
@@ -2297,12 +2300,14 @@ const runNotificationTick = async () => {
           lessonId: lesson.id,
           scheduledFor,
           dedupeKey: teacherKey,
+          minutesBefore: reminderMinutes,
         });
         await sendStudentLessonReminder({
           studentId: lesson.studentId,
           lessonId: lesson.id,
           scheduledFor,
           dedupeKey: studentKey,
+          minutesBefore: reminderMinutes,
         });
       }
     }
