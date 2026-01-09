@@ -388,6 +388,13 @@
   color: var(--color-gray-500);
 }
 
+.studentTelegramRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .studentBadgesRow {
   display: flex;
   gap: 8px;
@@ -445,6 +452,12 @@
   background: var(--color-blue-50);
   color: var(--color-blue-700);
   border-color: var(--color-blue-200);
+}
+
+.badgeInactive {
+  background: var(--color-slate-100);
+  color: var(--color-slate-700);
+  border-color: var(--color-slate-200);
 }
 
 .badgeNextLesson {
