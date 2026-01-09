@@ -37,7 +37,10 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
-  onRemindLessonPayment: (lessonId: number) => Promise<void>;
+  onRemindLessonPayment: (
+    lessonId: number,
+    options?: { force?: boolean },
+  ) => Promise<{ status: 'sent' | 'recent' | 'error'; lastSentAt?: string | null }>;
   onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
 }
 
@@ -74,6 +77,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isActivationHintOpen, setIsActivationHintOpen] = useState(false);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
+  const [confirmReminderLessonId, setConfirmReminderLessonId] = useState<number | null>(null);
+  const [confirmReminderSentAt, setConfirmReminderSentAt] = useState<string | null>(null);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
@@ -101,10 +106,36 @@ export const StudentHero: FC<StudentHeroProps> = ({
     if (pendingReminderIds.includes(lessonId)) return;
     setPendingReminderIds((prev) => [...prev, lessonId]);
     try {
-      await onRemindLessonPayment(lessonId);
+      const result = await onRemindLessonPayment(lessonId);
+      if (result.status === 'recent') {
+        setConfirmReminderLessonId(lessonId);
+        setConfirmReminderSentAt(result.lastSentAt ?? null);
+      } else if (result.status === 'sent') {
+        setConfirmReminderLessonId(null);
+        setConfirmReminderSentAt(null);
+      }
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
     }
+  };
+
+  const handleConfirmRemindPayment = async (lessonId: number) => {
+    if (pendingReminderIds.includes(lessonId)) return;
+    setPendingReminderIds((prev) => [...prev, lessonId]);
+    try {
+      const result = await onRemindLessonPayment(lessonId, { force: true });
+      if (result.status === 'sent') {
+        setConfirmReminderLessonId(null);
+        setConfirmReminderSentAt(null);
+      }
+    } finally {
+      setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
+    }
+  };
+
+  const handleCancelRemindPayment = () => {
+    setConfirmReminderLessonId(null);
+    setConfirmReminderSentAt(null);
   };
 
   const nextLessonInfo = useMemo(() => {
@@ -442,6 +473,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       pendingReminderIds={pendingReminderIds}
                       onMarkPaid={handleMarkPaid}
                       onSendPaymentReminder={handleRemindPayment}
+                      confirmReminderLessonId={confirmReminderLessonId}
+                      confirmReminderSentAt={confirmReminderSentAt}
+                      onConfirmPaymentReminder={handleConfirmRemindPayment}
+                      onCancelPaymentReminder={handleCancelRemindPayment}
                       reminderDisabledReason={reminderDisabledReason}
                     />
                   </AdaptivePopover>
@@ -567,6 +602,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
             pendingReminderIds={pendingReminderIds}
             onMarkPaid={handleMarkPaid}
             onSendPaymentReminder={handleRemindPayment}
+            confirmReminderLessonId={confirmReminderLessonId}
+            confirmReminderSentAt={confirmReminderSentAt}
+            onConfirmPaymentReminder={handleConfirmRemindPayment}
+            onCancelPaymentReminder={handleCancelRemindPayment}
             reminderDisabledReason={reminderDisabledReason}
             showCloseButton
             onClose={() => setIsDebtPopoverOpen(false)}
@@ -621,6 +660,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
             pendingReminderIds={pendingReminderIds}
             onMarkPaid={handleMarkPaid}
             onSendPaymentReminder={handleRemindPayment}
+            confirmReminderLessonId={confirmReminderLessonId}
+            confirmReminderSentAt={confirmReminderSentAt}
+            onConfirmPaymentReminder={handleConfirmRemindPayment}
+            onCancelPaymentReminder={handleCancelRemindPayment}
             reminderDisabledReason={reminderDisabledReason}
             showCloseButton
             onClose={() => setIsDebtPopoverOpen(false)}

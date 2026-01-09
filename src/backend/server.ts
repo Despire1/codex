@@ -19,6 +19,7 @@ import {
   sendTeacherLessonReminder,
   sendTeacherUnpaidDigest,
 } from './notificationService';
+import { resolveStudentTelegramId } from './studentContacts';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -2136,7 +2137,7 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number) => {
+const remindLessonPayment = async (user: User, lessonId: number, options?: { force?: boolean }) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -2149,7 +2150,11 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
   if (!teacher.studentNotificationsEnabled || !teacher.studentPaymentRemindersEnabled) {
     throw new Error('Уведомления ученику отключены в настройках');
   }
-  if (!lesson.student?.isActivated || !lesson.student.telegramId) {
+  if (!lesson.student) {
+    throw new Error('Ученик не найден');
+  }
+  const studentTelegramId = await resolveStudentTelegramId(lesson.student);
+  if (!studentTelegramId) {
     throw new Error('Ученик не активировал бота');
   }
 
@@ -2163,8 +2168,8 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
     },
     orderBy: { sentAt: 'desc' },
   });
-  if (recentReminder) {
-    throw new Error('Уже отправляли недавно');
+  if (recentReminder && !options?.force) {
+    return { status: 'recent', lastSentAt: recentReminder.sentAt?.toISOString() ?? null };
   }
 
   const result = await sendStudentPaymentReminder({
@@ -2876,7 +2881,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const remindPaymentMatch = pathname.match(/^\/api\/lessons\/(\d+)\/remind-payment$/);
     if (req.method === 'POST' && remindPaymentMatch) {
       const lessonId = Number(remindPaymentMatch[1]);
-      const result = await remindLessonPayment(requireApiUser(), lessonId);
+      const body = await readBody(req);
+      const result = await remindLessonPayment(requireApiUser(), lessonId, { force: Boolean((body as any)?.force) });
       return sendJson(res, 200, result);
     }
 
