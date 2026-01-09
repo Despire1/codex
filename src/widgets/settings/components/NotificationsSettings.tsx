@@ -17,6 +17,7 @@ const unpaidFrequencyOptions = [
 
 export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange }) => {
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
+  const studentPaymentRemindersDisabled = true;
 
   return (
     <div className={styles.moduleStack}>
@@ -100,7 +101,10 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
       <div className={styles.sectionBlock}>
         <div className={styles.rowHeader}>
           <div>
-            <div className={styles.label}>Глобальные напоминания ученику</div>
+            <div className={styles.label}>Напоминания всем ученикам</div>
+            <div className={styles.helperText}>
+              При выключении напоминания не отправляются ни одному ученику.
+            </div>
           </div>
           <label className={controls.switch}>
             <input
@@ -112,17 +116,20 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
           </label>
         </div>
       </div>
-      <div className={`${styles.sectionBlock} ${studentSectionDisabled ? styles.disabledSection : ''}`}>
+      <div
+        className={`${styles.sectionBlock} ${studentSectionDisabled || studentPaymentRemindersDisabled ? styles.disabledSection : ''}`}
+      >
         <div className={styles.rowHeader}>
           <div>
-            <div className={styles.label}>Напоминания ученику об оплате</div>
+            <div className={styles.label}>Автоматические напоминания ученику об оплате</div>
+            <div className={styles.helperText}>Скоро будет доступно.</div>
           </div>
           <label className={controls.switch}>
             <input
               type="checkbox"
               checked={teacher.studentPaymentRemindersEnabled}
               onChange={(event) => onChange({ studentPaymentRemindersEnabled: event.target.checked })}
-              disabled={studentSectionDisabled}
+              disabled={studentSectionDisabled || studentPaymentRemindersDisabled}
             />
             <span className={controls.slider} />
           </label>
