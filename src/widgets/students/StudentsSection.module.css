@@ -704,6 +704,7 @@
 .studentMetaRow {
   display: flex;
   gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
   color: var(--color-gray-500);
 }

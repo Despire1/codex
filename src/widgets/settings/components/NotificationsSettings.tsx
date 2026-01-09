@@ -101,9 +101,9 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
       <div className={styles.sectionBlock}>
         <div className={styles.rowHeader}>
           <div>
-            <div className={styles.label}>Напоминания всем ученикам</div>
+            <div className={styles.label}>Напоминания ученикам о занятиях</div>
             <div className={styles.helperText}>
-              При выключении напоминания не отправляются ни одному ученику.
+              При выключении автоматические напоминания не будут отправляться ученикам.
             </div>
           </div>
           <label className={controls.switch}>
