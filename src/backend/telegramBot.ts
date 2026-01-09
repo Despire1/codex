@@ -30,6 +30,7 @@ type TelegramUpdate = {
       last_name?: string;
     };
     message?: {
+      message_id?: number;
       chat: { id: number };
     };
   };
@@ -86,6 +87,24 @@ const sendRoleSelectionMessage = async (chatId: number) => {
       ],
     },
   });
+};
+
+const subscriptionPromptText =
+  'Чтобы пользоваться сервисом, оформите пробную подписку.\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса.';
+
+const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
+  const payload = {
+    chat_id: chatId,
+    text: subscriptionPromptText,
+    reply_markup: {
+      inline_keyboard: [[{ text: 'Оформить пробную подписку', callback_data: 'subscription_trial' }]],
+    },
+  };
+  if (messageId) {
+    await callTelegram('editMessageText', { ...payload, message_id: messageId });
+    return;
+  }
+  await callTelegram('sendMessage', payload);
 };
 
 const sendStudentWelcomeMessage = async (chatId: number) => {
@@ -203,23 +222,25 @@ const activateStudentByUsername = async (chatId: number, username?: string) => {
 };
 
 const canOpenTeacherApp = async (telegramUserId: bigint) => {
-  const teacher = await prisma.teacher.findUnique({ where: { chatId: telegramUserId } });
-  if (teacher) return true;
   const user = await prisma.user.findUnique({ where: { telegramUserId } });
-  return user?.role === 'TEACHER';
+  if (user?.role === 'STUDENT') return { allowed: false, reason: 'student' as const };
+  const hasSubscription = Boolean(user?.subscriptionStartAt);
+  if (hasSubscription) return { allowed: true, reason: 'ok' as const };
+  return { allowed: false, reason: 'subscription' as const };
 };
 
 const handleRoleSelection = async (
   chatId: number,
   role: 'TEACHER' | 'STUDENT',
   from: NonNullable<TelegramUpdate['callback_query']>['from'],
+  messageId?: number,
 ) => {
   const telegramUserId = BigInt(from.id);
   const username = from.username ?? null;
   const firstName = from.first_name ?? null;
   const lastName = from.last_name ?? null;
 
-  await upsertTelegramUser({
+  const user = await upsertTelegramUser({
     telegramUserId,
     username: username ?? undefined,
     firstName: firstName ?? undefined,
@@ -228,6 +249,11 @@ const handleRoleSelection = async (
   });
 
   if (role === 'TEACHER') {
+    if (!user.subscriptionStartAt) {
+      await setDefaultMenuButton(chatId);
+      await sendSubscriptionPromptMessage(chatId, messageId);
+      return;
+    }
     await setTeacherMenuButton(chatId);
     await sendWebAppMessage(chatId);
     return;
@@ -237,15 +263,59 @@ const handleRoleSelection = async (
   await activateStudentByUsername(chatId, username ?? undefined);
 };
 
+const ensureTrialSubscription = async (payload: {
+  telegramUserId: bigint;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  const user = await upsertTelegramUser({
+    telegramUserId: payload.telegramUserId,
+    username: payload.username,
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    role: 'TEACHER',
+  });
+  if (user.subscriptionStartAt) return user;
+  const now = new Date();
+  return prisma.user.update({
+    where: { telegramUserId: payload.telegramUserId },
+    data: {
+      subscriptionStartAt: now,
+      subscriptionEndAt: now,
+    },
+  });
+};
+
 const handleUpdate = async (update: TelegramUpdate) => {
   const text = update.message?.text?.trim().toLowerCase();
   const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
 
   if (update.callback_query?.data && chatId) {
-    const role = update.callback_query.data === 'role_teacher' ? 'TEACHER' : update.callback_query.data === 'role_student' ? 'STUDENT' : null;
+    const role =
+      update.callback_query.data === 'role_teacher'
+        ? 'TEACHER'
+        : update.callback_query.data === 'role_student'
+          ? 'STUDENT'
+          : null;
     if (role) {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      await handleRoleSelection(chatId, role, update.callback_query.from);
+      await handleRoleSelection(chatId, role, update.callback_query.from, update.callback_query.message?.message_id);
+      return;
+    }
+    if (update.callback_query.data === 'subscription_trial') {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      const from = update.callback_query.from;
+      const telegramUserId = BigInt(from.id);
+      await ensureTrialSubscription({
+        telegramUserId,
+        username: from.username ?? undefined,
+        firstName: from.first_name ?? undefined,
+        lastName: from.last_name ?? undefined,
+      });
+      await setTeacherMenuButton(chatId);
+      await sendStudentInfoMessage(chatId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+      return;
     }
     return;
   }
@@ -270,9 +340,13 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   if (text === '/app' || text.includes('открыть')) {
     if (telegramUserId) {
-      const allowed = await canOpenTeacherApp(telegramUserId);
-      if (!allowed) {
-        await sendStudentInfoMessage(chatId, 'Вы ученик, вам доступны только уведомления.');
+      const access = await canOpenTeacherApp(telegramUserId);
+      if (!access.allowed) {
+        if (access.reason === 'student') {
+          await sendStudentInfoMessage(chatId, 'Вы ученик, вам доступны только уведомления.');
+          return;
+        }
+        await sendStudentInfoMessage(chatId, 'Сначала оформите пробную подписку в боте. Это бесплатно и не требует карт.');
         return;
       }
     }

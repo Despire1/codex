@@ -106,6 +106,8 @@ declare module '@prisma/client' {
     photoUrl: string | null;
     lastAuthDate: number | null;
     role: string;
+    subscriptionStartAt: Date | null;
+    subscriptionEndAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   };

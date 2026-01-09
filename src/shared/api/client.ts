@@ -37,6 +37,12 @@ export type SessionSummary = {
   isCurrent: boolean;
 };
 
+export type SessionUser = {
+  subscriptionStartAt?: string | null;
+  subscriptionEndAt?: string | null;
+  role?: string;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
@@ -70,7 +76,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ token }),
     }),
-  getSession: () => apiFetch<{ user: unknown }>('/auth/session'),
+  getSession: () => apiFetch<{ user: SessionUser }>('/auth/session'),
   logout: () =>
     apiFetch<{ status: string }>('/auth/logout', {
       method: 'POST',
