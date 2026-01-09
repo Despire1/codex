@@ -19,6 +19,7 @@ import {
   sendTeacherLessonReminder,
   sendTeacherUnpaidDigest,
 } from './notificationService';
+import { resolveStudentTelegramId } from './studentContacts';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -2149,7 +2150,11 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
   if (!teacher.studentNotificationsEnabled || !teacher.studentPaymentRemindersEnabled) {
     throw new Error('Уведомления ученику отключены в настройках');
   }
-  if (!lesson.student?.isActivated || !lesson.student.telegramId) {
+  if (!lesson.student) {
+    throw new Error('Ученик не найден');
+  }
+  const studentTelegramId = await resolveStudentTelegramId(lesson.student);
+  if (!studentTelegramId) {
     throw new Error('Ученик не активировал бота');
   }
 
