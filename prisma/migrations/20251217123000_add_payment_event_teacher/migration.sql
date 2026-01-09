@@ -16,7 +16,7 @@ SET "teacherId" = (
   SELECT "teacherId"
   FROM "TeacherStudent"
   WHERE "TeacherStudent"."studentId" = "PaymentEvent"."studentId"
-    AND "TeacherStudent"."isArchived" = 0
+    AND "TeacherStudent"."isArchived" = false
   LIMIT 1
 )
 WHERE "lessonId" IS NULL
@@ -25,5 +25,5 @@ WHERE "lessonId" IS NULL
     SELECT COUNT(*)
     FROM "TeacherStudent"
     WHERE "TeacherStudent"."studentId" = "PaymentEvent"."studentId"
-      AND "TeacherStudent"."isArchived" = 0
+      AND "TeacherStudent"."isArchived" = false
   ) = 1;

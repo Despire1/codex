@@ -5,21 +5,21 @@ CREATE TABLE "Teacher" (
     "name" TEXT,
     "defaultLessonDuration" INTEGER NOT NULL DEFAULT 60,
     "reminderMinutesBefore" INTEGER NOT NULL DEFAULT 30,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "Student" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "username" TEXT,
     "telegramId" BIGINT,
     "pricePerLesson" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "TeacherStudent" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "teacherId" BIGINT NOT NULL,
     "studentId" INTEGER NOT NULL,
     "customName" TEXT NOT NULL,
@@ -31,21 +31,21 @@ CREATE TABLE "TeacherStudent" (
 
 -- CreateTable
 CREATE TABLE "Homework" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "text" TEXT NOT NULL,
-    "deadline" DATETIME,
+    "deadline" TIMESTAMP(3),
     "status" TEXT NOT NULL DEFAULT 'DRAFT',
     "isDone" BOOLEAN NOT NULL DEFAULT false,
     "attachments" TEXT NOT NULL DEFAULT '[]',
     "timeSpentMinutes" INTEGER,
-    "completedAt" DATETIME,
-    "takenAt" DATETIME,
+    "completedAt" TIMESTAMP(3),
+    "takenAt" TIMESTAMP(3),
     "takenByStudentId" INTEGER,
     "studentId" INTEGER NOT NULL,
     "teacherId" BIGINT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastReminderAt" DATETIME,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastReminderAt" TIMESTAMP(3),
     CONSTRAINT "Homework_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Homework_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("chatId") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Homework_takenByStudentId_fkey" FOREIGN KEY ("takenByStudentId") REFERENCES "Student" ("id") ON DELETE SET NULL ON UPDATE CASCADE
@@ -53,30 +53,30 @@ CREATE TABLE "Homework" (
 
 -- CreateTable
 CREATE TABLE "Lesson" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "teacherId" BIGINT NOT NULL,
     "studentId" INTEGER NOT NULL,
     "price" INTEGER NOT NULL DEFAULT 0,
-    "startAt" DATETIME NOT NULL,
+    "startAt" TIMESTAMP(3) NOT NULL,
     "durationMinutes" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'SCHEDULED',
     "isPaid" BOOLEAN NOT NULL DEFAULT false,
     "isRecurring" BOOLEAN NOT NULL DEFAULT false,
-    "recurrenceUntil" DATETIME,
+    "recurrenceUntil" TIMESTAMP(3),
     "recurrenceGroupId" TEXT,
     "recurrenceWeekdays" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Lesson_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("chatId") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Lesson_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "Payment" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "lessonId" INTEGER NOT NULL,
     "studentId" INTEGER NOT NULL,
     "amount" INTEGER NOT NULL,
-    "paidAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "teacherId" BIGINT NOT NULL,
     "comment" TEXT,
     CONSTRAINT "Payment_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "Lesson" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -86,24 +86,24 @@ CREATE TABLE "Payment" (
 
 -- CreateTable
 CREATE TABLE "LessonParticipant" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "lessonId" INTEGER NOT NULL,
     "studentId" INTEGER NOT NULL,
     "price" INTEGER NOT NULL DEFAULT 0,
     "isPaid" BOOLEAN NOT NULL DEFAULT false,
     "attended" BOOLEAN,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "LessonParticipant_lessonId_fkey" FOREIGN KEY ("lessonId") REFERENCES "Lesson" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "LessonParticipant_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "TeacherAuth" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "teacherId" BIGINT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "TeacherAuth_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "Teacher" ("chatId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
