@@ -190,16 +190,9 @@ const activateStudentByUsername = async (chatId: number, username?: string) => {
     await sendStudentInfoMessage(chatId, 'Мы не нашли вас в списке учеников. Попросите учителя добавить ваш username.');
     return;
   }
-  if (students.length > 1) {
-    await sendStudentInfoMessage(
-      chatId,
-      'Вы числитесь у нескольких учителей. Попросите их добавить вас с уникальным username.',
-    );
-    return;
-  }
 
-  await prisma.student.update({
-    where: { id: students[0].id },
+  await prisma.student.updateMany({
+    where: { id: { in: students.map((student) => student.id) } },
     data: {
       telegramId: BigInt(chatId),
       isActivated: true,
