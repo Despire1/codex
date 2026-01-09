@@ -8,6 +8,7 @@
     "api": "prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",
     "start:all": "./scripts/start-all.sh",
+    "start:prod": "npm run build && npx pm2-runtime ecosystem.config.cjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",

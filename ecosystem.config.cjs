@@ -10,10 +10,5 @@ module.exports = {
       script: "npm",
       args: "run bot",
     },
-    {
-      name: "dev",
-      script: "npm",
-      args: "run dev",
-    },
   ],
 };
