@@ -79,22 +79,24 @@ const sendWebAppMessage = async (chatId: number) => {
 const termsMessageText =
   '👋 Добро пожаловать!\n\n' +
   'Перед тем как начать пользоваться ботом, пожалуйста, ознакомьтесь с документами:\n\n' +
-  `📄 Политика конфиденциальности: ${TERMS_PRIVACY_URL}\n` +
-  `📜 Пользовательское соглашение: ${TERMS_AGREEMENT_URL}\n\n` +
+  `📄 <a href="${TERMS_PRIVACY_URL}">Политика конфиденциальности</a>\n` +
+  `📜 <a href="${TERMS_AGREEMENT_URL}">Пользовательское соглашение</a>\n\n` +
   'Нажимая «✅ Принимаю», вы соглашаетесь с условиями использования бота.';
 
 const sendTermsAcceptanceMessage = async (chatId: number) => {
   await callTelegram('sendMessage', {
     chat_id: chatId,
     text: termsMessageText,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
     reply_markup: {
       inline_keyboard: [[{ text: '✅ Принимаю', callback_data: 'terms_accept' }]],
     },
   });
 };
 
-const sendRoleSelectionMessage = async (chatId: number) => {
-  await callTelegram('sendMessage', {
+const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
+  const payload = {
     chat_id: chatId,
     text: 'Выберите роль:',
     reply_markup: {
@@ -105,7 +107,12 @@ const sendRoleSelectionMessage = async (chatId: number) => {
         ],
       ],
     },
-  });
+  };
+  if (messageId) {
+    await callTelegram('editMessageText', { ...payload, message_id: messageId });
+    return;
+  }
+  await callTelegram('sendMessage', payload);
 };
 
 const subscriptionPromptText =
@@ -377,7 +384,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
         firstName: from.first_name ?? undefined,
         lastName: from.last_name ?? undefined,
       });
-      await sendRoleSelectionMessage(chatId);
+      await sendRoleSelectionMessage(chatId, update.callback_query.message?.message_id);
       return;
     }
     return;
