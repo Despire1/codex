@@ -2,6 +2,7 @@ import { addDays, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Prisma } from '@prisma/client';
 import prisma from './prismaClient';
+import { resolveStudentTelegramId } from './studentContacts';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
@@ -191,7 +192,9 @@ export const sendStudentLessonReminder = async ({
   const teacher = await prisma.teacher.findUnique({ where: { chatId: lesson.teacherId } });
   const student = await prisma.student.findUnique({ where: { id: studentId } });
   if (!teacher?.studentNotificationsEnabled) return { status: 'skipped' as const };
-  if (!student?.isActivated || !student.telegramId) return { status: 'skipped' as const };
+  if (!student) return { status: 'skipped' as const };
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) return { status: 'skipped' as const };
 
   const log = await createNotificationLog({
     teacherId: lesson.teacherId,
@@ -211,7 +214,7 @@ export const sendStudentLessonReminder = async ({
   });
 
   try {
-    await sendTelegramMessage(student.telegramId, text);
+    await sendTelegramMessage(telegramId, text);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
@@ -276,7 +279,9 @@ export const sendStudentPaymentReminder = async ({
   if (!teacher?.studentNotificationsEnabled || !teacher.studentPaymentRemindersEnabled) {
     return { status: 'skipped' as const };
   }
-  if (!student?.isActivated || !student.telegramId) return { status: 'skipped' as const };
+  if (!student) return { status: 'skipped' as const };
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) return { status: 'skipped' as const };
 
   const log = await createNotificationLog({
     teacherId: lesson.teacherId,
@@ -289,7 +294,7 @@ export const sendStudentPaymentReminder = async ({
   const text = buildPaymentReminderMessage(lesson.startAt, lesson.price ?? 0, teacher.timezone);
 
   try {
-    await sendTelegramMessage(student.telegramId, text);
+    await sendTelegramMessage(telegramId, text);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
