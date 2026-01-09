@@ -124,6 +124,15 @@
   gap: 12px;
 }
 
+.rowHeader > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowHeader label {
+  flex-shrink: 0;
+}
+
 .inlineField {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 200px;
