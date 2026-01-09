@@ -47,26 +47,55 @@ const formatLessonDayLabel = (startAt: Date, timeZone?: string | null) => {
   return formatInTimeZone(startAt, 'd MMM', { locale: ru, timeZone: resolvedTimeZone });
 };
 
+const formatLeadTimeLabel = (minutesBefore?: number) => {
+  if (minutesBefore === undefined || Number.isNaN(minutesBefore)) return null;
+  if (minutesBefore <= 0) return 'сейчас';
+  return `${minutesBefore} мин`;
+};
+
 const buildLessonReminderMessage = ({
   startAt,
   durationMinutes,
   studentName,
   timeZone,
   target,
+  minutesBefore,
 }: {
   startAt: Date;
   durationMinutes: number;
   studentName?: string | null;
   timeZone?: string | null;
   target: 'teacher' | 'student';
+  minutesBefore?: number;
 }) => {
   const dayLabel = formatLessonDayLabel(startAt, timeZone);
   const timeLabel = formatInTimeZone(startAt, 'HH:mm', { timeZone: resolveTimeZone(timeZone) });
+  const leadTimeLabel = formatLeadTimeLabel(minutesBefore);
+  const leadTimeLine = leadTimeLabel ? `⏱️ До начала: ${leadTimeLabel}` : null;
+
   if (target === 'teacher') {
     const name = studentName?.trim() || 'учеником';
-    return `Напоминание: ${dayLabel} в ${timeLabel} урок с ${name} (${durationMinutes} мин).`;
+    return [
+      '⏰ Напоминание о занятии',
+      `📅 День: ${dayLabel}`,
+      `🕒 Время: ${timeLabel}`,
+      leadTimeLine,
+      `👤 Ученик: ${name}`,
+      `⏳ Длительность: ${durationMinutes} мин`,
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
-  return `Напоминание: ${dayLabel} в ${timeLabel} урок. Длительность ${durationMinutes} мин.`;
+
+  return [
+    '⏰ Скоро занятие',
+    `📅 День: ${dayLabel}`,
+    `🕒 Время: ${timeLabel}`,
+    leadTimeLine,
+    `⏳ Длительность: ${durationMinutes} мин`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 };
 
 const buildPaymentReminderMessage = (startAt: Date, price: number, timeZone?: string | null) => {
@@ -132,11 +161,13 @@ export const sendTeacherLessonReminder = async ({
   lessonId,
   scheduledFor,
   dedupeKey,
+  minutesBefore,
 }: {
   teacherId: bigint;
   lessonId: number;
   scheduledFor?: Date;
   dedupeKey?: string;
+  minutesBefore?: number;
 }) => {
   const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
   if (!teacher?.lessonReminderEnabled) return { status: 'skipped' as const };
@@ -163,6 +194,7 @@ export const sendTeacherLessonReminder = async ({
     studentName,
     timeZone: teacher.timezone,
     target: 'teacher',
+    minutesBefore,
   });
 
   try {
@@ -181,11 +213,13 @@ export const sendStudentLessonReminder = async ({
   lessonId,
   scheduledFor,
   dedupeKey,
+  minutesBefore,
 }: {
   studentId: number;
   lessonId: number;
   scheduledFor?: Date;
   dedupeKey?: string;
+  minutesBefore?: number;
 }) => {
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!lesson || lesson.studentId !== studentId) return { status: 'skipped' as const };
@@ -211,6 +245,7 @@ export const sendStudentLessonReminder = async ({
     durationMinutes: lesson.durationMinutes,
     timeZone: teacher.timezone,
     target: 'student',
+    minutesBefore,
   });
 
   try {
