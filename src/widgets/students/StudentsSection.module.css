@@ -395,6 +395,10 @@
   flex-wrap: wrap;
 }
 
+.studentDebtBadge {
+  margin-left: auto;
+}
+
 .badgeRow {
   display: flex;
   gap: 6px;
