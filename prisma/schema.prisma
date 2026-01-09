@@ -186,6 +186,8 @@ model User {
   role            String          @default("TEACHER")
   subscriptionStartAt DateTime?
   subscriptionEndAt   DateTime?
+  termsAccepted  Boolean   @default(false)
+  termsAcceptedAt DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now()) @updatedAt
   sessions        Session[]

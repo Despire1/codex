@@ -6,6 +6,8 @@ const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
+const TERMS_PRIVACY_URL = 'https://example.com/privacy';
+const TERMS_AGREEMENT_URL = 'https://example.com/terms';
 
 type TelegramUpdate = {
   update_id: number;
@@ -70,6 +72,23 @@ const sendWebAppMessage = async (chatId: number) => {
     text: 'Откройте мини-приложение:',
     reply_markup: {
       inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
+    },
+  });
+};
+
+const termsMessageText =
+  '👋 Добро пожаловать!\n\n' +
+  'Перед тем как начать пользоваться ботом, пожалуйста, ознакомьтесь с документами:\n\n' +
+  `📄 Политика конфиденциальности: ${TERMS_PRIVACY_URL}\n` +
+  `📜 Пользовательское соглашение: ${TERMS_AGREEMENT_URL}\n\n` +
+  'Нажимая «✅ Принимаю», вы соглашаетесь с условиями использования бота.';
+
+const sendTermsAcceptanceMessage = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: termsMessageText,
+    reply_markup: {
+      inline_keyboard: [[{ text: '✅ Принимаю', callback_data: 'terms_accept' }]],
     },
   });
 };
@@ -190,6 +209,38 @@ const ensureTelegramUser = async (payload: {
       username: payload.username ?? null,
       firstName: payload.firstName ?? null,
       lastName: payload.lastName ?? null,
+    },
+  });
+};
+
+const acceptTermsForUser = async (payload: {
+  telegramUserId: bigint;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  const existing = await prisma.user.findUnique({ where: { telegramUserId: payload.telegramUserId } });
+  const acceptedAt = existing?.termsAcceptedAt ?? new Date();
+  if (existing) {
+    return prisma.user.update({
+      where: { telegramUserId: payload.telegramUserId },
+      data: {
+        termsAccepted: true,
+        termsAcceptedAt: acceptedAt,
+        username: payload.username ?? existing.username,
+        firstName: payload.firstName ?? existing.firstName,
+        lastName: payload.lastName ?? existing.lastName,
+      },
+    });
+  }
+  return prisma.user.create({
+    data: {
+      telegramUserId: payload.telegramUserId,
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+      termsAccepted: true,
+      termsAcceptedAt: acceptedAt,
     },
   });
 };
@@ -317,6 +368,18 @@ const handleUpdate = async (update: TelegramUpdate) => {
       await sendStudentInfoMessage(chatId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
       return;
     }
+    if (update.callback_query.data === 'terms_accept') {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      const from = update.callback_query.from;
+      await acceptTermsForUser({
+        telegramUserId: BigInt(from.id),
+        username: from.username ?? undefined,
+        firstName: from.first_name ?? undefined,
+        lastName: from.last_name ?? undefined,
+      });
+      await sendRoleSelectionMessage(chatId);
+      return;
+    }
     return;
   }
 
@@ -327,12 +390,16 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   if (text === '/start') {
     if (telegramUserId) {
-      await ensureTelegramUser({
+      const user = await ensureTelegramUser({
         telegramUserId,
         username: from?.username,
         firstName: from?.first_name,
         lastName: from?.last_name,
       });
+      if (!user.termsAccepted) {
+        await sendTermsAcceptanceMessage(chatId);
+        return;
+      }
     }
     await sendRoleSelectionMessage(chatId);
     return;

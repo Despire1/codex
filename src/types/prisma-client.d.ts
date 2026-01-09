@@ -108,6 +108,8 @@ declare module '@prisma/client' {
     role: string;
     subscriptionStartAt: Date | null;
     subscriptionEndAt: Date | null;
+    termsAccepted: boolean;
+    termsAcceptedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   };
