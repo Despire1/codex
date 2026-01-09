@@ -31,6 +31,7 @@ const resolveBalanceBadge = (item: StudentListItem) => {
     };
   }
   if (balanceLessons < 0) {
+    if (typeof item.debtRub === 'number' && item.debtRub > 0) return null;
     const debtRub = item.debtRub ?? null;
     const label = typeof debtRub === 'number' && debtRub > 0
       ? `Долг: ${debtRub} ₽`
@@ -57,6 +58,8 @@ export const StudentListCard: FC<StudentListCardProps> = ({
   onSelect,
 }) => {
   const username = item.student.username?.trim();
+  const debtRub = typeof item.debtRub === 'number' ? item.debtRub : null;
+  const hasDebtBadge = debtRub !== null && debtRub > 0;
   const balanceBadge = resolveBalanceBadge(item);
   const nextLessonClassName = resolveNextLessonClassName(nextLessonVariant);
 
@@ -78,6 +81,11 @@ export const StudentListCard: FC<StudentListCardProps> = ({
       <div className={styles.studentCardBody}>
         <div className={styles.studentCardHeader}>
           <div className={styles.studentName}>{item.link.customName}</div>
+          {hasDebtBadge && (
+            <span className={`${styles.lozenge} ${styles.badgeDebt} ${styles.studentDebtBadge}`}>
+              Долг: {debtRub} ₽
+            </span>
+          )}
         </div>
         {username && <div className={styles.studentTelegram}>Telegram: @{username}</div>}
         <div className={styles.studentBadgesRow}>

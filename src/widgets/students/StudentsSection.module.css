@@ -376,11 +376,14 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
 }
 
 .studentName {
   font-weight: 800;
   font-size: 15px;
+  min-width: 0;
 }
 
 .studentTelegram {
@@ -393,6 +396,10 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.studentDebtBadge {
+  flex-shrink: 0;
 }
 
 .badgeRow {
