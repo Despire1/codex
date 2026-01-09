@@ -1270,7 +1270,17 @@ export const AppPage = () => {
         cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
       if (studentId !== undefined) {
         const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
-        setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+        const normalizedLesson = normalizeLesson(data.lesson);
+        const shouldUpdateStudentLists = selectedStudentId !== null
+          && (
+            selectedStudentId === studentId
+            || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
+          );
+        setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        if (shouldUpdateStudentLists) {
+          setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+          setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        }
 
         if (data.link) {
           setLinks((prev) => {
@@ -1294,7 +1304,18 @@ export const AppPage = () => {
         });
       } else {
         const data = await api.togglePaid(lessonId, payload);
-        setLessons(lessons.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+        const normalizedLesson = normalizeLesson(data.lesson);
+        const targetStudentId = data.lesson.studentId ?? null;
+        const shouldUpdateStudentLists = selectedStudentId !== null
+          && (
+            selectedStudentId === targetStudentId
+            || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
+          );
+        setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        if (shouldUpdateStudentLists) {
+          setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+          setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        }
 
         if (data.link) {
           setLinks((prev) => {
