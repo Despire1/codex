@@ -71,6 +71,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
+  const showActivationBadge = Boolean(telegramUsername) && selectedStudent.isActivated === false;
+  const activationHint =
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
     action();
@@ -224,6 +227,14 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 </button>
               ) : (
                 <span className={styles.studentMeta}>@нет</span>
+              )}
+              {showActivationBadge && (
+                <span
+                  className={`${styles.lozenge} ${styles.badgeInactive}`}
+                  title={activationHint}
+                >
+                  Не активирован
+                </span>
               )}
             </div>
           </div>
