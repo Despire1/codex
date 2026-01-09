@@ -50,7 +50,7 @@ export const StudentDebtPopoverContent = ({
                   <span className={styles.itemAmount}>{priceLabel}</span>
                   <button
                     type="button"
-                    className={styles.payButton}
+                    className={`${controls.primaryButton} ${styles.payButton}`}
                     onClick={() => onMarkPaid(item.id)}
                     disabled={isLoading}
                   >
