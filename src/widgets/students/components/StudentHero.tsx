@@ -68,6 +68,28 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
+  const reminderStorageKey = (lessonId: number) => `lesson-payment-reminder:${lessonId}`;
+  const readStoredReminder = (lessonId: number) => {
+    try {
+      return localStorage.getItem(reminderStorageKey(lessonId));
+    } catch {
+      return null;
+    }
+  };
+  const writeStoredReminder = (lessonId: number, sentAt: string) => {
+    try {
+      localStorage.setItem(reminderStorageKey(lessonId), sentAt);
+    } catch {
+      // ignore storage errors
+    }
+  };
+  const clearStoredReminder = (lessonId: number) => {
+    try {
+      localStorage.removeItem(reminderStorageKey(lessonId));
+    } catch {
+      // ignore storage errors
+    }
+  };
   const timeZone = useTimeZone();
   const todayZoned = toZonedDate(new Date(), timeZone);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -105,6 +127,18 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
   const handleRemindPayment = async (lessonId: number) => {
     if (pendingReminderIds.includes(lessonId)) return;
+    const storedSentAt = readStoredReminder(lessonId);
+    if (storedSentAt) {
+      const storedTime = new Date(storedSentAt).getTime();
+      const nowTime = Date.now();
+      const cooldownMs = 10 * 60 * 1000;
+      if (nowTime - storedTime < cooldownMs) {
+        setConfirmReminderLessonId(lessonId);
+        setConfirmReminderSentAt(storedSentAt);
+        return;
+      }
+      clearStoredReminder(lessonId);
+    }
     const cachedSentAt = lastReminderSentAtByLesson[lessonId];
     if (cachedSentAt) {
       const cachedTime = new Date(cachedSentAt).getTime();
@@ -125,11 +159,14 @@ export const StudentHero: FC<StudentHeroProps> = ({
         setConfirmReminderSentAt(sentAt);
         if (sentAt) {
           setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
+          writeStoredReminder(lessonId, sentAt);
         }
       } else if (result.status === 'sent') {
         setConfirmReminderLessonId(null);
         setConfirmReminderSentAt(null);
-        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: new Date().toISOString() }));
+        const sentAt = new Date().toISOString();
+        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
+        writeStoredReminder(lessonId, sentAt);
       }
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
@@ -144,7 +181,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
       if (result.status === 'sent') {
         setConfirmReminderLessonId(null);
         setConfirmReminderSentAt(null);
-        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: new Date().toISOString() }));
+        const sentAt = new Date().toISOString();
+        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
+        writeStoredReminder(lessonId, sentAt);
       }
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
