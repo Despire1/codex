@@ -173,6 +173,8 @@ export const api = {
       method: 'POST',
       body: payload ? JSON.stringify(payload) : undefined,
     }),
+  remindLessonPayment: (lessonId: number) =>
+    apiFetch<{ status: string }>(`/api/lessons/${lessonId}/remind-payment`, { method: 'POST' }),
   toggleParticipantPaid: (
     lessonId: number,
     studentId: number,

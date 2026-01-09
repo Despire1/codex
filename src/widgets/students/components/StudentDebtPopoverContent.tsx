@@ -1,6 +1,7 @@
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { Lesson, StudentDebtItem } from '../../../entities/types';
+import { NotificationsNoneOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './StudentDebtPopoverContent.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
@@ -8,7 +9,10 @@ import { useTimeZone } from '../../../shared/lib/timezoneContext';
 interface StudentDebtPopoverContentProps {
   items: StudentDebtItem[];
   pendingIds: number[];
+  pendingReminderIds: number[];
   onMarkPaid: (lessonId: number) => void;
+  onSendPaymentReminder: (lessonId: number) => void;
+  reminderDisabledReason: string | null;
   showCloseButton?: boolean;
   onClose?: () => void;
 }
@@ -22,11 +26,15 @@ const statusLabels: Record<Lesson['status'], string> = {
 export const StudentDebtPopoverContent = ({
   items,
   pendingIds,
+  pendingReminderIds,
   onMarkPaid,
+  onSendPaymentReminder,
+  reminderDisabledReason,
   showCloseButton = false,
   onClose,
 }: StudentDebtPopoverContentProps) => {
   const timeZone = useTimeZone();
+  const reminderDisabled = Boolean(reminderDisabledReason);
   return (
     <div className={styles.container}>
       <div className={styles.title}>Неоплаченные занятия</div>
@@ -36,6 +44,7 @@ export const StudentDebtPopoverContent = ({
         <div className={styles.list}>
           {items.map((item) => {
             const isLoading = pendingIds.includes(item.id);
+            const isReminderLoading = pendingReminderIds.includes(item.id);
             const dateLabel = formatInTimeZone(item.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
             const priceLabel = item.price === null ? '—' : `${item.price} ₽`;
             const statusLabel = statusLabels[item.status];
@@ -48,6 +57,17 @@ export const StudentDebtPopoverContent = ({
                 </div>
                 <div className={styles.itemActions}>
                   <span className={styles.itemAmount}>{priceLabel}</span>
+                  <button
+                    type="button"
+                    className={styles.remindButton}
+                    onClick={() => onSendPaymentReminder(item.id)}
+                    disabled={reminderDisabled || isReminderLoading}
+                    title={reminderDisabledReason ?? 'Отправить напоминание'}
+                  >
+                    {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
+                      <NotificationsNoneOutlinedIcon width={16} height={16} />
+                    )}
+                  </button>
                   <button
                     type="button"
                     className={`${controls.primaryButton} ${styles.payButton}`}

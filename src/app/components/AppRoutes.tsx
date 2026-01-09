@@ -36,6 +36,7 @@ interface AppRoutesProps {
     onOpenStudent: (studentId: number) => void;
   };
   students: {
+    teacher: Teacher;
     studentListItems: StudentListItem[];
     studentListCounts: { withDebt: number; overdue: number };
     studentListTotal: number;
@@ -100,6 +101,7 @@ interface AppRoutesProps {
     onAddStudent: () => void;
     onEditStudent: () => void;
     onRequestDeleteStudent: (studentId: number) => void;
+    onRemindLessonPayment: (lessonId: number) => Promise<void>;
     studentLessons: Lesson[];
     studentLessonsSummary: Lesson[];
     studentDebtItems: StudentDebtItem[];
