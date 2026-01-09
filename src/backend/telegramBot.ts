@@ -153,6 +153,28 @@ const upsertTelegramUser = async (payload: {
   });
 };
 
+const ensureTelegramUser = async (payload: {
+  telegramUserId: bigint;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  return prisma.user.upsert({
+    where: { telegramUserId: payload.telegramUserId },
+    update: {
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+    },
+    create: {
+      telegramUserId: payload.telegramUserId,
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+    },
+  });
+};
+
 const activateStudentByUsername = async (chatId: number, username?: string) => {
   const normalized = normalizeTelegramUsername(username);
   if (!normalized) {
@@ -185,6 +207,13 @@ const activateStudentByUsername = async (chatId: number, username?: string) => {
     },
   });
   await sendStudentWelcomeMessage(chatId);
+};
+
+const canOpenTeacherApp = async (telegramUserId: bigint) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: telegramUserId } });
+  if (teacher) return true;
+  const user = await prisma.user.findUnique({ where: { telegramUserId } });
+  return user?.role === 'TEACHER';
 };
 
 const handleRoleSelection = async (
@@ -235,17 +264,12 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   if (text === '/start') {
     if (telegramUserId) {
-      const existing = await prisma.user.findUnique({ where: { telegramUserId } });
-      if (existing?.role === 'STUDENT') {
-        await setDefaultMenuButton(chatId);
-        await activateStudentByUsername(chatId, existing.username ?? from?.username ?? undefined);
-        return;
-      }
-      if (existing?.role === 'TEACHER') {
-        await setTeacherMenuButton(chatId);
-        await sendWebAppMessage(chatId);
-        return;
-      }
+      await ensureTelegramUser({
+        telegramUserId,
+        username: from?.username,
+        firstName: from?.first_name,
+        lastName: from?.last_name,
+      });
     }
     await sendRoleSelectionMessage(chatId);
     return;
@@ -253,8 +277,8 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   if (text === '/app' || text.includes('открыть')) {
     if (telegramUserId) {
-      const existing = await prisma.user.findUnique({ where: { telegramUserId } });
-      if (existing?.role === 'STUDENT') {
+      const allowed = await canOpenTeacherApp(telegramUserId);
+      if (!allowed) {
         await sendStudentInfoMessage(chatId, 'Вы ученик, вам доступны только уведомления.');
         return;
       }
