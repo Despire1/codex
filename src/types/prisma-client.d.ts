@@ -23,6 +23,8 @@ declare module '@prisma/client' {
     id: number;
     username: string | null;
     telegramId: bigint | null;
+    isActivated: boolean;
+    activatedAt: Date | null;
     pricePerLesson: number;
     payments: Payment[];
     paymentEvents: PaymentEvent[];
@@ -67,6 +69,8 @@ declare module '@prisma/client' {
     status: string;
     price: number;
     isPaid: boolean;
+    paidAt: Date | null;
+    completedAt: Date | null;
     createdAt: Date;
   };
 
@@ -101,8 +105,23 @@ declare module '@prisma/client' {
     lastName: string | null;
     photoUrl: string | null;
     lastAuthDate: number | null;
+    role: string;
     createdAt: Date;
     updatedAt: Date;
+  };
+
+  export type NotificationLog = {
+    id: number;
+    teacherId: bigint;
+    studentId: number | null;
+    lessonId: number | null;
+    type: string;
+    scheduledFor: Date | null;
+    sentAt: Date | null;
+    status: string;
+    errorText: string | null;
+    dedupeKey: string | null;
+    createdAt: Date;
   };
 
   export type Session = {

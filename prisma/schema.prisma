@@ -24,6 +24,7 @@ model Teacher {
   students              TeacherStudent[]
   homeworks             Homework[]
   lessons               Lesson[]
+  notificationLogs      NotificationLog[]
   createdAt             DateTime        @default(now())
   authUser              TeacherAuth?
 }
@@ -32,6 +33,8 @@ model Student {
   id                   Int                  @id @default(autoincrement())
   username             String?
   telegramId           BigInt?
+  isActivated          Boolean              @default(false)
+  activatedAt          DateTime?
   pricePerLesson       Int                  @default(0)
   teacherLinks         TeacherStudent[]
   homeworks            Homework[]           @relation("HomeworkStudent")
@@ -39,6 +42,7 @@ model Student {
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
   paymentEvents        PaymentEvent[]
+  notificationLogs     NotificationLog[]
   createdAt            DateTime             @default(now())
 }
 
@@ -90,6 +94,8 @@ model Lesson {
   durationMinutes     Int
   status              String              @default("SCHEDULED") // values: SCHEDULED, COMPLETED, CANCELED
   isPaid              Boolean             @default(false)
+  paidAt              DateTime?
+  completedAt         DateTime?
   isRecurring         Boolean             @default(false)
   recurrenceUntil     DateTime?
   recurrenceGroupId   String?
@@ -99,6 +105,7 @@ model Lesson {
   participants        LessonParticipant[]
   payments            Payment[]
   paymentEvents       PaymentEvent[]
+  notificationLogs    NotificationLog[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
@@ -176,10 +183,34 @@ model User {
   lastName        String?
   photoUrl        String?
   lastAuthDate    Int?
+  role            String          @default("TEACHER")
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now()) @updatedAt
   sessions        Session[]
   transferTokens  TransferToken[]
+}
+
+model NotificationLog {
+  id           Int       @id @default(autoincrement())
+  teacherId    BigInt
+  studentId    Int?
+  lessonId     Int?
+  type         String
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  status       String
+  errorText    String?
+  dedupeKey    String?   @unique
+  createdAt    DateTime  @default(now())
+
+  teacher Teacher @relation(fields: [teacherId], references: [chatId])
+  student Student? @relation(fields: [studentId], references: [id])
+  lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([type])
 }
 
 model Session {
