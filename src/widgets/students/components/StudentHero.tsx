@@ -67,6 +67,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
+  const [isActivationHintOpen, setIsActivationHintOpen] = useState(false);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
@@ -229,12 +230,25 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 <span className={styles.studentMeta}>@нет</span>
               )}
               {showActivationBadge && (
-                <span
-                  className={`${styles.lozenge} ${styles.badgeInactive}`}
-                  title={activationHint}
+                <AdaptivePopover
+                  isOpen={isActivationHintOpen}
+                  onClose={() => setIsActivationHintOpen(false)}
+                  trigger={(
+                    <button
+                      type="button"
+                      className={`${styles.lozenge} ${styles.badgeInactive} ${styles.activationBadgeButton}`}
+                      onClick={() => setIsActivationHintOpen((prev) => !prev)}
+                    >
+                      Не активирован
+                    </button>
+                  )}
+                  side="bottom"
+                  align="start"
+                  offset={6}
+                  className={styles.activationPopover}
                 >
-                  Не активирован
-                </span>
+                  <div className={styles.activationPopoverText}>{activationHint}</div>
+                </AdaptivePopover>
               )}
             </div>
           </div>
