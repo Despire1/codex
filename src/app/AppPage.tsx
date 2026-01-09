@@ -542,6 +542,25 @@ export const AppPage = () => {
     loadStudentLessonsSummary();
   }, [loadStudentLessonsSummary, sessionState]);
 
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    setStudentListItems((prev) =>
+      prev.map((item) => {
+        if (item.student.id !== selectedStudentId) return item;
+        const debtRub = studentDebtTotal > 0 ? studentDebtTotal : null;
+        const debtLessonCount = studentDebtItems.length > 0 ? studentDebtItems.length : null;
+        if (item.debtRub === debtRub && item.debtLessonCount === debtLessonCount) {
+          return item;
+        }
+        return {
+          ...item,
+          debtRub,
+          debtLessonCount,
+        };
+      }),
+    );
+  }, [selectedStudentId, studentDebtItems.length, studentDebtTotal]);
+
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
       if (order === studentLessonSortOrder) return;
