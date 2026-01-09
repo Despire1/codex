@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import prisma from './prismaClient';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
@@ -11,7 +12,26 @@ type TelegramUpdate = {
   message?: {
     message_id: number;
     chat: { id: number };
+    from?: {
+      id: number;
+      username?: string;
+      first_name?: string;
+      last_name?: string;
+    };
     text?: string;
+  };
+  callback_query?: {
+    id: string;
+    data?: string;
+    from: {
+      id: number;
+      username?: string;
+      first_name?: string;
+      last_name?: string;
+    };
+    message?: {
+      chat: { id: number };
+    };
   };
 };
 
@@ -53,24 +73,218 @@ const sendWebAppMessage = async (chatId: number) => {
   });
 };
 
-const handleUpdate = async (update: TelegramUpdate) => {
-  const text = update.message?.text?.trim().toLowerCase();
-  const chatId = update.message?.chat.id;
-  if (!text || !chatId) return;
-
-  if (text === '/start' || text === '/app' || text.includes('открыть')) {
-    await sendWebAppMessage(chatId);
-  }
+const sendRoleSelectionMessage = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Выберите роль:',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: 'Я учитель', callback_data: 'role_teacher' },
+          { text: 'Я ученик', callback_data: 'role_student' },
+        ],
+      ],
+    },
+  });
 };
 
-const configureMenuButton = async () => {
+const sendStudentWelcomeMessage = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Профиль активирован. Вы ученик, вам доступны только уведомления.',
+  });
+};
+
+const sendStudentInfoMessage = async (chatId: number, text: string) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text,
+  });
+};
+
+const setTeacherMenuButton = async (chatId: number) => {
   await callTelegram('setChatMenuButton', {
+    chat_id: chatId,
     menu_button: {
       type: 'web_app',
       text: 'Открыть приложение',
       web_app: { url: TELEGRAM_WEBAPP_URL },
     },
   });
+};
+
+const setDefaultMenuButton = async (chatId: number) => {
+  await callTelegram('setChatMenuButton', {
+    chat_id: chatId,
+    menu_button: { type: 'default' },
+  });
+};
+
+const normalizeTelegramUsername = (username?: string | null) => {
+  if (!username) return null;
+  const trimmed = username.trim();
+  if (!trimmed) return null;
+  const withoutAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
+  return withoutAt.trim().toLowerCase() || null;
+};
+
+const upsertTelegramUser = async (payload: {
+  telegramUserId: bigint;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: 'TEACHER' | 'STUDENT';
+}) => {
+  return prisma.user.upsert({
+    where: { telegramUserId: payload.telegramUserId },
+    update: {
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+      role: payload.role ?? undefined,
+    },
+    create: {
+      telegramUserId: payload.telegramUserId,
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+      role: payload.role ?? 'TEACHER',
+    },
+  });
+};
+
+const ensureTelegramUser = async (payload: {
+  telegramUserId: bigint;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}) => {
+  return prisma.user.upsert({
+    where: { telegramUserId: payload.telegramUserId },
+    update: {
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+    },
+    create: {
+      telegramUserId: payload.telegramUserId,
+      username: payload.username ?? null,
+      firstName: payload.firstName ?? null,
+      lastName: payload.lastName ?? null,
+    },
+  });
+};
+
+const activateStudentByUsername = async (chatId: number, username?: string) => {
+  const normalized = normalizeTelegramUsername(username);
+  if (!normalized) {
+    await sendStudentInfoMessage(chatId, 'Чтобы активироваться, укажите username в Telegram и нажмите /start ещё раз.');
+    return;
+  }
+
+  const candidates = await prisma.student.findMany({
+    where: { username: { contains: normalized } },
+  });
+  const students = candidates.filter((student) => normalizeTelegramUsername(student.username) === normalized);
+  if (students.length === 0) {
+    await sendStudentInfoMessage(chatId, 'Мы не нашли вас в списке учеников. Попросите учителя добавить ваш username.');
+    return;
+  }
+  if (students.length > 1) {
+    await sendStudentInfoMessage(
+      chatId,
+      'Вы числитесь у нескольких учителей. Попросите их добавить вас с уникальным username.',
+    );
+    return;
+  }
+
+  await prisma.student.update({
+    where: { id: students[0].id },
+    data: {
+      telegramId: BigInt(chatId),
+      isActivated: true,
+      activatedAt: new Date(),
+    },
+  });
+  await sendStudentWelcomeMessage(chatId);
+};
+
+const canOpenTeacherApp = async (telegramUserId: bigint) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: telegramUserId } });
+  if (teacher) return true;
+  const user = await prisma.user.findUnique({ where: { telegramUserId } });
+  return user?.role === 'TEACHER';
+};
+
+const handleRoleSelection = async (
+  chatId: number,
+  role: 'TEACHER' | 'STUDENT',
+  from: NonNullable<TelegramUpdate['callback_query']>['from'],
+) => {
+  const telegramUserId = BigInt(from.id);
+  const username = from.username ?? null;
+  const firstName = from.first_name ?? null;
+  const lastName = from.last_name ?? null;
+
+  await upsertTelegramUser({
+    telegramUserId,
+    username: username ?? undefined,
+    firstName: firstName ?? undefined,
+    lastName: lastName ?? undefined,
+    role,
+  });
+
+  if (role === 'TEACHER') {
+    await setTeacherMenuButton(chatId);
+    await sendWebAppMessage(chatId);
+    return;
+  }
+
+  await setDefaultMenuButton(chatId);
+  await activateStudentByUsername(chatId, username ?? undefined);
+};
+
+const handleUpdate = async (update: TelegramUpdate) => {
+  const text = update.message?.text?.trim().toLowerCase();
+  const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
+
+  if (update.callback_query?.data && chatId) {
+    const role = update.callback_query.data === 'role_teacher' ? 'TEACHER' : update.callback_query.data === 'role_student' ? 'STUDENT' : null;
+    if (role) {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      await handleRoleSelection(chatId, role, update.callback_query.from);
+    }
+    return;
+  }
+
+  if (!text || !chatId) return;
+
+  const from = update.message?.from;
+  const telegramUserId = from?.id ? BigInt(from.id) : null;
+
+  if (text === '/start') {
+    if (telegramUserId) {
+      await ensureTelegramUser({
+        telegramUserId,
+        username: from?.username,
+        firstName: from?.first_name,
+        lastName: from?.last_name,
+      });
+    }
+    await sendRoleSelectionMessage(chatId);
+    return;
+  }
+
+  if (text === '/app' || text.includes('открыть')) {
+    if (telegramUserId) {
+      const allowed = await canOpenTeacherApp(telegramUserId);
+      if (!allowed) {
+        await sendStudentInfoMessage(chatId, 'Вы ученик, вам доступны только уведомления.');
+        return;
+      }
+    }
+    await sendWebAppMessage(chatId);
+  }
 };
 
 const clearWebhook = async () => {
@@ -80,7 +294,6 @@ const clearWebhook = async () => {
 const startPolling = async () => {
   ensureEnv();
   await clearWebhook();
-  await configureMenuButton();
   let offset = 0;
 
   // eslint-disable-next-line no-constant-condition
@@ -89,7 +302,7 @@ const startPolling = async () => {
       const updates = await callTelegram<TelegramUpdate[]>('getUpdates', {
         timeout: POLL_TIMEOUT_SEC,
         offset,
-        allowed_updates: ['message'],
+        allowed_updates: ['message', 'callback_query'],
       });
       for (const update of updates) {
         offset = update.update_id + 1;

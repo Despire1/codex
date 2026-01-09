@@ -1620,6 +1620,26 @@ export const AppPage = () => {
     }
   };
 
+  const remindLessonPayment = async (lessonId: number) => {
+    try {
+      await api.remindLessonPayment(lessonId);
+      showToast({ message: 'Напоминание отправлено', variant: 'success' });
+    } catch (error) {
+      let message = 'Не удалось отправить напоминание';
+      if (error instanceof Error) {
+        try {
+          const parsed = JSON.parse(error.message) as { message?: string };
+          message = parsed?.message ?? error.message;
+        } catch {
+          message = error.message;
+        }
+      }
+      showToast({ message, variant: 'error' });
+      // eslint-disable-next-line no-console
+      console.error('Failed to send payment reminder', error);
+    }
+  };
+
   const handleMonthShift = (delta: number) => {
     setMonthOffset((prev) => {
       const next = prev + delta;
@@ -1696,6 +1716,7 @@ export const AppPage = () => {
               },
             }}
             students={{
+              teacher,
               studentListItems,
               studentListCounts,
               studentListTotal,
@@ -1740,6 +1761,7 @@ export const AppPage = () => {
               onAddStudent: openCreateStudentModal,
               onEditStudent: openEditStudentModal,
               onRequestDeleteStudent: requestDeleteStudent,
+              onRemindLessonPayment: remindLessonPayment,
               studentLessons,
               studentLessonsSummary,
               studentDebtItems,
