@@ -1620,10 +1620,13 @@ export const AppPage = () => {
     }
   };
 
-  const remindLessonPayment = async (lessonId: number) => {
+  const remindLessonPayment = async (lessonId: number, options?: { force?: boolean }) => {
     try {
-      await api.remindLessonPayment(lessonId);
-      showToast({ message: 'Напоминание отправлено', variant: 'success' });
+      const result = await api.remindLessonPayment(lessonId, Boolean(options?.force));
+      if (result.status === 'sent') {
+        showToast({ message: 'Напоминание отправлено', variant: 'success' });
+      }
+      return result;
     } catch (error) {
       let message = 'Не удалось отправить напоминание';
       if (error instanceof Error) {
@@ -1637,6 +1640,7 @@ export const AppPage = () => {
       showToast({ message, variant: 'error' });
       // eslint-disable-next-line no-console
       console.error('Failed to send payment reminder', error);
+      return { status: 'error' as const };
     }
   };
 
