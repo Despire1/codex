@@ -1,13 +1,13 @@
 -- CreateTable
 CREATE TABLE "PaymentEvent" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "studentId" INTEGER NOT NULL,
     "lessonId" INTEGER,
     "type" TEXT NOT NULL,
     "lessonsDelta" INTEGER NOT NULL,
     "priceSnapshot" INTEGER NOT NULL,
     "moneyAmount" INTEGER,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdBy" TEXT NOT NULL,
     "reason" TEXT,
     CONSTRAINT "PaymentEvent_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
