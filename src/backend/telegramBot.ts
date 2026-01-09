@@ -7,7 +7,7 @@ const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
 const TERMS_PRIVACY_URL = 'https://bot.politdev.ru/privacy';
-const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/terms';
+const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
 
 type TelegramUpdate = {
   update_id: number;
