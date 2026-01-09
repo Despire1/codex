@@ -79,6 +79,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
   const [confirmReminderLessonId, setConfirmReminderLessonId] = useState<number | null>(null);
   const [confirmReminderSentAt, setConfirmReminderSentAt] = useState<string | null>(null);
+  const [lastReminderSentAtByLesson, setLastReminderSentAtByLesson] = useState<Record<number, string>>({});
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
@@ -104,15 +105,31 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
   const handleRemindPayment = async (lessonId: number) => {
     if (pendingReminderIds.includes(lessonId)) return;
+    const cachedSentAt = lastReminderSentAtByLesson[lessonId];
+    if (cachedSentAt) {
+      const cachedTime = new Date(cachedSentAt).getTime();
+      const nowTime = Date.now();
+      const cooldownMs = 10 * 60 * 1000;
+      if (nowTime - cachedTime < cooldownMs) {
+        setConfirmReminderLessonId(lessonId);
+        setConfirmReminderSentAt(cachedSentAt);
+        return;
+      }
+    }
     setPendingReminderIds((prev) => [...prev, lessonId]);
     try {
       const result = await onRemindLessonPayment(lessonId);
       if (result.status === 'recent') {
         setConfirmReminderLessonId(lessonId);
-        setConfirmReminderSentAt(result.lastSentAt ?? null);
+        const sentAt = result.lastSentAt ?? null;
+        setConfirmReminderSentAt(sentAt);
+        if (sentAt) {
+          setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
+        }
       } else if (result.status === 'sent') {
         setConfirmReminderLessonId(null);
         setConfirmReminderSentAt(null);
+        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: new Date().toISOString() }));
       }
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
@@ -127,6 +144,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
       if (result.status === 'sent') {
         setConfirmReminderLessonId(null);
         setConfirmReminderSentAt(null);
+        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: new Date().toISOString() }));
       }
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
