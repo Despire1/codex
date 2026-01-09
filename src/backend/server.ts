@@ -120,10 +120,22 @@ const hashToken = (token: string) => crypto.createHash('sha256').update(token).d
 
 const randomToken = (lengthBytes = 32) => crypto.randomBytes(lengthBytes).toString('base64url');
 
+const getForwardedHost = (req: IncomingMessage) => {
+  const forwardedHost = req.headers['x-forwarded-host'];
+  if (typeof forwardedHost === 'string') {
+    return forwardedHost.split(',')[0]?.trim() ?? '';
+  }
+  if (Array.isArray(forwardedHost)) {
+    return forwardedHost[0] ?? '';
+  }
+  return '';
+};
+
 const getBaseUrl = (req: IncomingMessage) => {
   const configured = process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL;
   if (configured) return configured.replace(/\/$/, '');
-  const host = req.headers.host ?? `localhost:${PORT}`;
+  const forwardedHost = getForwardedHost(req);
+  const host = forwardedHost || req.headers.host || `localhost:${PORT}`;
   const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
   const forwardedProtocol = forwardedProto.split(',')[0];
@@ -132,7 +144,8 @@ const getBaseUrl = (req: IncomingMessage) => {
 };
 
 const isSecureRequest = (req: IncomingMessage) => {
-  const host = req.headers.host ?? '';
+  const forwardedHost = getForwardedHost(req);
+  const host = forwardedHost || req.headers.host || '';
   const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
   if (isLocalhost) return false;
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';

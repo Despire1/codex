@@ -16,6 +16,6 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
       '/auth': 'http://localhost:4000',
     },
-    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev'],
+    allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.politdev.ru'],
   },
 });
