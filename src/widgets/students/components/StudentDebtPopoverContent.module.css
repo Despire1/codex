@@ -103,7 +103,6 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  position: relative;
   z-index: 3;
   width: 220px;
 }
