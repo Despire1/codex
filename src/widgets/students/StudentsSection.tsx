@@ -13,6 +13,7 @@ import {
   Student,
   StudentDebtItem,
   StudentListItem,
+  Teacher,
   TeacherStudent,
 } from '../../entities/types';
 import styles from './StudentsSection.module.css';
@@ -26,6 +27,7 @@ import { StudentsSidebar } from './components/StudentsSidebar';
 import { NewHomeworkDraft, SelectedStudent } from './types';
 
 interface StudentsSectionProps {
+  teacher: Teacher;
   studentListItems: StudentListItem[];
   studentListCounts: { withDebt: number; overdue: number };
   studentListTotal: number;
@@ -73,6 +75,7 @@ interface StudentsSectionProps {
   onAddStudent: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRemindLessonPayment: (lessonId: number) => Promise<void>;
   studentLessons: Lesson[];
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
@@ -121,6 +124,7 @@ const resolveStudentTab = (search: string): StudentTabId => {
 };
 
 export const StudentsSection: FC<StudentsSectionProps> = ({
+  teacher,
   studentListItems,
   studentListCounts,
   studentListTotal,
@@ -160,6 +164,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onAddStudent,
   onEditStudent,
   onRequestDeleteStudent,
+  onRemindLessonPayment,
   studentLessons,
   studentLessonsSummary,
   studentDebtItems,
@@ -372,6 +377,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 <StudentHero
                   headerRef={headerRef}
                   selectedStudent={selectedStudent}
+                  teacher={teacher}
                   studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
@@ -389,6 +395,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
+                  onRemindLessonPayment={onRemindLessonPayment}
                   onTogglePaid={onTogglePaid}
                 />
 

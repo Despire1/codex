@@ -1,7 +1,7 @@
 import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
+import { Lesson, Student, StudentDebtItem, Teacher, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   DeleteOutlineIcon,
@@ -19,6 +19,7 @@ import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
+  teacher: Teacher;
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   studentDebtTotal: number;
@@ -36,12 +37,14 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRemindLessonPayment: (lessonId: number) => Promise<void>;
   onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
   headerRef,
   selectedStudent,
+  teacher,
   studentLessonsSummary,
   studentDebtItems,
   studentDebtTotal,
@@ -59,6 +62,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onRemindLessonPayment,
   onTogglePaid,
 }) => {
   const timeZone = useTimeZone();
@@ -69,12 +73,20 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
   const [isActivationHintOpen, setIsActivationHintOpen] = useState(false);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
+  const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
   const showActivationBadge = Boolean(telegramUsername) && selectedStudent.isActivated === false;
   const activationHint =
     'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
+  const studentNotificationsEnabled =
+    teacher.studentNotificationsEnabled && teacher.studentPaymentRemindersEnabled;
+  const reminderDisabledReason = !studentNotificationsEnabled
+    ? 'Уведомления ученику отключены в настройках'
+    : !selectedStudent.isActivated
+      ? 'Ученик не активировал бота'
+      : null;
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
     action();
@@ -83,6 +95,16 @@ export const StudentHero: FC<StudentHeroProps> = ({
     if (!telegramUsername) return;
     setIsTelegramModalOpen(false);
     window.location.href = `tg://resolve?domain=${telegramUsername}`;
+  };
+
+  const handleRemindPayment = async (lessonId: number) => {
+    if (pendingReminderIds.includes(lessonId)) return;
+    setPendingReminderIds((prev) => [...prev, lessonId]);
+    try {
+      await onRemindLessonPayment(lessonId);
+    } finally {
+      setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
+    }
   };
 
   const nextLessonInfo = useMemo(() => {
@@ -417,7 +439,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
                     <StudentDebtPopoverContent
                       items={studentDebtItems}
                       pendingIds={pendingPaymentIds}
+                      pendingReminderIds={pendingReminderIds}
                       onMarkPaid={handleMarkPaid}
+                      onSendPaymentReminder={handleRemindPayment}
+                      reminderDisabledReason={reminderDisabledReason}
                     />
                   </AdaptivePopover>
                 </div>
@@ -539,7 +564,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
           <StudentDebtPopoverContent
             items={studentDebtItems}
             pendingIds={pendingPaymentIds}
+            pendingReminderIds={pendingReminderIds}
             onMarkPaid={handleMarkPaid}
+            onSendPaymentReminder={handleRemindPayment}
+            reminderDisabledReason={reminderDisabledReason}
             showCloseButton
             onClose={() => setIsDebtPopoverOpen(false)}
           />
@@ -590,7 +618,10 @@ export const StudentHero: FC<StudentHeroProps> = ({
           <StudentDebtPopoverContent
             items={studentDebtItems}
             pendingIds={pendingPaymentIds}
+            pendingReminderIds={pendingReminderIds}
             onMarkPaid={handleMarkPaid}
+            onSendPaymentReminder={handleRemindPayment}
+            reminderDisabledReason={reminderDisabledReason}
             showCloseButton
             onClose={() => setIsDebtPopoverOpen(false)}
           />

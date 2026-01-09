@@ -24,6 +24,7 @@ export interface Student {
   telegramId?: number;
   pricePerLesson?: number;
   isActivated?: boolean;
+  activatedAt?: string | null;
 }
 
 export interface TeacherStudent {
@@ -85,6 +86,8 @@ export interface Lesson {
   durationMinutes: number;
   status: LessonStatus;
   isPaid: boolean;
+  paidAt?: string | null;
+  completedAt?: string | null;
   color?: LessonColor;
   isRecurring?: boolean;
   recurrenceUntil?: string | null;
