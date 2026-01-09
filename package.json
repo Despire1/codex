@@ -7,6 +7,7 @@
     "dev": "vite",
     "api": "prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",
+    "start:all": "./scripts/start-all.sh",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
