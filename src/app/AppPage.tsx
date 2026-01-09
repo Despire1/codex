@@ -39,6 +39,7 @@ import { AppRoutes } from './components/AppRoutes';
 import { AppModals, DialogState } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
+import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -181,8 +182,9 @@ export const AppPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const { state: sessionState, refresh: refreshSession } = useSessionStatus();
+  const { state: sessionState, refresh: refreshSession, hasSubscription } = useSessionStatus();
   const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
+  const hasAccess = sessionState === 'authenticated' && hasSubscription;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
@@ -274,7 +276,7 @@ export const AppPage = () => {
     setDialogState({ type: 'info', title, message, confirmText });
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     const loadInitial = async () => {
       try {
         const data = await api.bootstrap();
@@ -299,7 +301,7 @@ export const AppPage = () => {
     };
 
     loadInitial();
-  }, [sessionState]);
+  }, [hasAccess]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -340,7 +342,7 @@ export const AppPage = () => {
 
   const loadStudentList = useCallback(
     async (options?: { offset?: number; append?: boolean }) => {
-      if (sessionState !== 'authenticated') {
+      if (!hasAccess) {
         setStudentListItems([]);
         setStudentListCounts({ withDebt: 0, overdue: 0 });
         setStudentListTotal(0);
@@ -376,12 +378,12 @@ export const AppPage = () => {
         setStudentListLoading(false);
       }
     },
-    [sessionState, studentFilter, studentQuery],
+    [hasAccess, studentFilter, studentQuery],
   );
 
   const loadStudentHomeworks = useCallback(
     async (options?: { offset?: number; append?: boolean; studentIdOverride?: number | null }) => {
-      if (sessionState !== 'authenticated') {
+      if (!hasAccess) {
         setStudentHomeworks([]);
         setStudentHomeworkHasMore(false);
         return;
@@ -414,12 +416,12 @@ export const AppPage = () => {
         setStudentHomeworkLoading(false);
       }
     },
-    [resolvedTimeZone, selectedStudentId, sessionState, studentHomeworkFilter],
+    [resolvedTimeZone, selectedStudentId, hasAccess, studentHomeworkFilter],
   );
 
   const loadStudentLessons = useCallback(
     async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
-      if (sessionState !== 'authenticated') {
+      if (!hasAccess) {
         setStudentLessons([]);
         setStudentDebtItems([]);
         setStudentDebtTotal(0);
@@ -474,7 +476,7 @@ export const AppPage = () => {
     },
     [
       selectedStudentId,
-      sessionState,
+      hasAccess,
       studentLessonDateRange.from,
       studentLessonDateRange.fromTime,
       studentLessonDateRange.to,
@@ -488,7 +490,7 @@ export const AppPage = () => {
 
   const loadStudentLessonsSummary = useCallback(
     async (options?: { studentIdOverride?: number | null }) => {
-      if (sessionState !== 'authenticated') {
+      if (!hasAccess) {
         setStudentLessonsSummary([]);
         return;
       }
@@ -516,31 +518,31 @@ export const AppPage = () => {
         }
       }
     },
-    [selectedStudentId, sessionState],
+    [selectedStudentId, hasAccess],
   );
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     loadStudentList();
-  }, [loadStudentList, sessionState]);
+  }, [loadStudentList, hasAccess]);
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     loadStudentHomeworks();
-  }, [loadStudentHomeworks, sessionState]);
+  }, [loadStudentHomeworks, hasAccess]);
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     if (skipNextLessonLoadRef.current) {
       skipNextLessonLoadRef.current = false;
     }
     loadStudentLessons();
-  }, [loadStudentLessons, sessionState]);
+  }, [loadStudentLessons, hasAccess]);
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     loadStudentLessonsSummary();
-  }, [loadStudentLessonsSummary, sessionState]);
+  }, [loadStudentLessonsSummary, hasAccess]);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -609,7 +611,7 @@ export const AppPage = () => {
 
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
-      if (sessionState !== 'authenticated') return;
+      if (!hasAccess) return;
       try {
         const filter = options?.filter ?? paymentFilterRef.current;
         const date = options?.date ?? paymentDateRef.current;
@@ -620,15 +622,15 @@ export const AppPage = () => {
         console.error('Failed to load payment events', error);
       }
     },
-    [sessionState],
+    [hasAccess],
   );
 
   useEffect(() => {
-    if (sessionState !== 'authenticated') return;
+    if (!hasAccess) return;
     if (selectedStudentId) {
       refreshPayments(selectedStudentId);
     }
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, sessionState]);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
@@ -1689,6 +1691,10 @@ export const AppPage = () => {
   if (sessionState !== 'authenticated') {
     const fallbackState = sessionState === 'checking' || telegramState === 'pending' ? 'checking' : 'unauthenticated';
     return <SessionFallback state={fallbackState} />;
+  }
+
+  if (!hasSubscription) {
+    return <SubscriptionGate />;
   }
 
   return (

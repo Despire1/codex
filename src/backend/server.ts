@@ -233,6 +233,8 @@ const formatTeacherName = (user: User) => {
   return fullName || user.username || 'Teacher';
 };
 
+const hasActiveSubscription = (user: User | null) => Boolean(user?.subscriptionStartAt);
+
 const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
   formatInTimeZone(date, "yyyy-MM-dd'T'HH:mm", { timeZone: resolveTimeZone(timeZone) });
 
@@ -2477,6 +2479,9 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
     const apiUser = sessionUser as User | null;
     const requireApiUser = () => apiUser as User;
+    if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser)) {
+      return sendJson(res, 403, { message: 'subscription_required' });
+    }
 
     if (req.method === 'GET' && pathname === '/transfer') {
       res.statusCode = 200;
