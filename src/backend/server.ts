@@ -2386,6 +2386,15 @@ const cleanupSessions = async () => {
   });
 };
 
+const cleanupTransferTokens = async () => {
+  const now = new Date();
+  await prisma.transferToken.deleteMany({
+    where: {
+      OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }],
+    },
+  });
+};
+
 const resolveNotificationLogRetentionDays = () => {
   const normalized = Number.isFinite(NOTIFICATION_LOG_RETENTION_DAYS)
     ? NOTIFICATION_LOG_RETENTION_DAYS
@@ -2417,6 +2426,10 @@ const scheduleDailySessionCleanup = () => {
       // eslint-disable-next-line no-console
       console.error('Не удалось очистить сессии', error);
     });
+    cleanupTransferTokens().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Не удалось очистить токены переноса', error);
+    });
     cleanupNotificationLogs().catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Не удалось очистить логи уведомлений', error);
@@ -2426,6 +2439,10 @@ const scheduleDailySessionCleanup = () => {
       cleanupSessions().catch((error) => {
         // eslint-disable-next-line no-console
         console.error('Не удалось очистить сессии', error);
+      });
+      cleanupTransferTokens().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось очистить токены переноса', error);
       });
       cleanupNotificationLogs().catch((error) => {
         // eslint-disable-next-line no-console
@@ -2652,11 +2669,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       if (record.usedAt || record.expiresAt.getTime() < Date.now()) {
         return sendJson(res, 410, { message: 'token_expired_or_used' });
       }
-      const updateResult = await prisma.transferToken.updateMany({
-        where: { id: record.id, usedAt: null, expiresAt: { gte: new Date() } },
-        data: { usedAt: new Date() },
+      const consumeResult = await prisma.$transaction(async (tx) => {
+        const updateResult = await tx.transferToken.updateMany({
+          where: { id: record.id, usedAt: null, expiresAt: { gte: new Date() } },
+          data: { usedAt: new Date() },
+        });
+        if (updateResult.count === 0) {
+          return false;
+        }
+        await tx.transferToken.deleteMany({ where: { id: record.id } });
+        return true;
       });
-      if (updateResult.count === 0) {
+      if (!consumeResult) {
         return sendJson(res, 410, { message: 'token_expired_or_used' });
       }
       const session = await createSession(record.userId, req, res);
