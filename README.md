@@ -30,6 +30,117 @@
    ```
 6. Откройте http://localhost:5173. Все запросы `/api/*` уйдут на локальный сервер.
 
+## Продакшен деплой на сервер (PostgreSQL + HTTPS)
+Ниже — минимальный, но полный список шагов для деплоя на удалённый сервер, чтобы всё работало так же, как при локальном запуске.
+
+### 1. Подготовьте сервер
+- Установите Node.js 18+.
+- Установите PostgreSQL.
+- Настройте домен и HTTPS (обязательно для Telegram WebApp и Secure cookies).
+
+### 2. Клонируйте репозиторий
+```bash
+git clone <YOUR_REPO_URL> teacherbot
+cd teacherbot
+npm install
+```
+
+### 3. Создайте PostgreSQL БД и пользователя
+Пример (на сервере):
+```bash
+createdb teacherbot
+createuser teacherbot_user --pwprompt
+```
+Назначьте права:
+```bash
+psql -d teacherbot -c "GRANT ALL PRIVILEGES ON DATABASE teacherbot TO teacherbot_user;"
+```
+
+### 4. Заполните .env на сервере
+Скопируйте пример:
+```bash
+cp .env.example .env
+```
+И заполните минимум эти переменные:
+- `DATABASE_URL="postgresql://teacherbot_user:password@localhost:5432/teacherbot?schema=public"`
+- `TELEGRAM_BOT_TOKEN="..."`
+- `TELEGRAM_WEBAPP_URL="https://your-domain.com"`
+- `APP_BASE_URL="https://your-domain.com"`
+- `API_PORT=4000`
+
+Если API будет на другом домене/поддомене, выставьте `VITE_API_BASE` (например, `https://api.your-domain.com`).
+
+### 5. Переключите Prisma на PostgreSQL
+Откройте `prisma/schema.prisma` и замените:
+```prisma
+provider = "sqlite"
+```
+на:
+```prisma
+provider = "postgresql"
+```
+
+### 6. Примените миграции в PostgreSQL
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
+> Важно: это не затрагивает вашу локальную SQLite БД, пока вы используете отдельный `.env` для локальной разработки.
+
+### 7. Соберите фронтенд
+```bash
+npm run build
+```
+
+### 8. Запуск API и бота
+Варианты:
+
+**Через pm2 (рекомендуется):**
+```bash
+npx pm2 start ecosystem.config.cjs
+npx pm2 save
+```
+
+**Локально/вручную:**
+```bash
+npm run api
+npm run bot
+```
+
+### 9. Настройте reverse-proxy (Nginx)
+Пример для одного домена (SPA + API):
+```nginx
+server {
+  listen 443 ssl;
+  server_name your-domain.com;
+
+  # SSL конфиг здесь (certbot и т.д.)
+
+  location / {
+    root /path/to/teacherbot/dist;
+    try_files $uri /index.html;
+  }
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location /auth/ {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+```
+
+### 10. Telegram Webhook (опционально)
+Сейчас бот работает через polling. Для webhook нужно добавить отдельный HTTP endpoint в API и вызывать `setWebhook`.
+Если хотите — скажите, я добавлю поддержку webhook в код.
+
 ## Запуск Telegram Mini App (локально через ngrok)
 Ниже — полный сценарий, чтобы открыть приложение внутри Telegram Mini App, сохранив локальный запуск.
 
