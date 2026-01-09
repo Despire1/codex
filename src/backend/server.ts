@@ -2137,7 +2137,7 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number) => {
+const remindLessonPayment = async (user: User, lessonId: number, options?: { force?: boolean }) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -2168,8 +2168,8 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
     },
     orderBy: { sentAt: 'desc' },
   });
-  if (recentReminder) {
-    throw new Error('Уже отправляли недавно');
+  if (recentReminder && !options?.force) {
+    return { status: 'recent', lastSentAt: recentReminder.sentAt?.toISOString() ?? null };
   }
 
   const result = await sendStudentPaymentReminder({
@@ -2881,7 +2881,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const remindPaymentMatch = pathname.match(/^\/api\/lessons\/(\d+)\/remind-payment$/);
     if (req.method === 'POST' && remindPaymentMatch) {
       const lessonId = Number(remindPaymentMatch[1]);
-      const result = await remindLessonPayment(requireApiUser(), lessonId);
+      const body = await readBody(req);
+      const result = await remindLessonPayment(requireApiUser(), lessonId, { force: Boolean((body as any)?.force) });
       return sendJson(res, 200, result);
     }
 
