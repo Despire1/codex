@@ -68,6 +68,3 @@ CREATE INDEX "NotificationLog_lessonId_idx" ON "NotificationLog"("lessonId");
 
 -- CreateIndex
 CREATE INDEX "NotificationLog_type_idx" ON "NotificationLog"("type");
-
--- CreateIndex
-CREATE INDEX "PaymentEvent_teacherId_idx" ON "PaymentEvent"("teacherId");
