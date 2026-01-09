@@ -362,6 +362,7 @@ const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pend
       },
     },
   });
+  const activeUsernames = await resolveActivatedUsernames(students.map((student) => student.username ?? null));
 
   const filteredLinks = links.filter((link) => {
     const student = students.find((s) => s.id === link.studentId);
@@ -399,7 +400,9 @@ const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pend
   });
 
   return {
-    students: students.filter((s) => withPending.some((link) => link.studentId === s.id)),
+    students: students
+      .filter((student) => withPending.some((link) => link.studentId === student.id))
+      .map((student) => attachActivationFlag(student, activeUsernames)),
     links: withPending,
     homeworks,
   };
@@ -436,6 +439,37 @@ const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
   });
 
   return { pendingHomeworkCount, overdueHomeworkCount, totalHomeworkCount };
+};
+
+const normalizeTelegramUsername = (username?: string | null) => {
+  if (!username) return null;
+  const trimmed = username.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
+const resolveActivatedUsernames = async (usernames: Array<string | null | undefined>) => {
+  const normalized = Array.from(
+    new Set(usernames.map((username) => normalizeTelegramUsername(username)).filter(Boolean)),
+  ) as string[];
+  if (!normalized.length) return new Set<string>();
+  const users = await prisma.user.findMany({
+    where: { username: { in: normalized } },
+    select: { username: true },
+  });
+  return new Set(
+    users.map((user) => normalizeTelegramUsername(user.username)).filter(Boolean) as string[],
+  );
+};
+
+const attachActivationFlag = <T extends { username?: string | null }>(
+  student: T,
+  activeUsernames: Set<string>,
+) => {
+  const normalized = normalizeTelegramUsername(student.username);
+  return {
+    ...student,
+    isActivated: normalized ? activeUsernames.has(normalized) : false,
+  };
 };
 
 const listStudents = async (
@@ -492,6 +526,9 @@ const listStudents = async (
     statsByStudent.set(link.studentId, stats);
   });
 
+  const activeUsernames = await resolveActivatedUsernames(
+    links.map((link) => link.student?.username ?? null),
+  );
   const filteredLinks = links.filter((link) => {
     const stats = statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 };
     if (filter === 'debt') return link.balanceLessons < 0;
@@ -503,7 +540,7 @@ const listStudents = async (
   const pageItems = filteredLinks.slice(offset, offset + limit).map((link) => {
     const { student, ...linkData } = link;
     return {
-      student,
+      student: attachActivationFlag(student, activeUsernames),
       link: linkData,
       stats: statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 },
     };
@@ -755,9 +792,11 @@ const addStudent = async (user: User, body: any) => {
         where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
         data: { isArchived: false, customName, pricePerLesson: normalizedPrice },
       });
-      return { student, link: restoredLink };
+      const activeUsernames = await resolveActivatedUsernames([student.username ?? null]);
+      return { student: attachActivationFlag(student, activeUsernames), link: restoredLink };
     }
-    return { student, link: existingLink };
+    const activeUsernames = await resolveActivatedUsernames([student.username ?? null]);
+    return { student: attachActivationFlag(student, activeUsernames), link: existingLink };
   }
 
   const link = await prisma.teacherStudent.create({
@@ -771,7 +810,8 @@ const addStudent = async (user: User, body: any) => {
     },
   });
 
-  return { student, link };
+  const activeUsernames = await resolveActivatedUsernames([student.username ?? null]);
+  return { student: attachActivationFlag(student, activeUsernames), link };
 };
 
 const updateStudent = async (user: User, studentId: number, body: any) => {
@@ -806,7 +846,8 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
     }),
   ]);
 
-  return { student, link: updatedLink };
+  const activeUsernames = await resolveActivatedUsernames([student.username ?? null]);
+  return { student: attachActivationFlag(student, activeUsernames), link: updatedLink };
 };
 
 const archiveStudentLink = async (user: User, studentId: number) => {

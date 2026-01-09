@@ -23,6 +23,7 @@ export interface Student {
   username?: string;
   telegramId?: number;
   pricePerLesson?: number;
+  isActivated?: boolean;
 }
 
 export interface TeacherStudent {

@@ -67,10 +67,14 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
+  const [isActivationHintOpen, setIsActivationHintOpen] = useState(false);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
+  const showActivationBadge = Boolean(telegramUsername) && selectedStudent.isActivated === false;
+  const activationHint =
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
     action();
@@ -224,6 +228,27 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 </button>
               ) : (
                 <span className={styles.studentMeta}>@нет</span>
+              )}
+              {showActivationBadge && (
+                <AdaptivePopover
+                  isOpen={isActivationHintOpen}
+                  onClose={() => setIsActivationHintOpen(false)}
+                  trigger={(
+                    <button
+                      type="button"
+                      className={`${styles.lozenge} ${styles.badgeInactive} ${styles.activationBadgeButton}`}
+                      onClick={() => setIsActivationHintOpen((prev) => !prev)}
+                    >
+                      Не активирован
+                    </button>
+                  )}
+                  side="bottom"
+                  align="start"
+                  offset={6}
+                  className={styles.activationPopover}
+                >
+                  <div className={styles.activationPopoverText}>{activationHint}</div>
+                </AdaptivePopover>
               )}
             </div>
           </div>

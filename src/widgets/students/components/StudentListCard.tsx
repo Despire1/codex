@@ -67,6 +67,9 @@ export const StudentListCard: FC<StudentListCardProps> = ({
   onSelect,
 }) => {
   const username = item.student.username?.trim();
+  const showActivationBadge = Boolean(username) && item.student.isActivated === false;
+  const activationHint =
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
   const balanceBadge = resolveBalanceBadge(item);
   const nextLessonClassName = resolveNextLessonClassName(nextLessonVariant);
 
@@ -89,7 +92,16 @@ export const StudentListCard: FC<StudentListCardProps> = ({
         <div className={styles.studentCardHeader}>
           <div className={styles.studentName}>{item.link.customName}</div>
         </div>
-        {username && <div className={styles.studentTelegram}>Telegram: @{username}</div>}
+        {username && (
+          <div className={styles.studentTelegramRow}>
+            <div className={styles.studentTelegram}>Telegram: @{username}</div>
+            {showActivationBadge && (
+              <span className={`${styles.lozenge} ${styles.badgeInactive}`} title={activationHint}>
+                Не активирован
+              </span>
+            )}
+          </div>
+        )}
         <div className={styles.studentBadgesRow}>
           {balanceBadge && <span className={`${styles.lozenge} ${balanceBadge.className}`}>{balanceBadge.label}</span>}
           <span className={`${styles.lozenge} ${nextLessonClassName}`}>{nextLessonLabel}</span>
