@@ -23,6 +23,19 @@ const getLessonNoun = (count: number) => {
 const formatLessonCount = (count: number) => `${count} ${getLessonNoun(count)}`;
 
 const resolveBalanceBadge = (item: StudentListItem) => {
+  const debtRub = item.debtRub ?? null;
+  const debtLessonCount = item.debtLessonCount ?? 0;
+  const hasDebt = (typeof debtRub === 'number' && debtRub > 0) || debtLessonCount > 0;
+  if (hasDebt) {
+    const debtCountLabel = debtLessonCount > 0 ? ` (${formatLessonCount(debtLessonCount)})` : '';
+    const label = typeof debtRub === 'number' && debtRub > 0
+      ? `Не оплачено: ${debtRub} ₽${debtCountLabel}`
+      : `Не оплачено: ${formatLessonCount(debtLessonCount)}`;
+    return {
+      label,
+      className: styles.badgeDebt,
+    };
+  }
   const balanceLessons = item.link.balanceLessons;
   if (balanceLessons > 0) {
     return {
@@ -31,10 +44,7 @@ const resolveBalanceBadge = (item: StudentListItem) => {
     };
   }
   if (balanceLessons < 0) {
-    const debtRub = item.debtRub ?? null;
-    const label = typeof debtRub === 'number' && debtRub > 0
-      ? `Долг: ${debtRub} ₽`
-      : `Долг: ${formatLessonCount(Math.abs(balanceLessons))}`;
+    const label = `Долг: ${formatLessonCount(Math.abs(balanceLessons))}`;
     return {
       label,
       className: styles.badgeDebt,

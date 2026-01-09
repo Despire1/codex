@@ -509,30 +509,33 @@ const listStudents = async (
     };
   });
 
-  const debtTotalsByStudent = new Map<number, number | null>();
-  const debtCandidates = pageItems.filter((item) => item.link.balanceLessons < 0);
-  if (debtCandidates.length) {
+  const debtSummariesByStudent = new Map<number, { total: number; count: number }>();
+  if (pageItems.length) {
     const debtResults = await Promise.all(
-      debtCandidates.map(async (item) => {
+      pageItems.map(async (item) => {
         try {
           const summary = await resolveStudentDebtSummary(teacher.chatId, item.student.id);
-          return { studentId: item.student.id, total: summary.total > 0 ? summary.total : null };
+          return { studentId: item.student.id, total: summary.total, count: summary.items.length };
         } catch {
-          return { studentId: item.student.id, total: null };
+          return { studentId: item.student.id, total: 0, count: 0 };
         }
       }),
     );
 
     debtResults.forEach((result) => {
-      debtTotalsByStudent.set(result.studentId, result.total);
+      if (result.total > 0 || result.count > 0) {
+        debtSummariesByStudent.set(result.studentId, { total: result.total, count: result.count });
+      }
     });
   }
 
   const items = pageItems.map((item) => {
-    if (item.link.balanceLessons >= 0) return item;
+    const debtSummary = debtSummariesByStudent.get(item.student.id);
+    if (!debtSummary) return item;
     return {
       ...item,
-      debtRub: debtTotalsByStudent.get(item.student.id) ?? null,
+      debtRub: debtSummary.total > 0 ? debtSummary.total : null,
+      debtLessonCount: debtSummary.count > 0 ? debtSummary.count : null,
     };
   });
 
