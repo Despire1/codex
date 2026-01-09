@@ -86,6 +86,11 @@ export const StudentListCard: FC<StudentListCardProps> = ({
         )}
         <div className={styles.studentCardHeader}>
           <div className={styles.studentName}>{item.link.customName}</div>
+          {hasDebtBadge && (
+            <span className={`${styles.lozenge} ${styles.badgeDebt} ${styles.studentDebtBadge}`}>
+              Долг: {debtRub} ₽
+            </span>
+          )}
         </div>
         {username && <div className={styles.studentTelegram}>Telegram: @{username}</div>}
         <div className={styles.studentBadgesRow}>
