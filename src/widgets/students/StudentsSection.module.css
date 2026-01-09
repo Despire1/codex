@@ -1103,6 +1103,9 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.tabHeader {
   margin-bottom: 12px;
 }
 
@@ -2527,11 +2530,6 @@
     font-size: 20px;
   }
 
-  .studentCardHeader {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .badgeRow {
     justify-content: flex-start;
   }
@@ -2570,11 +2568,6 @@
   .homeworkHeaderCompact {
     flex-direction: row;
     align-items: center;
-  }
-
-  .searchRow {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .filtersPopoverContent {
@@ -2649,6 +2642,10 @@
   .modalFooter {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .lessonCard {
+    gap: 8px;
   }
 
   .modalFooter button {

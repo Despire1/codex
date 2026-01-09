@@ -32,7 +32,7 @@ export const PaymentCancelModal: FC<PaymentCancelModalProps> = ({
           Отмена
         </button>
         <button type="button" className={`${controls.secondaryButton} ${styles.button}`} onClick={onWriteOff}>
-          Списать без возврата
+          Отменить без возврата
         </button>
         <button type="button" className={`${controls.primaryButton} ${styles.button}`} onClick={onRefund}>
           Вернуть на баланс

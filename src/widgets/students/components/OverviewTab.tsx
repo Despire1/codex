@@ -63,7 +63,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
-      <div className={styles.homeworkHeader}>
+      <div className={styles.tabHeader}>
         <div>
           <div className={styles.priceLabel}>Обзор</div>
         </div>

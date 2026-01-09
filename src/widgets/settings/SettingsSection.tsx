@@ -208,11 +208,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
 
   return (
     <section className={styles.page}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Настройки</h2>
-        <span className={styles.subtitle}>Авторизация через Telegram</span>
-      </div>
-
       {showMobileList ? (
         <div className={styles.moduleStack}>
           <div className={`${styles.card} ${styles.mobileList}`}>
