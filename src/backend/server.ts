@@ -470,6 +470,13 @@ const normalizeTelegramUsername = (username?: string | null) => {
   return withoutAt.trim().toLowerCase() || null;
 };
 
+const findUserByTelegramUsername = async (normalizedUsername: string) => {
+  const candidates = await prisma.user.findMany({
+    where: { username: { contains: normalizedUsername } },
+  });
+  return candidates.find((user) => normalizeTelegramUsername(user.username) === normalizedUsername) ?? null;
+};
+
 const listStudents = async (
   user: User,
   query?: string,
@@ -757,18 +764,22 @@ const addStudent = async (user: User, body: any) => {
   if (!customName || typeof customName !== 'string' || !customName.trim()) {
     throw new Error('Имя ученика обязательно');
   }
+  if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
+    throw new Error('Telegram username обязателен');
+  }
   if (!Number.isFinite(Number(pricePerLesson)) || Number(pricePerLesson) < 0) {
     throw new Error('Цена занятия обязательна и должна быть неотрицательной');
   }
 
   const teacher = await ensureTeacher(user);
   const normalizedUsername = typeof username === 'string' ? normalizeTelegramUsername(username) : null;
+  if (!normalizedUsername) throw new Error('Telegram username обязателен');
   const existingStudent = normalizedUsername
     ? await prisma.student.findFirst({ where: { username: normalizedUsername } })
     : null;
 
   const normalizedPrice = Math.round(Number(pricePerLesson));
-  const student =
+  let student =
     existingStudent ||
     (await prisma.student.create({
       data: {
@@ -776,6 +787,20 @@ const addStudent = async (user: User, body: any) => {
         pricePerLesson: normalizedPrice,
       },
     }));
+
+  if (normalizedUsername && (!student.telegramId || !student.isActivated)) {
+    const matchedUser = await findUserByTelegramUsername(normalizedUsername);
+    if (matchedUser) {
+      student = await prisma.student.update({
+        where: { id: student.id },
+        data: {
+          telegramId: matchedUser.telegramUserId,
+          isActivated: true,
+          activatedAt: new Date(),
+        },
+      });
+    }
+  }
 
   const existingLink = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
@@ -810,6 +835,9 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
   if (!customName || typeof customName !== 'string' || !customName.trim()) {
     throw new Error('Имя ученика обязательно');
   }
+  if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
+    throw new Error('Telegram username обязателен');
+  }
   const numericPrice = Number(pricePerLesson);
   if (!Number.isFinite(numericPrice) || numericPrice < 0) {
     throw new Error('Цена занятия обязательна и должна быть неотрицательной');
@@ -822,12 +850,21 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
   const normalizedUsername = normalizeTelegramUsername(typeof username === 'string' ? username : null);
+  if (!normalizedUsername) throw new Error('Telegram username обязателен');
+  const matchedUser = await findUserByTelegramUsername(normalizedUsername);
 
   const [student, updatedLink] = await prisma.$transaction([
     prisma.student.update({
       where: { id: studentId },
       data: {
         username: normalizedUsername,
+        ...(matchedUser
+          ? {
+              telegramId: matchedUser.telegramUserId,
+              isActivated: true,
+              activatedAt: new Date(),
+            }
+          : {}),
       },
     }),
     prisma.teacherStudent.update({
