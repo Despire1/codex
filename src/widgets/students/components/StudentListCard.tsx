@@ -59,6 +59,8 @@ export const StudentListCard: FC<StudentListCardProps> = ({
   const username = item.student.username?.trim();
   const balanceBadge = resolveBalanceBadge(item);
   const nextLessonClassName = resolveNextLessonClassName(nextLessonVariant);
+  const debtRub = item.debtRub ?? 0;
+  const hasDebt = debtRub > 0;
 
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -78,6 +80,11 @@ export const StudentListCard: FC<StudentListCardProps> = ({
       <div className={styles.studentCardBody}>
         <div className={styles.studentCardHeader}>
           <div className={styles.studentName}>{item.link.customName}</div>
+          {hasDebt && (
+            <span className={`${styles.lozenge} ${styles.studentDebtBadge}`}>
+              Долг: {debtRub} ₽
+            </span>
+          )}
         </div>
         {username && <div className={styles.studentTelegram}>Telegram: @{username}</div>}
         <div className={styles.studentBadgesRow}>
