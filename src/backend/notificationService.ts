@@ -72,7 +72,7 @@ const buildLessonReminderMessage = ({
 const buildPaymentReminderMessage = (startAt: Date, price: number, timeZone?: string | null) => {
   const dateLabel = formatInTimeZone(startAt, 'd MMM, HH:mm', { locale: ru, timeZone: resolveTimeZone(timeZone) });
   const priceLabel = Number.isFinite(price) && price > 0 ? `${price} ₽` : '—';
-  return `Пожалуйста, оплатите занятие от ${dateLabel}. Сумма: ${priceLabel}.`;
+  return `💳 Напоминание об оплате\nЗанятие от ${dateLabel}\nСумма: ${priceLabel}\n🙏 Спасибо!`;
 };
 
 const buildUnpaidDigestMessage = (summary: { studentCount: number; lessonCount: number; totalAmount: number }) =>
