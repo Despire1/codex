@@ -8,6 +8,9 @@ const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
 const TERMS_PRIVACY_URL = 'https://bot.politdev.ru/privacy';
 const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
+const SUPPORT_BOT_HANDLE = '@teacherbot_help';
+const SUPPORT_BUTTON_TEXT = '🛟 Поддержка';
+const SUPPORT_BUTTON_TEXT_NORMALIZED = SUPPORT_BUTTON_TEXT.toLowerCase();
 
 type TelegramUpdate = {
   update_id: number;
@@ -73,6 +76,26 @@ const sendWebAppMessage = async (chatId: number) => {
     reply_markup: {
       inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
     },
+  });
+};
+
+const sendSupportKeyboard = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: `Если нужна помощь, нажмите кнопку «${SUPPORT_BUTTON_TEXT}».`,
+    reply_markup: {
+      keyboard: [[{ text: SUPPORT_BUTTON_TEXT }]],
+      resize_keyboard: true,
+      one_time_keyboard: false,
+      is_persistent: true,
+    },
+  });
+};
+
+const sendSupportMessage = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: `Напишите в поддержку: ${SUPPORT_BOT_HANDLE}`,
   });
 };
 
@@ -396,6 +419,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
   const telegramUserId = from?.id ? BigInt(from.id) : null;
 
   if (text === '/start') {
+    await sendSupportKeyboard(chatId);
     if (telegramUserId) {
       const user = await ensureTelegramUser({
         telegramUserId,
@@ -409,6 +433,11 @@ const handleUpdate = async (update: TelegramUpdate) => {
       }
     }
     await sendRoleSelectionMessage(chatId);
+    return;
+  }
+
+  if (text === SUPPORT_BUTTON_TEXT_NORMALIZED) {
+    await sendSupportMessage(chatId);
     return;
   }
 
