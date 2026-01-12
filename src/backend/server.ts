@@ -17,6 +17,7 @@ import {
   sendStudentLessonReminder,
   sendStudentPaymentReminder,
   sendTeacherLessonReminder,
+  sendTeacherOnboardingNudge,
   sendTeacherUnpaidDigest,
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
@@ -40,6 +41,9 @@ const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRA
 const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
 const ALLOWED_UNPAID_REMINDER_FREQUENCIES = new Set(['daily', 'every_two_days', 'weekly']);
 const NOTIFICATION_TICK_MS = 60_000;
+const ONBOARDING_NUDGE_TICK_MS = 15 * 60_000;
+const ONBOARDING_NUDGE_DELAY_MS = 24 * 60 * 60 * 1000;
+const ONBOARDING_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 30);
 const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
 const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
@@ -2392,6 +2396,35 @@ const runNotificationTick = async () => {
   }
 };
 
+const runOnboardingNudgeTick = async () => {
+  const now = new Date();
+  const startedBefore = new Date(now.getTime() - ONBOARDING_NUDGE_DELAY_MS);
+  const cooldownBefore = new Date(now.getTime() - ONBOARDING_NUDGE_COOLDOWN_MS);
+
+  const candidates = await prisma.user.findMany({
+    where: {
+      role: 'TEACHER',
+      onboardingTeacherStartedAt: { not: null, lte: startedBefore },
+      OR: [{ lastOnboardingNudgeAt: null }, { lastOnboardingNudgeAt: { lte: cooldownBefore } }],
+    },
+    select: { telegramUserId: true },
+  });
+
+  for (const candidate of candidates) {
+    const hasStudent = await prisma.teacherStudent.findFirst({
+      where: { teacherId: candidate.telegramUserId, isArchived: false },
+      select: { id: true },
+    });
+    if (hasStudent) continue;
+
+    await sendTeacherOnboardingNudge({ teacherId: candidate.telegramUserId, scheduledFor: now });
+    await prisma.user.update({
+      where: { telegramUserId: candidate.telegramUserId },
+      data: { lastOnboardingNudgeAt: now },
+    });
+  }
+};
+
 const cleanupSessions = async () => {
   const now = new Date();
   await prisma.session.deleteMany({
@@ -2492,7 +2525,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
     const apiUser = sessionUser as User | null;
     const requireApiUser = () => apiUser as User;
-    if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser)) {
+    if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser) && role !== 'STUDENT') {
       return sendJson(res, 403, { message: 'subscription_required' });
     }
 
@@ -3044,6 +3077,15 @@ setInterval(() => {
 }, NOTIFICATION_TICK_MS);
 
 void runNotificationTick();
+
+setInterval(() => {
+  runOnboardingNudgeTick().catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error('Не удалось отправить напоминание по онбордингу', error);
+  });
+}, ONBOARDING_NUDGE_TICK_MS);
+
+void runOnboardingNudgeTick();
 
 scheduleDailySessionCleanup();
 
