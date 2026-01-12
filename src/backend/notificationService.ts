@@ -6,11 +6,13 @@ import { resolveStudentTelegramId } from './studentContacts';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
+const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 type NotificationType =
   | 'TEACHER_LESSON_REMINDER'
   | 'TEACHER_UNPAID_DIGEST'
+  | 'TEACHER_ONBOARDING_NUDGE'
   | 'STUDENT_LESSON_REMINDER'
   | 'STUDENT_PAYMENT_REMINDER'
   | 'MANUAL_STUDENT_PAYMENT_REMINDER';
@@ -35,6 +37,19 @@ const sendTelegramMessage = async (chatId: bigint | number, text: string) => {
   await callTelegram('sendMessage', {
     chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
     text,
+  });
+};
+
+const sendTelegramWebAppMessage = async (chatId: bigint | number, text: string) => {
+  if (!TELEGRAM_WEBAPP_URL) {
+    throw new Error('TELEGRAM_WEBAPP_URL is required');
+  }
+  await callTelegram('sendMessage', {
+    chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
+    text,
+    reply_markup: {
+      inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
+    },
   });
 };
 
@@ -258,6 +273,34 @@ export const sendStudentLessonReminder = async ({
     if (isTelegramUnreachableError(message)) {
       await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
     }
+    return { status: 'failed' as const, error: message };
+  }
+};
+
+export const sendTeacherOnboardingNudge = async ({
+  teacherId,
+  scheduledFor,
+}: {
+  teacherId: bigint;
+  scheduledFor?: Date;
+}) => {
+  const log = await createNotificationLog({
+    teacherId,
+    type: 'TEACHER_ONBOARDING_NUDGE',
+    scheduledFor: scheduledFor ?? null,
+  });
+  if (!log) return { status: 'skipped' as const };
+
+  const text =
+    'Привет! Быстрый совет: добавь одного ученика — и дальше будет гораздо проще вести занятия и оплаты. Это займёт пару минут.';
+
+  try {
+    await sendTelegramWebAppMessage(teacherId, text);
+    await finalizeNotificationLog(log.id, { status: 'SENT' });
+    return { status: 'sent' as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
     return { status: 'failed' as const, error: message };
   }
 };

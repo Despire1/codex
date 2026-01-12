@@ -108,6 +108,11 @@ declare module '@prisma/client' {
     role: string;
     subscriptionStartAt: Date | null;
     subscriptionEndAt: Date | null;
+    onboardingTeacherCompleted: boolean;
+    onboardingStudentCompleted: boolean;
+    onboardingTeacherStartedAt: Date | null;
+    onboardingStudentStartedAt: Date | null;
+    lastOnboardingNudgeAt: Date | null;
     termsAccepted: boolean;
     termsAcceptedAt: Date | null;
     createdAt: Date;
