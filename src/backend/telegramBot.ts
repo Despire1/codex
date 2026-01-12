@@ -166,16 +166,16 @@ const sendRoleKeyboardHintMessage = async (chatId: number) => {
 
 const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
   if (messageId) {
-    await editMessage(chatId, messageId, roleSelectionText, buildRoleInlineKeyboard());
     await sendRoleKeyboardHintMessage(chatId);
+    await editMessage(chatId, messageId, roleSelectionText, buildRoleInlineKeyboard());
     return messageId;
   }
+  await sendRoleKeyboardHintMessage(chatId);
   const result = await callTelegram<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text: roleSelectionText,
     reply_markup: buildRoleInlineKeyboard(),
   });
-  await sendRoleKeyboardHintMessage(chatId);
   onboardingMessageByChatId.set(chatId, result.message_id);
   return result.message_id;
 };
@@ -706,7 +706,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
     if (messageId) {
       onboardingMessageByChatId.set(chatId, messageId);
     }
-    await handleRoleSelection(chatId, role, from, messageId ?? undefined);
+    await handleRoleSelection(chatId, role, from);
     return;
   }
 
