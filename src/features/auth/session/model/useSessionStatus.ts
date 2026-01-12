@@ -6,6 +6,7 @@ type SessionState = 'checking' | 'authenticated' | 'unauthenticated';
 type SessionUser = {
   subscriptionStartAt?: string | null;
   subscriptionEndAt?: string | null;
+  role?: string;
 };
 
 export const useSessionStatus = () => {
@@ -15,10 +16,21 @@ export const useSessionStatus = () => {
   const refresh = useCallback(async () => {
     try {
       const response = await api.getSession();
-      setUser(response.user as SessionUser);
+      const sessionUser = response.user as SessionUser;
+      setUser(sessionUser);
+      if (typeof window !== 'undefined') {
+        if (sessionUser.role) {
+          window.localStorage.setItem('userRole', sessionUser.role);
+        } else {
+          window.localStorage.removeItem('userRole');
+        }
+      }
       setState('authenticated');
     } catch (error) {
       setUser(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('userRole');
+      }
       setState('unauthenticated');
     }
   }, []);

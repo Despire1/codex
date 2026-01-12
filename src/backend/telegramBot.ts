@@ -11,6 +11,12 @@ const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
 const SUPPORT_BOT_HANDLE = '@teacherbot_help';
 const SUPPORT_BUTTON_TEXT = '🛟 Поддержка';
 const SUPPORT_BUTTON_TEXT_NORMALIZED = SUPPORT_BUTTON_TEXT.toLowerCase();
+const ROLE_TEACHER_TEXT = '🧑‍🏫 Я учитель';
+const ROLE_STUDENT_TEXT = '🧑‍🎓 Я ученик';
+const ROLE_TEACHER_TEXT_NORMALIZED = ROLE_TEACHER_TEXT.toLowerCase();
+const ROLE_STUDENT_TEXT_NORMALIZED = ROLE_STUDENT_TEXT.toLowerCase();
+
+const onboardingMessageByChatId = new Map<number, number>();
 
 type TelegramUpdate = {
   update_id: number;
@@ -69,26 +75,27 @@ const callTelegram = async <T>(method: string, payload?: Record<string, unknown>
   return data.result;
 };
 
-const sendWebAppMessage = async (chatId: number) => {
-  await callTelegram('sendMessage', {
+const editMessage = async (chatId: number, messageId: number, text: string, replyMarkup?: Record<string, unknown>) => {
+  await callTelegram('editMessageText', {
     chat_id: chatId,
-    text: 'Откройте мини-приложение:',
-    reply_markup: {
-      inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
-    },
+    message_id: messageId,
+    text,
+    reply_markup: replyMarkup,
   });
 };
 
-const sendSupportKeyboard = async (chatId: number) => {
+const sendWebAppMessage = async (chatId: number, messageId?: number) => {
+  const reply_markup = {
+    inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, 'Откройте мини-приложение:', reply_markup);
+    return;
+  }
   await callTelegram('sendMessage', {
     chat_id: chatId,
-    text: `Если нужна помощь, нажмите кнопку «${SUPPORT_BUTTON_TEXT}».`,
-    reply_markup: {
-      keyboard: [[{ text: SUPPORT_BUTTON_TEXT }]],
-      resize_keyboard: true,
-      one_time_keyboard: false,
-      is_persistent: true,
-    },
+    text: 'Откройте мини-приложение:',
+    reply_markup,
   });
 };
 
@@ -118,24 +125,33 @@ const sendTermsAcceptanceMessage = async (chatId: number) => {
   });
 };
 
+const roleSelectionText =
+  '👋 Привет! Давайте начнём.\n' +
+  'Чтобы я показывал нужные функции, выберите вашу роль. Это можно изменить в любой момент.';
+
+const buildRoleKeyboard = () => ({
+  keyboard: [[{ text: ROLE_TEACHER_TEXT }, { text: ROLE_STUDENT_TEXT }], [{ text: SUPPORT_BUTTON_TEXT }]],
+  resize_keyboard: true,
+  one_time_keyboard: false,
+  is_persistent: true,
+});
+
 const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
-  const payload = {
-    chat_id: chatId,
-    text: 'Выберите роль:',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'Я учитель', callback_data: 'role_teacher' },
-          { text: 'Я ученик', callback_data: 'role_student' },
-        ],
-      ],
-    },
-  };
   if (messageId) {
-    await callTelegram('editMessageText', { ...payload, message_id: messageId });
-    return;
+    await callTelegram('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text: roleSelectionText,
+    });
+    return messageId;
   }
-  await callTelegram('sendMessage', payload);
+  const result = await callTelegram<{ message_id: number }>('sendMessage', {
+    chat_id: chatId,
+    text: roleSelectionText,
+    reply_markup: buildRoleKeyboard(),
+  });
+  onboardingMessageByChatId.set(chatId, result.message_id);
+  return result.message_id;
 };
 
 const subscriptionPromptText =
@@ -143,24 +159,16 @@ const subscriptionPromptText =
 
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
   const payload = {
-    chat_id: chatId,
     text: subscriptionPromptText,
     reply_markup: {
       inline_keyboard: [[{ text: 'Оформить пробную подписку', callback_data: 'subscription_trial' }]],
     },
   };
   if (messageId) {
-    await callTelegram('editMessageText', { ...payload, message_id: messageId });
+    await editMessage(chatId, messageId, payload.text, payload.reply_markup);
     return;
   }
-  await callTelegram('sendMessage', payload);
-};
-
-const sendStudentInfoMessage = async (chatId: number, text: string) => {
-  await callTelegram('sendMessage', {
-    chat_id: chatId,
-    text,
-  });
+  await callTelegram('sendMessage', { chat_id: chatId, ...payload });
 };
 
 const sendOnboardingTeacherIntro = async (chatId: number) => {
@@ -291,6 +299,158 @@ const sendOnboardingStudentIntro = async (chatId: number) => {
       ],
     },
   });
+};
+
+const sendOnboardingTeacherIntro = async (chatId: number, messageId?: number) => {
+  const text =
+    'Привет! Ты в TeacherBot.\n' +
+    'Я помогаю репетиторам не держать в голове занятия и оплаты: всё видно в одном месте, плюс напоминания в Telegram.';
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        { text: 'Что умею', callback_data: 'onboarding_teacher_features' },
+        { text: 'Начать за 1 минуту', callback_data: 'onboarding_teacher_quickstart' },
+      ],
+      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherFeatures = async (chatId: number, messageId?: number) => {
+  const text =
+    'Коротко, что здесь есть:\n' +
+    '• Занятия: чтобы не забывать расписание\n' +
+    '• Оплаты: видно, где не оплачено\n' +
+    '• Напоминания: себе и ученикам (после активации ученика)\n' +
+    'Хочешь — покажу быстрый старт.';
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        { text: 'Начать за 1 минуту', callback_data: 'onboarding_teacher_quickstart' },
+        { text: 'Пропустить', callback_data: 'onboarding_teacher_skip' },
+      ],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherStep1 = async (chatId: number, messageId?: number) => {
+  const text = 'Шаг 1 из 3: добавь первого ученика в приложении.\nНужен только Telegram username ученика.';
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        { text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } },
+        { text: 'Дальше', callback_data: 'onboarding_teacher_step2' },
+      ],
+      [{ text: 'Как узнать username?', callback_data: 'onboarding_teacher_username_help' }],
+      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherUsernameHint = async (chatId: number, messageId?: number) => {
+  const text =
+    'Открой профиль ученика в Telegram → “Имя пользователя”.\n' +
+    'Если его нет — ученик может добавить username в настройках Telegram.';
+  const reply_markup = {
+    inline_keyboard: [
+      [{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }],
+      [{ text: 'Дальше', callback_data: 'onboarding_teacher_step2' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherStep2 = async (chatId: number, messageId?: number) => {
+  const text = 'Шаг 2 из 3: добавь первое занятие.\nТак ты сразу увидишь ближайшие уроки и напоминания.';
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        { text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } },
+        { text: 'Дальше', callback_data: 'onboarding_teacher_step3' },
+      ],
+      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherStep3 = async (chatId: number, messageId?: number) => {
+  const text =
+    'Шаг 3 из 3 (по желанию): настрой напоминания.\n' +
+    'Я могу напоминать:\n' +
+    '• тебе — о ближайших уроках\n' +
+    '• тебе — о неоплаченных занятиях\n' +
+    '• ученику — об оплате (после того, как он нажмёт /start)';
+  const reply_markup = {
+    inline_keyboard: [
+      [{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }],
+      [{ text: 'Готово', callback_data: 'onboarding_teacher_finish' }],
+      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingTeacherFinal = async (chatId: number, messageId?: number) => {
+  const text =
+    'Готово. Логика простая:\n' +
+    '1. добавляешь ученика\n' +
+    '2. добавляешь занятия\n' +
+    '3. отмечаешь оплаты\n' +
+    'Я напомню, если что-то забывается.';
+  const reply_markup = {
+    inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
+};
+
+const sendOnboardingStudentIntro = async (chatId: number, messageId?: number) => {
+  const text =
+    'Привет! Ты ученик.\n' +
+    'Я буду присылать напоминания о занятиях и об оплате, если преподаватель это включил.\n' +
+    'Чтобы всё заработало, просто активируй профиль.';
+  const reply_markup = {
+    inline_keyboard: [
+      [{ text: 'Активировать', callback_data: 'onboarding_student_activate' }],
+      [{ text: 'Пропустить', callback_data: 'onboarding_student_skip' }],
+    ],
+  };
+  if (messageId) {
+    await editMessage(chatId, messageId, text, reply_markup);
+    return;
+  }
+  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
 };
 
 const setTeacherMenuButton = async (chatId: number) => {
@@ -435,11 +595,16 @@ const acceptTermsForUser = async (payload: {
 const activateStudentByUsername = async (
   chatId: number,
   username?: string,
-  options?: { successMessage?: string | null },
+  options?: { successMessage?: string | null; messageId?: number },
 ) => {
   const normalized = normalizeTelegramUsername(username);
   if (!normalized) {
-    await sendStudentInfoMessage(chatId, 'Чтобы активироваться, укажите username в Telegram и нажмите /start ещё раз.');
+    const text = 'Чтобы активироваться, укажите username в Telegram и нажмите /start ещё раз.';
+    if (options?.messageId) {
+      await editMessage(chatId, options.messageId, text);
+    } else {
+      await sendStudentInfoMessage(chatId, text);
+    }
     return { status: 'missing_username' as const };
   }
 
@@ -448,7 +613,12 @@ const activateStudentByUsername = async (
   });
   const students = candidates.filter((student) => normalizeTelegramUsername(student.username) === normalized);
   if (students.length === 0) {
-    await sendStudentInfoMessage(chatId, 'Мы не нашли вас в списке учеников. Попросите учителя добавить ваш username.');
+    const text = 'Мы не нашли вас в списке учеников. Попросите учителя добавить ваш username.';
+    if (options?.messageId) {
+      await editMessage(chatId, options.messageId, text);
+    } else {
+      await sendStudentInfoMessage(chatId, text);
+    }
     return { status: 'not_found' as const };
   }
 
@@ -462,14 +632,18 @@ const activateStudentByUsername = async (
   });
   const successMessage = options?.successMessage ?? 'Профиль активирован. Вы ученик, вам доступны только уведомления.';
   if (successMessage) {
-    await sendStudentInfoMessage(chatId, successMessage);
+    if (options?.messageId) {
+      await editMessage(chatId, options.messageId, successMessage);
+    } else {
+      await sendStudentInfoMessage(chatId, successMessage);
+    }
   }
   return { status: 'activated' as const };
 };
 
 const canOpenTeacherApp = async (telegramUserId: bigint) => {
   const user = await prisma.user.findUnique({ where: { telegramUserId } });
-  if (user?.role === 'STUDENT') return { allowed: false, reason: 'student' as const };
+  if (user?.role === 'STUDENT') return { allowed: true, reason: 'student' as const };
   const hasSubscription = Boolean(user?.subscriptionStartAt);
   if (hasSubscription) return { allowed: true, reason: 'ok' as const };
   return { allowed: false, reason: 'subscription' as const };
@@ -503,20 +677,20 @@ const handleRoleSelection = async (
     await setTeacherMenuButton(chatId);
     if (!user.onboardingTeacherCompleted) {
       await ensureTeacherOnboardingStarted(telegramUserId);
-      await sendOnboardingTeacherIntro(chatId);
+      await sendOnboardingTeacherIntro(chatId, messageId);
       return;
     }
-    await sendWebAppMessage(chatId);
+    await sendWebAppMessage(chatId, messageId);
     return;
   }
 
   await setDefaultMenuButton(chatId);
   if (!user.onboardingStudentCompleted) {
     await ensureStudentOnboardingStarted(telegramUserId);
-    await sendOnboardingStudentIntro(chatId);
+    await sendOnboardingStudentIntro(chatId, messageId);
     return;
   }
-  await activateStudentByUsername(chatId, username ?? undefined);
+  await activateStudentByUsername(chatId, username ?? undefined, { messageId });
 };
 
 const ensureTrialSubscription = async (payload: {
@@ -556,13 +730,18 @@ const handleUpdate = async (update: TelegramUpdate) => {
           : null;
     if (role) {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      await handleRoleSelection(chatId, role, update.callback_query.from, update.callback_query.message?.message_id);
+      const messageId = update.callback_query.message?.message_id;
+      if (messageId) {
+        onboardingMessageByChatId.set(chatId, messageId);
+      }
+      await handleRoleSelection(chatId, role, update.callback_query.from, messageId);
       return;
     }
     if (update.callback_query.data === 'subscription_trial') {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
       const from = update.callback_query.from;
       const telegramUserId = BigInt(from.id);
+      const messageId = update.callback_query.message?.message_id;
       const user = await ensureTrialSubscription({
         telegramUserId,
         username: from.username ?? undefined,
@@ -572,10 +751,14 @@ const handleUpdate = async (update: TelegramUpdate) => {
       await setTeacherMenuButton(chatId);
       if (!user.onboardingTeacherCompleted) {
         await ensureTeacherOnboardingStarted(telegramUserId);
-        await sendOnboardingTeacherIntro(chatId);
+        await sendOnboardingTeacherIntro(chatId, messageId);
         return;
       }
-      await sendStudentInfoMessage(chatId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+      if (messageId) {
+        await editMessage(chatId, messageId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+      } else {
+        await sendStudentInfoMessage(chatId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+      }
       return;
     }
     if (update.callback_query.data === 'terms_accept') {
@@ -587,7 +770,68 @@ const handleUpdate = async (update: TelegramUpdate) => {
         firstName: from.first_name ?? undefined,
         lastName: from.last_name ?? undefined,
       });
-      await sendRoleSelectionMessage(chatId, update.callback_query.message?.message_id);
+      const messageId = update.callback_query.message?.message_id;
+      if (messageId) {
+        onboardingMessageByChatId.set(chatId, messageId);
+      }
+      await sendRoleSelectionMessage(chatId, messageId);
+      return;
+    }
+    if (update.callback_query.data?.startsWith('onboarding_teacher_')) {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      const telegramUserId = BigInt(update.callback_query.from.id);
+      const messageId = update.callback_query.message?.message_id;
+      if (update.callback_query.data === 'onboarding_teacher_skip') {
+        await completeTeacherOnboarding(telegramUserId);
+        await sendOnboardingTeacherFinal(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_features') {
+        await sendOnboardingTeacherFeatures(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_quickstart') {
+        await sendOnboardingTeacherStep1(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_username_help') {
+        await sendOnboardingTeacherUsernameHint(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_step2') {
+        await sendOnboardingTeacherStep2(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_step3') {
+        await sendOnboardingTeacherStep3(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_finish') {
+        await sendOnboardingTeacherFinal(chatId, messageId);
+        await completeTeacherOnboarding(telegramUserId);
+        return;
+      }
+      return;
+    }
+    if (update.callback_query.data?.startsWith('onboarding_student_')) {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      const telegramUserId = BigInt(update.callback_query.from.id);
+      const messageId = update.callback_query.message?.message_id;
+      if (update.callback_query.data === 'onboarding_student_skip') {
+        await completeStudentOnboarding(telegramUserId);
+        if (messageId) {
+          await editMessage(chatId, messageId, 'Хорошо! Если понадобится, выберите роль снова.');
+        }
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_student_activate') {
+        await activateStudentByUsername(chatId, update.callback_query.from.username ?? undefined, {
+          successMessage: 'Готово, профиль активирован. Теперь преподаватель сможет отправлять тебе напоминания.',
+          messageId,
+        });
+        await completeStudentOnboarding(telegramUserId);
+        return;
+      }
       return;
     }
     if (update.callback_query.data?.startsWith('onboarding_teacher_')) {
@@ -646,7 +890,6 @@ const handleUpdate = async (update: TelegramUpdate) => {
   const telegramUserId = from?.id ? BigInt(from.id) : null;
 
   if (text === '/start') {
-    await sendSupportKeyboard(chatId);
     if (telegramUserId) {
       const user = await ensureTelegramUser({
         telegramUserId,
@@ -659,7 +902,10 @@ const handleUpdate = async (update: TelegramUpdate) => {
         return;
       }
     }
-    await sendRoleSelectionMessage(chatId);
+    const messageId = await sendRoleSelectionMessage(chatId);
+    if (messageId) {
+      onboardingMessageByChatId.set(chatId, messageId);
+    }
     return;
   }
 
@@ -668,14 +914,21 @@ const handleUpdate = async (update: TelegramUpdate) => {
     return;
   }
 
+  if (text === ROLE_TEACHER_TEXT_NORMALIZED || text === ROLE_STUDENT_TEXT_NORMALIZED) {
+    if (!telegramUserId || !from) return;
+    const role = text === ROLE_TEACHER_TEXT_NORMALIZED ? 'TEACHER' : 'STUDENT';
+    const messageId = onboardingMessageByChatId.get(chatId) ?? (await sendRoleSelectionMessage(chatId));
+    if (messageId) {
+      onboardingMessageByChatId.set(chatId, messageId);
+    }
+    await handleRoleSelection(chatId, role, from, messageId ?? undefined);
+    return;
+  }
+
   if (text === '/app' || text.includes('открыть')) {
     if (telegramUserId) {
       const access = await canOpenTeacherApp(telegramUserId);
       if (!access.allowed) {
-        if (access.reason === 'student') {
-          await sendStudentInfoMessage(chatId, 'Вы ученик, вам доступны только уведомления.');
-          return;
-        }
         await sendStudentInfoMessage(chatId, 'Сначала оформите пробную подписку в боте. Это бесплатно и не требует карт.');
         return;
       }

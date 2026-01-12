@@ -2525,7 +2525,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
     const apiUser = sessionUser as User | null;
     const requireApiUser = () => apiUser as User;
-    if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser)) {
+    if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser) && role !== 'STUDENT') {
       return sendJson(res, 403, { message: 'subscription_required' });
     }
 
