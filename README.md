@@ -141,8 +141,8 @@ server {
 Сейчас бот работает через polling. Для webhook нужно добавить отдельный HTTP endpoint в API и вызывать `setWebhook`.
 Если хотите — скажите, я добавлю поддержку webhook в код.
 
-## Запуск Telegram Mini App (локально через ngrok)
-Ниже — полный сценарий, чтобы открыть приложение внутри Telegram Mini App, сохранив локальный запуск.
+## Запуск Telegram Mini App
+Ниже — полный сценарий, чтобы открыть приложение внутри Telegram Mini App.
 
 ### 1. Подготовьте переменные окружения
 1. Скопируйте `.env.example` в `.env`, если ещё не сделали:
@@ -151,7 +151,7 @@ server {
    ```
 2. Откройте `.env` и заполните:
    - `TELEGRAM_BOT_TOKEN` — токен из BotFather.
-   - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда (будет от ngrok).
+   - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда.
 
 ### 2. Запустите API и фронтенд
 В отдельных терминалах:
@@ -162,12 +162,8 @@ npm run api
 npm run dev
 ```
 
-### 3. Поднимите ngrok для фронтенда
-В отдельном терминале:
-```bash
-ngrok http 5173
-```
-Скопируйте выданный HTTPS-адрес и вставьте его в `.env` как `TELEGRAM_WEBAPP_URL`.
+### 3. Укажите публичный HTTPS URL фронтенда
+Убедитесь, что фронтенд доступен по HTTPS, и укажите этот URL в `.env` как `TELEGRAM_WEBAPP_URL`.
 
 > Если меняете `TELEGRAM_WEBAPP_URL` — перезапустите `npm run bot`.
 
@@ -183,15 +179,15 @@ npm run bot
 
 ### 5. Настройте домен Mini App в BotFather
 В BotFather выполните:
-1. `/setdomain` → выберите бота → укажите домен из ngrok (без пути).
+1. `/setdomain` → выберите бота → укажите домен вашего HTTPS URL (без пути).
 2. (Опционально) `/setmenubutton` → выбрать “Web App” → указать `TELEGRAM_WEBAPP_URL`.
 
 После этого откройте бота в Telegram и нажмите кнопку меню — откроется ваше приложение.
 
 ### Примечания
-- Telegram Mini App требует HTTPS URL. Локально это решается через ngrok.
+- Telegram Mini App требует HTTPS URL.
 - Авторизация внутри Mini App работает через `/auth/telegram/webapp`.
-- Если ngrok URL меняется, обновите `TELEGRAM_WEBAPP_URL` и перезапустите `npm run bot`.
+- Если URL меняется, обновите `TELEGRAM_WEBAPP_URL` и перезапустите `npm run bot`.
 
 ## Диагностика ошибки 500 при `/api/bootstrap`
 - Убедитесь, что API запущен (`npm run api`), а консоль показывает `API server running on http://localhost:4000`.

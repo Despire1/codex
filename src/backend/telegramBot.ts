@@ -516,7 +516,7 @@ const handleRoleSelection = async (
     return;
   }
 
-  await setDefaultMenuButton(chatId);
+  await setTeacherMenuButton(chatId);
   if (!user.onboardingStudentCompleted) {
     await ensureStudentOnboardingStarted(telegramUserId);
     await onboardingMessages.sendStudentIntro(chatId, messageId);
