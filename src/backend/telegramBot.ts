@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import prisma from './prismaClient';
+import { createOnboardingMessages } from './telegramOnboardingMessages';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
@@ -157,6 +158,12 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 const subscriptionPromptText =
   'Чтобы пользоваться сервисом, оформите пробную подписку ✨\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса. 🤝';
 
+const onboardingMessages = createOnboardingMessages({
+  callTelegram,
+  editMessage,
+  webAppUrl: TELEGRAM_WEBAPP_URL,
+});
+
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
   const payload = {
     text: subscriptionPromptText,
@@ -169,24 +176,6 @@ const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number)
     return;
   }
   await callTelegram('sendMessage', { chat_id: chatId, ...payload });
-};
-
-const sendOnboardingTeacherIntro = async (chatId: number) => {
-  await callTelegram('sendMessage', {
-    chat_id: chatId,
-    text:
-      'Привет! Ты в TeacherBot.\n' +
-      'Я помогаю репетиторам не держать в голове занятия и оплаты: всё видно в одном месте, плюс напоминания в Telegram.',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'Что умею', callback_data: 'onboarding_teacher_features' },
-          { text: 'Начать за 1 минуту', callback_data: 'onboarding_teacher_quickstart' },
-        ],
-        [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-      ],
-    },
-  });
 };
 
 const sendOnboardingTeacherFeatures = async (chatId: number) => {
@@ -270,188 +259,6 @@ const sendOnboardingTeacherStep3 = async (chatId: number) => {
   });
 };
 
-const sendOnboardingTeacherFinal = async (chatId: number) => {
-  await callTelegram('sendMessage', {
-    chat_id: chatId,
-    text:
-      'Готово. Логика простая:\n' +
-      '1. добавляешь ученика\n' +
-      '2. добавляешь занятия\n' +
-      '3. отмечаешь оплаты\n' +
-      'Я напомню, если что-то забывается.',
-    reply_markup: {
-      inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
-    },
-  });
-};
-
-const sendOnboardingStudentIntro = async (chatId: number) => {
-  await callTelegram('sendMessage', {
-    chat_id: chatId,
-    text:
-      'Привет! Ты ученик.\n' +
-      'Я буду присылать напоминания о занятиях и об оплате, если преподаватель это включил.\n' +
-      'Чтобы всё заработало, просто активируй профиль.',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'Активировать', callback_data: 'onboarding_student_activate' }],
-        [{ text: 'Пропустить', callback_data: 'onboarding_student_skip' }],
-      ],
-    },
-  });
-};
-
-const sendOnboardingTeacherIntro = async (chatId: number, messageId?: number) => {
-  const text =
-    'Привет! Ты в TeacherBot.\n' +
-    'Я помогаю репетиторам не держать в голове занятия и оплаты: всё видно в одном месте, плюс напоминания в Telegram.';
-  const reply_markup = {
-    inline_keyboard: [
-      [
-        { text: 'Что умею', callback_data: 'onboarding_teacher_features' },
-        { text: 'Начать за 1 минуту', callback_data: 'onboarding_teacher_quickstart' },
-      ],
-      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherFeatures = async (chatId: number, messageId?: number) => {
-  const text =
-    'Коротко, что здесь есть:\n' +
-    '• Занятия: чтобы не забывать расписание\n' +
-    '• Оплаты: видно, где не оплачено\n' +
-    '• Напоминания: себе и ученикам (после активации ученика)\n' +
-    'Хочешь — покажу быстрый старт.';
-  const reply_markup = {
-    inline_keyboard: [
-      [
-        { text: 'Начать за 1 минуту', callback_data: 'onboarding_teacher_quickstart' },
-        { text: 'Пропустить', callback_data: 'onboarding_teacher_skip' },
-      ],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherStep1 = async (chatId: number, messageId?: number) => {
-  const text = 'Шаг 1 из 3: добавь первого ученика в приложении.\nНужен только Telegram username ученика.';
-  const reply_markup = {
-    inline_keyboard: [
-      [
-        { text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } },
-        { text: 'Дальше', callback_data: 'onboarding_teacher_step2' },
-      ],
-      [{ text: 'Как узнать username?', callback_data: 'onboarding_teacher_username_help' }],
-      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherUsernameHint = async (chatId: number, messageId?: number) => {
-  const text =
-    'Открой профиль ученика в Telegram → “Имя пользователя”.\n' +
-    'Если его нет — ученик может добавить username в настройках Telegram.';
-  const reply_markup = {
-    inline_keyboard: [
-      [{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }],
-      [{ text: 'Дальше', callback_data: 'onboarding_teacher_step2' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherStep2 = async (chatId: number, messageId?: number) => {
-  const text = 'Шаг 2 из 3: добавь первое занятие.\nТак ты сразу увидишь ближайшие уроки и напоминания.';
-  const reply_markup = {
-    inline_keyboard: [
-      [
-        { text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } },
-        { text: 'Дальше', callback_data: 'onboarding_teacher_step3' },
-      ],
-      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherStep3 = async (chatId: number, messageId?: number) => {
-  const text =
-    'Шаг 3 из 3 (по желанию): настрой напоминания.\n' +
-    'Я могу напоминать:\n' +
-    '• тебе — о ближайших уроках\n' +
-    '• тебе — о неоплаченных занятиях\n' +
-    '• ученику — об оплате (после того, как он нажмёт /start)';
-  const reply_markup = {
-    inline_keyboard: [
-      [{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }],
-      [{ text: 'Готово', callback_data: 'onboarding_teacher_finish' }],
-      [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingTeacherFinal = async (chatId: number, messageId?: number) => {
-  const text =
-    'Готово. Логика простая:\n' +
-    '1. добавляешь ученика\n' +
-    '2. добавляешь занятия\n' +
-    '3. отмечаешь оплаты\n' +
-    'Я напомню, если что-то забывается.';
-  const reply_markup = {
-    inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
-
-const sendOnboardingStudentIntro = async (chatId: number, messageId?: number) => {
-  const text =
-    'Привет! Ты ученик.\n' +
-    'Я буду присылать напоминания о занятиях и об оплате, если преподаватель это включил.\n' +
-    'Чтобы всё заработало, просто активируй профиль.';
-  const reply_markup = {
-    inline_keyboard: [
-      [{ text: 'Активировать', callback_data: 'onboarding_student_activate' }],
-      [{ text: 'Пропустить', callback_data: 'onboarding_student_skip' }],
-    ],
-  };
-  if (messageId) {
-    await editMessage(chatId, messageId, text, reply_markup);
-    return;
-  }
-  await callTelegram('sendMessage', { chat_id: chatId, text, reply_markup });
-};
 
 const setTeacherMenuButton = async (chatId: number) => {
   await callTelegram('setChatMenuButton', {
@@ -677,7 +484,7 @@ const handleRoleSelection = async (
     await setTeacherMenuButton(chatId);
     if (!user.onboardingTeacherCompleted) {
       await ensureTeacherOnboardingStarted(telegramUserId);
-      await sendOnboardingTeacherIntro(chatId, messageId);
+      await onboardingMessages.sendTeacherIntro(chatId, messageId);
       return;
     }
     await sendWebAppMessage(chatId, messageId);
@@ -687,7 +494,7 @@ const handleRoleSelection = async (
   await setDefaultMenuButton(chatId);
   if (!user.onboardingStudentCompleted) {
     await ensureStudentOnboardingStarted(telegramUserId);
-    await sendOnboardingStudentIntro(chatId, messageId);
+    await onboardingMessages.sendStudentIntro(chatId, messageId);
     return;
   }
   await activateStudentByUsername(chatId, username ?? undefined, { messageId });
@@ -751,7 +558,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
       await setTeacherMenuButton(chatId);
       if (!user.onboardingTeacherCompleted) {
         await ensureTeacherOnboardingStarted(telegramUserId);
-        await sendOnboardingTeacherIntro(chatId, messageId);
+        await onboardingMessages.sendTeacherIntro(chatId, messageId);
         return;
       }
       if (messageId) {
@@ -783,31 +590,31 @@ const handleUpdate = async (update: TelegramUpdate) => {
       const messageId = update.callback_query.message?.message_id;
       if (update.callback_query.data === 'onboarding_teacher_skip') {
         await completeTeacherOnboarding(telegramUserId);
-        await sendOnboardingTeacherFinal(chatId, messageId);
+        await onboardingMessages.sendTeacherFinal(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_features') {
-        await sendOnboardingTeacherFeatures(chatId, messageId);
+        await onboardingMessages.sendTeacherFeatures(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_quickstart') {
-        await sendOnboardingTeacherStep1(chatId, messageId);
+        await onboardingMessages.sendTeacherStep1(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_username_help') {
-        await sendOnboardingTeacherUsernameHint(chatId, messageId);
+        await onboardingMessages.sendTeacherUsernameHint(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_step2') {
-        await sendOnboardingTeacherStep2(chatId, messageId);
+        await onboardingMessages.sendTeacherStep2(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_step3') {
-        await sendOnboardingTeacherStep3(chatId, messageId);
+        await onboardingMessages.sendTeacherStep3(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_finish') {
-        await sendOnboardingTeacherFinal(chatId, messageId);
+        await onboardingMessages.sendTeacherFinal(chatId, messageId);
         await completeTeacherOnboarding(telegramUserId);
         return;
       }
@@ -828,53 +635,6 @@ const handleUpdate = async (update: TelegramUpdate) => {
         await activateStudentByUsername(chatId, update.callback_query.from.username ?? undefined, {
           successMessage: 'Готово, профиль активирован. Теперь преподаватель сможет отправлять тебе напоминания.',
           messageId,
-        });
-        await completeStudentOnboarding(telegramUserId);
-        return;
-      }
-      return;
-    }
-    if (update.callback_query.data?.startsWith('onboarding_teacher_')) {
-      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      const telegramUserId = BigInt(update.callback_query.from.id);
-      if (update.callback_query.data === 'onboarding_teacher_skip') {
-        await completeTeacherOnboarding(telegramUserId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_features') {
-        await sendOnboardingTeacherFeatures(chatId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_quickstart') {
-        await sendOnboardingTeacherStep1(chatId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_username_help') {
-        await sendOnboardingTeacherUsernameHint(chatId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_step2') {
-        await sendOnboardingTeacherStep2(chatId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_step3') {
-        await sendOnboardingTeacherStep3(chatId);
-        await sendOnboardingTeacherFinal(chatId);
-        await completeTeacherOnboarding(telegramUserId);
-        return;
-      }
-      return;
-    }
-    if (update.callback_query.data?.startsWith('onboarding_student_')) {
-      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      const telegramUserId = BigInt(update.callback_query.from.id);
-      if (update.callback_query.data === 'onboarding_student_skip') {
-        await completeStudentOnboarding(telegramUserId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_student_activate') {
-        await activateStudentByUsername(chatId, update.callback_query.from.username ?? undefined, {
-          successMessage: 'Готово, профиль активирован. Теперь преподаватель сможет отправлять тебе напоминания.',
         });
         await completeStudentOnboarding(telegramUserId);
         return;
