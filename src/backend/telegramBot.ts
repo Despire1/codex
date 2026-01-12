@@ -77,12 +77,25 @@ const callTelegram = async <T>(method: string, payload?: Record<string, unknown>
 };
 
 const editMessage = async (chatId: number, messageId: number, text: string, replyMarkup?: Record<string, unknown>) => {
-  await callTelegram('editMessageText', {
-    chat_id: chatId,
-    message_id: messageId,
-    text,
-    reply_markup: replyMarkup,
-  });
+  try {
+    await callTelegram('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      reply_markup: replyMarkup,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("message can't be edited")) {
+      await callTelegram('sendMessage', {
+        chat_id: chatId,
+        text,
+        reply_markup: replyMarkup,
+      });
+      return;
+    }
+    throw error;
+  }
 };
 
 const sendWebAppMessage = async (chatId: number, messageId?: number) => {
@@ -129,6 +142,8 @@ const sendTermsAcceptanceMessage = async (chatId: number) => {
 const roleSelectionText =
   '👋 Привет! Давайте начнём.\n' +
   'Чтобы я показывал нужные функции, выберите вашу роль. Это можно изменить в любой момент.';
+const roleSelectionKeyboardHint =
+  'Выберите роль кнопками ниже или через inline-кнопки в сообщении.';
 
 const buildRoleKeyboard = () => ({
   keyboard: [[{ text: ROLE_TEACHER_TEXT }, { text: ROLE_STUDENT_TEXT }], [{ text: SUPPORT_BUTTON_TEXT }]],
@@ -137,20 +152,30 @@ const buildRoleKeyboard = () => ({
   is_persistent: true,
 });
 
+const buildRoleInlineKeyboard = () => ({
+  inline_keyboard: [[{ text: ROLE_TEACHER_TEXT, callback_data: 'role_teacher' }, { text: ROLE_STUDENT_TEXT, callback_data: 'role_student' }]],
+});
+
+const sendRoleKeyboardHintMessage = async (chatId: number) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text: roleSelectionKeyboardHint,
+    reply_markup: buildRoleKeyboard(),
+  });
+};
+
 const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
   if (messageId) {
-    await callTelegram('editMessageText', {
-      chat_id: chatId,
-      message_id: messageId,
-      text: roleSelectionText,
-    });
+    await editMessage(chatId, messageId, roleSelectionText, buildRoleInlineKeyboard());
+    await sendRoleKeyboardHintMessage(chatId);
     return messageId;
   }
   const result = await callTelegram<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text: roleSelectionText,
-    reply_markup: buildRoleKeyboard(),
+    reply_markup: buildRoleInlineKeyboard(),
   });
+  await sendRoleKeyboardHintMessage(chatId);
   onboardingMessageByChatId.set(chatId, result.message_id);
   return result.message_id;
 };
