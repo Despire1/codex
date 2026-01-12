@@ -120,6 +120,14 @@ const sendSupportMessage = async (chatId: number) => {
   });
 };
 
+const sendStudentInfoMessage = async (chatId: number, text: string) => {
+  await callTelegram('sendMessage', {
+    chat_id: chatId,
+    text,
+    reply_markup: buildRoleKeyboard(),
+  });
+};
+
 const termsMessageText =
   '👋 Добро пожаловать!\n\n' +
   'Перед тем как начать пользоваться ботом, пожалуйста, ознакомьтесь с документами:\n\n' +
