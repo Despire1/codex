@@ -40,6 +40,7 @@ import { AppModals, DialogState } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
+import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -184,20 +185,6 @@ export const AppPage = () => {
   const { showToast } = useToast();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
   const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
-  const studentHintShownRef = useRef(false);
-
-  useEffect(() => {
-    if (studentHintShownRef.current) return;
-    const role = sessionUser?.role?.toUpperCase();
-    if (role === 'STUDENT') {
-      showToast({
-        message: 'Mini App открыт в роли ученика. Чтобы управлять занятиями, переключитесь на роль «Я учитель» в боте.',
-        variant: 'info',
-        durationMs: 5000,
-      });
-      studentHintShownRef.current = true;
-    }
-  }, [sessionUser?.role, showToast]);
   const hasAccess = sessionState === 'authenticated' && hasSubscription;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
@@ -1708,6 +1695,18 @@ export const AppPage = () => {
   }
 
   const isStudentRole = sessionUser?.role?.toUpperCase() === 'STUDENT';
+
+  if (isStudentRole) {
+    return (
+      <div className={layoutStyles.page}>
+        <div className={layoutStyles.pageInner}>
+          <main className={layoutStyles.content}>
+            <StudentRoleNotice />
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasSubscription && !isStudentRole) {
     return <SubscriptionGate />;
