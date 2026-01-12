@@ -1,0 +1,20 @@
+.container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.text {
+  margin: 12px 0 0;
+  color: var(--color-slate-700);
+  line-height: 1.5;
+}
+
+.hint {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--color-slate-500);
+}
