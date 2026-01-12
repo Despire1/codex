@@ -182,8 +182,22 @@ export const AppPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const { state: sessionState, refresh: refreshSession, hasSubscription } = useSessionStatus();
+  const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
   const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
+  const studentHintShownRef = useRef(false);
+
+  useEffect(() => {
+    if (studentHintShownRef.current) return;
+    const role = sessionUser?.role?.toUpperCase();
+    if (role === 'STUDENT') {
+      showToast({
+        message: 'Mini App открыт в роли ученика. Чтобы управлять занятиями, переключитесь на роль «Я учитель» в боте.',
+        variant: 'info',
+        durationMs: 5000,
+      });
+      studentHintShownRef.current = true;
+    }
+  }, [sessionUser?.role, showToast]);
   const hasAccess = sessionState === 'authenticated' && hasSubscription;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
@@ -1693,7 +1707,9 @@ export const AppPage = () => {
     return <SessionFallback state={fallbackState} />;
   }
 
-  if (!hasSubscription) {
+  const isStudentRole = sessionUser?.role?.toUpperCase() === 'STUDENT';
+
+  if (!hasSubscription && !isStudentRole) {
     return <SubscriptionGate />;
   }
 

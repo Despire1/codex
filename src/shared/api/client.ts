@@ -46,8 +46,14 @@ export type SessionUser = {
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
+  const roleHeader =
+    typeof window !== 'undefined' ? window.localStorage.getItem('userRole') ?? undefined : undefined;
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(roleHeader ? { 'X-User-Role': roleHeader } : {}),
+      ...(options?.headers ?? {}),
+    },
     credentials: 'include',
     ...options,
   });
