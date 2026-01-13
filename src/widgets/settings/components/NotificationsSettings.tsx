@@ -9,12 +9,6 @@ interface NotificationsSettingsProps {
 }
 
 const lessonReminderOptions = [5, 10, 15, 30, 60, 120];
-const unpaidFrequencyOptions = [
-  { value: 'daily', label: '1 раз в день' },
-  { value: 'every_two_days', label: '1 раз в 2 дня' },
-  { value: 'weekly', label: '1 раз в неделю' },
-];
-
 export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange }) => {
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
   const studentPaymentRemindersDisabled = true;
@@ -50,50 +44,6 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
               </option>
             ))}
           </select>
-        </div>
-      </div>
-
-      <div className={styles.sectionBlock}>
-        <div className={styles.rowHeader}>
-          <div>
-            <div className={styles.label}>Напоминания о неоплаченных занятиях</div>
-            <div className={styles.helperText}>
-              Учитываются только завершенные и неоплаченные занятия.
-            </div>
-          </div>
-          <label className={controls.switch}>
-            <input
-              type="checkbox"
-              checked={teacher.unpaidReminderEnabled}
-              onChange={(event) => onChange({ unpaidReminderEnabled: event.target.checked })}
-            />
-            <span className={controls.slider} />
-          </label>
-        </div>
-        <div className={styles.inlineField}>
-          <div className={styles.inlineLabel}>Как часто</div>
-          <select
-            className={controls.input}
-            value={teacher.unpaidReminderFrequency}
-            onChange={(event) => onChange({ unpaidReminderFrequency: event.target.value as Teacher['unpaidReminderFrequency'] })}
-            disabled={!teacher.unpaidReminderEnabled}
-          >
-            {unpaidFrequencyOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.inlineField}>
-          <div className={styles.inlineLabel}>Время отправки</div>
-          <input
-            className={controls.input}
-            type="time"
-            value={teacher.unpaidReminderTime}
-            onChange={(event) => onChange({ unpaidReminderTime: event.target.value })}
-            disabled={!teacher.unpaidReminderEnabled}
-          />
         </div>
       </div>
 

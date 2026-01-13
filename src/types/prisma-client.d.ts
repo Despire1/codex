@@ -10,9 +10,6 @@ declare module '@prisma/client' {
     reminderMinutesBefore: number;
     lessonReminderEnabled: boolean;
     lessonReminderMinutes: number;
-    unpaidReminderEnabled: boolean;
-    unpaidReminderFrequency: string;
-    unpaidReminderTime: string;
     dailySummaryEnabled: boolean;
     dailySummaryTime: string;
     tomorrowSummaryEnabled: boolean;

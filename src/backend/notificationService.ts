@@ -11,7 +11,6 @@ const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 type NotificationType =
   | 'TEACHER_LESSON_REMINDER'
-  | 'TEACHER_UNPAID_DIGEST'
   | 'TEACHER_DAILY_SUMMARY'
   | 'TEACHER_TOMORROW_SUMMARY'
   | 'TEACHER_ONBOARDING_NUDGE'
@@ -132,9 +131,6 @@ const buildPaymentReminderMessage = (startAt: Date, price: number, timeZone?: st
   const priceLabel = Number.isFinite(price) && price > 0 ? `${price} ₽` : '—';
   return `💳 Напоминание об оплате\n\nЗанятие от ${dateLabel}\nСумма: ${priceLabel}\n\n🙏 Спасибо!`;
 };
-
-const buildUnpaidDigestMessage = (summary: { studentCount: number; lessonCount: number; totalAmount: number }) =>
-  `Есть неоплаченные занятия: ${summary.studentCount} ученика, ${summary.lessonCount} занятия, ${summary.totalAmount} ₽. Откройте приложение, чтобы отметить оплаты.`;
 
 const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: string | null) => {
   const resolvedTimeZone = resolveTimeZone(timeZone);
@@ -372,42 +368,6 @@ export const sendTeacherOnboardingNudge = async ({
 
   try {
     await sendTelegramWebAppMessage(teacherId, text);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
-};
-
-export const sendTeacherUnpaidDigest = async ({
-  teacherId,
-  summary,
-  scheduledFor,
-  dedupeKey,
-}: {
-  teacherId: bigint;
-  summary: { studentCount: number; lessonCount: number; totalAmount: number };
-  scheduledFor?: Date;
-  dedupeKey?: string;
-}) => {
-  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
-  if (!teacher?.unpaidReminderEnabled) return { status: 'skipped' as const };
-  if (summary.lessonCount <= 0) return { status: 'skipped' as const };
-
-  const log = await createNotificationLog({
-    teacherId,
-    type: 'TEACHER_UNPAID_DIGEST',
-    scheduledFor,
-    dedupeKey,
-  });
-  if (!log) return { status: 'skipped' as const };
-
-  const text = buildUnpaidDigestMessage(summary);
-
-  try {
-    await sendTelegramMessage(teacher.chatId, text);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
