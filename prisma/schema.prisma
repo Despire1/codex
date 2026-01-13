@@ -19,6 +19,10 @@ model Teacher {
   unpaidReminderEnabled Boolean         @default(false)
   unpaidReminderFrequency String        @default("daily")
   unpaidReminderTime    String          @default("10:00")
+  dailySummaryEnabled   Boolean         @default(true)
+  dailySummaryTime      String          @default("09:00")
+  tomorrowSummaryEnabled Boolean        @default(false)
+  tomorrowSummaryTime   String          @default("20:00")
   studentNotificationsEnabled Boolean   @default(true)
   studentPaymentRemindersEnabled Boolean @default(true)
   students              TeacherStudent[]

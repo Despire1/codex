@@ -12,11 +12,14 @@ import {
   getTimeZoneStartOfDay,
   resolveTimeZone,
   toUtcDateFromDate,
+  toUtcDateFromTimeZone,
+  toUtcEndOfDay,
 } from '../shared/lib/timezoneDates';
 import {
   sendStudentLessonReminder,
   sendStudentPaymentReminder,
   sendTeacherLessonReminder,
+  sendTeacherDailySummary,
   sendTeacherOnboardingNudge,
   sendTeacherUnpaidDigest,
 } from './notificationService';
@@ -277,6 +280,10 @@ const pickTeacherSettings = (teacher: any) => ({
   unpaidReminderEnabled: teacher.unpaidReminderEnabled,
   unpaidReminderFrequency: teacher.unpaidReminderFrequency,
   unpaidReminderTime: teacher.unpaidReminderTime,
+  dailySummaryEnabled: teacher.dailySummaryEnabled,
+  dailySummaryTime: teacher.dailySummaryTime,
+  tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
+  tomorrowSummaryTime: teacher.tomorrowSummaryTime,
   studentNotificationsEnabled: teacher.studentNotificationsEnabled,
   studentPaymentRemindersEnabled: teacher.studentPaymentRemindersEnabled,
 });
@@ -325,6 +332,22 @@ const updateSettings = async (user: User, body: any) => {
 
   if (typeof body.unpaidReminderTime === 'string' && isValidTimeString(body.unpaidReminderTime)) {
     data.unpaidReminderTime = body.unpaidReminderTime;
+  }
+
+  if (typeof body.dailySummaryEnabled === 'boolean') {
+    data.dailySummaryEnabled = body.dailySummaryEnabled;
+  }
+
+  if (typeof body.dailySummaryTime === 'string' && isValidTimeString(body.dailySummaryTime)) {
+    data.dailySummaryTime = body.dailySummaryTime;
+  }
+
+  if (typeof body.tomorrowSummaryEnabled === 'boolean') {
+    data.tomorrowSummaryEnabled = body.tomorrowSummaryEnabled;
+  }
+
+  if (typeof body.tomorrowSummaryTime === 'string' && isValidTimeString(body.tomorrowSummaryTime)) {
+    data.tomorrowSummaryTime = body.tomorrowSummaryTime;
   }
 
   if (typeof body.studentNotificationsEnabled === 'boolean') {
@@ -2329,6 +2352,93 @@ const shouldSendUnpaidDigest = async (teacher: any, now: Date) => {
   return differenceInCalendarDays(todayDate, lastDate) >= frequencyDays;
 };
 
+const shouldSendDailySummary = (teacher: any, now: Date, scope: 'today' | 'tomorrow') => {
+  if (scope === 'today' && !teacher.dailySummaryEnabled) return false;
+  if (scope === 'tomorrow' && !teacher.tomorrowSummaryEnabled) return false;
+  const timeLabel = formatInTimeZone(now, 'HH:mm', { timeZone: teacher.timezone });
+  const targetTime = scope === 'today' ? teacher.dailySummaryTime : teacher.tomorrowSummaryTime;
+  return timeLabel === targetTime;
+};
+
+const buildDailySummaryData = async (teacher: any, targetDate: Date, includeUnpaid: boolean) => {
+  const resolvedTimeZone = resolveTimeZone(teacher.timezone);
+  const dateKey = formatInTimeZone(targetDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+  const dayStart = toUtcDateFromTimeZone(dateKey, '00:00', resolvedTimeZone);
+  const dayEnd = toUtcEndOfDay(dateKey, resolvedTimeZone);
+  const summaryDate = toUtcDateFromTimeZone(dateKey, '12:00', resolvedTimeZone);
+
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: 'SCHEDULED',
+      startAt: { gte: dayStart, lte: dayEnd },
+    },
+    include: { student: true, participants: { include: { student: true } } },
+    orderBy: { startAt: 'asc' },
+  });
+
+  const unpaidLessons = includeUnpaid
+    ? await prisma.lesson.findMany({
+        where: {
+          teacherId: teacher.chatId,
+          status: 'COMPLETED',
+          isPaid: false,
+          startAt: { lt: dayStart },
+        },
+        include: { student: true },
+        orderBy: { startAt: 'asc' },
+      })
+    : [];
+
+  const studentIds = new Set<number>();
+  lessons.forEach((lesson) => {
+    studentIds.add(lesson.studentId);
+    lesson.participants.forEach((participant) => studentIds.add(participant.studentId));
+  });
+  unpaidLessons.forEach((lesson) => studentIds.add(lesson.studentId));
+
+  const links = studentIds.size
+    ? await prisma.teacherStudent.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: Array.from(studentIds) } },
+      })
+    : [];
+  const linksByStudentId = new Map<number, any>(links.map((link) => [link.studentId, link]));
+
+  const resolveStudentName = (studentId: number, fallback?: string | null) => {
+    const link = linksByStudentId.get(studentId);
+    const customName = typeof link?.customName === 'string' ? link.customName.trim() : '';
+    if (customName) return customName;
+    const fallbackName = typeof fallback === 'string' ? fallback.trim() : '';
+    return fallbackName || 'ученик';
+  };
+
+  const summaryLessons = lessons.map((lesson) => {
+    const names = new Set<string>();
+    names.add(resolveStudentName(lesson.studentId, lesson.student?.username));
+    lesson.participants.forEach((participant) => {
+      names.add(resolveStudentName(participant.studentId, participant.student?.username));
+    });
+    return {
+      startAt: lesson.startAt,
+      durationMinutes: lesson.durationMinutes,
+      studentNames: Array.from(names),
+    };
+  });
+
+  const summaryUnpaid = unpaidLessons.map((lesson) => ({
+    startAt: lesson.startAt,
+    studentName: resolveStudentName(lesson.studentId, lesson.student?.username),
+    price: lesson.price ?? null,
+  }));
+
+  return {
+    dateKey,
+    summaryDate: Number.isNaN(summaryDate.getTime()) ? targetDate : summaryDate,
+    lessons: summaryLessons,
+    unpaidLessons: summaryUnpaid,
+  };
+};
+
 const runNotificationTick = async () => {
   const now = new Date();
   const teachers = await prisma.teacher.findMany();
@@ -2369,6 +2479,31 @@ const runNotificationTick = async () => {
           minutesBefore: reminderMinutes,
         });
       }
+    }
+
+    if (shouldSendDailySummary(teacher, now, 'today')) {
+      const summary = await buildDailySummaryData(teacher, now, true);
+      await sendTeacherDailySummary({
+        teacherId: teacher.chatId,
+        type: 'TEACHER_DAILY_SUMMARY',
+        summaryDate: summary.summaryDate,
+        lessons: summary.lessons,
+        unpaidLessons: summary.unpaidLessons,
+        scheduledFor: now,
+        dedupeKey: `TEACHER_DAILY_SUMMARY:${teacher.chatId}:${summary.dateKey}`,
+      });
+    }
+
+    if (shouldSendDailySummary(teacher, now, 'tomorrow')) {
+      const summary = await buildDailySummaryData(teacher, addDays(now, 1), false);
+      await sendTeacherDailySummary({
+        teacherId: teacher.chatId,
+        type: 'TEACHER_TOMORROW_SUMMARY',
+        summaryDate: summary.summaryDate,
+        lessons: summary.lessons,
+        scheduledFor: now,
+        dedupeKey: `TEACHER_TOMORROW_SUMMARY:${teacher.chatId}:${summary.dateKey}`,
+      });
     }
 
     if (await shouldSendUnpaidDigest(teacher, now)) {

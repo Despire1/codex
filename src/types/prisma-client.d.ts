@@ -13,6 +13,10 @@ declare module '@prisma/client' {
     unpaidReminderEnabled: boolean;
     unpaidReminderFrequency: string;
     unpaidReminderTime: string;
+    dailySummaryEnabled: boolean;
+    dailySummaryTime: string;
+    tomorrowSummaryEnabled: boolean;
+    tomorrowSummaryTime: string;
     studentNotificationsEnabled: boolean;
     studentPaymentRemindersEnabled: boolean;
     payments: Payment[];
