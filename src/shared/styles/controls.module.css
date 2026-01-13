@@ -1,6 +1,7 @@
 .input {
   width: 100%;
   padding: 12px;
+  box-sizing: border-box;
   border: 1px solid var(--color-slate-300);
   border-radius: 12px;
   font-size: 14px;
@@ -10,6 +11,7 @@
 .textArea {
   width: 100%;
   padding: 12px;
+  box-sizing: border-box;
   min-height: 80px;
   border: 1px solid var(--color-slate-300);
   border-radius: 12px;
