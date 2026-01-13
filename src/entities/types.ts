@@ -1,7 +1,5 @@
 export type LessonStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELED';
 export type LessonColor = 'blue' | 'peach' | 'rose' | 'mint' | 'sand' | 'lavender';
-export type UnpaidReminderFrequency = 'daily' | 'every_two_days' | 'weekly';
-
 export interface Teacher {
   chatId: number;
   name?: string;
@@ -11,9 +9,6 @@ export interface Teacher {
   reminderMinutesBefore: number;
   lessonReminderEnabled: boolean;
   lessonReminderMinutes: number;
-  unpaidReminderEnabled: boolean;
-  unpaidReminderFrequency: UnpaidReminderFrequency;
-  unpaidReminderTime: string;
   dailySummaryEnabled: boolean;
   dailySummaryTime: string;
   tomorrowSummaryEnabled: boolean;

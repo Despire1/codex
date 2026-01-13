@@ -2,7 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
-import { addDays, addYears, differenceInCalendarDays } from 'date-fns';
+import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
 import type { User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
@@ -11,7 +11,6 @@ import {
   formatInTimeZone,
   getTimeZoneStartOfDay,
   resolveTimeZone,
-  toUtcDateFromDate,
   toUtcDateFromTimeZone,
   toUtcEndOfDay,
 } from '../shared/lib/timezoneDates';
@@ -21,7 +20,6 @@ import {
   sendTeacherLessonReminder,
   sendTeacherDailySummary,
   sendTeacherOnboardingNudge,
-  sendTeacherUnpaidDigest,
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
 
@@ -42,7 +40,6 @@ const RATE_LIMIT_TRANSFER_CREATE_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFE
 const RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN ?? 10);
 const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN ?? 10);
 const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
-const ALLOWED_UNPAID_REMINDER_FREQUENCIES = new Set(['daily', 'every_two_days', 'weekly']);
 const NOTIFICATION_TICK_MS = 60_000;
 const ONBOARDING_NUDGE_TICK_MS = 15 * 60_000;
 const ONBOARDING_NUDGE_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -277,9 +274,6 @@ const pickTeacherSettings = (teacher: any) => ({
   defaultLessonDuration: teacher.defaultLessonDuration,
   lessonReminderEnabled: teacher.lessonReminderEnabled,
   lessonReminderMinutes: teacher.lessonReminderMinutes,
-  unpaidReminderEnabled: teacher.unpaidReminderEnabled,
-  unpaidReminderFrequency: teacher.unpaidReminderFrequency,
-  unpaidReminderTime: teacher.unpaidReminderTime,
   dailySummaryEnabled: teacher.dailySummaryEnabled,
   dailySummaryTime: teacher.dailySummaryTime,
   tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
@@ -320,18 +314,6 @@ const updateSettings = async (user: User, body: any) => {
     if (Number.isFinite(numeric)) {
       data.lessonReminderMinutes = clampNumber(Math.round(numeric), 5, 120);
     }
-  }
-
-  if (typeof body.unpaidReminderEnabled === 'boolean') {
-    data.unpaidReminderEnabled = body.unpaidReminderEnabled;
-  }
-
-  if (typeof body.unpaidReminderFrequency === 'string' && ALLOWED_UNPAID_REMINDER_FREQUENCIES.has(body.unpaidReminderFrequency)) {
-    data.unpaidReminderFrequency = body.unpaidReminderFrequency;
-  }
-
-  if (typeof body.unpaidReminderTime === 'string' && isValidTimeString(body.unpaidReminderTime)) {
-    data.unpaidReminderTime = body.unpaidReminderTime;
   }
 
   if (typeof body.dailySummaryEnabled === 'boolean') {
@@ -2325,33 +2307,6 @@ const autoSettleUnpaidLessons = async () => {
   }
 };
 
-const resolveUnpaidFrequencyDays = (value?: string | null) => {
-  if (value === 'every_two_days') return 2;
-  if (value === 'weekly') return 7;
-  return 1;
-};
-
-const shouldSendUnpaidDigest = async (teacher: any, now: Date) => {
-  if (!teacher.unpaidReminderEnabled) return false;
-  const timeLabel = formatInTimeZone(now, 'HH:mm', { timeZone: teacher.timezone });
-  if (timeLabel !== teacher.unpaidReminderTime) return false;
-  const frequencyDays = resolveUnpaidFrequencyDays(teacher.unpaidReminderFrequency);
-  if (frequencyDays === 1) return true;
-
-  const lastLog = await prisma.notificationLog.findFirst({
-    where: { teacherId: teacher.chatId, type: 'TEACHER_UNPAID_DIGEST', status: 'SENT' },
-    orderBy: { sentAt: 'desc' },
-  });
-  if (!lastLog?.sentAt) return true;
-
-  const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: teacher.timezone });
-  const lastKey = formatInTimeZone(lastLog.sentAt, 'yyyy-MM-dd', { timeZone: teacher.timezone });
-  const todayDate = toUtcDateFromDate(todayKey, teacher.timezone);
-  const lastDate = toUtcDateFromDate(lastKey, teacher.timezone);
-  if (Number.isNaN(todayDate.getTime()) || Number.isNaN(lastDate.getTime())) return true;
-  return differenceInCalendarDays(todayDate, lastDate) >= frequencyDays;
-};
-
 const shouldSendDailySummary = (teacher: any, now: Date, scope: 'today' | 'tomorrow') => {
   if (scope === 'today' && !teacher.dailySummaryEnabled) return false;
   if (scope === 'tomorrow' && !teacher.tomorrowSummaryEnabled) return false;
@@ -2506,28 +2461,6 @@ const runNotificationTick = async () => {
       });
     }
 
-    if (await shouldSendUnpaidDigest(teacher, now)) {
-      const unpaidLessons = await prisma.lesson.findMany({
-        where: {
-          teacherId: teacher.chatId,
-          status: 'COMPLETED',
-          isPaid: false,
-        },
-      });
-      const studentIds = new Set(unpaidLessons.map((lesson) => lesson.studentId));
-      const totalAmount = unpaidLessons.reduce((sum, lesson) => sum + (lesson.price ?? 0), 0);
-      const dateKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: teacher.timezone });
-      await sendTeacherUnpaidDigest({
-        teacherId: teacher.chatId,
-        summary: {
-          studentCount: studentIds.size,
-          lessonCount: unpaidLessons.length,
-          totalAmount,
-        },
-        scheduledFor: now,
-        dedupeKey: `TEACHER_UNPAID_DIGEST:${teacher.chatId}:${dateKey}`,
-      });
-    }
   }
 };
 
