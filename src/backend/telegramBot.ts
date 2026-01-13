@@ -320,6 +320,44 @@ const normalizeTelegramUsername = (username?: string | null) => {
   return withoutAt.trim().toLowerCase() || null;
 };
 
+const ADMIN_TELEGRAM_CHAT_ID = 683130123;
+
+const buildNewUserNotification = (payload: {
+  telegramUserId: bigint;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+}) => {
+  const username = payload.username ? `@${payload.username}` : 'не указан';
+  const firstName = payload.firstName?.trim() || 'не указано';
+  const lastName = payload.lastName?.trim() || 'не указано';
+  return [
+    'Новый пользователь в боте:',
+    `ID: ${payload.telegramUserId.toString()}`,
+    `Имя: ${firstName}`,
+    `Фамилия: ${lastName}`,
+    `Username: ${username}`,
+  ].join('\n');
+};
+
+const notifyAdminAboutNewUser = async (payload: {
+  telegramUserId: bigint;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+}) => {
+  const text = buildNewUserNotification(payload);
+  try {
+    await callTelegram('sendMessage', {
+      chat_id: ADMIN_TELEGRAM_CHAT_ID,
+      text,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[telegram-bot] Failed to notify admin about new user: ${message}`);
+  }
+};
+
 const upsertTelegramUser = async (payload: {
   telegramUserId: bigint;
   username?: string;
@@ -351,20 +389,27 @@ const ensureTelegramUser = async (payload: {
   firstName?: string;
   lastName?: string;
 }) => {
-  return prisma.user.upsert({
-    where: { telegramUserId: payload.telegramUserId },
-    update: {
-      username: payload.username ?? null,
-      firstName: payload.firstName ?? null,
-      lastName: payload.lastName ?? null,
-    },
-    create: {
+  const existing = await prisma.user.findUnique({ where: { telegramUserId: payload.telegramUserId } });
+  if (existing) {
+    const user = await prisma.user.update({
+      where: { telegramUserId: payload.telegramUserId },
+      data: {
+        username: payload.username ?? null,
+        firstName: payload.firstName ?? null,
+        lastName: payload.lastName ?? null,
+      },
+    });
+    return { user, isNew: false };
+  }
+  const user = await prisma.user.create({
+    data: {
       telegramUserId: payload.telegramUserId,
       username: payload.username ?? null,
       firstName: payload.firstName ?? null,
       lastName: payload.lastName ?? null,
     },
   });
+  return { user, isNew: true };
 };
 
 const ensureTeacherOnboardingStarted = async (telegramUserId: bigint) => {
@@ -685,12 +730,20 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   if (text === '/start') {
     if (telegramUserId) {
-      const user = await ensureTelegramUser({
+      const { user, isNew } = await ensureTelegramUser({
         telegramUserId,
         username: from?.username,
         firstName: from?.first_name,
         lastName: from?.last_name,
       });
+      if (isNew) {
+        await notifyAdminAboutNewUser({
+          telegramUserId,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        });
+      }
       if (!user.termsAccepted) {
         await sendTermsAcceptanceMessage(chatId);
         return;
