@@ -14,6 +14,10 @@ export interface Teacher {
   unpaidReminderEnabled: boolean;
   unpaidReminderFrequency: UnpaidReminderFrequency;
   unpaidReminderTime: string;
+  dailySummaryEnabled: boolean;
+  dailySummaryTime: string;
+  tomorrowSummaryEnabled: boolean;
+  tomorrowSummaryTime: string;
   studentNotificationsEnabled: boolean;
   studentPaymentRemindersEnabled: boolean;
 }

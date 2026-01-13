@@ -28,6 +28,10 @@ type SettingsPatch = Partial<
     | 'unpaidReminderEnabled'
     | 'unpaidReminderFrequency'
     | 'unpaidReminderTime'
+    | 'dailySummaryEnabled'
+    | 'dailySummaryTime'
+    | 'tomorrowSummaryEnabled'
+    | 'tomorrowSummaryTime'
     | 'studentNotificationsEnabled'
     | 'studentPaymentRemindersEnabled'
   >

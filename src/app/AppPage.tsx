@@ -54,6 +54,10 @@ const initialTeacher: Teacher = {
   unpaidReminderEnabled: false,
   unpaidReminderFrequency: 'daily',
   unpaidReminderTime: '10:00',
+  dailySummaryEnabled: true,
+  dailySummaryTime: '09:00',
+  tomorrowSummaryEnabled: false,
+  tomorrowSummaryTime: '20:00',
   studentNotificationsEnabled: true,
   studentPaymentRemindersEnabled: true,
 };

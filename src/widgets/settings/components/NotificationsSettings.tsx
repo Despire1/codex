@@ -97,6 +97,64 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
         </div>
       </div>
 
+      <div className={styles.sectionBlock}>
+        <div className={styles.rowHeader}>
+          <div>
+            <div className={styles.label}>Сводка на сегодня</div>
+            <div className={styles.helperText}>
+              Утром приходит список занятий на день и неоплаченные занятия за прошлые дни.
+            </div>
+          </div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.dailySummaryEnabled}
+              onChange={(event) => onChange({ dailySummaryEnabled: event.target.checked })}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Время отправки</div>
+          <input
+            className={controls.input}
+            type="time"
+            value={teacher.dailySummaryTime}
+            onChange={(event) => onChange({ dailySummaryTime: event.target.value })}
+            disabled={!teacher.dailySummaryEnabled}
+          />
+        </div>
+      </div>
+
+      <div className={styles.sectionBlock}>
+        <div className={styles.rowHeader}>
+          <div>
+            <div className={styles.label}>Сводка на завтра</div>
+            <div className={styles.helperText}>
+              Вечером показывает завтрашние занятия. По умолчанию — 20:00.
+            </div>
+          </div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.tomorrowSummaryEnabled}
+              onChange={(event) => onChange({ tomorrowSummaryEnabled: event.target.checked })}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Время отправки</div>
+          <input
+            className={controls.input}
+            type="time"
+            value={teacher.tomorrowSummaryTime}
+            onChange={(event) => onChange({ tomorrowSummaryTime: event.target.value })}
+            disabled={!teacher.tomorrowSummaryEnabled}
+          />
+        </div>
+      </div>
+
       <div className={styles.sectionTitle}>Ученику</div>
       <div className={styles.sectionBlock}>
         <div className={styles.rowHeader}>

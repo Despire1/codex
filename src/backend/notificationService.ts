@@ -1,4 +1,4 @@
-import { addDays, isSameDay } from 'date-fns';
+import { addDays, addMinutes, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Prisma } from '@prisma/client';
 import prisma from './prismaClient';
@@ -12,10 +12,24 @@ const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 type NotificationType =
   | 'TEACHER_LESSON_REMINDER'
   | 'TEACHER_UNPAID_DIGEST'
+  | 'TEACHER_DAILY_SUMMARY'
+  | 'TEACHER_TOMORROW_SUMMARY'
   | 'TEACHER_ONBOARDING_NUDGE'
   | 'STUDENT_LESSON_REMINDER'
   | 'STUDENT_PAYMENT_REMINDER'
   | 'MANUAL_STUDENT_PAYMENT_REMINDER';
+
+type DailySummaryLesson = {
+  startAt: Date;
+  durationMinutes: number;
+  studentNames: string[];
+};
+
+type DailySummaryUnpaidLesson = {
+  startAt: Date;
+  studentName: string;
+  price: number | null;
+};
 
 const callTelegram = async <T>(method: string, payload?: Record<string, unknown>): Promise<T> => {
   if (!TELEGRAM_BOT_TOKEN) {
@@ -121,6 +135,68 @@ const buildPaymentReminderMessage = (startAt: Date, price: number, timeZone?: st
 
 const buildUnpaidDigestMessage = (summary: { studentCount: number; lessonCount: number; totalAmount: number }) =>
   `Есть неоплаченные занятия: ${summary.studentCount} ученика, ${summary.lessonCount} занятия, ${summary.totalAmount} ₽. Откройте приложение, чтобы отметить оплаты.`;
+
+const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: string | null) => {
+  const resolvedTimeZone = resolveTimeZone(timeZone);
+  const startLabel = formatInTimeZone(startAt, 'HH:mm', { timeZone: resolvedTimeZone });
+  const endLabel = formatInTimeZone(addMinutes(startAt, durationMinutes), 'HH:mm', { timeZone: resolvedTimeZone });
+  return `${startLabel}–${endLabel}`;
+};
+
+const buildTeacherDailySummaryMessage = ({
+  scope,
+  summaryDate,
+  lessons,
+  unpaidLessons,
+  timeZone,
+}: {
+  scope: 'today' | 'tomorrow';
+  summaryDate: Date;
+  lessons: DailySummaryLesson[];
+  unpaidLessons?: DailySummaryUnpaidLesson[];
+  timeZone?: string | null;
+}) => {
+  const resolvedTimeZone = resolveTimeZone(timeZone);
+  const dayLabel = scope === 'today' ? 'сегодня' : 'завтра';
+  const title = scope === 'today' ? '🌅 Сводка на сегодня' : '🌙 Сводка на завтра';
+  const dateLabel = formatInTimeZone(summaryDate, 'd MMMM', { locale: ru, timeZone: resolvedTimeZone });
+
+  const lessonLines =
+    lessons.length > 0
+      ? lessons.map((lesson) => {
+          const timeRange = formatTimeRange(lesson.startAt, lesson.durationMinutes, resolvedTimeZone);
+          const nameLabel = lesson.studentNames.length ? lesson.studentNames.join(', ') : 'ученик';
+          return `• ${timeRange} · ${nameLabel}`;
+        })
+      : [`${dayLabel[0].toUpperCase()}${dayLabel.slice(1)} занятий нет — можно выдохнуть.`];
+
+  const sections = [
+    title,
+    `📅 ${dayLabel[0].toUpperCase()}${dayLabel.slice(1)}, ${dateLabel}`,
+    '',
+    '📚 Занятия',
+    ...lessonLines,
+  ];
+
+  if (scope === 'today') {
+    const unpaidLines =
+      unpaidLessons && unpaidLessons.length > 0
+        ? unpaidLessons.map((lesson) => {
+            const dateTime = formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', {
+              locale: ru,
+              timeZone: resolvedTimeZone,
+            });
+            const priceLabel =
+              lesson.price !== null && Number.isFinite(lesson.price) && lesson.price > 0 ? `${lesson.price} ₽` : '—';
+            return `• ${dateTime} · ${lesson.studentName} · ${priceLabel}`;
+          })
+        : ['✅ Все занятия оплачены.'];
+
+    sections.push('', '💳 Неоплаченные занятия', ...unpaidLines);
+  }
+
+  return sections.join('\n');
+};
 
 const createNotificationLog = async (payload: {
   teacherId: bigint;
@@ -329,6 +405,55 @@ export const sendTeacherUnpaidDigest = async ({
   if (!log) return { status: 'skipped' as const };
 
   const text = buildUnpaidDigestMessage(summary);
+
+  try {
+    await sendTelegramMessage(teacher.chatId, text);
+    await finalizeNotificationLog(log.id, { status: 'SENT' });
+    return { status: 'sent' as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
+    return { status: 'failed' as const, error: message };
+  }
+};
+
+export const sendTeacherDailySummary = async ({
+  teacherId,
+  type,
+  summaryDate,
+  lessons,
+  unpaidLessons,
+  scheduledFor,
+  dedupeKey,
+}: {
+  teacherId: bigint;
+  type: 'TEACHER_DAILY_SUMMARY' | 'TEACHER_TOMORROW_SUMMARY';
+  summaryDate: Date;
+  lessons: DailySummaryLesson[];
+  unpaidLessons?: DailySummaryUnpaidLesson[];
+  scheduledFor?: Date;
+  dedupeKey?: string;
+}) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
+  if (!teacher) return { status: 'skipped' as const };
+  if (type === 'TEACHER_DAILY_SUMMARY' && !teacher.dailySummaryEnabled) return { status: 'skipped' as const };
+  if (type === 'TEACHER_TOMORROW_SUMMARY' && !teacher.tomorrowSummaryEnabled) return { status: 'skipped' as const };
+
+  const log = await createNotificationLog({
+    teacherId,
+    type,
+    scheduledFor,
+    dedupeKey,
+  });
+  if (!log) return { status: 'skipped' as const };
+
+  const text = buildTeacherDailySummaryMessage({
+    scope: type === 'TEACHER_DAILY_SUMMARY' ? 'today' : 'tomorrow',
+    summaryDate,
+    lessons,
+    unpaidLessons,
+    timeZone: teacher.timezone,
+  });
 
   try {
     await sendTelegramMessage(teacher.chatId, text);
