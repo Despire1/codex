@@ -13,6 +13,7 @@ import {
   resolveTimeZone,
   toUtcDateFromTimeZone,
   toUtcEndOfDay,
+  toZonedDate,
 } from '../shared/lib/timezoneDates';
 import {
   sendStudentLessonReminder,
@@ -20,8 +21,8 @@ import {
   sendTeacherLessonReminder,
   sendTeacherDailySummary,
   sendTeacherOnboardingNudge,
+  sendTeacherPaymentReminderNotice,
 } from './notificationService';
-import { resolveStudentTelegramId } from './studentContacts';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -52,7 +53,6 @@ const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const scheduledMs = scheduledFor.getTime();
   return scheduledMs <= nowMs && nowMs < scheduledMs + NOTIFICATION_TICK_MS;
 };
-const MANUAL_PAYMENT_REMINDER_COOLDOWN_MINUTES = 10;
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status;
@@ -279,7 +279,13 @@ const pickTeacherSettings = (teacher: any) => ({
   tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
   tomorrowSummaryTime: teacher.tomorrowSummaryTime,
   studentNotificationsEnabled: teacher.studentNotificationsEnabled,
-  studentPaymentRemindersEnabled: teacher.studentPaymentRemindersEnabled,
+  autoConfirmLessons: teacher.autoConfirmLessons,
+  globalPaymentRemindersEnabled: teacher.globalPaymentRemindersEnabled,
+  paymentReminderDelayHours: teacher.paymentReminderDelayHours,
+  paymentReminderRepeatHours: teacher.paymentReminderRepeatHours,
+  paymentReminderMaxCount: teacher.paymentReminderMaxCount,
+  notifyTeacherOnAutoPaymentReminder: teacher.notifyTeacherOnAutoPaymentReminder,
+  notifyTeacherOnManualPaymentReminder: teacher.notifyTeacherOnManualPaymentReminder,
 });
 
 const getSettings = async (user: User) => {
@@ -336,8 +342,41 @@ const updateSettings = async (user: User, body: any) => {
     data.studentNotificationsEnabled = body.studentNotificationsEnabled;
   }
 
-  if (typeof body.studentPaymentRemindersEnabled === 'boolean') {
-    data.studentPaymentRemindersEnabled = body.studentPaymentRemindersEnabled;
+  if (typeof body.autoConfirmLessons === 'boolean') {
+    data.autoConfirmLessons = body.autoConfirmLessons;
+  }
+
+  if (typeof body.globalPaymentRemindersEnabled === 'boolean') {
+    data.globalPaymentRemindersEnabled = body.globalPaymentRemindersEnabled;
+  }
+
+  if (body.paymentReminderDelayHours !== undefined) {
+    const numeric = Number(body.paymentReminderDelayHours);
+    if (Number.isFinite(numeric)) {
+      data.paymentReminderDelayHours = clampNumber(Math.round(numeric), 1, 168);
+    }
+  }
+
+  if (body.paymentReminderRepeatHours !== undefined) {
+    const numeric = Number(body.paymentReminderRepeatHours);
+    if (Number.isFinite(numeric)) {
+      data.paymentReminderRepeatHours = clampNumber(Math.round(numeric), 1, 168);
+    }
+  }
+
+  if (body.paymentReminderMaxCount !== undefined) {
+    const numeric = Number(body.paymentReminderMaxCount);
+    if (Number.isFinite(numeric)) {
+      data.paymentReminderMaxCount = clampNumber(Math.round(numeric), 1, 10);
+    }
+  }
+
+  if (typeof body.notifyTeacherOnAutoPaymentReminder === 'boolean') {
+    data.notifyTeacherOnAutoPaymentReminder = body.notifyTeacherOnAutoPaymentReminder;
+  }
+
+  if (typeof body.notifyTeacherOnManualPaymentReminder === 'boolean') {
+    data.notifyTeacherOnManualPaymentReminder = body.notifyTeacherOnManualPaymentReminder;
   }
 
   if (Object.keys(data).length === 0) {
@@ -693,6 +732,35 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
   return { items, total };
 };
 
+const listStudentPaymentReminders = async (user: User, studentId: number, limit = 10) => {
+  const teacher = await ensureTeacher(user);
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+
+  const safeLimit = clampNumber(limit, 1, 50);
+  const reminders = await prisma.notificationLog.findMany({
+    where: {
+      studentId,
+      lessonId: { not: null },
+      type: 'PAYMENT_REMINDER_STUDENT',
+    },
+    orderBy: { createdAt: 'desc' },
+    take: safeLimit,
+  });
+
+  return {
+    reminders: reminders.map((reminder) => ({
+      id: reminder.id,
+      lessonId: reminder.lessonId!,
+      createdAt: reminder.createdAt,
+      status: reminder.status,
+      source: reminder.source ?? 'AUTO',
+    })),
+  };
+};
+
 const listStudentLessons = async (
   user: User,
   studentId: number,
@@ -928,6 +996,19 @@ const toggleAutoReminder = async (user: User, studentId: number, value: boolean)
   });
 };
 
+const updateStudentPaymentReminders = async (user: User, studentId: number, enabled: boolean) => {
+  const teacher = await ensureTeacher(user);
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+  const student = await prisma.student.update({
+    where: { id: studentId },
+    data: { paymentRemindersEnabled: enabled },
+  });
+  return { student };
+};
+
 const updatePricePerLesson = async (user: User, studentId: number, value: number) => {
   if (Number.isNaN(value) || value < 0) {
     throw new Error('Цена должна быть неотрицательным числом');
@@ -1142,6 +1223,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
     const paymentTeacherStudentIds = new Set(existingPayments.map((payment) => payment.teacherStudentId));
     const existingEvents = await tx.paymentEvent.findMany({ where: { lessonId: lesson.id, type: 'AUTO_CHARGE' } });
     const eventStudentIds = new Set(existingEvents.map((event: any) => event.studentId));
+    let primaryCharged = false;
 
     for (const participant of lesson.participants ?? []) {
       const link = linksByStudentId.get(participant.studentId);
@@ -1210,10 +1292,23 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
         where: { lessonId_studentId: { lessonId: lesson.id, studentId: participant.studentId } },
         data: { isPaid: true },
       });
+      if (participant.studentId === lesson.studentId) {
+        primaryCharged = true;
+      }
     }
 
     const participants = await tx.lessonParticipant.findMany({ where: { lessonId: lesson.id } });
     const allPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
+    const primaryParticipant = participants.find((item: any) => item.studentId === lesson.studentId);
+    const primaryPaid = Boolean(primaryParticipant?.isPaid);
+    const nextPaymentStatus = primaryPaid ? 'PAID' : 'UNPAID';
+    const nextPaidSource = primaryPaid
+      ? lesson.paidSource && lesson.paidSource !== 'NONE'
+        ? lesson.paidSource
+        : primaryCharged
+          ? 'BALANCE'
+          : 'MANUAL'
+      : 'NONE';
 
     const updatedLesson = await tx.lesson.update({
       where: { id: lesson.id },
@@ -1222,6 +1317,8 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
         status: 'COMPLETED',
         completedAt: lesson.completedAt ?? new Date(),
         paidAt: allPaid ? lesson.paidAt ?? new Date() : null,
+        paymentStatus: nextPaymentStatus,
+        paidSource: nextPaidSource,
       },
       include: { participants: { include: { student: true } } },
     });
@@ -1973,6 +2070,7 @@ const togglePaymentForStudent = async (
   });
 
   let updatedLink = link;
+  let nextPaidSource = lesson.paidSource ?? 'NONE';
 
   if (participant.isPaid || lesson.isPaid) {
     const cancelBehavior = normalizeCancelBehavior(options?.cancelBehavior);
@@ -2009,6 +2107,9 @@ const togglePaymentForStudent = async (
       where: { lessonId_studentId: { lessonId, studentId } },
       data: { isPaid: false },
     });
+    if (studentId === lesson.studentId) {
+      nextPaidSource = 'NONE';
+    }
   } else {
     const amount =
       [link.pricePerLesson, participant.price, lesson.price].find(
@@ -2060,6 +2161,7 @@ const togglePaymentForStudent = async (
 
     if (studentId === lesson.studentId) {
       await prisma.lesson.update({ where: { id: lessonId }, data: { price: amount } });
+      nextPaidSource = shouldWriteOffBalance ? 'BALANCE' : 'MANUAL';
     }
   }
 
@@ -2069,6 +2171,14 @@ const togglePaymentForStudent = async (
   });
 
   const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
+  const primaryParticipant = participants.find((item: any) => item.studentId === lesson.studentId);
+  const primaryPaid = Boolean(primaryParticipant?.isPaid);
+  const nextPaymentStatus = primaryPaid ? 'PAID' : 'UNPAID';
+  if (!primaryPaid) {
+    nextPaidSource = 'NONE';
+  } else if (nextPaidSource === 'NONE') {
+    nextPaidSource = 'MANUAL';
+  }
 
   const nextStatus = lesson.status === 'SCHEDULED' ? 'COMPLETED' : lesson.status;
   const completedAt = nextStatus === 'COMPLETED' ? lesson.completedAt ?? new Date() : null;
@@ -2076,7 +2186,14 @@ const togglePaymentForStudent = async (
 
   const normalizedLesson = await prisma.lesson.update({
     where: { id: lessonId },
-    data: { isPaid: participantsPaid, status: nextStatus, completedAt, paidAt },
+    data: {
+      isPaid: participantsPaid,
+      status: nextStatus,
+      completedAt,
+      paidAt,
+      paymentStatus: nextPaymentStatus,
+      paidSource: nextPaidSource,
+    },
     include: {
       participants: {
         include: { student: true },
@@ -2177,7 +2294,12 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
 
       const updatedLesson = await tx.lesson.update({
         where: { id: lessonId },
-        data: { status: normalizedStatus, isPaid: normalizedStatus === 'COMPLETED' ? participantsPaid : false },
+        data: {
+          status: normalizedStatus,
+          isPaid: normalizedStatus === 'COMPLETED' ? participantsPaid : false,
+          paymentStatus: normalizedStatus === 'COMPLETED' ? (participantsPaid ? 'PAID' : 'UNPAID') : 'UNPAID',
+          paidSource: normalizedStatus === 'COMPLETED' && participantsPaid ? 'MANUAL' : 'NONE',
+        },
         include: { participants: { include: { student: true } } },
       });
 
@@ -2189,7 +2311,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
 
   const updatedLesson = await prisma.lesson.update({
     where: { id: lessonId },
-    data: { status: normalizedStatus, isPaid: false },
+    data: { status: normalizedStatus, isPaid: false, paymentStatus: 'UNPAID', paidSource: 'NONE' },
     include: { participants: { include: { student: true } } },
   });
 
@@ -2205,48 +2327,59 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number, options?: { force?: boolean }) => {
+const remindLessonPayment = async (user: User, lessonId: number) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { student: true },
   });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
-  if (lesson.status !== 'COMPLETED' || lesson.isPaid) {
-    throw new Error('Напоминание доступно только для завершённых и неоплаченных занятий');
+  if (lesson.status !== 'COMPLETED') {
+    throw new Error('Напоминание доступно только для завершённых занятий');
   }
-  if (!teacher.studentNotificationsEnabled || !teacher.studentPaymentRemindersEnabled) {
-    throw new Error('Уведомления ученику отключены в настройках');
+  if (lesson.paymentStatus === 'PAID' || lesson.isPaid) {
+    throw new Error('Урок уже оплачен');
   }
   if (!lesson.student) {
     throw new Error('Ученик не найден');
   }
-  const studentTelegramId = await resolveStudentTelegramId(lesson.student);
-  if (!studentTelegramId) {
-    throw new Error('Ученик не активировал бота');
+  if (!lesson.student.isActivated || !lesson.student.telegramId) {
+    throw new Error('student_not_activated');
   }
 
-  const rateLimitSince = new Date(Date.now() - MANUAL_PAYMENT_REMINDER_COOLDOWN_MINUTES * 60_000);
-  const recentReminder = await prisma.notificationLog.findFirst({
-    where: {
-      lessonId,
-      type: 'MANUAL_STUDENT_PAYMENT_REMINDER',
-      status: 'SENT',
-      sentAt: { gte: rateLimitSince },
-    },
-    orderBy: { sentAt: 'desc' },
-  });
-  if (recentReminder && !options?.force) {
-    return { status: 'recent', lastSentAt: recentReminder.sentAt?.toISOString() ?? null };
+  if (lesson.lastPaymentReminderAt) {
+    const cooldownMs = 2 * 60 * 60 * 1000;
+    if (Date.now() - lesson.lastPaymentReminderAt.getTime() < cooldownMs) {
+      throw new Error('recently_sent');
+    }
   }
 
   const result = await sendStudentPaymentReminder({
     studentId: lesson.studentId,
     lessonId,
-    manual: true,
+    source: 'MANUAL',
   });
   if (result.status !== 'sent') {
     throw new Error('Не удалось отправить напоминание');
+  }
+
+  const now = new Date();
+  await prisma.lesson.update({
+    where: { id: lessonId },
+    data: {
+      paymentReminderCount: lesson.paymentReminderCount + 1,
+      lastPaymentReminderAt: now,
+      lastPaymentReminderSource: 'MANUAL',
+    },
+  });
+
+  if (teacher.notifyTeacherOnManualPaymentReminder) {
+    await sendTeacherPaymentReminderNotice({
+      teacherId: teacher.chatId,
+      studentId: lesson.studentId,
+      lessonId,
+      source: 'MANUAL',
+    });
   }
 
   return { status: 'sent' };
@@ -2282,27 +2415,155 @@ const remindHomeworkById = async (user: User, homeworkId: number) => {
   return { status: 'queued', homework: result };
 };
 
-const AUTO_PAYMENT_DELAY_MINUTES = 30;
-const AUTO_PAYMENT_INTERVAL_MS = 60_000;
+const AUTO_CONFIRM_GRACE_MINUTES = 30;
+const AUTOMATION_TICK_MS = 5 * 60_000;
+const QUIET_HOURS_START = 22;
+const QUIET_HOURS_END = 9;
+const QUIET_HOURS_RESUME_TIME = '09:30';
 
-const autoSettleUnpaidLessons = async () => {
-  const now = Date.now();
+const resolveLessonEndTime = (lesson: { startAt: Date; durationMinutes: number }) =>
+  new Date(lesson.startAt).getTime() + lesson.durationMinutes * 60_000;
+
+const resolveQuietHoursResume = (now: Date, timeZone?: string | null) => {
+  const zoned = toZonedDate(now, timeZone);
+  const hours = zoned.getHours();
+  const minutes = zoned.getMinutes();
+  const inQuietHours =
+    hours >= QUIET_HOURS_START || hours < QUIET_HOURS_END || (hours === QUIET_HOURS_END && minutes < 30);
+
+  if (!inQuietHours) {
+    return { inQuietHours: false, nextSendAt: now };
+  }
+
+  const targetDate =
+    hours >= QUIET_HOURS_START
+      ? formatInTimeZone(addDays(zoned, 1), 'yyyy-MM-dd', { timeZone })
+      : formatInTimeZone(zoned, 'yyyy-MM-dd', { timeZone });
+  const nextSendAt = toUtcDateFromTimeZone(targetDate, QUIET_HOURS_RESUME_TIME, timeZone);
+  return { inQuietHours: true, nextSendAt };
+};
+
+const runLessonAutomationTick = async () => {
+  const now = new Date();
   const teachers = await prisma.teacher.findMany();
 
   for (const teacher of teachers) {
-    const lessons = await prisma.lesson.findMany({
-      where: { teacherId: teacher.chatId, status: 'SCHEDULED', isPaid: false, startAt: { lt: new Date() } },
+    if (teacher.autoConfirmLessons) {
+      const scheduledLessons = await prisma.lesson.findMany({
+        where: { teacherId: teacher.chatId, status: 'SCHEDULED', startAt: { lt: now } },
+      });
+
+      const dueLessons = scheduledLessons.filter((lesson) => {
+        const lessonEnd = resolveLessonEndTime(lesson);
+        return lessonEnd + AUTO_CONFIRM_GRACE_MINUTES * 60_000 <= now.getTime();
+      });
+
+      for (const lesson of dueLessons) {
+        try {
+          await prisma.lesson.update({
+            where: { id: lesson.id },
+            data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
+          });
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Не удалось авто-подтвердить урок', error);
+        }
+      }
+    }
+
+    const unpaidCompleted = await prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.chatId,
+        status: 'COMPLETED',
+        paymentStatus: 'UNPAID',
+        paidSource: 'NONE',
+      },
       include: { participants: { include: { student: true } } },
     });
 
-    const dueLessons = lessons.filter((lesson: any) => {
-      const lessonEnd =
-        new Date(lesson.startAt).getTime() + (lesson.durationMinutes + AUTO_PAYMENT_DELAY_MINUTES) * 60_000;
-      return lessonEnd <= now;
+    for (const lesson of unpaidCompleted) {
+      try {
+        await settleLessonPayments(lesson.id, teacher.chatId);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось списать баланс по уроку', error);
+      }
+    }
+
+    if (!teacher.globalPaymentRemindersEnabled) continue;
+
+    const reminderCandidates = await prisma.lesson.findMany({
+      where: {
+        teacherId: teacher.chatId,
+        status: 'COMPLETED',
+        paymentStatus: 'UNPAID',
+        completedAt: { not: null },
+        paymentReminderCount: { lt: teacher.paymentReminderMaxCount },
+      },
+      include: { student: true },
     });
 
-    for (const lesson of dueLessons) {
-      await settleLessonPayments(lesson.id, teacher.chatId);
+    const quietHours = resolveQuietHoursResume(now, teacher.timezone);
+    if (quietHours.inQuietHours && now.getTime() < quietHours.nextSendAt.getTime()) {
+      continue;
+    }
+
+    for (const lesson of reminderCandidates) {
+      if (!lesson.student) continue;
+      if (!lesson.student.paymentRemindersEnabled) continue;
+      if (!lesson.student.isActivated || !lesson.student.telegramId) continue;
+      if (!lesson.completedAt) continue;
+
+      const delayMs = teacher.paymentReminderDelayHours * 60 * 60 * 1000;
+      if (now.getTime() < lesson.completedAt.getTime() + delayMs) {
+        continue;
+      }
+
+      if (lesson.lastPaymentReminderAt) {
+        const repeatMs = teacher.paymentReminderRepeatHours * 60 * 60 * 1000;
+        if (now.getTime() < lesson.lastPaymentReminderAt.getTime() + repeatMs) {
+          continue;
+        }
+      }
+
+      try {
+        const result = await sendStudentPaymentReminder({
+          studentId: lesson.studentId,
+          lessonId: lesson.id,
+          source: 'AUTO',
+        });
+
+        if (result.status === 'sent') {
+          await prisma.lesson.update({
+            where: { id: lesson.id },
+            data: {
+              paymentReminderCount: lesson.paymentReminderCount + 1,
+              lastPaymentReminderAt: now,
+              lastPaymentReminderSource: 'AUTO',
+            },
+          });
+
+          if (teacher.notifyTeacherOnAutoPaymentReminder) {
+            await sendTeacherPaymentReminderNotice({
+              teacherId: teacher.chatId,
+              studentId: lesson.studentId,
+              lessonId: lesson.id,
+              source: 'AUTO',
+            });
+          }
+        } else if (result.status === 'failed') {
+          await prisma.lesson.update({
+            where: { id: lesson.id },
+            data: {
+              lastPaymentReminderAt: now,
+              lastPaymentReminderSource: 'AUTO',
+            },
+          });
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Не удалось отправить авто-напоминание об оплате', error);
+      }
     }
   }
 };
@@ -2947,6 +3208,22 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 200, data);
     }
 
+    const studentRemindersMatch = pathname.match(/^\/api\/students\/(\d+)\/payment-reminders$/);
+    if (studentRemindersMatch) {
+      const studentId = Number(studentRemindersMatch[1]);
+      if (req.method === 'GET') {
+        const limit = Number(url.searchParams.get('limit') ?? 10);
+        const data = await listStudentPaymentReminders(requireApiUser(), studentId, limit);
+        return sendJson(res, 200, data);
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const enabled = Boolean((body as any)?.enabled);
+        const data = await updateStudentPaymentReminders(requireApiUser(), studentId, enabled);
+        return sendJson(res, 200, data);
+      }
+    }
+
     const autoRemindMatch = pathname.match(/^\/api\/students\/(\d+)\/auto-remind$/);
     if (req.method === 'POST' && autoRemindMatch) {
       const studentId = Number(autoRemindMatch[1]);
@@ -3094,8 +3371,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const remindPaymentMatch = pathname.match(/^\/api\/lessons\/(\d+)\/remind-payment$/);
     if (req.method === 'POST' && remindPaymentMatch) {
       const lessonId = Number(remindPaymentMatch[1]);
-      const body = await readBody(req);
-      const result = await remindLessonPayment(requireApiUser(), lessonId, { force: Boolean((body as any)?.force) });
+      await readBody(req);
+      const result = await remindLessonPayment(requireApiUser(), lessonId);
       return sendJson(res, 200, result);
     }
 
@@ -3129,13 +3406,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 };
 
 setInterval(() => {
-  autoSettleUnpaidLessons().catch((error) => {
+  runLessonAutomationTick().catch((error) => {
     // eslint-disable-next-line no-console
-    console.error('Не удалось автоматически списать оплату', error);
+    console.error('Не удалось выполнить автоматические сценарии', error);
   });
-}, AUTO_PAYMENT_INTERVAL_MS);
+}, AUTOMATION_TICK_MS);
 
-void autoSettleUnpaidLessons();
+void runLessonAutomationTick();
 
 setInterval(() => {
   runNotificationTick().catch((error) => {

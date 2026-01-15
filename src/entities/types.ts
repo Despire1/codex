@@ -15,6 +15,13 @@ export interface Teacher {
   tomorrowSummaryTime: string;
   studentNotificationsEnabled: boolean;
   studentPaymentRemindersEnabled: boolean;
+  autoConfirmLessons: boolean;
+  globalPaymentRemindersEnabled: boolean;
+  paymentReminderDelayHours: number;
+  paymentReminderRepeatHours: number;
+  paymentReminderMaxCount: number;
+  notifyTeacherOnAutoPaymentReminder: boolean;
+  notifyTeacherOnManualPaymentReminder: boolean;
 }
 
 export interface Student {
@@ -24,6 +31,7 @@ export interface Student {
   pricePerLesson?: number;
   isActivated?: boolean;
   activatedAt?: string | null;
+  paymentRemindersEnabled?: boolean;
 }
 
 export interface TeacherStudent {
@@ -87,6 +95,11 @@ export interface Lesson {
   isPaid: boolean;
   paidAt?: string | null;
   completedAt?: string | null;
+  paymentStatus?: 'UNPAID' | 'PAID';
+  paidSource?: 'NONE' | 'BALANCE' | 'MANUAL';
+  lastPaymentReminderAt?: string | null;
+  paymentReminderCount?: number;
+  lastPaymentReminderSource?: 'AUTO' | 'MANUAL' | null;
   color?: LessonColor;
   isRecurring?: boolean;
   recurrenceUntil?: string | null;
@@ -100,6 +113,17 @@ export interface StudentDebtItem {
   startAt: string;
   price: number | null;
   status: LessonStatus;
+}
+
+export type PaymentReminderSource = 'AUTO' | 'MANUAL';
+export type PaymentReminderStatus = 'SENT' | 'FAILED';
+
+export interface PaymentReminderLog {
+  id: number;
+  lessonId: number;
+  createdAt: string;
+  status: PaymentReminderStatus;
+  source: PaymentReminderSource;
 }
 
 export interface StudentDebtSummary {

@@ -45,6 +45,7 @@ interface LessonsTabProps {
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lessonId: number) => void;
   getLessonStatusLabel: (status: Lesson['status']) => string;
+  autoConfirmLessons: boolean;
 }
 
 export const LessonsTab: FC<LessonsTabProps> = ({
@@ -70,6 +71,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   onEditLesson,
   onDeleteLesson,
   getLessonStatusLabel,
+  autoConfirmLessons,
 }) => {
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
@@ -196,6 +198,16 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const getRecurrenceLabel = (lesson: Lesson) =>
     lesson.isRecurring || lesson.recurrenceGroupId ? 'Повторяющееся' : 'Одиночное';
 
+  const isAwaitingConfirmation = useCallback(
+    (lesson: Lesson) => {
+      if (autoConfirmLessons) return false;
+      if (lesson.status !== 'SCHEDULED') return false;
+      const lessonEnd = new Date(lesson.startAt).getTime() + lesson.durationMinutes * 60_000;
+      return lessonEnd < Date.now();
+    },
+    [autoConfirmLessons],
+  );
+
   const renderLessonActions = (lesson: Lesson, isPaid: boolean) => {
     if (isLessonsMobile) {
       return (
@@ -293,6 +305,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
               {lessonListLoading && <div className={styles.loadingRow}>Обновляем список...</div>}
               {sortedLessons.map((lesson) => {
                 const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
+                const awaitingConfirmation = isAwaitingConfirmation(lesson);
 
                 return (
                   <article key={lesson.id} className={styles.lessonCard}>
@@ -325,6 +338,13 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         >
                           {getLessonStatusLabel(lesson.status)}
                         </button>
+                      )}
+                      {awaitingConfirmation && (
+                        <Badge
+                          label="Ожидает подтверждения"
+                          variant="pending"
+                          className={styles.lessonPendingBadge}
+                        />
                       )}
                       <Badge
                         label={isPaid ? 'Оплачено' : 'Не оплачено'}
@@ -385,6 +405,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                 <TableBody>
                   {sortedLessons.map((lesson) => {
                     const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
+                    const awaitingConfirmation = isAwaitingConfirmation(lesson);
 
                     return (
                       <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
@@ -421,6 +442,13 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                               >
                                 {getLessonStatusLabel(lesson.status)}
                               </button>
+                            )}
+                            {awaitingConfirmation && (
+                              <Badge
+                                label="Ожидает подтверждения"
+                                variant="pending"
+                                className={styles.lessonPendingBadge}
+                              />
                             )}
                           </div>
                         </TableCell>

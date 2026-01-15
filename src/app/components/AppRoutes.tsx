@@ -10,6 +10,7 @@ import {
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
+  PaymentReminderLog,
   Student,
   StudentDebtItem,
   StudentListItem,
@@ -67,6 +68,7 @@ interface AppRoutesProps {
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
     onLoadMoreHomeworks: () => void;
     onToggleAutoReminder: (studentId: number) => void;
+    onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
     onAdjustBalance: (studentId: number, delta: number) => void;
     onBalanceTopup: (
       studentId: number,
@@ -119,6 +121,7 @@ interface AppRoutesProps {
     onLessonDateRangeChange: (range: LessonDateRange) => void;
     onLessonSortOrderChange: (order: LessonSortOrder) => void;
     payments: PaymentEvent[];
+    paymentReminders: PaymentReminderLog[];
     paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
     paymentDate: string;
     onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -149,6 +152,7 @@ interface AppRoutesProps {
     onTogglePaid: (lessonId: number, studentId?: number) => void;
     onDayViewDateChange: (date: Date) => void;
     onGoToToday: () => void;
+    autoConfirmLessons: boolean;
   };
   settings: {
     teacher: Teacher;

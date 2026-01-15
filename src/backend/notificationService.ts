@@ -16,7 +16,9 @@ type NotificationType =
   | 'TEACHER_ONBOARDING_NUDGE'
   | 'STUDENT_LESSON_REMINDER'
   | 'STUDENT_PAYMENT_REMINDER'
-  | 'MANUAL_STUDENT_PAYMENT_REMINDER';
+  | 'MANUAL_STUDENT_PAYMENT_REMINDER'
+  | 'PAYMENT_REMINDER_STUDENT'
+  | 'PAYMENT_REMINDER_TEACHER';
 
 type DailySummaryLesson = {
   startAt: Date;
@@ -126,10 +128,53 @@ const buildLessonReminderMessage = ({
     .join('\n');
 };
 
-const buildPaymentReminderMessage = (startAt: Date, price: number, timeZone?: string | null) => {
-  const dateLabel = formatInTimeZone(startAt, 'd MMM, HH:mm', { locale: ru, timeZone: resolveTimeZone(timeZone) });
-  const priceLabel = Number.isFinite(price) && price > 0 ? `${price} ₽` : '—';
-  return `💳 Напоминание об оплате\n\nЗанятие от ${dateLabel}\nСумма: ${priceLabel}\n\n🙏 Спасибо!`;
+const formatLessonDateLabel = (startAt: Date, timeZone?: string | null) =>
+  formatInTimeZone(startAt, 'd MMMM', { locale: ru, timeZone: resolveTimeZone(timeZone) });
+
+const formatLessonTimeLabel = (startAt: Date, timeZone?: string | null) =>
+  formatInTimeZone(startAt, 'HH:mm', { timeZone: resolveTimeZone(timeZone) });
+
+const buildAutoPaymentReminderMessage = ({
+  teacherName,
+  startAt,
+  price,
+  timeZone,
+}: {
+  teacherName: string;
+  startAt: Date;
+  price: number | null;
+  timeZone?: string | null;
+}) => {
+  const dateLabel = formatLessonDateLabel(startAt, timeZone);
+  const timeLabel = formatLessonTimeLabel(startAt, timeZone);
+  const priceLabel = typeof price === 'number' && price > 0 ? `${price} ₽` : null;
+  if (priceLabel) {
+    return `Здравствуйте! Напоминание об оплате занятия с преподавателем ${teacherName} за ${dateLabel} ${timeLabel}. Сумма: ${priceLabel}. Спасибо!`;
+  }
+  return `Здравствуйте! Напоминание об оплате занятия с преподавателем ${teacherName} за ${dateLabel} ${timeLabel}. Если уже оплатили — можно не отвечать 🙂 Спасибо!`;
+};
+
+const buildManualPaymentReminderMessage = (startAt: Date, timeZone?: string | null) => {
+  const dateLabel = formatLessonDateLabel(startAt, timeZone);
+  return `Здравствуйте! Напоминаю про оплату занятия за ${dateLabel}. Спасибо 🙂`;
+};
+
+const buildTeacherPaymentReminderMessage = ({
+  studentName,
+  startAt,
+  timeZone,
+  source,
+}: {
+  studentName: string;
+  startAt: Date;
+  timeZone?: string | null;
+  source: 'AUTO' | 'MANUAL';
+}) => {
+  const dateLabel = formatLessonDateLabel(startAt, timeZone);
+  if (source === 'MANUAL') {
+    return `Готово ✅ Напоминание отправлено ученику ${studentName} по занятию ${dateLabel}.`;
+  }
+  return `Авто-напоминание отправлено ученику ${studentName} по занятию ${dateLabel}.`;
 };
 
 const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: string | null) => {
@@ -199,6 +244,8 @@ const createNotificationLog = async (payload: {
   studentId?: number | null;
   lessonId?: number | null;
   type: NotificationType;
+  source?: 'AUTO' | 'MANUAL' | null;
+  channel?: 'TELEGRAM' | null;
   scheduledFor?: Date | null;
   dedupeKey?: string | null;
 }) => {
@@ -209,6 +256,8 @@ const createNotificationLog = async (payload: {
         studentId: payload.studentId ?? null,
         lessonId: payload.lessonId ?? null,
         type: payload.type,
+        source: payload.source ?? null,
+        channel: payload.channel ?? 'TELEGRAM',
         scheduledFor: payload.scheduledFor ?? null,
         status: 'PENDING',
         dedupeKey: payload.dedupeKey ?? null,
@@ -429,35 +478,42 @@ export const sendTeacherDailySummary = async ({
 export const sendStudentPaymentReminder = async ({
   studentId,
   lessonId,
-  manual,
+  source,
 }: {
   studentId: number;
   lessonId: number;
-  manual?: boolean;
+  source: 'AUTO' | 'MANUAL';
 }) => {
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
   if (!lesson || lesson.studentId !== studentId) return { status: 'skipped' as const };
   const teacher = await prisma.teacher.findUnique({ where: { chatId: lesson.teacherId } });
   const student = await prisma.student.findUnique({ where: { id: studentId } });
-  if (!teacher?.studentNotificationsEnabled || !teacher.studentPaymentRemindersEnabled) {
-    return { status: 'skipped' as const };
-  }
-  if (!student) return { status: 'skipped' as const };
-  const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) return { status: 'skipped' as const };
+  if (!teacher || !student) return { status: 'skipped' as const };
+  if (!student.isActivated || !student.telegramId) return { status: 'skipped' as const };
 
   const log = await createNotificationLog({
     teacherId: lesson.teacherId,
     studentId,
     lessonId,
-    type: manual ? 'MANUAL_STUDENT_PAYMENT_REMINDER' : 'STUDENT_PAYMENT_REMINDER',
+    type: 'PAYMENT_REMINDER_STUDENT',
+    source,
+    channel: 'TELEGRAM',
   });
   if (!log) return { status: 'skipped' as const };
 
-  const text = buildPaymentReminderMessage(lesson.startAt, lesson.price ?? 0, teacher.timezone);
+  const teacherName = teacher.name?.trim() || teacher.username?.trim() || 'преподаватель';
+  const text =
+    source === 'MANUAL'
+      ? buildManualPaymentReminderMessage(lesson.startAt, teacher.timezone)
+      : buildAutoPaymentReminderMessage({
+          teacherName,
+          startAt: lesson.startAt,
+          price: lesson.price ?? null,
+          timeZone: teacher.timezone,
+        });
 
   try {
-    await sendTelegramMessage(telegramId, text);
+    await sendTelegramMessage(student.telegramId, text);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
@@ -466,6 +522,55 @@ export const sendStudentPaymentReminder = async ({
     if (isTelegramUnreachableError(message)) {
       await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
     }
+    return { status: 'failed' as const, error: message };
+  }
+};
+
+export const sendTeacherPaymentReminderNotice = async ({
+  teacherId,
+  lessonId,
+  studentId,
+  source,
+}: {
+  teacherId: bigint;
+  lessonId: number;
+  studentId: number;
+  source: 'AUTO' | 'MANUAL';
+}) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!teacher || !student || !lesson) return { status: 'skipped' as const };
+
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId, studentId } },
+  });
+  const studentName = link?.customName?.trim() || student.username?.trim() || 'ученик';
+
+  const log = await createNotificationLog({
+    teacherId,
+    studentId,
+    lessonId,
+    type: 'PAYMENT_REMINDER_TEACHER',
+    source,
+    channel: 'TELEGRAM',
+  });
+  if (!log) return { status: 'skipped' as const };
+
+  const text = buildTeacherPaymentReminderMessage({
+    studentName,
+    startAt: lesson.startAt,
+    timeZone: teacher.timezone,
+    source,
+  });
+
+  try {
+    await sendTelegramMessage(teacher.chatId, text);
+    await finalizeNotificationLog(log.id, { status: 'SENT' });
+    return { status: 'sent' as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
     return { status: 'failed' as const, error: message };
   }
 };

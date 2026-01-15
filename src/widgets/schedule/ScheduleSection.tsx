@@ -59,6 +59,7 @@ interface ScheduleSectionProps {
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onDayViewDateChange: (date: Date) => void;
   onGoToToday: () => void;
+  autoConfirmLessons: boolean;
 }
 
 export const ScheduleSection: FC<ScheduleSectionProps> = ({
@@ -80,6 +81,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   onTogglePaid,
   onDayViewDateChange,
   onGoToToday,
+  autoConfirmLessons,
 }) => {
   const timeZone = useTimeZone();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
@@ -404,6 +406,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return names.length > 0 ? names.join(', ') : 'Урок';
   };
 
+  const isAwaitingConfirmation = (lesson: Lesson) => {
+    if (autoConfirmLessons) return false;
+    if (lesson.status !== 'SCHEDULED') return false;
+    const lessonEnd = new Date(lesson.startAt).getTime() + lesson.durationMinutes * 60_000;
+    return lessonEnd < Date.now();
+  };
+
   const renderPaymentBadges = (lessonId: number, participants: any[], isGroupLesson: boolean) => {
     const paidCount = participants.filter((participant: any) => participant.isPaid).length;
     const unpaidCount = participants.length - paidCount;
@@ -413,30 +422,24 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       if (paidCount > 0) badges.push({ label: `${paidCount} оплачено`, variant: 'groupPaid' });
       if (unpaidCount > 0) badges.push({ label: `${unpaidCount} не оплачено`, variant: 'groupUnpaid' });
 
-      return (
-        <div className={styles.statusBadges}>
-          {badges.map((badge) => (
-            <Badge key={`${badge.variant}-${badge.label}`} label={badge.label} variant={badge.variant} withDot />
-          ))}
-        </div>
-      );
+      return badges.map((badge) => (
+        <Badge key={`${badge.variant}-${badge.label}`} label={badge.label} variant={badge.variant} withDot />
+      ));
     }
 
     const participant = participants[0];
     const isPaid = !!participant?.isPaid;
 
     return (
-      <div className={styles.statusBadges}>
-        <Badge
-          label={isPaid ? 'Оплачено' : 'Не оплачено'}
-          variant={isPaid ? 'paid' : 'unpaid'}
-          onClick={(event) => {
-            event.stopPropagation();
-            onTogglePaid(lessonId, participant?.studentId);
-          }}
-          title={isPaid ? 'Оплачено' : 'Не оплачено'}
-        />
-      </div>
+      <Badge
+        label={isPaid ? 'Оплачено' : 'Не оплачено'}
+        variant={isPaid ? 'paid' : 'unpaid'}
+        onClick={(event) => {
+          event.stopPropagation();
+          onTogglePaid(lessonId, participant?.studentId);
+        }}
+        title={isPaid ? 'Оплачено' : 'Не оплачено'}
+      />
     );
   };
 
@@ -530,6 +533,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       const startDate = toZonedDate(lesson.startAt, timeZone);
                       const participants = buildParticipants(lesson);
                       const isGroupLesson = participants.length > 1;
+                      const awaitingConfirmation = isAwaitingConfirmation(lesson);
                       const dateTimeLabel = `${format(startDate, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                         isGroupLesson ? ` · ${participants.length} уч.` : ''
                       }`;
@@ -553,7 +557,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             </Ellipsis>
                             <span className={styles.lessonDate}>{dateTimeLabel}</span>
                           </div>
-                          {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                          <div className={styles.statusBadges}>
+                            {awaitingConfirmation && (
+                              <Badge label="Ожидает подтверждения" variant="pending" />
+                            )}
+                            {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                          </div>
                           {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                         </div>
                       );
@@ -605,6 +614,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
+                const awaitingConfirmation = isAwaitingConfirmation(lesson);
                 const date = toZonedDate(lesson.startAt, timeZone);
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
@@ -631,7 +641,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       </Ellipsis>
                       <span className={styles.lessonDate}>{dateTimeLabel}</span>
                     </div>
-                    {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    <div className={styles.statusBadges}>
+                      {awaitingConfirmation && (
+                        <Badge label="Ожидает подтверждения" variant="pending" />
+                      )}
+                      {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    </div>
                     {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                   </div>
                 );
@@ -679,6 +694,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 const lesson = layout.lesson;
                 const participants = buildParticipants(lesson);
                 const isGroupLesson = participants.length > 1;
+                const awaitingConfirmation = isAwaitingConfirmation(lesson);
                 const date = toZonedDate(lesson.startAt, timeZone);
                 const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
                   isGroupLesson ? ` · ${participants.length} уч.` : ''
@@ -705,7 +721,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       </Ellipsis>
                       <span className={styles.lessonDate}>{dateTimeLabel}</span>
                     </div>
-                    {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    <div className={styles.statusBadges}>
+                      {awaitingConfirmation && (
+                        <Badge label="Ожидает подтверждения" variant="pending" />
+                      )}
+                      {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                    </div>
                     {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
                   </div>
                 );
@@ -811,6 +832,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             const participants = buildParticipants(lesson);
             const isGroupLesson = participants.length > 1;
             const lessonLabel = getLessonLabel(participants);
+            const awaitingConfirmation = isAwaitingConfirmation(lesson);
 
             return (
               <div
@@ -829,7 +851,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     {lessonLabel}
                   </Ellipsis>
                 </div>
-                {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                <div className={styles.statusBadges}>
+                  {awaitingConfirmation && <Badge label="Ожидает подтверждения" variant="pending" />}
+                  {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+                </div>
               </div>
             );
           })}

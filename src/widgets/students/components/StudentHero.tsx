@@ -1,7 +1,7 @@
 import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Lesson, Student, StudentDebtItem, Teacher, TeacherStudent } from '../../../entities/types';
+import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   DeleteOutlineIcon,
@@ -19,7 +19,6 @@ import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates
 interface StudentHeroProps {
   headerRef?: Ref<HTMLDivElement>;
   selectedStudent: Student & { link: TeacherStudent };
-  teacher: Teacher;
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   studentDebtTotal: number;
@@ -33,6 +32,7 @@ interface StudentHeroProps {
   onSavePrice: () => void;
   onCancelPriceEdit: () => void;
   onToggleAutoReminder: (studentId: number) => void;
+  onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
@@ -40,14 +40,13 @@ interface StudentHeroProps {
   onRemindLessonPayment: (
     lessonId: number,
     options?: { force?: boolean },
-  ) => Promise<{ status: 'sent' | 'recent' | 'error'; lastSentAt?: string | null }>;
+  ) => Promise<{ status: 'sent' | 'error' }>;
   onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
 }
 
 export const StudentHero: FC<StudentHeroProps> = ({
   headerRef,
   selectedStudent,
-  teacher,
   studentLessonsSummary,
   studentDebtItems,
   studentDebtTotal,
@@ -61,6 +60,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onSavePrice,
   onCancelPriceEdit,
   onToggleAutoReminder,
+  onTogglePaymentReminders,
   onAdjustBalance,
   onOpenBalanceTopup,
   onEditStudent,
@@ -68,28 +68,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
-  const reminderStorageKey = (lessonId: number) => `lesson-payment-reminder:${lessonId}`;
-  const readStoredReminder = (lessonId: number) => {
-    try {
-      return localStorage.getItem(reminderStorageKey(lessonId));
-    } catch {
-      return null;
-    }
-  };
-  const writeStoredReminder = (lessonId: number, sentAt: string) => {
-    try {
-      localStorage.setItem(reminderStorageKey(lessonId), sentAt);
-    } catch {
-      // ignore storage errors
-    }
-  };
-  const clearStoredReminder = (lessonId: number) => {
-    try {
-      localStorage.removeItem(reminderStorageKey(lessonId));
-    } catch {
-      // ignore storage errors
-    }
-  };
   const timeZone = useTimeZone();
   const todayZoned = toZonedDate(new Date(), timeZone);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -99,22 +77,15 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const [isActivationHintOpen, setIsActivationHintOpen] = useState(false);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
-  const [confirmReminderLessonId, setConfirmReminderLessonId] = useState<number | null>(null);
-  const [confirmReminderSentAt, setConfirmReminderSentAt] = useState<string | null>(null);
-  const [lastReminderSentAtByLesson, setLastReminderSentAtByLesson] = useState<Record<number, string>>({});
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
   const previousDebtTotal = useRef<number>(0);
   const telegramUsername = selectedStudent.username?.trim();
   const showActivationBadge = Boolean(telegramUsername) && selectedStudent.isActivated === false;
   const activationHint =
     'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
-  const studentNotificationsEnabled =
-    teacher.studentNotificationsEnabled && teacher.studentPaymentRemindersEnabled;
-  const reminderDisabledReason = !studentNotificationsEnabled
-    ? 'Уведомления ученику отключены в настройках'
-    : !selectedStudent.isActivated
-      ? 'Ученик не активировал бота'
-      : null;
+  const reminderDisabledReason = !selectedStudent.isActivated
+    ? 'Ученик не активировал бота — отправка невозможна'
+    : null;
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
     action();
@@ -127,72 +98,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
 
   const handleRemindPayment = async (lessonId: number) => {
     if (pendingReminderIds.includes(lessonId)) return;
-    const storedSentAt = readStoredReminder(lessonId);
-    if (storedSentAt) {
-      const storedTime = new Date(storedSentAt).getTime();
-      const nowTime = Date.now();
-      const cooldownMs = 10 * 60 * 1000;
-      if (nowTime - storedTime < cooldownMs) {
-        setConfirmReminderLessonId(lessonId);
-        setConfirmReminderSentAt(storedSentAt);
-        return;
-      }
-      clearStoredReminder(lessonId);
-    }
-    const cachedSentAt = lastReminderSentAtByLesson[lessonId];
-    if (cachedSentAt) {
-      const cachedTime = new Date(cachedSentAt).getTime();
-      const nowTime = Date.now();
-      const cooldownMs = 10 * 60 * 1000;
-      if (nowTime - cachedTime < cooldownMs) {
-        setConfirmReminderLessonId(lessonId);
-        setConfirmReminderSentAt(cachedSentAt);
-        return;
-      }
-    }
     setPendingReminderIds((prev) => [...prev, lessonId]);
     try {
-      const result = await onRemindLessonPayment(lessonId);
-      if (result.status === 'recent') {
-        setConfirmReminderLessonId(lessonId);
-        const sentAt = result.lastSentAt ?? null;
-        setConfirmReminderSentAt(sentAt);
-        if (sentAt) {
-          setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
-          writeStoredReminder(lessonId, sentAt);
-        }
-      } else if (result.status === 'sent') {
-        setConfirmReminderLessonId(null);
-        setConfirmReminderSentAt(null);
-        const sentAt = new Date().toISOString();
-        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
-        writeStoredReminder(lessonId, sentAt);
-      }
+      await onRemindLessonPayment(lessonId);
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
     }
-  };
-
-  const handleConfirmRemindPayment = async (lessonId: number) => {
-    if (pendingReminderIds.includes(lessonId)) return;
-    setPendingReminderIds((prev) => [...prev, lessonId]);
-    try {
-      const result = await onRemindLessonPayment(lessonId, { force: true });
-      if (result.status === 'sent') {
-        setConfirmReminderLessonId(null);
-        setConfirmReminderSentAt(null);
-        const sentAt = new Date().toISOString();
-        setLastReminderSentAtByLesson((prev) => ({ ...prev, [lessonId]: sentAt }));
-        writeStoredReminder(lessonId, sentAt);
-      }
-    } finally {
-      setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
-    }
-  };
-
-  const handleCancelRemindPayment = () => {
-    setConfirmReminderLessonId(null);
-    setConfirmReminderSentAt(null);
   };
 
   const nextLessonInfo = useMemo(() => {
@@ -292,6 +203,11 @@ export const StudentHero: FC<StudentHeroProps> = ({
     onToggleAutoReminder(selectedStudent.id);
     setIsReminderSettingsOpen(false);
   };
+  const paymentRemindersEnabled = selectedStudent.paymentRemindersEnabled !== false;
+  const handleTogglePaymentReminderSettings = () => {
+    onTogglePaymentReminders(selectedStudent.id, !paymentRemindersEnabled);
+    setIsReminderSettingsOpen(false);
+  };
 
   const hasDebt = studentDebtItems.length > 0;
   const debtCount = studentDebtItems.length;
@@ -306,6 +222,8 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const debtLabel = `${studentDebtTotal} ₽ (${formatLessonCount(debtCount)})`;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
+  const paymentReminderStatusLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
+  const paymentReminderActionLabel = paymentRemindersEnabled ? 'Выключить' : 'Включить';
 
   return (
     <div
@@ -530,10 +448,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       pendingReminderIds={pendingReminderIds}
                       onMarkPaid={handleMarkPaid}
                       onSendPaymentReminder={handleRemindPayment}
-                      confirmReminderLessonId={confirmReminderLessonId}
-                      confirmReminderSentAt={confirmReminderSentAt}
-                      onConfirmPaymentReminder={handleConfirmRemindPayment}
-                      onCancelPaymentReminder={handleCancelRemindPayment}
                       reminderDisabledReason={reminderDisabledReason}
                     />
                   </AdaptivePopover>
@@ -618,15 +532,26 @@ export const StudentHero: FC<StudentHeroProps> = ({
           title="Напоминания"
           onClose={() => setIsReminderSettingsOpen(false)}
         >
-          <p className={styles.reminderStatus}>
-            Автонапоминания: {reminderStatusLabel}
-          </p>
+          <p className={styles.reminderStatus}>Домашние задания: {reminderStatusLabel}</p>
           <div className={styles.reminderActions}>
             <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
               Закрыть
             </button>
             <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
               {reminderActionLabel}
+            </button>
+          </div>
+          <div className={styles.reminderDivider} />
+          <p className={styles.reminderStatus}>Оплата: {paymentReminderStatusLabel}</p>
+          {!selectedStudent.isActivated && (
+            <p className={styles.reminderHint}>Ученик не активировал бота — отправка напоминаний в Telegram невозможна.</p>
+          )}
+          <div className={styles.reminderActions}>
+            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+              Закрыть
+            </button>
+            <button type="button" className={controls.primaryButton} onClick={handleTogglePaymentReminderSettings}>
+              {paymentReminderActionLabel}
             </button>
           </div>
         </Modal>
@@ -636,15 +561,26 @@ export const StudentHero: FC<StudentHeroProps> = ({
         <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
           <div className={styles.reminderSheet}>
             <h3 className={styles.reminderTitle}>Напоминания</h3>
-            <p className={styles.reminderStatus}>
-              Автонапоминания: {reminderStatusLabel}
-            </p>
+            <p className={styles.reminderStatus}>Домашние задания: {reminderStatusLabel}</p>
             <div className={styles.reminderActions}>
               <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
                 Закрыть
               </button>
               <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
                 {reminderActionLabel}
+              </button>
+            </div>
+            <div className={styles.reminderDivider} />
+            <p className={styles.reminderStatus}>Оплата: {paymentReminderStatusLabel}</p>
+            {!selectedStudent.isActivated && (
+              <p className={styles.reminderHint}>Ученик не активировал бота — отправка напоминаний в Telegram невозможна.</p>
+            )}
+            <div className={styles.reminderActions}>
+              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
+                Закрыть
+              </button>
+              <button type="button" className={controls.primaryButton} onClick={handleTogglePaymentReminderSettings}>
+                {paymentReminderActionLabel}
               </button>
             </div>
           </div>
@@ -659,68 +595,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
             pendingReminderIds={pendingReminderIds}
             onMarkPaid={handleMarkPaid}
             onSendPaymentReminder={handleRemindPayment}
-            confirmReminderLessonId={confirmReminderLessonId}
-            confirmReminderSentAt={confirmReminderSentAt}
-            onConfirmPaymentReminder={handleConfirmRemindPayment}
-            onCancelPaymentReminder={handleCancelRemindPayment}
-            reminderDisabledReason={reminderDisabledReason}
-            showCloseButton
-            onClose={() => setIsDebtPopoverOpen(false)}
-          />
-        </BottomSheet>
-      )}
-
-      {!isMobile && (
-        <Modal
-          open={isReminderSettingsOpen}
-          title="Напоминания"
-          onClose={() => setIsReminderSettingsOpen(false)}
-        >
-          <p className={styles.reminderStatus}>
-            Автонапоминания: {reminderStatusLabel}
-          </p>
-          <div className={styles.reminderActions}>
-            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
-              Закрыть
-            </button>
-            <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
-              {reminderActionLabel}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {isMobile && (
-        <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
-          <div className={styles.reminderSheet}>
-            <h3 className={styles.reminderTitle}>Напоминания</h3>
-            <p className={styles.reminderStatus}>
-              Автонапоминания: {reminderStatusLabel}
-            </p>
-            <div className={styles.reminderActions}>
-              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
-                Закрыть
-              </button>
-              <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
-                {reminderActionLabel}
-              </button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
-
-      {isMobile && (
-        <BottomSheet isOpen={isDebtPopoverOpen} onClose={() => setIsDebtPopoverOpen(false)}>
-          <StudentDebtPopoverContent
-            items={studentDebtItems}
-            pendingIds={pendingPaymentIds}
-            pendingReminderIds={pendingReminderIds}
-            onMarkPaid={handleMarkPaid}
-            onSendPaymentReminder={handleRemindPayment}
-            confirmReminderLessonId={confirmReminderLessonId}
-            confirmReminderSentAt={confirmReminderSentAt}
-            onConfirmPaymentReminder={handleConfirmRemindPayment}
-            onCancelPaymentReminder={handleCancelRemindPayment}
             reminderDisabledReason={reminderDisabledReason}
             showCloseButton
             onClose={() => setIsDebtPopoverOpen(false)}

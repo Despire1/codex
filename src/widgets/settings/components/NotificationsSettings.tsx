@@ -9,9 +9,12 @@ interface NotificationsSettingsProps {
 }
 
 const lessonReminderOptions = [5, 10, 15, 30, 60, 120];
+const paymentDelayOptions = [2, 6, 12, 24, 48];
+const paymentRepeatOptions = [24, 48, 72];
+const paymentMaxOptions = [1, 2, 3, 5];
 export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange }) => {
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
-  const studentPaymentRemindersDisabled = true;
+  const paymentRemindersDisabled = !teacher.globalPaymentRemindersEnabled;
 
   return (
     <div className={styles.moduleStack}>
@@ -124,20 +127,89 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
           </label>
         </div>
       </div>
-      <div
-        className={`${styles.sectionBlock} ${studentSectionDisabled || studentPaymentRemindersDisabled ? styles.disabledSection : ''}`}
-      >
+      <div className={`${styles.sectionBlock} ${studentSectionDisabled ? styles.disabledSection : ''}`}>
         <div className={styles.rowHeader}>
           <div>
             <div className={styles.label}>Автоматические напоминания ученику об оплате</div>
-            <div className={styles.helperText}>Скоро будет доступно.</div>
+            <div className={styles.helperText}>
+              Учитываются только завершённые и неоплаченные занятия. В ночные часы отправка ставится на паузу.
+            </div>
           </div>
           <label className={controls.switch}>
             <input
               type="checkbox"
-              checked={teacher.studentPaymentRemindersEnabled}
-              onChange={(event) => onChange({ studentPaymentRemindersEnabled: event.target.checked })}
-              disabled={studentSectionDisabled || studentPaymentRemindersDisabled}
+              checked={teacher.globalPaymentRemindersEnabled}
+              onChange={(event) => onChange({ globalPaymentRemindersEnabled: event.target.checked })}
+              disabled={studentSectionDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Отправлять через</div>
+          <select
+            className={controls.input}
+            value={teacher.paymentReminderDelayHours}
+            onChange={(event) => onChange({ paymentReminderDelayHours: Number(event.target.value) })}
+            disabled={studentSectionDisabled || paymentRemindersDisabled}
+          >
+            {paymentDelayOptions.map((hours) => (
+              <option key={hours} value={hours}>
+                {hours} ч
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Повторять</div>
+          <select
+            className={controls.input}
+            value={teacher.paymentReminderRepeatHours}
+            onChange={(event) => onChange({ paymentReminderRepeatHours: Number(event.target.value) })}
+            disabled={studentSectionDisabled || paymentRemindersDisabled}
+          >
+            {paymentRepeatOptions.map((hours) => (
+              <option key={hours} value={hours}>
+                каждые {hours} ч
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Максимум напоминаний</div>
+          <select
+            className={controls.input}
+            value={teacher.paymentReminderMaxCount}
+            onChange={(event) => onChange({ paymentReminderMaxCount: Number(event.target.value) })}
+            disabled={studentSectionDisabled || paymentRemindersDisabled}
+          >
+            {paymentMaxOptions.map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Уведомлять меня об авто-напоминаниях</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.notifyTeacherOnAutoPaymentReminder}
+              onChange={(event) => onChange({ notifyTeacherOnAutoPaymentReminder: event.target.checked })}
+              disabled={studentSectionDisabled || paymentRemindersDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Уведомлять меня о ручных напоминаниях</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.notifyTeacherOnManualPaymentReminder}
+              onChange={(event) => onChange({ notifyTeacherOnManualPaymentReminder: event.target.checked })}
+              disabled={studentSectionDisabled}
             />
             <span className={controls.slider} />
           </label>

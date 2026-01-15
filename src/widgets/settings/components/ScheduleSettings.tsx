@@ -30,6 +30,25 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({ teacher, onChange,
         />
         <div className={styles.helperText}>Применяется при создании новых уроков.</div>
       </div>
+      <div className={styles.sectionBlock}>
+        <div className={styles.rowHeader}>
+          <div>
+            <div className={styles.label}>Автоматически отмечать занятия как проведённые</div>
+            <div className={styles.helperText}>
+              Если выключено, занятия нужно подтверждать вручную. Автосписание и напоминания об оплате начнут работать
+              только после подтверждения занятия.
+            </div>
+          </div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.autoConfirmLessons}
+              onChange={(event) => onChange({ autoConfirmLessons: event.target.checked })}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+      </div>
       <div className={styles.comingSoonGroup}>
         <div className={styles.comingSoonHeader}>Дополнительные настройки расписания</div>
         <div className={styles.comingSoonRow} onClick={onComingSoonClick} role="button" aria-disabled="true">

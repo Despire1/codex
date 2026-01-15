@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, DetailedHTMLProps } from 'react';
 import styles from './Badge.module.css';
 
-type BadgeVariant = 'paid' | 'unpaid' | 'groupPaid' | 'groupUnpaid';
+type BadgeVariant = 'paid' | 'unpaid' | 'groupPaid' | 'groupUnpaid' | 'pending';
 
 type BadgeElementProps = DetailedHTMLProps<ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
 
