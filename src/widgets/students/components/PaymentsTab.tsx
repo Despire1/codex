@@ -1,7 +1,7 @@
 import { FC, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { PaymentEvent, Lesson } from '../../../entities/types';
+import { PaymentEvent, Lesson, PaymentReminderLog } from '../../../entities/types';
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from '../../../shared/day-picker';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
@@ -9,10 +9,11 @@ import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
 import { PaymentList } from './PaymentList';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
-import { toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 interface PaymentsTabProps {
   payments: PaymentEvent[];
+  paymentReminders: PaymentReminderLog[];
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -22,6 +23,7 @@ interface PaymentsTabProps {
 
 export const PaymentsTab: FC<PaymentsTabProps> = ({
   payments,
+  paymentReminders,
   paymentFilter,
   paymentDate,
   onPaymentFilterChange,
@@ -38,6 +40,11 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   }, [paymentDate, timeZone]);
   const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : 'Все';
   const isFilterActive = paymentFilter !== 'all' || Boolean(paymentDate);
+  const formatReminderDate = (value: string) =>
+    formatInTimeZone(value, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
+  const reminderLabel = (reminder: PaymentReminderLog) => (reminder.source === 'AUTO' ? 'Авто' : 'Вручную');
+  const reminderStatusLabel = (reminder: PaymentReminderLog) =>
+    reminder.status === 'FAILED' ? 'Не доставлено' : 'Доставлено';
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
@@ -129,6 +136,24 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
             </div>
           </AdaptivePopover>
         </div>
+      </div>
+      <div className={styles.remindersPanel}>
+        <div className={styles.remindersPanelTitle}>Напоминания об оплате</div>
+        {paymentReminders.length === 0 ? (
+          <div className={styles.remindersEmpty}>Пока нет отправленных напоминаний.</div>
+        ) : (
+          <div className={styles.remindersList}>
+            {paymentReminders.map((reminder) => (
+              <div key={reminder.id} className={styles.reminderRow}>
+                <div className={styles.reminderDate}>{formatReminderDate(reminder.createdAt)}</div>
+                <div className={styles.reminderMeta}>
+                  <span className={styles.reminderType}>{reminderLabel(reminder)}</span>
+                  <span className={styles.reminderStatus}>{reminderStatusLabel(reminder)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <PaymentList
         payments={payments}

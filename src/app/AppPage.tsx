@@ -12,6 +12,7 @@ import {
   LinkedStudent,
   PaymentCancelBehavior,
   PaymentEvent,
+  PaymentReminderLog,
   Student,
   StudentDebtItem,
   StudentListItem,
@@ -57,6 +58,13 @@ const initialTeacher: Teacher = {
   tomorrowSummaryTime: '20:00',
   studentNotificationsEnabled: true,
   studentPaymentRemindersEnabled: true,
+  autoConfirmLessons: true,
+  globalPaymentRemindersEnabled: true,
+  paymentReminderDelayHours: 24,
+  paymentReminderRepeatHours: 48,
+  paymentReminderMaxCount: 3,
+  notifyTeacherOnAutoPaymentReminder: false,
+  notifyTeacherOnManualPaymentReminder: true,
 };
 
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
@@ -229,6 +237,7 @@ export const AppPage = () => {
   const lessonSummaryLoadRequestId = useRef(0);
   const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
+  const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
@@ -627,12 +636,27 @@ export const AppPage = () => {
     [hasAccess],
   );
 
+  const refreshPaymentReminders = useCallback(
+    async (studentId: number) => {
+      if (!hasAccess) return;
+      try {
+        const data = await api.getPaymentReminders(studentId, 10);
+        setPaymentRemindersByStudent((prev) => ({ ...prev, [studentId]: data.reminders }));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load payment reminders', error);
+      }
+    },
+    [hasAccess],
+  );
+
   useEffect(() => {
     if (!hasAccess) return;
     if (selectedStudentId) {
       refreshPayments(selectedStudentId);
+      refreshPaymentReminders(selectedStudentId);
     }
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess]);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, refreshPaymentReminders, hasAccess]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
@@ -828,6 +852,25 @@ export const AppPage = () => {
     } catch (error) {
       showToast({
         message: 'Не удалось обновить автонапоминания',
+        variant: 'error',
+      });
+    }
+  };
+
+  const togglePaymentReminders = async (studentId: number, enabled: boolean) => {
+    try {
+      const data = await api.updateStudentPaymentReminders(studentId, enabled);
+      setStudents((prev) => prev.map((student) => (student.id === studentId ? data.student : student)));
+      setStudentListItems((prev) =>
+        prev.map((item) => (item.student.id === studentId ? { ...item, student: data.student } : item)),
+      );
+      showToast({
+        message: data.student.paymentRemindersEnabled ? 'Авто-напоминания об оплате включены' : 'Авто-напоминания об оплате выключены',
+        variant: 'success',
+      });
+    } catch (error) {
+      showToast({
+        message: 'Не удалось обновить настройки напоминаний',
         variant: 'error',
       });
     }
@@ -1634,21 +1677,28 @@ export const AppPage = () => {
 
   const remindLessonPayment = async (lessonId: number, options?: { force?: boolean }) => {
     try {
-      const result = await api.remindLessonPayment(lessonId, Boolean(options?.force));
-      if (result.status === 'sent') {
-        showToast({ message: 'Напоминание отправлено', variant: 'success' });
+      await api.remindLessonPayment(lessonId, Boolean(options?.force));
+      showToast({ message: 'Отправлено ✅', variant: 'success' });
+      if (selectedStudentId) {
+        refreshPaymentReminders(selectedStudentId);
       }
-      return result;
+      return { status: 'sent' as const };
     } catch (error) {
-      let message = 'Не удалось отправить напоминание';
+      let code = 'error';
       if (error instanceof Error) {
         try {
           const parsed = JSON.parse(error.message) as { message?: string };
-          message = parsed?.message ?? error.message;
+          code = parsed?.message ?? error.message;
         } catch {
-          message = error.message;
+          code = error.message;
         }
       }
+      const message =
+        code === 'recently_sent'
+          ? 'Напоминание уже отправлялось недавно'
+          : code === 'student_not_activated'
+            ? 'Ученик не активировал бота — отправка невозможна'
+            : 'Не удалось отправить напоминание';
       showToast({ message, variant: 'error' });
       // eslint-disable-next-line no-console
       console.error('Failed to send payment reminder', error);
@@ -1773,6 +1823,7 @@ export const AppPage = () => {
               onHomeworkFilterChange: setStudentHomeworkFilter,
               onLoadMoreHomeworks: loadMoreStudentHomeworks,
               onToggleAutoReminder: toggleAutoReminder,
+              onTogglePaymentReminders: togglePaymentReminders,
               onAdjustBalance: adjustBalance,
               onBalanceTopup: topupBalance,
               onStartEditPrice: startEditPrice,
@@ -1810,6 +1861,7 @@ export const AppPage = () => {
               onLessonDateRangeChange: setStudentLessonDateRange,
               onLessonSortOrderChange: handleLessonSortOrderChange,
               payments: paymentEvents,
+              paymentReminders: selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [],
               paymentFilter,
               paymentDate,
               onPaymentFilterChange: handlePaymentFilterChange,
@@ -1840,6 +1892,7 @@ export const AppPage = () => {
               onTogglePaid: togglePaid,
               onDayViewDateChange: setDayViewDate,
               onGoToToday: handleGoToToday,
+              autoConfirmLessons: teacher.autoConfirmLessons,
             }}
             settings={{ teacher, onTeacherChange: setTeacher }}
             />

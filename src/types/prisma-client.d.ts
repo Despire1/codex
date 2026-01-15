@@ -16,6 +16,13 @@ declare module '@prisma/client' {
     tomorrowSummaryTime: string;
     studentNotificationsEnabled: boolean;
     studentPaymentRemindersEnabled: boolean;
+    autoConfirmLessons: boolean;
+    globalPaymentRemindersEnabled: boolean;
+    paymentReminderDelayHours: number;
+    paymentReminderRepeatHours: number;
+    paymentReminderMaxCount: number;
+    notifyTeacherOnAutoPaymentReminder: boolean;
+    notifyTeacherOnManualPaymentReminder: boolean;
     payments: Payment[];
     createdAt: Date;
   };
@@ -27,6 +34,7 @@ declare module '@prisma/client' {
     isActivated: boolean;
     activatedAt: Date | null;
     pricePerLesson: number;
+    paymentRemindersEnabled: boolean;
     payments: Payment[];
     paymentEvents: PaymentEvent[];
     createdAt: Date;
@@ -72,6 +80,11 @@ declare module '@prisma/client' {
     isPaid: boolean;
     paidAt: Date | null;
     completedAt: Date | null;
+    paymentStatus: string;
+    paidSource: string;
+    lastPaymentReminderAt: Date | null;
+    paymentReminderCount: number;
+    lastPaymentReminderSource: string | null;
     createdAt: Date;
   };
 
@@ -126,6 +139,8 @@ declare module '@prisma/client' {
     studentId: number | null;
     lessonId: number | null;
     type: string;
+    source: string | null;
+    channel: string;
     scheduledFor: Date | null;
     sentAt: Date | null;
     status: string;

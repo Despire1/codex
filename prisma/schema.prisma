@@ -22,6 +22,13 @@ model Teacher {
   tomorrowSummaryTime   String          @default("20:00")
   studentNotificationsEnabled Boolean   @default(true)
   studentPaymentRemindersEnabled Boolean @default(true)
+  autoConfirmLessons    Boolean         @default(true)
+  globalPaymentRemindersEnabled Boolean @default(true)
+  paymentReminderDelayHours Int         @default(24)
+  paymentReminderRepeatHours Int        @default(48)
+  paymentReminderMaxCount Int           @default(3)
+  notifyTeacherOnAutoPaymentReminder Boolean @default(false)
+  notifyTeacherOnManualPaymentReminder Boolean @default(true)
   students              TeacherStudent[]
   homeworks             Homework[]
   lessons               Lesson[]
@@ -37,6 +44,7 @@ model Student {
   isActivated          Boolean              @default(false)
   activatedAt          DateTime?
   pricePerLesson       Int                  @default(0)
+  paymentRemindersEnabled Boolean           @default(true)
   teacherLinks         TeacherStudent[]
   homeworks            Homework[]           @relation("HomeworkStudent")
   takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
@@ -97,6 +105,11 @@ model Lesson {
   isPaid              Boolean             @default(false)
   paidAt              DateTime?
   completedAt         DateTime?
+  paymentStatus       LessonPaymentStatus @default(UNPAID)
+  paidSource          LessonPaidSource    @default(NONE)
+  lastPaymentReminderAt DateTime?
+  paymentReminderCount Int               @default(0)
+  lastPaymentReminderSource PaymentReminderSource?
   isRecurring         Boolean             @default(false)
   recurrenceUntil     DateTime?
   recurrenceGroupId   String?
@@ -206,6 +219,8 @@ model NotificationLog {
   studentId    Int?
   lessonId     Int?
   type         String
+  source       PaymentReminderSource?
+  channel      NotificationChannel @default(TELEGRAM)
   scheduledFor DateTime?
   sentAt       DateTime?
   status       String
@@ -220,7 +235,30 @@ model NotificationLog {
   @@index([teacherId])
   @@index([studentId])
   @@index([lessonId])
+  @@index([teacherId, createdAt])
+  @@index([studentId, createdAt])
+  @@index([lessonId, createdAt])
   @@index([type])
+}
+
+enum LessonPaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum LessonPaidSource {
+  NONE
+  BALANCE
+  MANUAL
+}
+
+enum PaymentReminderSource {
+  AUTO
+  MANUAL
+}
+
+enum NotificationChannel {
+  TELEGRAM
 }
 
 model Session {

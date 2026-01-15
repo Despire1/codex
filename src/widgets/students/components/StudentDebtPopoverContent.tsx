@@ -5,7 +5,6 @@ import { NotificationsNoneOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './StudentDebtPopoverContent.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
-import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 
 interface StudentDebtPopoverContentProps {
   items: StudentDebtItem[];
@@ -13,10 +12,6 @@ interface StudentDebtPopoverContentProps {
   pendingReminderIds: number[];
   onMarkPaid: (lessonId: number) => void;
   onSendPaymentReminder: (lessonId: number) => void;
-  confirmReminderLessonId: number | null;
-  confirmReminderSentAt: string | null;
-  onConfirmPaymentReminder: (lessonId: number) => void;
-  onCancelPaymentReminder: () => void;
   reminderDisabledReason: string | null;
   showCloseButton?: boolean;
   onClose?: () => void;
@@ -34,16 +29,11 @@ export const StudentDebtPopoverContent = ({
   pendingReminderIds,
   onMarkPaid,
   onSendPaymentReminder,
-  confirmReminderLessonId,
-  confirmReminderSentAt,
-  onConfirmPaymentReminder,
-  onCancelPaymentReminder,
   reminderDisabledReason,
   showCloseButton = false,
   onClose,
 }: StudentDebtPopoverContentProps) => {
   const timeZone = useTimeZone();
-  const reminderDisabled = Boolean(reminderDisabledReason);
   return (
     <div className={styles.container}>
       <div className={styles.title}>Неоплаченные занятия</div>
@@ -57,10 +47,6 @@ export const StudentDebtPopoverContent = ({
             const dateLabel = formatInTimeZone(item.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
             const priceLabel = item.price === null ? '—' : `${item.price} ₽`;
             const statusLabel = statusLabels[item.status];
-            const isConfirmOpen = confirmReminderLessonId === item.id;
-            const reminderSentAtLabel = confirmReminderSentAt
-              ? formatInTimeZone(new Date(confirmReminderSentAt), 'd MMM yyyy, HH:mm', { locale: ru, timeZone })
-              : null;
 
             return (
               <div key={item.id} className={styles.item}>
@@ -70,40 +56,17 @@ export const StudentDebtPopoverContent = ({
                 </div>
                 <div className={styles.itemActions}>
                   <span className={styles.itemAmount}>{priceLabel}</span>
-                  <AdaptivePopover
-                    isOpen={isConfirmOpen}
-                    onClose={onCancelPaymentReminder}
-                    trigger={(
-                      <button
-                        type="button"
-                        className={styles.remindButton}
-                        onClick={() => (isConfirmOpen ? onCancelPaymentReminder() : onSendPaymentReminder(item.id))}
-                        disabled={reminderDisabled || isReminderLoading}
-                        title={reminderDisabledReason ?? 'Отправить напоминание'}
-                      >
-                        {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
-                          <NotificationsNoneOutlinedIcon width={16} height={16} />
-                        )}
-                      </button>
-                    )}
-                    side="bottom"
-                    align="end"
-                    offset={6}
-                    className={styles.confirmPopover}
+                  <button
+                    type="button"
+                    className={styles.remindButton}
+                    onClick={() => onSendPaymentReminder(item.id)}
+                    disabled={isReminderLoading}
+                    title={reminderDisabledReason ?? 'Отправить напоминание'}
                   >
-                    <div className={styles.confirmTitle}>Отправить ещё раз?</div>
-                    {reminderSentAtLabel && (
-                      <div className={styles.confirmText}>Последнее напоминание: {reminderSentAtLabel}</div>
+                    {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
+                      <NotificationsNoneOutlinedIcon width={16} height={16} />
                     )}
-                    <div className={styles.confirmActions}>
-                      <button type="button" className={controls.secondaryButton} onClick={onCancelPaymentReminder}>
-                        Отмена
-                      </button>
-                      <button type="button" className={controls.primaryButton} onClick={() => onConfirmPaymentReminder(item.id)}>
-                        Отправить
-                      </button>
-                    </div>
-                  </AdaptivePopover>
+                  </button>
                   <button
                     type="button"
                     className={`${controls.primaryButton} ${styles.payButton}`}

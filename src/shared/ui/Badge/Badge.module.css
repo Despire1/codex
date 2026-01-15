@@ -53,3 +53,9 @@
   color: #b15e09;
   border-color: #f5d9b0;
 }
+
+.pending {
+  background: #fff7e6;
+  color: #b26a00;
+  border-color: #ffe0b3;
+}

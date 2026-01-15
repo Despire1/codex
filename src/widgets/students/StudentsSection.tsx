@@ -10,6 +10,7 @@ import {
   LessonStatusFilter,
   PaymentEvent,
   PaymentEventType,
+  PaymentReminderLog,
   Student,
   StudentDebtItem,
   StudentListItem,
@@ -49,6 +50,7 @@ interface StudentsSectionProps {
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onLoadMoreHomeworks: () => void;
   onToggleAutoReminder: (studentId: number) => void;
+  onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onBalanceTopup: (
     studentId: number,
@@ -78,7 +80,7 @@ interface StudentsSectionProps {
   onRemindLessonPayment: (
     lessonId: number,
     options?: { force?: boolean },
-  ) => Promise<{ status: 'sent' | 'recent' | 'error'; lastSentAt?: string | null }>;
+  ) => Promise<{ status: 'sent' | 'error' }>;
   studentLessons: Lesson[];
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
@@ -93,6 +95,7 @@ interface StudentsSectionProps {
   onLessonDateRangeChange: (range: LessonDateRange) => void;
   onLessonSortOrderChange: (order: LessonSortOrder) => void;
   payments: PaymentEvent[];
+  paymentReminders: PaymentReminderLog[];
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -149,6 +152,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onHomeworkFilterChange,
   onLoadMoreHomeworks,
   onToggleAutoReminder,
+  onTogglePaymentReminders,
   onAdjustBalance,
   onBalanceTopup,
   onStartEditPrice,
@@ -182,6 +186,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onLessonDateRangeChange,
   onLessonSortOrderChange,
   payments,
+  paymentReminders,
   paymentFilter,
   paymentDate,
   onPaymentFilterChange,
@@ -377,11 +382,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
                 onScroll={handleDetailsScroll}
               >
-                <StudentHero
-                  headerRef={headerRef}
-                  selectedStudent={selectedStudent}
-                  teacher={teacher}
-                  studentLessonsSummary={studentLessonsSummary}
+          <StudentHero
+            headerRef={headerRef}
+            selectedStudent={selectedStudent}
+            studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
                   priceEditState={priceEditState}
@@ -392,9 +396,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onStartEditPrice={onStartEditPrice}
                   onPriceChange={onPriceChange}
                   onSavePrice={onSavePrice}
-                  onCancelPriceEdit={onCancelPriceEdit}
-                  onToggleAutoReminder={onToggleAutoReminder}
-                  onAdjustBalance={onAdjustBalance}
+            onCancelPriceEdit={onCancelPriceEdit}
+            onToggleAutoReminder={onToggleAutoReminder}
+            onTogglePaymentReminders={onTogglePaymentReminders}
+            onAdjustBalance={onAdjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
@@ -448,10 +453,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onEditLesson={onEditLesson}
                     onDeleteLesson={onDeleteLesson}
                     getLessonStatusLabel={getLessonStatusLabel}
+                    autoConfirmLessons={teacher.autoConfirmLessons}
                   />
                 ) : activeTab === 'payments' ? (
                   <PaymentsTab
                     payments={payments}
+                    paymentReminders={paymentReminders}
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
                     onPaymentFilterChange={onPaymentFilterChange}

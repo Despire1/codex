@@ -9,6 +9,7 @@ import {
   LessonColor,
   PaymentCancelBehavior,
   PaymentEvent,
+  PaymentReminderLog,
   Student,
   StudentDebtSummary,
   StudentListItem,
@@ -27,7 +28,13 @@ type SettingsPayload = Pick<
   | 'tomorrowSummaryEnabled'
   | 'tomorrowSummaryTime'
   | 'studentNotificationsEnabled'
-  | 'studentPaymentRemindersEnabled'
+  | 'autoConfirmLessons'
+  | 'globalPaymentRemindersEnabled'
+  | 'paymentReminderDelayHours'
+  | 'paymentReminderRepeatHours'
+  | 'paymentReminderMaxCount'
+  | 'notifyTeacherOnAutoPaymentReminder'
+  | 'notifyTeacherOnManualPaymentReminder'
 >;
 
 export type SessionSummary = {
@@ -117,6 +124,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  updateStudentPaymentReminders: (studentId: number, enabled: boolean) =>
+    apiFetch<{ student: Student }>(`/api/students/${studentId}/payment-reminders`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
   deleteStudent: (studentId: number) =>
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}`, {
       method: 'DELETE',
@@ -187,7 +199,7 @@ export const api = {
       body: payload ? JSON.stringify(payload) : undefined,
     }),
   remindLessonPayment: (lessonId: number, force = false) =>
-    apiFetch<{ status: 'sent' | 'recent'; lastSentAt?: string | null }>(`/api/lessons/${lessonId}/remind-payment`, {
+    apiFetch<{ status: 'sent' }>(`/api/lessons/${lessonId}/remind-payment`, {
       method: 'POST',
       body: force ? JSON.stringify({ force }) : undefined,
     }),
@@ -212,6 +224,10 @@ export const api = {
       `/api/students/${studentId}/payments${suffix ? `?${suffix}` : ''}`,
     );
   },
+  getPaymentReminders: (studentId: number, limit = 10) =>
+    apiFetch<{ reminders: PaymentReminderLog[] }>(
+      `/api/students/${studentId}/payment-reminders?limit=${limit}`,
+    ),
   createHomework: (payload: {
     studentId: number;
     text: string;
