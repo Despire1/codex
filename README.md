@@ -65,6 +65,7 @@ cp .env.example .env
 - `DATABASE_URL="postgresql://teacherbot_user:password@localhost:5432/teacherbot?schema=public"`
 - `TELEGRAM_BOT_TOKEN="..."`
 - `TELEGRAM_WEBAPP_URL="https://your-domain.com"`
+- `TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL="https://your-domain.com/assets/onboarding-fullscreen.png"`
 - `APP_BASE_URL="https://your-domain.com"`
 - `API_PORT=4000`
 
