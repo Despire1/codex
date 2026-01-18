@@ -23,6 +23,7 @@ import {
   sendTeacherOnboardingNudge,
   sendTeacherPaymentReminderNotice,
 } from './notificationService';
+import { resolveStudentTelegramId } from './studentContacts';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -718,7 +719,15 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
 
   const items = lessons.map((lesson) => {
     const participant = lesson.participants.find((item) => item.studentId === studentId);
-    const price = participant?.price ?? link?.pricePerLesson ?? lesson.price ?? null;
+    const participantPrice =
+      typeof participant?.price === 'number' && participant.price > 0 ? participant.price : null;
+    const fallbackPrice =
+      typeof link?.pricePerLesson === 'number' && link.pricePerLesson > 0
+        ? link.pricePerLesson
+        : typeof lesson.price === 'number' && lesson.price > 0
+          ? lesson.price
+          : null;
+    const price = participantPrice ?? fallbackPrice;
     return {
       id: lesson.id,
       startAt: lesson.startAt,
@@ -2343,7 +2352,8 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
   if (!lesson.student) {
     throw new Error('Ученик не найден');
   }
-  if (!lesson.student.isActivated || !lesson.student.telegramId) {
+  const telegramId = await resolveStudentTelegramId(lesson.student);
+  if (!telegramId) {
     throw new Error('student_not_activated');
   }
 
