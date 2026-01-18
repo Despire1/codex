@@ -215,13 +215,17 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 const subscriptionPromptText =
   'Чтобы пользоваться сервисом, оформите пробную подписку ✨\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса. 🤝';
 
+const onboardingFullscreenPhotoUrl =
+  TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
+  `${TELEGRAM_WEBAPP_URL.replace(/\/$/, '')}/onboarding-fullscreen.png`;
+
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
   editMessage,
   deleteMessage,
   sendPhoto,
   webAppUrl: TELEGRAM_WEBAPP_URL,
-  fullscreenPhotoUrl: TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL || undefined,
+  fullscreenPhotoUrl: onboardingFullscreenPhotoUrl,
 });
 
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
