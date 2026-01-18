@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
@@ -112,6 +114,24 @@ const sendPhoto = async (payload: {
   caption: string;
   replyMarkup?: Record<string, unknown>;
 }) => {
+  if (!payload.photoUrl.startsWith('http') && fs.existsSync(payload.photoUrl)) {
+    const formData = new FormData();
+    formData.append('chat_id', payload.chatId.toString());
+    formData.append('caption', payload.caption);
+    if (payload.replyMarkup) {
+      formData.append('reply_markup', JSON.stringify(payload.replyMarkup));
+    }
+    formData.append('photo', fs.createReadStream(payload.photoUrl));
+    const response = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = (await response.json()) as TelegramResponse<{ message_id: number }>;
+    if (!data.ok) {
+      throw new Error(data.description ?? 'Telegram API error: sendPhoto');
+    }
+    return data.result.message_id;
+  }
   const result = await callTelegram<{ message_id: number }>('sendPhoto', {
     chat_id: payload.chatId,
     photo: payload.photoUrl,
@@ -217,7 +237,7 @@ const subscriptionPromptText =
 
 const onboardingFullscreenPhotoUrl =
   TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
-  `${TELEGRAM_WEBAPP_URL.replace(/\/$/, '')}/onboarding-fullscreen.png`;
+  path.resolve(process.cwd(), 'public', 'onboarding-fullscreen.png');
 
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
