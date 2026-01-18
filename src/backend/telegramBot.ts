@@ -4,6 +4,7 @@ import { createOnboardingMessages } from './telegramOnboardingMessages';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
+const TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL = process.env.TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
@@ -96,6 +97,28 @@ const editMessage = async (chatId: number, messageId: number, text: string, repl
     }
     throw error;
   }
+};
+
+const deleteMessage = async (chatId: number, messageId: number) => {
+  await callTelegram('deleteMessage', {
+    chat_id: chatId,
+    message_id: messageId,
+  });
+};
+
+const sendPhoto = async (payload: {
+  chatId: number;
+  photoUrl: string;
+  caption: string;
+  replyMarkup?: Record<string, unknown>;
+}) => {
+  const result = await callTelegram<{ message_id: number }>('sendPhoto', {
+    chat_id: payload.chatId,
+    photo: payload.photoUrl,
+    caption: payload.caption,
+    reply_markup: payload.replyMarkup,
+  });
+  return result.message_id;
 };
 
 const sendWebAppMessage = async (chatId: number, messageId?: number) => {
@@ -195,7 +218,10 @@ const subscriptionPromptText =
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
   editMessage,
+  deleteMessage,
+  sendPhoto,
   webAppUrl: TELEGRAM_WEBAPP_URL,
+  fullscreenPhotoUrl: TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL || undefined,
 });
 
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
@@ -688,7 +714,11 @@ const handleUpdate = async (update: TelegramUpdate) => {
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_step3') {
-        await onboardingMessages.sendTeacherStep3(chatId, messageId);
+        await onboardingMessages.sendTeacherFullscreenStep(chatId, messageId);
+        return;
+      }
+      if (update.callback_query.data === 'onboarding_teacher_step4') {
+        await onboardingMessages.sendTeacherStep4(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_finish') {
