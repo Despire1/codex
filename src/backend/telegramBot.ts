@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
@@ -239,7 +240,7 @@ const subscriptionPromptText =
 
 const onboardingFullscreenPhotoUrl =
   TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
-  path.resolve(__dirname, '../../public/onboarding-fullscreen.png');
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public/onboarding-fullscreen.png');
 
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
