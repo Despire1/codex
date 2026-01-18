@@ -484,12 +484,18 @@ export const sendStudentPaymentReminder = async ({
   lessonId: number;
   source: 'AUTO' | 'MANUAL';
 }) => {
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
-  if (!lesson || lesson.studentId !== studentId) return { status: 'skipped' as const };
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { participants: true },
+  });
+  if (!lesson) return { status: 'skipped' as const };
+  const participant = lesson.participants.find((item) => item.studentId === studentId);
+  if (!participant) return { status: 'skipped' as const };
   const teacher = await prisma.teacher.findUnique({ where: { chatId: lesson.teacherId } });
   const student = await prisma.student.findUnique({ where: { id: studentId } });
   if (!teacher || !student) return { status: 'skipped' as const };
-  if (!student.isActivated || !student.telegramId) return { status: 'skipped' as const };
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) return { status: 'skipped' as const };
 
   const log = await createNotificationLog({
     teacherId: lesson.teacherId,
@@ -502,18 +508,24 @@ export const sendStudentPaymentReminder = async ({
   if (!log) return { status: 'skipped' as const };
 
   const teacherName = teacher.name?.trim() || teacher.username?.trim() || 'преподаватель';
+  const priceSnapshot =
+    typeof participant.price === 'number' && participant.price > 0
+      ? participant.price
+      : typeof lesson.price === 'number' && lesson.price > 0
+        ? lesson.price
+        : null;
   const text =
     source === 'MANUAL'
       ? buildManualPaymentReminderMessage(lesson.startAt, teacher.timezone)
       : buildAutoPaymentReminderMessage({
           teacherName,
           startAt: lesson.startAt,
-          price: lesson.price ?? null,
+          price: priceSnapshot,
           timeZone: teacher.timezone,
         });
 
   try {
-    await sendTelegramMessage(student.telegramId, text);
+    await sendTelegramMessage(telegramId, text);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {

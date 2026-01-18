@@ -23,6 +23,7 @@ import {
   sendTeacherOnboardingNudge,
   sendTeacherPaymentReminderNotice,
 } from './notificationService';
+import { resolveStudentTelegramId } from './studentContacts';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -718,7 +719,15 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
 
   const items = lessons.map((lesson) => {
     const participant = lesson.participants.find((item) => item.studentId === studentId);
-    const price = participant?.price ?? link?.pricePerLesson ?? lesson.price ?? null;
+    const participantPrice =
+      typeof participant?.price === 'number' && participant.price > 0 ? participant.price : null;
+    const fallbackPrice =
+      typeof link?.pricePerLesson === 'number' && link.pricePerLesson > 0
+        ? link.pricePerLesson
+        : typeof lesson.price === 'number' && lesson.price > 0
+          ? lesson.price
+          : null;
+    const price = participantPrice ?? fallbackPrice;
     return {
       id: lesson.id,
       startAt: lesson.startAt,
@@ -2327,11 +2336,11 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number) => {
+const remindLessonPayment = async (user: User, lessonId: number, studentId?: number | null) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { student: true },
+    include: { student: true, participants: true },
   });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
   if (lesson.status !== 'COMPLETED') {
@@ -2340,10 +2349,17 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
   if (lesson.paymentStatus === 'PAID' || lesson.isPaid) {
     throw new Error('Урок уже оплачен');
   }
-  if (!lesson.student) {
+  const resolvedStudentId = studentId ?? lesson.studentId;
+  const participant = lesson.participants.find((item) => item.studentId === resolvedStudentId);
+  if (!participant) {
     throw new Error('Ученик не найден');
   }
-  if (!lesson.student.isActivated || !lesson.student.telegramId) {
+  const student = await prisma.student.findUnique({ where: { id: resolvedStudentId } });
+  if (!student) {
+    throw new Error('Ученик не найден');
+  }
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) {
     throw new Error('student_not_activated');
   }
 
@@ -2355,7 +2371,7 @@ const remindLessonPayment = async (user: User, lessonId: number) => {
   }
 
   const result = await sendStudentPaymentReminder({
-    studentId: lesson.studentId,
+    studentId: resolvedStudentId,
     lessonId,
     source: 'MANUAL',
   });
@@ -3371,8 +3387,10 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const remindPaymentMatch = pathname.match(/^\/api\/lessons\/(\d+)\/remind-payment$/);
     if (req.method === 'POST' && remindPaymentMatch) {
       const lessonId = Number(remindPaymentMatch[1]);
-      await readBody(req);
-      const result = await remindLessonPayment(requireApiUser(), lessonId);
+      const body = await readBody(req);
+      const studentId = Number((body as any)?.studentId);
+      const resolvedStudentId = Number.isFinite(studentId) ? studentId : null;
+      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId);
       return sendJson(res, 200, result);
     }
 

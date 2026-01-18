@@ -105,8 +105,9 @@ interface AppRoutesProps {
     onRequestDeleteStudent: (studentId: number) => void;
     onRemindLessonPayment: (
       lessonId: number,
+      studentId?: number,
       options?: { force?: boolean },
-    ) => Promise<{ status: 'sent' | 'recent' | 'error'; lastSentAt?: string | null }>;
+    ) => Promise<{ status: 'sent' | 'error' }>;
     studentLessons: Lesson[];
     studentLessonsSummary: Lesson[];
     studentDebtItems: StudentDebtItem[];

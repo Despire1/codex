@@ -79,6 +79,7 @@ interface StudentsSectionProps {
   onRequestDeleteStudent: (studentId: number) => void;
   onRemindLessonPayment: (
     lessonId: number,
+    studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
   studentLessons: Lesson[];

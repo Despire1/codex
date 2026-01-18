@@ -198,10 +198,13 @@ export const api = {
       method: 'POST',
       body: payload ? JSON.stringify(payload) : undefined,
     }),
-  remindLessonPayment: (lessonId: number, force = false) =>
+  remindLessonPayment: (lessonId: number, studentId?: number, force = false) =>
     apiFetch<{ status: 'sent' }>(`/api/lessons/${lessonId}/remind-payment`, {
       method: 'POST',
-      body: force ? JSON.stringify({ force }) : undefined,
+      body: JSON.stringify({
+        ...(force ? { force } : {}),
+        ...(typeof studentId === 'number' ? { studentId } : {}),
+      }),
     }),
   toggleParticipantPaid: (
     lessonId: number,
