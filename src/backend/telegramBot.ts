@@ -114,14 +114,16 @@ const sendPhoto = async (payload: {
   caption: string;
   replyMarkup?: Record<string, unknown>;
 }) => {
-  if (!payload.photoUrl.startsWith('http') && fs.existsSync(payload.photoUrl)) {
+  if (!payload.photoUrl.startsWith('http')) {
+    await fs.promises.access(payload.photoUrl);
+    const fileBuffer = await fs.promises.readFile(payload.photoUrl);
     const formData = new FormData();
     formData.append('chat_id', payload.chatId.toString());
     formData.append('caption', payload.caption);
     if (payload.replyMarkup) {
       formData.append('reply_markup', JSON.stringify(payload.replyMarkup));
     }
-    formData.append('photo', fs.createReadStream(payload.photoUrl));
+    formData.append('photo', new Blob([fileBuffer]), path.basename(payload.photoUrl));
     const response = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
       method: 'POST',
       body: formData,
@@ -237,7 +239,7 @@ const subscriptionPromptText =
 
 const onboardingFullscreenPhotoUrl =
   TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
-  path.resolve(process.cwd(), 'public', 'onboarding-fullscreen.png');
+  path.resolve(__dirname, '../../public/onboarding-fullscreen.png');
 
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
