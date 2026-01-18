@@ -39,6 +39,7 @@ interface StudentHeroProps {
   onRequestDeleteStudent: (studentId: number) => void;
   onRemindLessonPayment: (
     lessonId: number,
+    studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
   onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
@@ -100,7 +101,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
     if (pendingReminderIds.includes(lessonId)) return;
     setPendingReminderIds((prev) => [...prev, lessonId]);
     try {
-      await onRemindLessonPayment(lessonId);
+      await onRemindLessonPayment(lessonId, selectedStudent.id);
     } finally {
       setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
     }
@@ -312,12 +313,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
               >
                 <button onClick={() => handleMenuAction(onEditStudent)}>Редактировать ученика</button>
                 <button onClick={() => handleMenuAction(handleOpenReminderSettings)}>Напоминания</button>
-                <button onClick={() => handleMenuAction(() => onAdjustBalance(selectedStudent.id, -1))}>
-                  Напомнить про оплату
-                </button>
-                <button onClick={() => handleMenuAction(() => navigator.clipboard?.writeText('Правила и памятка'))}>
-                  Скопировать памятку
-                </button>
                 <button
                   className={styles.dangerButton}
                   onClick={() => handleMenuAction(() => onRequestDeleteStudent(selectedStudent.id))}

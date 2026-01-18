@@ -1675,9 +1675,9 @@ export const AppPage = () => {
     }
   };
 
-  const remindLessonPayment = async (lessonId: number, options?: { force?: boolean }) => {
+  const remindLessonPayment = async (lessonId: number, studentId?: number, options?: { force?: boolean }) => {
     try {
-      await api.remindLessonPayment(lessonId, Boolean(options?.force));
+      await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
       showToast({ message: 'Отправлено ✅', variant: 'success' });
       if (selectedStudentId) {
         refreshPaymentReminders(selectedStudentId);
