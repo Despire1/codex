@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
@@ -112,6 +114,26 @@ const sendPhoto = async (payload: {
   caption: string;
   replyMarkup?: Record<string, unknown>;
 }) => {
+  if (!payload.photoUrl.startsWith('http')) {
+    await fs.promises.access(payload.photoUrl);
+    const fileBuffer = await fs.promises.readFile(payload.photoUrl);
+    const formData = new FormData();
+    formData.append('chat_id', payload.chatId.toString());
+    formData.append('caption', payload.caption);
+    if (payload.replyMarkup) {
+      formData.append('reply_markup', JSON.stringify(payload.replyMarkup));
+    }
+    formData.append('photo', new Blob([fileBuffer]), path.basename(payload.photoUrl));
+    const response = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = (await response.json()) as TelegramResponse<{ message_id: number }>;
+    if (!data.ok) {
+      throw new Error(data.description ?? 'Telegram API error: sendPhoto');
+    }
+    return data.result.message_id;
+  }
   const result = await callTelegram<{ message_id: number }>('sendPhoto', {
     chat_id: payload.chatId,
     photo: payload.photoUrl,
@@ -215,13 +237,17 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 const subscriptionPromptText =
   'Чтобы пользоваться сервисом, оформите пробную подписку ✨\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса. 🤝';
 
+const onboardingFullscreenPhotoUrl =
+  TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
+  path.resolve(__dirname, '../../public/onboarding-fullscreen.png');
+
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
   editMessage,
   deleteMessage,
   sendPhoto,
   webAppUrl: TELEGRAM_WEBAPP_URL,
-  fullscreenPhotoUrl: TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL || undefined,
+  fullscreenPhotoUrl: onboardingFullscreenPhotoUrl,
 });
 
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
