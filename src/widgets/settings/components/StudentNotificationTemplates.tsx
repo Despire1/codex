@@ -1,4 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
 import { Teacher } from '../../../entities/types';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '../../../shared/lib/toast';
@@ -32,122 +34,9 @@ type TemplateConfig = {
 
 const TEMPLATE_MAX_LENGTH = 1000;
 
-const emojiOptions = [
-  '😀',
-  '😁',
-  '😂',
-  '🤣',
-  '😃',
-  '😄',
-  '😅',
-  '😆',
-  '😉',
-  '😊',
-  '😋',
-  '😎',
-  '😍',
-  '😘',
-  '🥰',
-  '😗',
-  '😙',
-  '😚',
-  '🙂',
-  '🤗',
-  '🤩',
-  '🤔',
-  '🤨',
-  '😐',
-  '😑',
-  '😶',
-  '🙄',
-  '😏',
-  '😣',
-  '😥',
-  '😮',
-  '🤐',
-  '😯',
-  '😪',
-  '😫',
-  '🥱',
-  '😴',
-  '😌',
-  '😛',
-  '😜',
-  '😝',
-  '🤤',
-  '😒',
-  '😓',
-  '😔',
-  '😕',
-  '🙃',
-  '🫠',
-  '🤑',
-  '😲',
-  '☹️',
-  '🙁',
-  '😖',
-  '😞',
-  '😟',
-  '😤',
-  '😢',
-  '😭',
-  '😦',
-  '😧',
-  '😨',
-  '😩',
-  '🤯',
-  '😬',
-  '😰',
-  '😱',
-  '🥵',
-  '🥶',
-  '😳',
-  '🤪',
-  '😵',
-  '😵‍💫',
-  '🥴',
-  '😠',
-  '😡',
-  '🤬',
-  '😷',
-  '🤒',
-  '🤕',
-  '🤢',
-  '🤮',
-  '🤧',
-  '😇',
-  '🥳',
-  '🥺',
-  '🤠',
-  '🤡',
-  '🤥',
-  '🫡',
-  '👍',
-  '👎',
-  '👏',
-  '🙌',
-  '🙏',
-  '💪',
-  '🔥',
-  '✨',
-  '⭐',
-  '🎉',
-  '🎊',
-  '💯',
-  '✅',
-  '📚',
-  '⏰',
-  '📝',
-  '💡',
-  '💬',
-  '📌',
-  '📎',
-  '📅',
-  '💳',
-  '💸',
-  '💵',
-  '📣',
-];
+type EmojiMartSelection = {
+  native?: string;
+};
 
 const variableLabels: Record<string, { label: string; code: string }> = {
   student_name: { label: 'Имя ученика', code: '{{student_name}}' },
@@ -288,21 +177,29 @@ const TemplateEditor: FC<{
   isMobile,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const hasSelectionRef = useRef(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
 
   const insertAtCursor = useCallback(
     (insertion: string) => {
       const textarea = textareaRef.current;
       if (!textarea) return;
-      const isFocused = document.activeElement === textarea;
-      const start = isFocused ? textarea.selectionStart ?? value.length : value.length;
-      const end = isFocused ? textarea.selectionEnd ?? value.length : value.length;
-      const nextValue = `${value.slice(0, start)}${insertion}${value.slice(end)}`;
+      const { start, end } = selectionRef.current;
+      const fallbackPos = value.length;
+      const resolvedStart = hasSelectionRef.current ? start : fallbackPos;
+      const resolvedEnd = hasSelectionRef.current ? end : fallbackPos;
+      const safeStart = Number.isFinite(resolvedStart)
+        ? Math.min(Math.max(resolvedStart, 0), value.length)
+        : value.length;
+      const safeEnd = Number.isFinite(resolvedEnd) ? Math.min(Math.max(resolvedEnd, 0), value.length) : value.length;
+      const nextValue = `${value.slice(0, safeStart)}${insertion}${value.slice(safeEnd)}`;
       onValueChange(nextValue);
       requestAnimationFrame(() => {
         textarea.focus();
-        const nextPos = start + insertion.length;
+        const nextPos = safeStart + insertion.length;
         textarea.setSelectionRange(nextPos, nextPos);
+        selectionRef.current = { start: nextPos, end: nextPos };
       });
     },
     [onValueChange, value],
@@ -321,6 +218,16 @@ const TemplateEditor: FC<{
 
   const handleDragOver = (event: React.DragEvent<HTMLTextAreaElement>) => {
     event.preventDefault();
+  };
+
+  const handleSelectionUpdate = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    hasSelectionRef.current = true;
+    selectionRef.current = {
+      start: textarea.selectionStart ?? value.length,
+      end: textarea.selectionEnd ?? value.length,
+    };
   };
 
   return (
@@ -377,20 +284,17 @@ const TemplateEditor: FC<{
                 }
                 className={styles.emojiPopover}
               >
-                <div className={styles.emojiGrid}>
-                  {emojiOptions.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className={styles.emojiItem}
-                      onClick={() => {
-                        insertAtCursor(emoji);
-                        setIsEmojiOpen(false);
-                      }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                <div className={styles.emojiPickerWrapper}>
+                  <Picker
+                    data={data}
+                    theme="light"
+                    previewPosition="none"
+                    onEmojiSelect={(emoji: EmojiMartSelection) => {
+                      if (!emoji.native) return;
+                      insertAtCursor(emoji.native);
+                      setIsEmojiOpen(false);
+                    }}
+                  />
                 </div>
               </AdaptivePopover>
             )}
@@ -401,6 +305,10 @@ const TemplateEditor: FC<{
             className={`${controls.textArea} ${styles.textArea} ${error ? styles.fieldError : ''}`}
             value={value}
             onChange={(event) => onValueChange(event.target.value)}
+            onClick={handleSelectionUpdate}
+            onKeyUp={handleSelectionUpdate}
+            onSelect={handleSelectionUpdate}
+            onFocus={handleSelectionUpdate}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             data-testid={`student-notification-${config.id}-textarea`}
