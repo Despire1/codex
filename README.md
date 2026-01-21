@@ -49,6 +49,43 @@
    ```
    Откройте `http://localhost:5173` и проверьте, что запросы идут на `http://localhost:4000` (через Vite proxy).
 
+## Локальный PostgreSQL для проверки миграций
+Если хотите прогонять миграции не на SQLite, а на локальном PostgreSQL:
+
+### 1. Поднимите PostgreSQL локально
+Самый простой вариант — Docker:
+```bash
+docker run --name teacherbot-postgres \
+  -e POSTGRES_DB=teacherbot \
+  -e POSTGRES_USER=teacherbot_user \
+  -e POSTGRES_PASSWORD=teacherbot_pass \
+  -p 5432:5432 \
+  -d postgres:16
+```
+Проверьте доступность:
+```bash
+psql "postgresql://teacherbot_user:teacherbot_pass@localhost:5432/teacherbot" -c "SELECT 1;"
+```
+
+### 2. Укажите PostgreSQL в локальном `.env`
+В `.env` выставьте:
+```
+DATABASE_URL="postgresql://teacherbot_user:teacherbot_pass@localhost:5432/teacherbot?schema=public"
+```
+
+### 3. Прогоните миграции в PostgreSQL (без риска для SQLite)
+```bash
+npm run prisma:migrate
+npm run prisma:generate
+```
+> Эти команды применяются к базе из `DATABASE_URL`, так что SQLite не пострадает, если вы укажете PostgreSQL в `.env`.
+
+### 4. Вернитесь к SQLite при необходимости
+Если нужно снова работать с SQLite, верните в `.env`:
+```
+DATABASE_URL="file:./prisma/teacherbot.db"
+```
+
 ## Продакшен деплой на сервер (PostgreSQL + HTTPS)
 Ниже — минимальный, но полный список шагов для деплоя на удалённый сервер, чтобы всё работало так же, как при локальном запуске.
 
