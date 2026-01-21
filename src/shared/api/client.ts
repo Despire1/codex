@@ -28,6 +28,8 @@ type SettingsPayload = Pick<
   | 'tomorrowSummaryEnabled'
   | 'tomorrowSummaryTime'
   | 'studentNotificationsEnabled'
+  | 'studentUpcomingLessonTemplate'
+  | 'studentPaymentDueTemplate'
   | 'autoConfirmLessons'
   | 'globalPaymentRemindersEnabled'
   | 'paymentReminderDelayHours'
