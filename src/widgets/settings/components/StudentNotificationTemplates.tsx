@@ -44,7 +44,7 @@ const variableLabels: Record<string, { label: string; code: string }> = {
   lesson_time: { label: 'Время', code: '{{lesson_time}}' },
   lesson_datetime: { label: 'Дата и время', code: '{{lesson_datetime}}' },
   lesson_price: { label: 'Цена занятия', code: '{{lesson_price}}' },
-  lesson_link: { label: 'Ссылка на созвон', code: '{{lesson_link}}' },
+  lesson_link: { label: 'Ссылка на занятие', code: '{{lesson_link}}' },
 };
 
 const resolveTemplateValue = (value: string | null, fallback: string) => (value?.trim() ? value : fallback);

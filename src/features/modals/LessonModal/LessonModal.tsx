@@ -228,7 +228,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           </div>
           <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
             <div className={modalStyles.field}>
-              <span className={modalStyles.fieldLabel}>Ссылка на созвон (необязательно)</span>
+              <span className={modalStyles.fieldLabel}>Ссылка на занятие (необязательно)</span>
               <TextField
                 type="text"
                 value={draft.meetingLink}

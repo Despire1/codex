@@ -221,7 +221,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           type="button"
           className={`${styles.lessonMeetingLinkButton} ${className ?? ''}`}
           onClick={(event) => handleOpenMeetingLink(event, lesson.meetingLink as string)}
-          aria-label="Открыть ссылку на созвон"
+          aria-label="Открыть ссылку на занятие"
           data-testid={`lesson-item-open-link-${lesson.id}`}
         >
           <LinkIcon width={14} height={14} />
