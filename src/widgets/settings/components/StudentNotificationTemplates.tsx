@@ -122,7 +122,7 @@ const templateConfigs: TemplateConfig[] = [
         lesson_datetime: '5 сентября 18:00',
       },
       B: {
-        student_name: '',
+        student_name: 'Мария',
         lesson_date: '12 октября',
         lesson_time: '09:30',
         lesson_datetime: '12 октября 09:30',
