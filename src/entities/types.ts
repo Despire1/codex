@@ -14,6 +14,8 @@ export interface Teacher {
   tomorrowSummaryEnabled: boolean;
   tomorrowSummaryTime: string;
   studentNotificationsEnabled: boolean;
+  studentUpcomingLessonTemplate: string | null;
+  studentPaymentDueTemplate: string | null;
   studentPaymentRemindersEnabled: boolean;
   autoConfirmLessons: boolean;
   globalPaymentRemindersEnabled: boolean;

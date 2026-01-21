@@ -2,6 +2,7 @@ import { FC } from 'react';
 import { Teacher } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../SettingsSection.module.css';
+import { StudentNotificationTemplates } from './StudentNotificationTemplates';
 
 interface NotificationsSettingsProps {
   teacher: Teacher;
@@ -214,6 +215,10 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
             <span className={controls.slider} />
           </label>
         </div>
+      </div>
+
+      <div className={styles.sectionBlock}>
+        <StudentNotificationTemplates teacher={teacher} onChange={onChange} />
       </div>
     </div>
   );

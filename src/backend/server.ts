@@ -16,6 +16,10 @@ import {
   toZonedDate,
 } from '../shared/lib/timezoneDates';
 import {
+  STUDENT_LESSON_TEMPLATE_VARIABLES,
+  STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+} from '../shared/lib/notificationTemplates';
+import {
   sendStudentLessonReminder,
   sendStudentPaymentReminder,
   sendTeacherLessonReminder,
@@ -66,6 +70,29 @@ const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const nowMs = now.getTime();
   const scheduledMs = scheduledFor.getTime();
   return scheduledMs <= nowMs && nowMs < scheduledMs + NOTIFICATION_TICK_MS;
+};
+
+const TEMPLATE_MAX_LENGTH = 1000;
+
+const validateStudentTemplate = (value: string, allowedVariables: readonly string[]) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('Текст уведомления не может быть пустым');
+  }
+  if (value.length > TEMPLATE_MAX_LENGTH) {
+    throw new Error(`Текст уведомления не должен превышать ${TEMPLATE_MAX_LENGTH} символов`);
+  }
+
+  const allowedSet = new Set(allowedVariables);
+  const variableRegex = /{{\\s*([^}]+)\\s*}}/g;
+  for (const match of value.matchAll(variableRegex)) {
+    const rawVariable = match[1]?.trim() ?? '';
+    if (!allowedSet.has(rawVariable)) {
+      throw new Error(`Неизвестная переменная: {{${rawVariable}}}`);
+    }
+  }
+
+  return value;
 };
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
@@ -329,6 +356,8 @@ const pickTeacherSettings = (teacher: any) => ({
   tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
   tomorrowSummaryTime: teacher.tomorrowSummaryTime,
   studentNotificationsEnabled: teacher.studentNotificationsEnabled,
+  studentUpcomingLessonTemplate: teacher.studentUpcomingLessonTemplate,
+  studentPaymentDueTemplate: teacher.studentPaymentDueTemplate,
   autoConfirmLessons: teacher.autoConfirmLessons,
   globalPaymentRemindersEnabled: teacher.globalPaymentRemindersEnabled,
   paymentReminderDelayHours: teacher.paymentReminderDelayHours,
@@ -390,6 +419,24 @@ const updateSettings = async (user: User, body: any) => {
 
   if (typeof body.studentNotificationsEnabled === 'boolean') {
     data.studentNotificationsEnabled = body.studentNotificationsEnabled;
+  }
+
+  if (typeof body.studentUpcomingLessonTemplate === 'string') {
+    data.studentUpcomingLessonTemplate = validateStudentTemplate(
+      body.studentUpcomingLessonTemplate,
+      STUDENT_LESSON_TEMPLATE_VARIABLES,
+    );
+  } else if (body.studentUpcomingLessonTemplate === null) {
+    data.studentUpcomingLessonTemplate = null;
+  }
+
+  if (typeof body.studentPaymentDueTemplate === 'string') {
+    data.studentPaymentDueTemplate = validateStudentTemplate(
+      body.studentPaymentDueTemplate,
+      STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+    );
+  } else if (body.studentPaymentDueTemplate === null) {
+    data.studentPaymentDueTemplate = null;
   }
 
   if (typeof body.autoConfirmLessons === 'boolean') {
