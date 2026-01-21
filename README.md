@@ -15,6 +15,8 @@
    ```bash
    cp .env.example .env
    ```
+   - Для локальной разработки оставьте `VITE_API_BASE` пустым — Vite будет проксировать `/api` и `/auth` на `http://localhost:4000`.
+   - `APP_BASE_URL` и `TELEGRAM_WEBAPP_URL` по умолчанию в примере уже указывают на `http://localhost:5173`.
 3. Примените миграции и сгенерируйте Prisma Client (создаст `prisma/teacherbot.db`):
    ```bash
    npm run prisma:migrate
@@ -29,6 +31,23 @@
    npm run dev
    ```
 6. Откройте http://localhost:5173. Все запросы `/api/*` уйдут на локальный сервер.
+
+## Локальный dev на localhost (проверка настройки)
+Чтобы убедиться, что всё ходит именно на localhost:
+1. Убедитесь, что в `.env`:
+   - `DATABASE_URL="file:./prisma/teacherbot.db"`
+   - `APP_BASE_URL="http://localhost:5173"`
+   - `VITE_API_BASE=""` (пусто)
+2. Запустите API:
+   ```bash
+   npm run api
+   ```
+   В логах должно быть: `API server running on http://localhost:4000`.
+3. Запустите фронтенд:
+   ```bash
+   npm run dev
+   ```
+   Откройте `http://localhost:5173` и проверьте, что запросы идут на `http://localhost:4000` (через Vite proxy).
 
 ## Продакшен деплой на сервер (PostgreSQL + HTTPS)
 Ниже — минимальный, но полный список шагов для деплоя на удалённый сервер, чтобы всё работало так же, как при локальном запуске.
