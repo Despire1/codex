@@ -219,7 +219,12 @@ export const DeleteOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const LinkIcon = LinkOutlinedIcon;
+export const LinkIcon = ({ width, height, style, ...rest }: SVGProps<SVGSVGElement>) => (
+  <LinkOutlinedIcon
+    style={{ ...style, width: width ?? style?.width, height: height ?? style?.height }}
+    {...rest}
+  />
+);
 
 export const OpenInNewIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
