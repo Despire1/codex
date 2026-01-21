@@ -1,4 +1,4 @@
-ALTER TABLE "User"
+ALTER TABLE IF EXISTS "User"
 ADD COLUMN "onboardingTeacherCompleted" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "onboardingStudentCompleted" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN "onboardingTeacherStartedAt" TIMESTAMP(3),
