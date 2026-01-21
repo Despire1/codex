@@ -282,6 +282,7 @@ const TemplateEditor: FC<{
                     </span>
                   </button>
                 }
+                side="top"
                 className={styles.emojiPopover}
               >
                 <div className={styles.emojiPickerWrapper}>
