@@ -180,6 +180,18 @@ const TemplateEditor: FC<{
   const selectionRef = useRef({ start: 0, end: 0 });
   const hasSelectionRef = useRef(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const [popoverTick, setPopoverTick] = useState(0);
+
+  useEffect(() => {
+    if (!isEmojiOpen) return undefined;
+    setPopoverTick((prev) => prev + 1);
+    const timeoutId = window.setTimeout(() => {
+      setPopoverTick((prev) => prev + 1);
+    }, 60);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isEmojiOpen]);
 
   const insertAtCursor = useCallback(
     (insertion: string) => {
@@ -282,10 +294,10 @@ const TemplateEditor: FC<{
                     </span>
                   </button>
                 }
-                side="top"
+                side="bottom"
                 className={styles.emojiPopover}
               >
-                <div className={styles.emojiPickerWrapper}>
+                <div className={styles.emojiPickerWrapper} data-popover-tick={popoverTick}>
                   <Picker
                     data={data}
                     theme="light"
