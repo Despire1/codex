@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "./scripts/dev-local.sh",
+    "db:local": "./scripts/db-local.sh",
     "api": "prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",
     "start:all": "./scripts/start-all.sh",

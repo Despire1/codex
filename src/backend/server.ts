@@ -31,6 +31,19 @@ const MAX_PAGE_SIZE = 50;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
+const LOCAL_AUTH_BYPASS = process.env.LOCAL_AUTH_BYPASS === 'true' && process.env.NODE_ENV !== 'production';
+const LOCAL_DEV_TELEGRAM_ID = (() => {
+  const raw = process.env.LOCAL_DEV_TELEGRAM_ID;
+  if (!raw) return 999_999_999n;
+  try {
+    return BigInt(raw);
+  } catch (error) {
+    return 999_999_999n;
+  }
+})();
+const LOCAL_DEV_USERNAME = process.env.LOCAL_DEV_USERNAME ?? 'local_teacher';
+const LOCAL_DEV_FIRST_NAME = process.env.LOCAL_DEV_FIRST_NAME ?? 'Local';
+const LOCAL_DEV_LAST_NAME = process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher';
 const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 1440);
 const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
@@ -148,10 +161,14 @@ const getBaseUrl = (req: IncomingMessage) => {
   return `${protocol}://${host}`;
 };
 
-const isSecureRequest = (req: IncomingMessage) => {
+const isLocalhostRequest = (req: IncomingMessage) => {
   const forwardedHost = getForwardedHost(req);
   const host = forwardedHost || req.headers.host || '';
-  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
+  return host.includes('localhost') || host.startsWith('127.0.0.1');
+};
+
+const isSecureRequest = (req: IncomingMessage) => {
+  const isLocalhost = isLocalhostRequest(req);
   if (isLocalhost) return false;
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
   const forwardedProtocol = forwardedProto.split(',')[0]?.trim();
@@ -197,6 +214,38 @@ const getSessionUser = async (req: IncomingMessage) => {
     include: { user: true },
   });
   return session?.user ?? null;
+};
+
+const ensureLocalDevUser = async () => {
+  const existing = await prisma.user.findUnique({ where: { telegramUserId: LOCAL_DEV_TELEGRAM_ID } });
+  if (existing) {
+    if (!existing.subscriptionStartAt) {
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: { subscriptionStartAt: new Date(), subscriptionEndAt: null },
+      });
+    }
+    return existing;
+  }
+  return prisma.user.create({
+    data: {
+      telegramUserId: LOCAL_DEV_TELEGRAM_ID,
+      username: LOCAL_DEV_USERNAME,
+      firstName: LOCAL_DEV_FIRST_NAME,
+      lastName: LOCAL_DEV_LAST_NAME,
+      role: 'TEACHER',
+      subscriptionStartAt: new Date(),
+    },
+  });
+};
+
+const resolveSessionUser = async (req: IncomingMessage, res: ServerResponse) => {
+  const sessionUser = await getSessionUser(req);
+  if (sessionUser) return sessionUser;
+  if (!LOCAL_AUTH_BYPASS || !isLocalhostRequest(req)) return null;
+  const localUser = await ensureLocalDevUser();
+  await createSession(localUser.id, req, res);
+  return localUser;
 };
 
 const getSessionTokenHash = (req: IncomingMessage) => {
@@ -2864,7 +2913,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    const sessionUser = pathname.startsWith('/api/') ? await getSessionUser(req) : null;
+    const sessionUser = pathname.startsWith('/api/') ? await resolveSessionUser(req, res) : null;
     if (pathname.startsWith('/api/') && !sessionUser) {
       return sendJson(res, 401, { message: 'unauthorized' });
     }
@@ -2938,7 +2987,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (req.method === 'GET' && pathname === '/auth/session') {
-      const user = await getSessionUser(req);
+      const user = await resolveSessionUser(req, res);
       if (!user) return sendJson(res, 401, { message: 'unauthorized' });
       return sendJson(res, 200, { user });
     }
