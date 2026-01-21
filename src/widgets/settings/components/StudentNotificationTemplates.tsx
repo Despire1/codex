@@ -32,7 +32,122 @@ type TemplateConfig = {
 
 const TEMPLATE_MAX_LENGTH = 1000;
 
-const emojiOptions = ['🙂', '😊', '👍', '✨', '🎉', '🔥', '✅', '📚', '⏰'];
+const emojiOptions = [
+  '😀',
+  '😁',
+  '😂',
+  '🤣',
+  '😃',
+  '😄',
+  '😅',
+  '😆',
+  '😉',
+  '😊',
+  '😋',
+  '😎',
+  '😍',
+  '😘',
+  '🥰',
+  '😗',
+  '😙',
+  '😚',
+  '🙂',
+  '🤗',
+  '🤩',
+  '🤔',
+  '🤨',
+  '😐',
+  '😑',
+  '😶',
+  '🙄',
+  '😏',
+  '😣',
+  '😥',
+  '😮',
+  '🤐',
+  '😯',
+  '😪',
+  '😫',
+  '🥱',
+  '😴',
+  '😌',
+  '😛',
+  '😜',
+  '😝',
+  '🤤',
+  '😒',
+  '😓',
+  '😔',
+  '😕',
+  '🙃',
+  '🫠',
+  '🤑',
+  '😲',
+  '☹️',
+  '🙁',
+  '😖',
+  '😞',
+  '😟',
+  '😤',
+  '😢',
+  '😭',
+  '😦',
+  '😧',
+  '😨',
+  '😩',
+  '🤯',
+  '😬',
+  '😰',
+  '😱',
+  '🥵',
+  '🥶',
+  '😳',
+  '🤪',
+  '😵',
+  '😵‍💫',
+  '🥴',
+  '😠',
+  '😡',
+  '🤬',
+  '😷',
+  '🤒',
+  '🤕',
+  '🤢',
+  '🤮',
+  '🤧',
+  '😇',
+  '🥳',
+  '🥺',
+  '🤠',
+  '🤡',
+  '🤥',
+  '🫡',
+  '👍',
+  '👎',
+  '👏',
+  '🙌',
+  '🙏',
+  '💪',
+  '🔥',
+  '✨',
+  '⭐',
+  '🎉',
+  '🎊',
+  '💯',
+  '✅',
+  '📚',
+  '⏰',
+  '📝',
+  '💡',
+  '💬',
+  '📌',
+  '📎',
+  '📅',
+  '💳',
+  '💸',
+  '💵',
+  '📣',
+];
 
 const variableLabels: Record<string, { label: string; code: string }> = {
   student_name: { label: 'Имя ученика', code: '{{student_name}}' },
@@ -215,40 +330,6 @@ const TemplateEditor: FC<{
           <div className={styles.editorTitle}>{config.label}</div>
           <div className={styles.editorDescription}>{config.description}</div>
         </div>
-        {!isMobile && (
-          <AdaptivePopover
-            isOpen={isEmojiOpen}
-            onClose={() => setIsEmojiOpen(false)}
-            trigger={
-              <button
-                type="button"
-                className={`${controls.iconButton} ${styles.emojiButton}`}
-                onClick={() => setIsEmojiOpen((prev) => !prev)}
-                aria-label="Добавить эмодзи"
-                data-testid={`student-notification-${config.id}-emoji`}
-              >
-                🙂
-              </button>
-            }
-            className={styles.emojiPopover}
-          >
-            <div className={styles.emojiGrid}>
-              {emojiOptions.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  className={styles.emojiItem}
-                  onClick={() => {
-                    insertAtCursor(emoji);
-                    setIsEmojiOpen(false);
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </AdaptivePopover>
-        )}
       </div>
 
       <div className={styles.variablePanel}>
@@ -273,13 +354,51 @@ const TemplateEditor: FC<{
 
       <div className={styles.editorGrid}>
         <div className={styles.fieldGroup}>
-          <label className={styles.fieldLabel} htmlFor={`template-${config.id}`}>
-            Текст уведомления
-          </label>
+          <div className={styles.fieldLabelRow}>
+            <label className={styles.fieldLabel} htmlFor={`template-${config.id}`}>
+              Текст уведомления
+            </label>
+            {!isMobile && (
+              <AdaptivePopover
+                isOpen={isEmojiOpen}
+                onClose={() => setIsEmojiOpen(false)}
+                trigger={
+                  <button
+                    type="button"
+                    className={`${controls.iconButton} ${styles.emojiButton}`}
+                    onClick={() => setIsEmojiOpen((prev) => !prev)}
+                    aria-label="Добавить эмодзи"
+                    data-testid={`student-notification-${config.id}-emoji`}
+                  >
+                    <span className={styles.emojiIcon} role="img" aria-hidden>
+                      😊
+                    </span>
+                  </button>
+                }
+                className={styles.emojiPopover}
+              >
+                <div className={styles.emojiGrid}>
+                  {emojiOptions.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={styles.emojiItem}
+                      onClick={() => {
+                        insertAtCursor(emoji);
+                        setIsEmojiOpen(false);
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </AdaptivePopover>
+            )}
+          </div>
           <textarea
             id={`template-${config.id}`}
             ref={textareaRef}
-            className={`${controls.textArea} ${error ? styles.fieldError : ''}`}
+            className={`${controls.textArea} ${styles.textArea} ${error ? styles.fieldError : ''}`}
             value={value}
             onChange={(event) => onValueChange(event.target.value)}
             onDrop={handleDrop}
