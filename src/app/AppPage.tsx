@@ -57,6 +57,8 @@ const initialTeacher: Teacher = {
   tomorrowSummaryEnabled: false,
   tomorrowSummaryTime: '20:00',
   studentNotificationsEnabled: true,
+  studentUpcomingLessonTemplate: null,
+  studentPaymentDueTemplate: null,
   studentPaymentRemindersEnabled: true,
   autoConfirmLessons: true,
   globalPaymentRemindersEnabled: true,
