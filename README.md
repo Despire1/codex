@@ -15,6 +15,8 @@
    ```bash
    cp .env.example .env
    ```
+   - Для локальной разработки оставьте `VITE_API_BASE` пустым — Vite будет проксировать `/api` и `/auth` на `http://localhost:4000`.
+   - `APP_BASE_URL` и `TELEGRAM_WEBAPP_URL` по умолчанию в примере уже указывают на `http://localhost:5173`.
 3. Примените миграции и сгенерируйте Prisma Client (создаст `prisma/teacherbot.db`):
    ```bash
    npm run prisma:migrate
