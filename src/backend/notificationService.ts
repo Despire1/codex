@@ -250,6 +250,12 @@ const createNotificationLog = async (payload: {
   dedupeKey?: string | null;
 }) => {
   try {
+    const teacherExists = await prisma.teacher.findUnique({
+      where: { chatId: payload.teacherId },
+      select: { chatId: true },
+    });
+    if (!teacherExists) return null;
+
     return await prisma.notificationLog.create({
       data: {
         teacherId: payload.teacherId,
@@ -266,9 +272,10 @@ const createNotificationLog = async (payload: {
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002' &&
-      Array.isArray(error.meta?.target) &&
-      error.meta?.target.includes('dedupeKey')
+      ((error.code === 'P2002' &&
+        Array.isArray(error.meta?.target) &&
+        error.meta?.target.includes('dedupeKey')) ||
+        error.code === 'P2003')
     ) {
       return null;
     }
