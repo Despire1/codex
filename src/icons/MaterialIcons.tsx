@@ -1,5 +1,6 @@
 import { SVGProps } from 'react';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 
 // Minimal inline Material Design icons to avoid external downloads in sandboxed envs.
 // Paths taken from the official Material icon set used by MUI's icon package.
@@ -218,11 +219,7 @@ export const DeleteOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const LinkIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
-    <path d="M3.9 12a5 5 0 0 1 5-5h3v2h-3a3 3 0 1 0 0 6h3v2h-3a5 5 0 0 1-5-5zm6.1 1h4v-2h-4v2zm5-6h-3V5h3a5 5 0 0 1 0 10h-3v-2h3a3 3 0 0 0 0-6z" />
-  </svg>
-);
+export const LinkIcon = LinkOutlinedIcon;
 
 export const OpenInNewIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
