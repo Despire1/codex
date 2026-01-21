@@ -30,6 +30,8 @@ type SettingsPatch = Partial<
     | 'tomorrowSummaryEnabled'
     | 'tomorrowSummaryTime'
     | 'studentNotificationsEnabled'
+    | 'studentUpcomingLessonTemplate'
+    | 'studentPaymentDueTemplate'
     | 'autoConfirmLessons'
     | 'globalPaymentRemindersEnabled'
     | 'paymentReminderDelayHours'

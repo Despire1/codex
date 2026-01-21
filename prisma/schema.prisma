@@ -21,6 +21,8 @@ model Teacher {
   tomorrowSummaryEnabled Boolean        @default(false)
   tomorrowSummaryTime   String          @default("20:00")
   studentNotificationsEnabled Boolean   @default(true)
+  studentUpcomingLessonTemplate String?
+  studentPaymentDueTemplate String?
   studentPaymentRemindersEnabled Boolean @default(true)
   autoConfirmLessons    Boolean         @default(true)
   globalPaymentRemindersEnabled Boolean @default(true)
