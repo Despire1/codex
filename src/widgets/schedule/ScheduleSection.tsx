@@ -16,6 +16,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   HistoryOutlinedIcon,
+  LinkIcon,
   ViewDayIcon,
   ViewWeekIcon,
 } from '../../icons/MaterialIcons';
@@ -443,6 +444,26 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     );
   };
 
+  const handleOpenMeetingLink = (event: MouseEvent, meetingLink: string) => {
+    event.stopPropagation();
+    window.open(meetingLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const renderMeetingLinkButton = (lesson: Lesson, className?: string) => {
+    if (!lesson.meetingLink) return null;
+    return (
+      <button
+        type="button"
+        className={`${styles.meetingLinkButton} ${className ?? ''}`}
+        onClick={(event) => handleOpenMeetingLink(event, lesson.meetingLink as string)}
+        aria-label="Открыть ссылку на созвон"
+        data-testid={`lesson-item-open-link-${lesson.id}`}
+      >
+        <LinkIcon width={14} height={14} />
+      </button>
+    );
+  };
+
   const handleTimeHover = (event: MouseEvent<HTMLDivElement>, dayIso: string) => {
     const target = event.target as HTMLElement;
     if (target.closest(`.${styles.weekLesson}`) || target.closest(`.${styles.dayLesson}`)) {
@@ -555,7 +576,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                             <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
                               {lessonLabel}
                             </Ellipsis>
-                            <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                            <div className={styles.lessonDateRow}>
+                              <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                              {renderMeetingLinkButton(lesson)}
+                            </div>
                           </div>
                           <div className={styles.statusBadges}>
                             {awaitingConfirmation && (
@@ -639,7 +663,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
                         {lessonLabel}
                       </Ellipsis>
-                      <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                      <div className={styles.lessonDateRow}>
+                        <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                        {renderMeetingLinkButton(lesson)}
+                      </div>
                     </div>
                     <div className={styles.statusBadges}>
                       {awaitingConfirmation && (
@@ -719,7 +746,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
                         {lessonLabel}
                       </Ellipsis>
-                      <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                      <div className={styles.lessonDateRow}>
+                        <span className={styles.lessonDate}>{dateTimeLabel}</span>
+                        {renderMeetingLinkButton(lesson)}
+                      </div>
                     </div>
                     <div className={styles.statusBadges}>
                       {awaitingConfirmation && (
@@ -846,7 +876,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               >
                 {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
                 <div className={styles.monthLessonInfo}>
-                  <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                  <div className={styles.monthLessonHeaderRow}>
+                    <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
+                    {renderMeetingLinkButton(lesson, styles.monthLessonLink)}
+                  </div>
                   <Ellipsis className={styles.monthLessonName} title={lessonLabel}>
                     {lessonLabel}
                   </Ellipsis>

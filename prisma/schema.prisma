@@ -113,6 +113,7 @@ model Lesson {
   paymentReminderCount Int               @default(0)
   lastPaymentReminderSource PaymentReminderSource?
   isRecurring         Boolean             @default(false)
+  meetingLink         String?
   recurrenceUntil     DateTime?
   recurrenceGroupId   String?
   recurrenceWeekdays  String?

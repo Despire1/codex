@@ -161,6 +161,8 @@ const fillTemplateVariables = (
 
 const resolveStudentTemplate = (value: string | null, fallback: string) => (value?.trim() ? value : fallback);
 
+const normalizeNotificationText = (value: string) => value.replace(/\n{3,}/g, '\n\n').trim();
+
 const buildTeacherPaymentReminderMessage = ({
   studentName,
   startAt,
@@ -403,12 +405,14 @@ export const sendStudentLessonReminder = async ({
       lesson_date: dateLabel,
       lesson_time: timeLabel,
       lesson_datetime: dateTimeLabel,
+      lesson_link: lesson.meetingLink ?? '',
     },
     STUDENT_LESSON_TEMPLATE_VARIABLES,
   );
+  const normalizedText = normalizeNotificationText(text);
 
   try {
-    await sendTelegramMessage(telegramId, text);
+    await sendTelegramMessage(telegramId, normalizedText);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
@@ -555,12 +559,14 @@ export const sendStudentPaymentReminder = async ({
       lesson_time: timeLabel,
       lesson_datetime: dateTimeLabel,
       lesson_price: String(priceSnapshot ?? 0),
+      lesson_link: lesson.meetingLink ?? '',
     },
     STUDENT_PAYMENT_TEMPLATE_VARIABLES,
   );
+  const normalizedText = normalizeNotificationText(text);
 
   try {
-    await sendTelegramMessage(telegramId, text);
+    await sendTelegramMessage(telegramId, normalizedText);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {

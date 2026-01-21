@@ -7,6 +7,7 @@ export const normalizeLesson = (lesson: any): Lesson => ({
   price: typeof lesson.price === 'number' ? lesson.price : Number(lesson.price ?? 0),
   startAt: typeof lesson.startAt === 'string' ? lesson.startAt : new Date(lesson.startAt).toISOString(),
   color: normalizeLessonColor(lesson.color),
+  meetingLink: typeof lesson.meetingLink === 'string' ? lesson.meetingLink : lesson.meetingLink ?? null,
   recurrenceUntil: lesson.recurrenceUntil
     ? typeof lesson.recurrenceUntil === 'string'
       ? lesson.recurrenceUntil

@@ -8,6 +8,11 @@ import type { User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
+  isValidMeetingLink,
+  MEETING_LINK_MAX_LENGTH,
+  normalizeMeetingLinkInput,
+} from '../shared/lib/meetingLink';
+import {
   formatInTimeZone,
   getTimeZoneStartOfDay,
   resolveTimeZone,
@@ -93,6 +98,23 @@ const validateStudentTemplate = (value: string, allowedVariables: readonly strin
   }
 
   return value;
+};
+
+const resolveMeetingLinkValue = (value: any) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') {
+    throw new Error('Некорректная ссылка');
+  }
+  const normalized = normalizeMeetingLinkInput(value);
+  if (!normalized) return null;
+  if (normalized.length > MEETING_LINK_MAX_LENGTH) {
+    throw new Error('Ссылка слишком длинная');
+  }
+  if (!isValidMeetingLink(normalized)) {
+    throw new Error('Некорректная ссылка');
+  }
+  return normalized;
 };
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
@@ -1601,6 +1623,7 @@ const createLesson = async (user: User, body: any) => {
   if (!startAt) throw new Error('Заполните дату и время урока');
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
+  const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1614,6 +1637,7 @@ const createLesson = async (user: User, body: any) => {
       studentId: studentIds[0],
       price: 0,
       color: lessonColor,
+      meetingLink: meetingLink ?? null,
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
@@ -1717,6 +1741,7 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
+  const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1780,6 +1805,7 @@ const createRecurringLessons = async (user: User, body: any) => {
         studentId: studentIds[0],
         price: 0,
         color: lessonColor,
+        meetingLink: meetingLink ?? null,
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -1907,6 +1933,9 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+  const requestedMeetingLink = resolveMeetingLinkValue(body?.meetingLink);
+  const resolvedSeriesMeetingLink =
+    requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
 
   if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
     await prisma.lessonParticipant.deleteMany({
@@ -1919,6 +1948,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         studentId: ids[0],
         price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
         color: normalizedColor,
+        meetingLink: existingLesson.meetingLink ?? null,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -1977,6 +2007,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               studentId: ids[0],
               price: 0,
               color: normalizedColor,
+              meetingLink: resolvedSeriesMeetingLink,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -2056,6 +2087,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               studentId: ids[0],
               price: 0,
               color: normalizedColor,
+              meetingLink: resolvedSeriesMeetingLink,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -2097,22 +2129,28 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     where: { lessonId },
   });
 
+  const updatePayload: Record<string, unknown> = {
+    studentId: ids[0],
+    price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
+    color: normalizedColor,
+    startAt: targetStart,
+    durationMinutes: nextDuration,
+    participants: {
+      create: students.map((student) => ({
+        studentId: student.id,
+        price: 0,
+        isPaid: false,
+      })),
+    },
+  };
+
+  if (requestedMeetingLink !== undefined) {
+    updatePayload.meetingLink = requestedMeetingLink;
+  }
+
   return prisma.lesson.update({
     where: { id: lessonId },
-    data: {
-      studentId: ids[0],
-      price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
-      color: normalizedColor,
-      startAt: targetStart,
-      durationMinutes: nextDuration,
-      participants: {
-        create: students.map((student) => ({
-          studentId: student.id,
-          price: 0,
-          isPaid: false,
-        })),
-      },
-    },
+    data: updatePayload,
     include: {
       participants: {
         include: {

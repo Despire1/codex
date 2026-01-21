@@ -103,6 +103,7 @@ export interface Lesson {
   paymentReminderCount?: number;
   lastPaymentReminderSource?: 'AUTO' | 'MANUAL' | null;
   color?: LessonColor;
+  meetingLink?: string | null;
   isRecurring?: boolean;
   recurrenceUntil?: string | null;
   recurrenceGroupId?: string | null;

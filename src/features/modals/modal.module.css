@@ -60,6 +60,31 @@
   font-weight: 600;
 }
 
+.inputAdornment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inputIconButton {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-slate-700);
+  cursor: pointer;
+  padding: 0;
+}
+
+.inputIconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .weekdayGroup {
   display: flex;
   flex-wrap: wrap;
