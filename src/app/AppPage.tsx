@@ -22,6 +22,7 @@ import {
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
+import { normalizeMeetingLinkInput } from '../shared/lib/meetingLink';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import {
@@ -258,6 +259,7 @@ export const AppPage = () => {
     date: todayISO(resolvedTimeZone),
     time: '18:00',
     durationMinutes: teacher.defaultLessonDuration,
+    meetingLink: '',
     color: DEFAULT_LESSON_COLOR,
     isRecurring: false,
     repeatWeekdays: [] as number[],
@@ -1023,6 +1025,7 @@ export const AppPage = () => {
               ? [selectedStudentId]
               : [],
       durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      meetingLink: existing?.meetingLink ?? '',
       color: existing?.color ?? DEFAULT_LESSON_COLOR,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
       repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
@@ -1115,6 +1118,8 @@ export const AppPage = () => {
 
     const startAtDate = toUtcDateFromTimeZone(newLessonDraft.date, newLessonDraft.time, resolvedTimeZone);
     const startAt = startAtDate.toISOString();
+    const meetingLinkPayload = normalizeMeetingLinkInput(newLessonDraft.meetingLink ?? '');
+    const meetingLink = meetingLinkPayload ? meetingLinkPayload : null;
 
     try {
       if (editingLessonId) {
@@ -1157,6 +1162,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
           applyToSeries,
           detachFromSeries: shouldDetach,
           repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
@@ -1201,6 +1207,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
           repeatWeekdays: newLessonDraft.repeatWeekdays,
           repeatUntil: resolvedRepeatUntil,
         });
@@ -1223,6 +1230,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);

@@ -159,6 +159,7 @@ export const api = {
     startAt: string;
     durationMinutes: number;
     color?: LessonColor;
+    meetingLink?: string | null;
   }) =>
     apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
   createRecurringLessons: (payload: {
@@ -169,6 +170,7 @@ export const api = {
     color?: LessonColor;
     repeatWeekdays: number[];
     repeatUntil?: string;
+    meetingLink?: string | null;
   }) => apiFetch<{ lessons: Lesson[] }>('/api/lessons/recurring', { method: 'POST', body: JSON.stringify(payload) }),
   updateLesson: (
     id: number,
@@ -178,6 +180,7 @@ export const api = {
       startAt: string;
       durationMinutes: number;
       color?: LessonColor;
+      meetingLink?: string | null;
       applyToSeries?: boolean;
       detachFromSeries?: boolean;
       repeatWeekdays?: number[];

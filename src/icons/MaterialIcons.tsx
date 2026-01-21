@@ -217,3 +217,16 @@ export const DeleteOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM18 4h-3.5l-1-1h-3l-1 1H4v2h16V4z" />
   </svg>
 );
+
+export const LinkIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M3.9 12a5 5 0 0 1 5-5h3v2h-3a3 3 0 1 0 0 6h3v2h-3a5 5 0 0 1-5-5zm6.1 1h4v-2h-4v2zm5-6h-3V5h3a5 5 0 0 1 0 10h-3v-2h3a3 3 0 0 0 0-6z" />
+  </svg>
+);
+
+export const OpenInNewIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 3h-6v2h2.59l-7.83 7.83 1.41 1.41L17 6.41V9h2V3z" />
+    <path d="M5 5h6V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2v6H5V5z" />
+  </svg>
+);

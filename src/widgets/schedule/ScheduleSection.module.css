@@ -430,6 +430,17 @@
   gap: 2px;
 }
 
+.monthLessonHeaderRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.monthLessonLink {
+  width: 20px;
+  height: 20px;
+}
+
 .monthLessonTime {
   font-weight: 700;
 }
@@ -872,6 +883,12 @@
   gap: 4px;
 }
 
+.lessonDateRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .lessonLabel {
   font-weight: 800;
   color: var(--color-slate-900);
@@ -881,6 +898,29 @@
   font-size: 12px;
   color: var(--color-slate-700);
   font-weight: 600;
+}
+
+.meetingLinkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  cursor: pointer;
+  padding: 0;
+}
+
+.meetingLinkButton:hover {
+  border-color: var(--color-slate-300);
+}
+
+.meetingLinkButton:focus-visible {
+  outline: 2px solid var(--primary-weak);
+  outline-offset: 1px;
 }
 
 .statusBadges {

@@ -8,6 +8,7 @@ import {
   Box,
   Checkbox,
   FormControlLabel,
+  InputAdornment,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -21,6 +22,12 @@ import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/
 import { LessonColor } from '../../../entities/types';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { ClearIcon, OpenInNewIcon } from '../../../icons/MaterialIcons';
+import {
+  isValidMeetingLink,
+  MEETING_LINK_MAX_LENGTH,
+  normalizeMeetingLinkInput,
+} from '../../../shared/lib/meetingLink';
 
 interface LessonDraft {
   studentId: number | undefined;
@@ -28,6 +35,7 @@ interface LessonDraft {
   date: string;
   time: string;
   durationMinutes: number;
+  meetingLink: string;
   color: LessonColor;
   isRecurring: boolean;
   repeatWeekdays: number[];
@@ -78,6 +86,21 @@ export const LessonModal: FC<LessonModalProps> = ({
     () => toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone),
     [draft.date, draft.time, timeZone],
   );
+  const normalizedMeetingLink = useMemo(
+    () => normalizeMeetingLinkInput(draft.meetingLink ?? ''),
+    [draft.meetingLink],
+  );
+  const meetingLinkError = useMemo(() => {
+    const trimmed = draft.meetingLink?.trim() ?? '';
+    if (!trimmed) return null;
+    if (normalizedMeetingLink.length > MEETING_LINK_MAX_LENGTH) {
+      return 'Ссылка слишком длинная';
+    }
+    if (!isValidMeetingLink(normalizedMeetingLink)) {
+      return 'Похоже, это не ссылка';
+    }
+    return null;
+  }, [draft.meetingLink, normalizedMeetingLink]);
 
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceLocked && !checked) return;
@@ -134,6 +157,18 @@ export const LessonModal: FC<LessonModalProps> = ({
       display: 'none',
     },
   } as const;
+  const isSubmitDisabled = Boolean(meetingLinkError);
+
+  const handleOpenMeetingLink = () => {
+    if (!normalizedMeetingLink || meetingLinkError) return;
+    window.open(normalizedMeetingLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleMeetingLinkBlur = () => {
+    const normalized = normalizeMeetingLinkInput(draft.meetingLink ?? '');
+    if (normalized === draft.meetingLink) return;
+    onDraftChange({ ...draft, meetingLink: normalized });
+  };
 
   return (
     <div className={modalStyles.modalOverlay} onClick={onClose}>
@@ -190,6 +225,58 @@ export const LessonModal: FC<LessonModalProps> = ({
                 sx={textFieldSx}
               />
             </div>
+          </div>
+          <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Ссылка на созвон (необязательно)</span>
+              <TextField
+                type="text"
+                value={draft.meetingLink}
+                onChange={(event) => onDraftChange({ ...draft, meetingLink: event.target.value })}
+                onBlur={handleMeetingLinkBlur}
+                placeholder="Вставьте ссылку (Zoom / Google Meet / Telegram / Teams…)"
+                fullWidth
+                sx={textFieldSx}
+                error={Boolean(meetingLinkError)}
+                inputProps={{ 'data-testid': 'lesson-modal-meeting-link-input' }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <div className={modalStyles.inputAdornment}>
+                        {draft.meetingLink && (
+                          <button
+                            type="button"
+                            className={modalStyles.inputIconButton}
+                            onClick={() => onDraftChange({ ...draft, meetingLink: '' })}
+                            aria-label="Очистить ссылку"
+                            data-testid="lesson-modal-meeting-link-clear"
+                          >
+                            <ClearIcon width={16} height={16} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={modalStyles.inputIconButton}
+                          onClick={handleOpenMeetingLink}
+                          aria-label="Открыть ссылку"
+                          disabled={!normalizedMeetingLink || Boolean(meetingLinkError)}
+                          data-testid="lesson-modal-meeting-link-open"
+                        >
+                          <OpenInNewIcon width={16} height={16} />
+                        </button>
+                      </div>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              {meetingLinkError && (
+                <Typography variant="caption" className={controls.error}>
+                  {meetingLinkError}
+                </Typography>
+              )}
+            </div>
+          </div>
+          <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Длительность (мин)</span>
               <TextField
@@ -323,7 +410,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           <button className={controls.secondaryButton} onClick={onClose}>
             Отмена
           </button>
-          <button className={controls.primaryButton} onClick={onSubmit}>
+          <button className={controls.primaryButton} onClick={onSubmit} disabled={isSubmitDisabled}>
             Сохранить урок
           </button>
         </div>

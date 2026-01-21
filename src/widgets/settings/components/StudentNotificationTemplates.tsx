@@ -44,6 +44,7 @@ const variableLabels: Record<string, { label: string; code: string }> = {
   lesson_time: { label: 'Время', code: '{{lesson_time}}' },
   lesson_datetime: { label: 'Дата и время', code: '{{lesson_datetime}}' },
   lesson_price: { label: 'Цена занятия', code: '{{lesson_price}}' },
+  lesson_link: { label: 'Ссылка на созвон', code: '{{lesson_link}}' },
 };
 
 const resolveTemplateValue = (value: string | null, fallback: string) => (value?.trim() ? value : fallback);
@@ -120,12 +121,14 @@ const templateConfigs: TemplateConfig[] = [
         lesson_date: '5 сентября',
         lesson_time: '18:00',
         lesson_datetime: '5 сентября 18:00',
+        lesson_link: 'https://meet.google.com/abc-defg-hij',
       },
       B: {
         student_name: 'Мария',
         lesson_date: '12 октября',
         lesson_time: '09:30',
         lesson_datetime: '12 октября 09:30',
+        lesson_link: '',
       },
     },
   },
@@ -143,6 +146,7 @@ const templateConfigs: TemplateConfig[] = [
         lesson_time: '16:00',
         lesson_datetime: '7 сентября 16:00',
         lesson_price: '1500',
+        lesson_link: 'https://meet.google.com/abc-defg-hij',
       },
       B: {
         student_name: 'София',
@@ -150,6 +154,7 @@ const templateConfigs: TemplateConfig[] = [
         lesson_time: '10:00',
         lesson_datetime: '11 сентября 10:00',
         lesson_price: '900',
+        lesson_link: '',
       },
     },
   },
