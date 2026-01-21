@@ -459,7 +459,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         aria-label="Открыть ссылку на занятие"
         data-testid={`lesson-item-open-link-${lesson.id}`}
       >
-        <LinkIcon width={14} height={14} />
+        <LinkIcon width={12} height={12} />
       </button>
     );
   };
