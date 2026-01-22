@@ -946,6 +946,49 @@
   gap: 6px;
 }
 
+.paymentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.paymentBadgeIcon {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paymentBadgePaid {
+  color: var(--lesson-border, var(--color-emerald-700));
+}
+
+.paymentBadgePaid .paymentBadgeIcon {
+  background: var(--lesson-border, var(--color-emerald-700));
+}
+
+.paymentBadgePaid .paymentBadgeIcon::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--color-white);
+  clip-path: polygon(14% 52%, 0 66%, 39% 100%, 100% 28%, 86% 14%, 38% 68%);
+}
+
+.paymentBadgeUnpaid {
+  color: #ef4444;
+}
+
 .viewGrid {
   display: flex;
   flex-direction: column;

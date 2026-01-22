@@ -431,15 +431,18 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const isPaid = !!participant?.isPaid;
 
     return (
-      <Badge
-        label={isPaid ? 'Оплачено' : 'Не оплачено'}
-        variant={isPaid ? 'paid' : 'unpaid'}
+      <button
+        type="button"
+        className={`${styles.paymentBadge} ${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaid}`}
         onClick={(event) => {
           event.stopPropagation();
           onTogglePaid(lessonId, participant?.studentId);
         }}
         title={isPaid ? 'Оплачено' : 'Не оплачено'}
-      />
+      >
+        <span className={styles.paymentBadgeIcon} aria-hidden="true" />
+        {isPaid ? 'Оплачено' : 'Не оплачено'}
+      </button>
     );
   };
 
