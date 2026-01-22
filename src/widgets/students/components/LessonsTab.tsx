@@ -2,7 +2,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent 
 import { format, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { LinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
+import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import {
   Lesson,
   LessonDateRange,
@@ -224,7 +224,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           aria-label="Открыть ссылку на занятие"
           data-testid={`lesson-item-open-link-${lesson.id}`}
         >
-          <LinkIcon width={10} height={10} />
+          <MeetingLinkIcon width={10} height={10} />
         </button>
       );
     },

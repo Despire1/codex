@@ -22,7 +22,7 @@ import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/
 import { LessonColor } from '../../../entities/types';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
-import { ClearIcon, OpenInNewIcon } from '../../../icons/MaterialIcons';
+import { ClearIcon, MeetingLinkIcon } from '../../../icons/MaterialIcons';
 import {
   isValidMeetingLink,
   MEETING_LINK_MAX_LENGTH,
@@ -262,7 +262,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                           disabled={!normalizedMeetingLink || Boolean(meetingLinkError)}
                           data-testid="lesson-modal-meeting-link-open"
                         >
-                          <OpenInNewIcon width={16} height={16} />
+                          <MeetingLinkIcon width={16} height={16} />
                         </button>
                       </div>
                     </InputAdornment>
