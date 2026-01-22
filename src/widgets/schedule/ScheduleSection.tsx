@@ -33,7 +33,7 @@ import styles from './ScheduleSection.module.css';
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
 const HOURS_IN_DAY = 24;
-const HOUR_BLOCK_HEIGHT = 52;
+const HOUR_BLOCK_HEIGHT = 72;
 const DEFAULT_SCROLL_HOUR = 9;
 const DEFAULT_SCROLL_TOP = DEFAULT_SCROLL_HOUR * HOUR_BLOCK_HEIGHT;
 const LAST_MINUTE = DAY_END_MINUTE - 1;
@@ -459,7 +459,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         aria-label="Открыть ссылку на занятие"
         data-testid={`lesson-item-open-link-${lesson.id}`}
       >
-        <LinkIcon width={10} height={10} />
+        <LinkIcon width={12} height={12} />
       </button>
     );
   };
