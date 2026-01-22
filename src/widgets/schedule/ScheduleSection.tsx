@@ -1,4 +1,4 @@
-import { addDays, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
+import { addDays, addMinutes, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import {
   useEffect,
@@ -16,7 +16,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   HistoryOutlinedIcon,
-  LinkIcon,
   ViewDayIcon,
   ViewWeekIcon,
 } from '../../icons/MaterialIcons';
@@ -459,8 +458,56 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         aria-label="Открыть ссылку на занятие"
         data-testid={`lesson-item-open-link-${lesson.id}`}
       >
-        <LinkIcon width={12} height={12} />
+        <svg className={styles.meetingLinkIcon} aria-hidden="true" focusable="false" viewBox="0 0 640 512">
+          <path
+            fill="currentColor"
+            d="M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-56.5-186.3-15.4l-1.6 1.1c-14.4 10.3-17.7 30.3-7.4 44.6s30.3 17.7 44.6 7.4l1.6-1.1c32.1-22.9 76-19.3 103.8 8.6c31.5 31.5 31.5 82.5 0 114L422.3 334.8c-31.5 31.5-82.5 31.5-114 0c-27.9-27.9-31.5-71.8-8.6-103.8l1.1-1.6c10.3-14.4 6.9-34.4-7.4-44.6s-34.4-6.9-44.6 7.4l-1.1 1.6C206.5 251.2 213 330 263 380c56.5 56.5 148 56.5 204.5 0L579.8 267.7zM60.2 244.3c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 56.5 186.3 15.4l1.6-1.1c14.4-10.3 17.7-30.3 7.4-44.6s-30.3-17.7-44.6-7.4l-1.6 1.1c-32.1 22.9-76 19.3-103.8-8.6C74 372 74 321 105.5 289.5L217.7 177.2c31.5-31.5 82.5-31.5 114 0c27.9 27.9 31.5 71.8 8.6 103.9l-1.1 1.6c-10.3 14.4-6.9 34.4 7.4 44.6s34.4 6.9 44.6-7.4l1.1-1.6C433.5 260.8 427 182 377 132c-56.5-56.5-148-56.5-204.5 0L60.2 244.3z"
+          />
+        </svg>
       </button>
+    );
+  };
+
+  const renderLessonContent = (
+    lesson: Lesson,
+    layoutStyle: CSSProperties,
+    className?: string,
+  ) => {
+    const participants = buildParticipants(lesson);
+    const isGroupLesson = participants.length > 1;
+    const awaitingConfirmation = isAwaitingConfirmation(lesson);
+    const startDate = toZonedDate(lesson.startAt, timeZone);
+    const endDate = addMinutes(startDate, lesson.durationMinutes);
+    const timeLabel = `${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`;
+    const lessonLabel = getLessonLabel(participants);
+    const lessonMeta = isGroupLesson ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}` : '';
+
+    return (
+      <div
+        key={lesson.id}
+        className={`${styles.weekLesson} ${className ?? ''} ${
+          lesson.status === 'CANCELED' ? styles.canceledLesson : ''
+        }`}
+        style={{ ...layoutStyle, ...buildLessonColorStyle(lesson) }}
+        onClick={() => onStartEditLesson(lesson)}
+        onMouseEnter={() => setHoverIndicator(null)}
+      >
+        {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
+        <div className={styles.lessonCardHeader}>
+          <div className={styles.lessonCardInfo}>
+            <div className={styles.lessonTime}>{timeLabel}</div>
+            <Ellipsis className={styles.lessonTitle} title={lessonLabel}>
+              {lessonLabel}
+            </Ellipsis>
+          </div>
+          {renderMeetingLinkButton(lesson)}
+        </div>
+        <div className={styles.statusBadges}>
+          {awaitingConfirmation && <Badge label="Ожидает подтверждения" variant="pending" />}
+          {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+        </div>
+        {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
+      </div>
     );
   };
 
@@ -549,48 +596,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onMouseMove={(event) => handleTimeHover(event, day.iso)}
                   >
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
-                    {dayLessonLayouts.map((layout) => {
-                      const lesson = layout.lesson;
-                      const startDate = toZonedDate(lesson.startAt, timeZone);
-                      const participants = buildParticipants(lesson);
-                      const isGroupLesson = participants.length > 1;
-                      const awaitingConfirmation = isAwaitingConfirmation(lesson);
-                      const dateTimeLabel = `${format(startDate, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
-                        isGroupLesson ? ` · ${participants.length} уч.` : ''
-                      }`;
-                      const lessonLabel = getLessonLabel(participants);
-                      const lessonMeta = isGroupLesson
-                        ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                        : '';
-
-                      return (
-                        <div
-                          key={lesson.id}
-                          className={`${styles.weekLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
-                          style={{ ...buildLessonStyle(layout, WEEK_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
-                          onClick={() => onStartEditLesson(lesson)}
-                          onMouseEnter={() => setHoverIndicator(null)}
-                        >
-                          {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                          <div className={styles.lessonHeader}>
-                            <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
-                              {lessonLabel}
-                            </Ellipsis>
-                            <div className={styles.lessonDateRow}>
-                              <span className={styles.lessonDate}>{dateTimeLabel}</span>
-                              {renderMeetingLinkButton(lesson)}
-                            </div>
-                          </div>
-                          <div className={styles.statusBadges}>
-                            {awaitingConfirmation && (
-                              <Badge label="Ожидает подтверждения" variant="pending" />
-                            )}
-                            {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                          </div>
-                          {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
-                        </div>
-                      );
-                    })}
+                    {dayLessonLayouts.map((layout) =>
+                      renderLessonContent(layout.lesson, buildLessonStyle(layout, WEEK_LESSON_INSET)),
+                    )}
                   </div>
                 </div>
               );
@@ -634,50 +642,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === selectedDayIso && renderHoverIndicator(hoverIndicator.minutes)}
-              {selectedLessonLayouts.map((layout) => {
-                const lesson = layout.lesson;
-                const participants = buildParticipants(lesson);
-                const isGroupLesson = participants.length > 1;
-                const awaitingConfirmation = isAwaitingConfirmation(lesson);
-                const date = toZonedDate(lesson.startAt, timeZone);
-                const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
-                  isGroupLesson ? ` · ${participants.length} уч.` : ''
-                }`;
-                const lessonLabel = getLessonLabel(participants);
-                const lessonMeta = isGroupLesson
-                  ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                  : '';
-
-                return (
-                  <div
-                    key={lesson.id}
-                    className={`${styles.weekLesson} ${styles.dayLesson} ${
-                      lesson.status === 'CANCELED' ? styles.canceledLesson : ''
-                    }`}
-                    style={{ ...buildLessonStyle(layout, DAY_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
-                    onClick={() => onStartEditLesson(lesson)}
-                    onMouseEnter={() => setHoverIndicator(null)}
-                  >
-                    {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                    <div className={styles.lessonHeader}>
-                      <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
-                        {lessonLabel}
-                      </Ellipsis>
-                      <div className={styles.lessonDateRow}>
-                        <span className={styles.lessonDate}>{dateTimeLabel}</span>
-                        {renderMeetingLinkButton(lesson)}
-                      </div>
-                    </div>
-                    <div className={styles.statusBadges}>
-                      {awaitingConfirmation && (
-                        <Badge label="Ожидает подтверждения" variant="pending" />
-                      )}
-                      {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                    </div>
-                    {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
-                  </div>
-                );
-              })}
+              {selectedLessonLayouts.map((layout) =>
+                renderLessonContent(layout.lesson, buildLessonStyle(layout, DAY_LESSON_INSET), styles.dayLesson),
+              )}
             </div>
           </div>
         </div>
@@ -717,50 +684,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
-              {dayLessonLayouts.map((layout) => {
-                const lesson = layout.lesson;
-                const participants = buildParticipants(lesson);
-                const isGroupLesson = participants.length > 1;
-                const awaitingConfirmation = isAwaitingConfirmation(lesson);
-                const date = toZonedDate(lesson.startAt, timeZone);
-                const dateTimeLabel = `${format(date, 'dd.MM HH:mm')} · ${lesson.durationMinutes} мин${
-                  isGroupLesson ? ` · ${participants.length} уч.` : ''
-                }`;
-                const lessonLabel = getLessonLabel(participants);
-                const lessonMeta = isGroupLesson
-                  ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}`
-                  : '';
-
-                return (
-                  <div
-                    key={lesson.id}
-                    className={`${styles.weekLesson} ${styles.dayLesson} ${
-                      lesson.status === 'CANCELED' ? styles.canceledLesson : ''
-                    }`}
-                    style={{ ...buildLessonStyle(layout, DAY_LESSON_INSET), ...buildLessonColorStyle(lesson) }}
-                    onClick={() => onStartEditLesson(lesson)}
-                    onMouseEnter={() => setHoverIndicator(null)}
-                  >
-                    {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                    <div className={styles.lessonHeader}>
-                      <Ellipsis className={styles.lessonLabel} title={lessonLabel}>
-                        {lessonLabel}
-                      </Ellipsis>
-                      <div className={styles.lessonDateRow}>
-                        <span className={styles.lessonDate}>{dateTimeLabel}</span>
-                        {renderMeetingLinkButton(lesson)}
-                      </div>
-                    </div>
-                    <div className={styles.statusBadges}>
-                      {awaitingConfirmation && (
-                        <Badge label="Ожидает подтверждения" variant="pending" />
-                      )}
-                      {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                    </div>
-                    {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
-                  </div>
-                );
-              })}
+              {dayLessonLayouts.map((layout) =>
+                renderLessonContent(layout.lesson, buildLessonStyle(layout, DAY_LESSON_INSET), styles.dayLesson),
+              )}
             </div>
           </div>
         </div>
