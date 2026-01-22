@@ -6,12 +6,8 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
-  Checkbox,
-  FormControlLabel,
   InputAdornment,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -121,6 +117,13 @@ export const LessonModal: FC<LessonModalProps> = ({
           : [],
       repeatUntil: checked ? draft.repeatUntil : undefined,
     });
+  };
+
+  const handleWeekdayToggle = (day: number) => {
+    const nextWeekdays = draft.repeatWeekdays.includes(day)
+      ? draft.repeatWeekdays.filter((item) => item !== day)
+      : [...draft.repeatWeekdays, day];
+    onDraftChange({ ...draft, repeatWeekdays: nextWeekdays });
   };
 
   const textFieldSx = {
@@ -346,57 +349,45 @@ export const LessonModal: FC<LessonModalProps> = ({
               )}
             </div>
           </div>
-          <FormControlLabel
-            control={
-              <Checkbox
+          <div className={modalStyles.switchRow}>
+            <label className={controls.switch}>
+              <input
+                type="checkbox"
                 checked={draft.isRecurring}
                 disabled={recurrenceLocked && draft.isRecurring}
                 onChange={(e) => handleRecurringToggle(e.target.checked)}
               />
-            }
-            label={'Сделать урок повторяющимся'}
-          />
+              <span className={controls.slider} />
+            </label>
+            <span className={modalStyles.switchLabel}>Сделать урок повторяющимся</span>
+          </div>
           {draft.isRecurring && (
             <Box>
               <div className={modalStyles.field}>
-                <span className={modalStyles.fieldLabel}>Выберите дни недели для повтора</span>
-                <ToggleButtonGroup
-                  value={draft.repeatWeekdays}
-                  onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
-                  className={modalStyles.weekdayGroup}
-                  sx={{
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                    '& .MuiToggleButton-root': {
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      padding: '10px 12px',
-                      textTransform: 'none',
-                      color: 'var(--text)',
-                      minWidth: '44px',
-                    },
-                    '& .MuiToggleButton-root.Mui-selected': {
-                      background: 'var(--color-blue-600)',
-                      color: 'var(--color-white)',
-                      borderColor: 'var(--color-blue-600)',
-                    },
-                    '& .MuiToggleButton-root.Mui-selected:hover': {
-                      background: 'var(--color-blue-700)',
-                      borderColor: 'var(--color-blue-700)',
-                    },
-                  }}
-                >
-                  {weekdayOptions.map((day) => (
-                    <ToggleButton
-                      key={day.value}
-                      value={day.value}
-                      aria-label={`repeat-${day.label}`}
-                      className={modalStyles.weekdayToggle}
-                    >
-                      {day.label}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
+                <span className={modalStyles.fieldLabel}>Выберите дни недели</span>
+                <div className={modalStyles.weekdayGrid} role="group" aria-label="Дни недели">
+                  {weekdayOptions.map((day) => {
+                    const isActive = draft.repeatWeekdays.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        className={`${modalStyles.weekdayButton} ${
+                          isActive ? modalStyles.weekdayButtonActive : ''
+                        }`}
+                        onClick={() => handleWeekdayToggle(day.value)}
+                        aria-pressed={isActive}
+                      >
+                        <span>{day.label}</span>
+                        <span
+                          className={`${modalStyles.weekdayDot} ${
+                            isActive ? modalStyles.weekdayDotActive : ''
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <Box
                 style={{

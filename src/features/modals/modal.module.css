@@ -60,6 +60,19 @@
   font-weight: 600;
 }
 
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.switchLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .timeRow {
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 0.7fr) auto minmax(120px, 0.7fr);
@@ -110,6 +123,44 @@
   text-transform: none !important;
   padding: 10px 12px !important;
   color: var(--text) !important;
+}
+
+.weekdayGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(48px, 1fr));
+  gap: 10px;
+}
+
+.weekdayButton {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--color-white);
+  padding: 10px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-700);
+  cursor: pointer;
+}
+
+.weekdayButtonActive {
+  border-color: var(--color-blue-600);
+  background: var(--primary-weak);
+  color: var(--color-blue-600);
+}
+
+.weekdayDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-slate-300);
+}
+
+.weekdayDotActive {
+  background: var(--color-blue-600);
 }
 
 .settingsAccordion {
