@@ -719,7 +719,7 @@
 }
 
 .timeSlot {
-  height: 52px;
+  height: 72px;
   padding: 8px 6px;
   font-size: 12px;
   text-align: center;
@@ -743,7 +743,7 @@
 .weekDayBody {
   position: relative;
   background-image: linear-gradient(to bottom, var(--color-slate-200) 1px, transparent 1px);
-  background-size: 100% 52px;
+  background-size: 100% 72px;
 }
 
 .weekDayBody:hover {
@@ -753,25 +753,32 @@
 
 .weekLesson {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  border-radius: 12px;
-  padding: 10px 12px;
+  left: 6px;
+  right: 6px;
+  border-radius: 10px;
+  padding: 10px;
   background: var(--lesson-bg, var(--color-sky-100));
-  border: 1px solid var(--lesson-border, var(--color-blue-600));
+  border: 1px solid var(--color-slate-100);
+  border-left: 4px solid var(--lesson-border, var(--color-blue-600));
   color: var(--color-slate-900);
-  box-shadow: 0 8px 20px var(--lesson-shadow, rgba(14, 165, 233, 0.15));
+  box-shadow: 0 8px 18px var(--lesson-shadow, rgba(14, 165, 233, 0.14));
   overflow: hidden;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.weekLesson:hover {
+  background: var(--color-white);
+  box-shadow: 0 8px 16px var(--lesson-shadow, rgba(14, 165, 233, 0.16));
 }
 
 .recurringBadge {
   position: absolute;
   top: 6px;
-  right: 11px;
+  right: 10px;
   background: transparent;
   color: var(--color-slate-400);
   padding: 0;
@@ -820,7 +827,7 @@
 .dayColumn {
   position: relative;
   background-image: linear-gradient(to bottom, var(--color-slate-200) 1px, transparent 1px);
-  background-size: 100% 52px;
+  background-size: 100% 72px;
   background-color: var(--color-slate-50);
 }
 
@@ -856,8 +863,8 @@
 }
 
 .dayLesson {
-  left: 12px;
-  right: 12px;
+  left: 8px;
+  right: 8px;
 }
 
 .canceledLesson {
@@ -895,7 +902,7 @@
 }
 
 .lessonDate {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-slate-700);
   font-weight: 600;
 }
@@ -904,18 +911,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid var(--lesson-border, var(--color-slate-200));
+  background: var(--lesson-bg, var(--color-slate-100));
+  color: var(--lesson-border, var(--color-slate-700));
   cursor: pointer;
   padding: 0;
 }
 
 .meetingLinkButton:hover {
-  border-color: var(--color-slate-300);
+  border-color: var(--lesson-border, var(--color-slate-300));
+  background: var(--color-white);
 }
 
 .meetingLinkButton:focus-visible {
