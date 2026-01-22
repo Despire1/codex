@@ -23,6 +23,7 @@ import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
 import { normalizeMeetingLinkInput } from '../shared/lib/meetingLink';
+import { addMinutesToTime, diffTimeMinutes } from '../shared/lib/timeFields';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import {
@@ -73,6 +74,9 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 type TabPath = (typeof tabs)[number]['path'];
+
+const resolveLessonEndTime = (startTime: string, durationMinutes: number) =>
+  addMinutesToTime(startTime, durationMinutes) || startTime;
 
 type StudentCardFiltersState = {
   homeworkFilter?: 'all' | HomeworkStatus | 'overdue';
@@ -258,7 +262,7 @@ export const AppPage = () => {
     studentIds: [] as number[],
     date: todayISO(resolvedTimeZone),
     time: '18:00',
-    durationMinutes: teacher.defaultLessonDuration,
+    endTime: resolveLessonEndTime('18:00', teacher.defaultLessonDuration),
     meetingLink: '',
     color: DEFAULT_LESSON_COLOR,
     isRecurring: false,
@@ -307,7 +311,10 @@ export const AppPage = () => {
         setNewLessonDraft((draft) => ({
           ...draft,
           studentId: draft.studentId ?? firstStudentId ?? undefined,
-          durationMinutes: data.teacher?.defaultLessonDuration ?? draft.durationMinutes,
+          endTime: resolveLessonEndTime(
+            draft.time,
+            data.teacher?.defaultLessonDuration ?? teacher.defaultLessonDuration,
+          ),
         }));
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -327,7 +334,10 @@ export const AppPage = () => {
   }, [studentSearch]);
 
   useEffect(() => {
-    setNewLessonDraft((draft) => ({ ...draft, durationMinutes: teacher.defaultLessonDuration }));
+    setNewLessonDraft((draft) => ({
+      ...draft,
+      endTime: resolveLessonEndTime(draft.time, teacher.defaultLessonDuration),
+    }));
   }, [teacher.defaultLessonDuration]);
 
   useEffect(() => {
@@ -1011,10 +1021,13 @@ export const AppPage = () => {
           ? [existing.studentId]
           : [];
 
+    const nextStartTime = time ?? (startDate ? format(startDate, 'HH:mm') : newLessonDraft.time);
+    const nextDuration = existing?.durationMinutes ?? teacher.defaultLessonDuration;
+
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
-      time: time ?? (startDate ? format(startDate, 'HH:mm') : draft.time),
+      time: nextStartTime,
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       studentIds:
         existingStudentIds.length > 0
@@ -1024,7 +1037,7 @@ export const AppPage = () => {
               : selectedStudentId
               ? [selectedStudentId]
               : [],
-      durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      endTime: resolveLessonEndTime(nextStartTime, nextDuration),
       meetingLink: existing?.meetingLink ?? '',
       color: existing?.color ?? DEFAULT_LESSON_COLOR,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
@@ -1108,8 +1121,11 @@ export const AppPage = () => {
       showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
       return;
     }
-    const durationMinutes = Number(newLessonDraft.durationMinutes);
-    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
+    const durationMinutes = diffTimeMinutes(newLessonDraft.time, newLessonDraft.endTime);
+    if (!durationMinutes || durationMinutes <= 0) {
+      showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
+      return;
+    }
 
     if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
       showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
