@@ -18,7 +18,6 @@ export const STUDENT_PAYMENT_TEMPLATE_VARIABLES = [
   'lesson_time',
   'lesson_datetime',
   'lesson_price',
-  'lesson_link',
 ] as const;
 
 export type StudentLessonTemplateVariable = (typeof STUDENT_LESSON_TEMPLATE_VARIABLES)[number];
