@@ -28,13 +28,19 @@ import {
   MEETING_LINK_MAX_LENGTH,
   normalizeMeetingLinkInput,
 } from '../../../shared/lib/meetingLink';
+import {
+  addMinutesToTime,
+  diffTimeMinutes,
+  normalizeTimeInput,
+  parseTimeToMinutes,
+} from '../../../shared/lib/timeFields';
 
 interface LessonDraft {
   studentId: number | undefined;
   studentIds: number[];
   date: string;
   time: string;
-  durationMinutes: number;
+  endTime: string;
   meetingLink: string;
   color: LessonColor;
   isRecurring: boolean;
@@ -164,6 +170,50 @@ export const LessonModal: FC<LessonModalProps> = ({
     window.open(normalizedMeetingLink, '_blank', 'noopener,noreferrer');
   };
 
+  const resolveEndTime = (startTime: string, endTime: string) => {
+    const startMinutes = parseTimeToMinutes(startTime);
+    const endMinutes = parseTimeToMinutes(endTime);
+    if (startMinutes === null || endMinutes === null) return endTime;
+    if (endMinutes < startMinutes) {
+      return addMinutesToTime(startTime, defaultDuration) || startTime;
+    }
+    return endTime;
+  };
+
+  const handleStartTimeChange = (nextValue: string) => {
+    const previousDuration = diffTimeMinutes(draft.time, draft.endTime);
+    const durationMinutes =
+      previousDuration && previousDuration > 0 ? previousDuration : defaultDuration;
+    const nextEndTime =
+      parseTimeToMinutes(nextValue) !== null
+        ? addMinutesToTime(nextValue, durationMinutes)
+        : draft.endTime;
+    onDraftChange({ ...draft, time: nextValue, endTime: nextEndTime });
+  };
+
+  const handleStartTimeBlur = () => {
+    const normalizedStart = normalizeTimeInput(draft.time);
+    const normalizedEnd = normalizeTimeInput(draft.endTime);
+    onDraftChange({
+      ...draft,
+      time: normalizedStart,
+      endTime: resolveEndTime(normalizedStart, normalizedEnd),
+    });
+  };
+
+  const handleEndTimeChange = (nextValue: string) => {
+    const nextEndTime = resolveEndTime(draft.time, nextValue);
+    onDraftChange({ ...draft, endTime: nextEndTime });
+  };
+
+  const handleEndTimeBlur = () => {
+    const normalizedEnd = normalizeTimeInput(draft.endTime);
+    onDraftChange({
+      ...draft,
+      endTime: resolveEndTime(draft.time, normalizedEnd),
+    });
+  };
+
   const handleMeetingLinkBlur = () => {
     const normalized = normalizeMeetingLinkInput(draft.meetingLink ?? '');
     if (normalized === draft.meetingLink) return;
@@ -175,8 +225,10 @@ export const LessonModal: FC<LessonModalProps> = ({
       <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={modalStyles.modalHeader}>
           <div>
-            <div className={modalStyles.modalLabel}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
-            <div className={modalStyles.modalTitle}>По умолчанию {defaultDuration} мин</div>
+            <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
+            <div className={modalStyles.modalSubtitle}>
+              {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
+            </div>
           </div>
           <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
             ×
@@ -208,7 +260,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               />
             </div>
           </div>
-          <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className={modalStyles.timeRow}>
             <DatePickerField
               label="Дата"
               value={draft.date}
@@ -216,13 +268,31 @@ export const LessonModal: FC<LessonModalProps> = ({
               className={modalStyles.field}
             />
             <div className={modalStyles.field}>
-              <span className={modalStyles.fieldLabel}>Время</span>
+              <span className={modalStyles.fieldLabel}>Начало</span>
               <TextField
                 type="time"
                 value={draft.time}
-                onChange={(e) => onDraftChange({ ...draft, time: e.target.value })}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                onBlur={handleStartTimeBlur}
                 fullWidth
                 sx={textFieldSx}
+                inputProps={{ step: 60 }}
+              />
+            </div>
+            <span className={modalStyles.timeDivider}>—</span>
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Конец</span>
+              <TextField
+                type="time"
+                value={draft.endTime}
+                onChange={(e) => handleEndTimeChange(e.target.value)}
+                onBlur={handleEndTimeBlur}
+                fullWidth
+                sx={textFieldSx}
+                inputProps={{
+                  step: 60,
+                  min: parseTimeToMinutes(draft.time) !== null ? normalizeTimeInput(draft.time) : '00:00',
+                }}
               />
             </div>
           </div>
@@ -274,19 +344,6 @@ export const LessonModal: FC<LessonModalProps> = ({
                   {meetingLinkError}
                 </Typography>
               )}
-            </div>
-          </div>
-          <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <div className={modalStyles.field}>
-              <span className={modalStyles.fieldLabel}>Длительность (мин)</span>
-              <TextField
-                type="number"
-                value={draft.durationMinutes}
-                onChange={(e) => onDraftChange({ ...draft, durationMinutes: Number(e.target.value) })}
-                placeholder={`${defaultDuration}`}
-                fullWidth
-                sx={textFieldSx}
-              />
             </div>
           </div>
           <FormControlLabel

@@ -12,9 +12,9 @@
 .modal {
   background: var(--color-white);
   border-radius: 16px;
-  max-width: 520px;
+  max-width: 640px;
   width: 100%;
-  padding: 14px;
+  padding: 20px;
   box-shadow: 0 20px 40px var(--shadow-slate-900-20);
 }
 
@@ -25,26 +25,26 @@
   gap: 10px;
 }
 
-.modalLabel {
-  color: var(--color-slate-500);
-  font-size: 13px;
+.modalTitle {
+  font-size: 22px;
+  font-weight: 700;
 }
 
-.modalTitle {
-  font-size: 18px;
-  font-weight: 800;
-  margin-top: 2px;
+.modalSubtitle {
+  font-size: 14px;
+  color: var(--color-slate-500);
+  margin-top: 4px;
 }
 
 .modalBody {
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
 .modalActions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .field {
@@ -55,9 +55,23 @@
 }
 
 .fieldLabel {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   font-weight: 600;
+}
+
+.timeRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 0.7fr) auto minmax(120px, 0.7fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.timeDivider {
+  align-self: center;
+  color: var(--color-slate-300);
+  font-weight: 600;
+  padding-top: 12px;
 }
 
 .inputAdornment {
