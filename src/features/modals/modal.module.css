@@ -238,3 +238,33 @@
   font-size: 18px;
   cursor: pointer;
 }
+
+@media (max-width: 640px) {
+  .modal {
+    padding: 16px;
+  }
+
+  .timeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .timeDivider {
+    display: none;
+  }
+
+  .weekdayGrid {
+    grid-template-columns: repeat(7, minmax(36px, 1fr));
+    gap: 6px;
+  }
+
+  .weekdayButton {
+    padding: 8px 0 6px;
+    font-size: 12px;
+    border-width: 1px;
+  }
+
+  .weekdayDot {
+    width: 4px;
+    height: 4px;
+  }
+}
