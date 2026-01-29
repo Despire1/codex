@@ -851,6 +851,7 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
       startAt: lesson.startAt,
       status: lesson.status,
       price,
+      lastPaymentReminderAt: lesson.lastPaymentReminderAt,
     };
   });
 
@@ -2470,7 +2471,12 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number, studentId?: number | null) => {
+const remindLessonPayment = async (
+  user: User,
+  lessonId: number,
+  studentId?: number | null,
+  options?: { force?: boolean },
+) => {
   const teacher = await ensureTeacher(user);
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -2497,7 +2503,7 @@ const remindLessonPayment = async (user: User, lessonId: number, studentId?: num
     throw new Error('student_not_activated');
   }
 
-  if (lesson.lastPaymentReminderAt) {
+  if (lesson.lastPaymentReminderAt && !options?.force) {
     const cooldownMs = 2 * 60 * 60 * 1000;
     if (Date.now() - lesson.lastPaymentReminderAt.getTime() < cooldownMs) {
       throw new Error('recently_sent');
@@ -3524,7 +3530,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const studentId = Number((body as any)?.studentId);
       const resolvedStudentId = Number.isFinite(studentId) ? studentId : null;
-      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId);
+      const force = Boolean((body as any)?.force);
+      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId, { force });
       return sendJson(res, 200, result);
     }
 
