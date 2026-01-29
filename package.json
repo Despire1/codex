@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:local": "./scripts/dev-local.sh",
+    "dev:local:bot": "./scripts/dev-local-bot.sh",
     "db:local": "./scripts/db-local.sh",
     "api": "prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",

@@ -33,9 +33,19 @@ wait_for_port "127.0.0.1" "$api_port"
 npm run dev &
 dev_pid=$!
 
+pids=("$api_pid" "$dev_pid")
+
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+  npm run bot &
+  bot_pid=$!
+  pids+=("$bot_pid")
+else
+  echo "TELEGRAM_BOT_TOKEN is empty; skipping bot startup." >&2
+fi
+
 cleanup() {
-  kill "$api_pid" "$dev_pid" 2>/dev/null || true
+  kill "${pids[@]}" 2>/dev/null || true
 }
 
 trap cleanup EXIT
-wait "$api_pid" "$dev_pid"
+wait "${pids[@]}"
