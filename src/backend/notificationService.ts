@@ -152,7 +152,7 @@ const fillTemplateVariables = (
   allowedVariables: readonly string[],
 ) => {
   const allowedSet = new Set(allowedVariables);
-  return template.replace(/{{\\s*([^}]+)\\s*}}/g, (match, rawVariable) => {
+  return template.replace(/{{\s*([^}]+)\s*}}/g, (match, rawVariable) => {
     const key = typeof rawVariable === 'string' ? rawVariable.trim() : '';
     if (!allowedSet.has(key)) return '';
     return values[key] ?? '';
