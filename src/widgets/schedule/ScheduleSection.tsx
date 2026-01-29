@@ -442,7 +442,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         title={isPaid ? 'Оплачено' : 'Не оплачено'}
       >
         <span className={styles.paymentBadgeIcon} aria-hidden="true" />
-        {isPaid ? 'Оплачено' : 'Не оплачено'}
+        <span
+            className={`${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaidText}`}
+        >
+          {isPaid ? 'Оплачено' : 'Не оплачено'}
+        </span>
       </button>
     );
   };

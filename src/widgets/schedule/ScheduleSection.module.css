@@ -985,8 +985,13 @@
   clip-path: polygon(14% 52%, 0 66%, 39% 100%, 100% 28%, 86% 14%, 38% 68%);
 }
 
-.paymentBadgeUnpaid {
-  color: #dc2626;
+.paymentBadgeUnpaid.paymentBadgeUnpaid {
+  color: var(--color-red-600)!important;
+}
+
+.paymentBadgeUnpaidText.paymentBadgeUnpaidText {
+  color: currentColor !important;
+  -webkit-text-fill-color: currentColor;
 }
 
 .viewGrid {
