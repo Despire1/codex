@@ -116,6 +116,7 @@ export interface StudentDebtItem {
   startAt: string;
   price: number | null;
   status: LessonStatus;
+  lastPaymentReminderAt?: string | null;
 }
 
 export type PaymentReminderSource = 'AUTO' | 'MANUAL';

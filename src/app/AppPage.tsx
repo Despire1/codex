@@ -1,4 +1,5 @@
 import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -1705,6 +1706,13 @@ export const AppPage = () => {
     try {
       await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
       showToast({ message: 'Отправлено ✅', variant: 'success' });
+      setStudentDebtItems((prev) =>
+        prev.map((item) =>
+          item.id === lessonId
+            ? { ...item, lastPaymentReminderAt: new Date().toISOString() }
+            : item,
+        ),
+      );
       if (selectedStudentId) {
         refreshPaymentReminders(selectedStudentId);
       }
@@ -1719,12 +1727,35 @@ export const AppPage = () => {
           code = error.message;
         }
       }
+      if (code === 'recently_sent' && !options?.force) {
+        const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+        const lastReminderLabel = reminderItem?.lastPaymentReminderAt
+          ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
+              locale: ru,
+              timeZone: resolvedTimeZone,
+            })
+          : null;
+        const message = lastReminderLabel
+          ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
+          : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
+        setDialogState({
+          type: 'confirm',
+          title: 'Напоминание уже отправлялось недавно',
+          message,
+          confirmText: 'Отправить',
+          cancelText: 'Отмена',
+          onConfirm: () => {
+            closeDialog();
+            remindLessonPayment(lessonId, studentId, { force: true });
+          },
+          onCancel: closeDialog,
+        });
+        return { status: 'error' as const };
+      }
       const message =
-        code === 'recently_sent'
-          ? 'Напоминание уже отправлялось недавно'
-          : code === 'student_not_activated'
-            ? 'Ученик не активировал бота — отправка невозможна'
-            : 'Не удалось отправить напоминание';
+        code === 'student_not_activated'
+          ? 'Ученик не активировал бота — отправка невозможна'
+          : 'Не удалось отправить напоминание';
       showToast({ message, variant: 'error' });
       // eslint-disable-next-line no-console
       console.error('Failed to send payment reminder', error);
