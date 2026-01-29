@@ -224,7 +224,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
           aria-label="Открыть ссылку на занятие"
           data-testid={`lesson-item-open-link-${lesson.id}`}
         >
-          <MeetingLinkIcon width={10} height={10} />
+          <MeetingLinkIcon width={14} height={14} />
         </button>
       );
     },

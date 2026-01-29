@@ -159,7 +159,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   } as const;
 
   const accordionSx = {
-    borderRadius: '12px',
+    borderRadius: '12px !important',
     border: '1px solid var(--border)',
     boxShadow: 'none',
     '&::before': {
