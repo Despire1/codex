@@ -68,7 +68,7 @@ export const createOnboardingMessages = (deps: {
       '💰 Оплаты\n' +
       '— сразу понятно, где есть неоплаченные занятия\n\n' +
       '🔔 Напоминания\n' +
-      '— для Вас и для учеников (после их активации)\n\n' +
+      '— для Вас и для учеников (после того, как ученик нажмёт /start)\n\n' +
       'Если хотите, проведу быстрый старт — без лишних шагов.';
     const replyMarkup = {
       inline_keyboard: [
@@ -168,7 +168,7 @@ export const createOnboardingMessages = (deps: {
       'Шаг 4 из 4 (по желанию).\n\n' +
       'Я могу аккуратно напоминать:\n' +
       '• Вам — о занятиях\n' +
-      '• ученику — об оплате (после его активации)\n\n' +
+      '• ученику — об оплате (после того, как он нажмёт /start)\n\n' +
       'Так Вы можете спокойно заниматься работой,\n' +
       'а не держать всё в голове.';
     const replyMarkup = {
@@ -199,24 +199,6 @@ export const createOnboardingMessages = (deps: {
     await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
   };
 
-  const sendStudentIntro = async (chatId: number, messageId?: OnboardingMessageId) => {
-    const text =
-      'Здравствуйте!\n' +
-      'Вы подключены как ученик.\n\n' +
-      'Я буду присылать напоминания:\n' +
-      '• о занятиях\n' +
-      '• об оплате\n\n' +
-      '— если преподаватель включит эти уведомления.\n\n' +
-      'Чтобы всё заработало, пожалуйста, активируйте профиль.';
-    const replyMarkup = {
-      inline_keyboard: [
-        [{ text: 'Активировать', callback_data: 'onboarding_student_activate' }],
-        [{ text: 'Пропустить', callback_data: 'onboarding_student_skip' }],
-      ],
-    };
-    await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
-  };
-
   return {
     sendTeacherIntro,
     sendTeacherFeatures,
@@ -226,6 +208,5 @@ export const createOnboardingMessages = (deps: {
     sendTeacherFullscreenStep,
     sendTeacherStep4,
     sendTeacherFinal,
-    sendStudentIntro,
   };
 };

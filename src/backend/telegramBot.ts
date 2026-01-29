@@ -272,7 +272,7 @@ const sendOnboardingTeacherFeatures = async (chatId: number) => {
       'Коротко, что здесь есть:\n' +
       '• Занятия: чтобы не забывать расписание\n' +
       '• Оплаты: видно, где не оплачено\n' +
-      '• Напоминания: себе и ученикам (после активации ученика)\n' +
+      '• Напоминания: себе и ученикам (после того, как ученик нажмёт /start)\n' +
       'Хочешь — покажу быстрый старт.',
     reply_markup: {
       inline_keyboard: [
@@ -537,7 +537,7 @@ const activateStudentByUsername = async (
 ) => {
   const normalized = normalizeTelegramUsername(username);
   if (!normalized) {
-    const text = 'Чтобы активироваться, укажите username в Telegram и нажмите /start ещё раз.';
+    const text = 'Чтобы получать уведомления, укажите username в Telegram и нажмите /start ещё раз.';
     if (options?.messageId) {
       await editMessage(chatId, options.messageId, text);
     } else {
@@ -568,7 +568,8 @@ const activateStudentByUsername = async (
       activatedAt: new Date(),
     },
   });
-  const successMessage = options?.successMessage ?? 'Профиль активирован. Вы ученик, вам доступны только уведомления.';
+  const successMessage =
+    options?.successMessage ?? 'Готово! Теперь преподаватель сможет отправлять вам уведомления.';
   if (successMessage) {
     if (options?.messageId) {
       await editMessage(chatId, options.messageId, successMessage);
@@ -623,12 +624,10 @@ const handleRoleSelection = async (
   }
 
   await setTeacherMenuButton(chatId);
-  if (!user.onboardingStudentCompleted) {
-    await ensureStudentOnboardingStarted(telegramUserId);
-    await onboardingMessages.sendStudentIntro(chatId, messageId);
-    return;
-  }
+  await ensureStudentOnboardingStarted(telegramUserId);
   await activateStudentByUsername(chatId, username ?? undefined, { messageId });
+  await completeStudentOnboarding(telegramUserId);
+  return;
 };
 
 const ensureTrialSubscription = async (payload: {
@@ -768,7 +767,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
       }
       if (update.callback_query.data === 'onboarding_student_activate') {
         await activateStudentByUsername(chatId, update.callback_query.from.username ?? undefined, {
-          successMessage: 'Готово, профиль активирован. Теперь преподаватель сможет отправлять тебе напоминания.',
+          successMessage: 'Готово! Теперь преподаватель сможет отправлять тебе уведомления.',
           messageId,
         });
         await completeStudentOnboarding(telegramUserId);
