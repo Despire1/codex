@@ -32,78 +32,29 @@
    ```
 6. Откройте http://localhost:5173. Все запросы `/api/*` уйдут на локальный сервер.
 
-## Локальный запуск тестового Telegram-бота одной командой (ngrok + API + фронтенд)
-Если нужен отдельный тестовый бот, добавьте в `.env` токен тест-бота и запустите всё одной командой:
-
-1. Установите и авторизуйте ngrok (один раз): https://ngrok.com/download
-2. В `.env` заполните:
-   - `TELEGRAM_TEST_BOT_TOKEN="..."` (тестовый бот из BotFather)
-   - `TELEGRAM_WEBAPP_URL` можно оставить как есть — при локальном запуске он будет переопределён ngrok URL
-3. Запустите локальную сборку + API + тестового бота:
-   ```bash
-   npm run start:local
-   ```
-
-Скрипт:
-- поднимет ngrok туннель на Vite (5173),
-- подставит публичный HTTPS URL в `TELEGRAM_WEBAPP_URL` и `APP_BASE_URL`,
-- запустит API, Vite и тестового Telegram-бота.
-
-> Для локального запуска используется `TELEGRAM_TEST_BOT_TOKEN`, основной бот не трогается.
-
-## Локальный dev на localhost (проверка настройки)
-Чтобы убедиться, что всё ходит именно на localhost:
-1. Убедитесь, что в `.env`:
-   - `DATABASE_URL="file:./prisma/teacherbot.db"`
-   - `APP_BASE_URL="http://localhost:5173"`
-   - `VITE_API_BASE=""` (пусто)
-2. Запустите API:
-   ```bash
-   npm run api
-   ```
-   В логах должно быть: `API server running on http://localhost:4000`.
-3. Запустите фронтенд:
-   ```bash
-   npm run dev
-   ```
-   Откройте `http://localhost:5173` и проверьте, что запросы идут на `http://localhost:4000` (через Vite proxy).
-
-## Локальный PostgreSQL для проверки миграций
-Если хотите прогонять миграции не на SQLite, а на локальном PostgreSQL:
-
-### 1. Поднимите PostgreSQL локально
-Самый простой вариант — Docker:
+### Один команда для локальной разработки (API + Vite + база)
+Если хотите запускать всё одной командой и без авторизации через Telegram локально:
 ```bash
-docker run --name teacherbot-postgres \
-  -e POSTGRES_DB=teacherbot \
-  -e POSTGRES_USER=teacherbot_user \
-  -e POSTGRES_PASSWORD=teacherbot_pass \
-  -p 5432:5432 \
-  -d postgres:16
+npm run dev:local
 ```
-Проверьте доступность:
+Скрипт применит миграции, сгенерирует Prisma Client, запустит API и Vite, а также включит локальный bypass авторизации
+через Telegram (для продакшена он не используется). В случае необходимости можно переопределить параметры через `.env`. 
+
+### Один команда для локальной разработки вместе с Telegram-ботом
+Если хотите одновременно поднять API, Vite и Telegram-бота (для тестового бота):
 ```bash
-psql "postgresql://teacherbot_user:teacherbot_pass@localhost:5432/teacherbot" -c "SELECT 1;"
+npm run dev:local:bot
 ```
+Скрипт делает всё как `dev:local`, а также запускает `npm run bot`, если задан `TELEGRAM_BOT_TOKEN`. Если токен не указан,
+бот будет пропущен.
 
-### 2. Укажите PostgreSQL в локальном `.env`
-В `.env` выставьте:
-```
-DATABASE_URL="postgresql://teacherbot_user:teacherbot_pass@localhost:5432/teacherbot?schema=public"
-```
-
-### 3. Прогоните миграции в PostgreSQL (без риска для SQLite)
+### Запуск PostgreSQL в Docker для локальной разработки
+Если хотите использовать PostgreSQL локально:
 ```bash
-npm run prisma:migrate
-npm run prisma:generate
+npm run db:local
 ```
-> Эти команды применяются к базе из `DATABASE_URL`, так что SQLite не пострадает, если вы укажете PostgreSQL в `.env`.
-
-### 4. Вернитесь к SQLite при необходимости
-Если нужно снова работать с SQLite, верните в `.env`:
-```
-DATABASE_URL="file:./prisma/teacherbot.db"
-```
+По умолчанию контейнер называется `teacherbot-db`, а порт 5432 пробрасывается наружу. Для переопределения используйте
+переменные `DB_CONTAINER_NAME`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`. 
 
 ## Продакшен деплой на сервер (PostgreSQL + HTTPS)
 Ниже — минимальный, но полный список шагов для деплоя на удалённый сервер, чтобы всё работало так же, как при локальном запуске.

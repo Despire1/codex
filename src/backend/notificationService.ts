@@ -4,6 +4,12 @@ import { Prisma } from '@prisma/client';
 import prisma from './prismaClient';
 import { resolveStudentTelegramId } from './studentContacts';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
+import {
+  DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
+  DEFAULT_STUDENT_UPCOMING_LESSON_TEMPLATE,
+  STUDENT_LESSON_TEMPLATE_VARIABLES,
+  STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+} from '../shared/lib/notificationTemplates';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
@@ -134,30 +140,28 @@ const formatLessonDateLabel = (startAt: Date, timeZone?: string | null) =>
 const formatLessonTimeLabel = (startAt: Date, timeZone?: string | null) =>
   formatInTimeZone(startAt, 'HH:mm', { timeZone: resolveTimeZone(timeZone) });
 
-const buildAutoPaymentReminderMessage = ({
-  teacherName,
-  startAt,
-  price,
-  timeZone,
-}: {
-  teacherName: string;
-  startAt: Date;
-  price: number | null;
-  timeZone?: string | null;
-}) => {
+const buildLessonDateTimeLabel = (startAt: Date, timeZone?: string | null) => {
   const dateLabel = formatLessonDateLabel(startAt, timeZone);
   const timeLabel = formatLessonTimeLabel(startAt, timeZone);
-  const priceLabel = typeof price === 'number' && price > 0 ? `${price} ₽` : null;
-  if (priceLabel) {
-    return `Здравствуйте! Напоминание об оплате занятия с преподавателем ${teacherName} за ${dateLabel} ${timeLabel}. Сумма: ${priceLabel}. Спасибо!`;
-  }
-  return `Здравствуйте! Напоминание об оплате занятия с преподавателем ${teacherName} за ${dateLabel} ${timeLabel}. Если уже оплатили — можно не отвечать 🙂 Спасибо!`;
+  return `${dateLabel} ${timeLabel}`;
 };
 
-const buildManualPaymentReminderMessage = (startAt: Date, timeZone?: string | null) => {
-  const dateLabel = formatLessonDateLabel(startAt, timeZone);
-  return `Здравствуйте! Напоминаю про оплату занятия за ${dateLabel}. Спасибо 🙂`;
+const fillTemplateVariables = (
+  template: string,
+  values: Record<string, string>,
+  allowedVariables: readonly string[],
+) => {
+  const allowedSet = new Set(allowedVariables);
+  return template.replace(/{{\s*([^}]+)\s*}}/g, (match, rawVariable) => {
+    const key = typeof rawVariable === 'string' ? rawVariable.trim() : '';
+    if (!allowedSet.has(key)) return '';
+    return values[key] ?? '';
+  });
 };
+
+const resolveStudentTemplate = (value: string | null, fallback: string) => (value?.trim() ? value : fallback);
+
+const normalizeNotificationText = (value: string) => value.replace(/\n{3,}/g, '\n\n').trim();
 
 const buildTeacherPaymentReminderMessage = ({
   studentName,
@@ -383,16 +387,32 @@ export const sendStudentLessonReminder = async ({
   });
   if (!log) return { status: 'skipped' as const };
 
-  const text = buildLessonReminderMessage({
-    startAt: lesson.startAt,
-    durationMinutes: lesson.durationMinutes,
-    timeZone: teacher.timezone,
-    target: 'student',
-    minutesBefore,
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: lesson.teacherId, studentId } },
   });
+  const studentName = link?.customName?.trim() || student.username?.trim() || 'ученик';
+  const dateLabel = formatLessonDateLabel(lesson.startAt, teacher.timezone);
+  const timeLabel = formatLessonTimeLabel(lesson.startAt, teacher.timezone);
+  const dateTimeLabel = buildLessonDateTimeLabel(lesson.startAt, teacher.timezone);
+  const template = resolveStudentTemplate(
+    teacher.studentUpcomingLessonTemplate,
+    DEFAULT_STUDENT_UPCOMING_LESSON_TEMPLATE,
+  );
+  const text = fillTemplateVariables(
+    template,
+    {
+      student_name: studentName,
+      lesson_date: dateLabel,
+      lesson_time: timeLabel,
+      lesson_datetime: dateTimeLabel,
+      lesson_link: lesson.meetingLink ?? '',
+    },
+    STUDENT_LESSON_TEMPLATE_VARIABLES,
+  );
+  const normalizedText = normalizeNotificationText(text);
 
   try {
-    await sendTelegramMessage(telegramId, text);
+    await sendTelegramMessage(telegramId, normalizedText);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {
@@ -514,25 +534,39 @@ export const sendStudentPaymentReminder = async ({
   });
   if (!log) return { status: 'skipped' as const };
 
-  const teacherName = teacher.name?.trim() || teacher.username?.trim() || 'преподаватель';
   const priceSnapshot =
     typeof participant.price === 'number' && participant.price > 0
       ? participant.price
       : typeof lesson.price === 'number' && lesson.price > 0
         ? lesson.price
         : null;
-  const text =
-    source === 'MANUAL'
-      ? buildManualPaymentReminderMessage(lesson.startAt, teacher.timezone)
-      : buildAutoPaymentReminderMessage({
-          teacherName,
-          startAt: lesson.startAt,
-          price: priceSnapshot,
-          timeZone: teacher.timezone,
-        });
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: lesson.teacherId, studentId } },
+  });
+  const studentName = link?.customName?.trim() || student.username?.trim() || 'ученик';
+  const dateLabel = formatLessonDateLabel(lesson.startAt, teacher.timezone);
+  const timeLabel = formatLessonTimeLabel(lesson.startAt, teacher.timezone);
+  const dateTimeLabel = buildLessonDateTimeLabel(lesson.startAt, teacher.timezone);
+  const template = resolveStudentTemplate(
+    teacher.studentPaymentDueTemplate,
+    DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
+  );
+  const text = fillTemplateVariables(
+    template,
+    {
+      student_name: studentName,
+      lesson_date: dateLabel,
+      lesson_time: timeLabel,
+      lesson_datetime: dateTimeLabel,
+      lesson_price: String(priceSnapshot ?? 0),
+      lesson_link: lesson.meetingLink ?? '',
+    },
+    STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+  );
+  const normalizedText = normalizeNotificationText(text);
 
   try {
-    await sendTelegramMessage(telegramId, text);
+    await sendTelegramMessage(telegramId, normalizedText);
     await finalizeNotificationLog(log.id, { status: 'SENT' });
     return { status: 'sent' as const };
   } catch (error) {

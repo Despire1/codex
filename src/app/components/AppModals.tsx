@@ -56,7 +56,8 @@ type LessonDraft = {
   studentIds: number[];
   date: string;
   time: string;
-  durationMinutes: number;
+  endTime: string;
+  meetingLink: string;
   color: LessonColor;
   isRecurring: boolean;
   repeatWeekdays: number[];

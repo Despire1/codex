@@ -1,8 +1,8 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { MoreHorizIcon } from '../../../icons/MaterialIcons';
+import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import {
   Lesson,
   LessonDateRange,
@@ -208,6 +208,29 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     [autoConfirmLessons],
   );
 
+  const handleOpenMeetingLink = useCallback((event: MouseEvent<HTMLButtonElement>, meetingLink: string) => {
+    event.stopPropagation();
+    window.open(meetingLink, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const renderMeetingLinkButton = useCallback(
+    (lesson: Lesson, className?: string) => {
+      if (!lesson.meetingLink) return null;
+      return (
+        <button
+          type="button"
+          className={`${styles.lessonMeetingLinkButton} ${className ?? ''}`}
+          onClick={(event) => handleOpenMeetingLink(event, lesson.meetingLink as string)}
+          aria-label="Открыть ссылку на занятие"
+          data-testid={`lesson-item-open-link-${lesson.id}`}
+        >
+          <MeetingLinkIcon width={14} height={14} />
+        </button>
+      );
+    },
+    [handleOpenMeetingLink],
+  );
+
   const renderLessonActions = (lesson: Lesson, isPaid: boolean) => {
     if (isLessonsMobile) {
       return (
@@ -311,7 +334,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                   <article key={lesson.id} className={styles.lessonCard}>
                     <div className={styles.lessonCardHeader}>
                       <div className={styles.lessonCardDate}>
-                        {formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}
+                        <span>{formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}</span>
+                        {renderMeetingLinkButton(lesson)}
                       </div>
                       <div className={styles.lessonCardActions}>{renderLessonActions(lesson, isPaid)}</div>
                     </div>
@@ -411,8 +435,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                       <TableRow key={lesson.id} hover className={styles.lessonTableRow}>
                         <TableCell>
                           <div className={styles.lessonDateCell}>
-                            <div className={styles.lessonTitle}>
-                              {formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}
+                            <div className={styles.lessonTitleRow}>
+                              <div className={styles.lessonTitle}>
+                                {formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone })}
+                              </div>
+                              {renderMeetingLinkButton(lesson, styles.lessonMeetingLinkInline)}
                             </div>
                           </div>
                         </TableCell>

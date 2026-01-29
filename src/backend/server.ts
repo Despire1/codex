@@ -8,6 +8,11 @@ import type { User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
+  isValidMeetingLink,
+  MEETING_LINK_MAX_LENGTH,
+  normalizeMeetingLinkInput,
+} from '../shared/lib/meetingLink';
+import {
   formatInTimeZone,
   getTimeZoneStartOfDay,
   resolveTimeZone,
@@ -15,6 +20,10 @@ import {
   toUtcEndOfDay,
   toZonedDate,
 } from '../shared/lib/timezoneDates';
+import {
+  STUDENT_LESSON_TEMPLATE_VARIABLES,
+  STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+} from '../shared/lib/notificationTemplates';
 import {
   sendStudentLessonReminder,
   sendStudentPaymentReminder,
@@ -31,6 +40,19 @@ const MAX_PAGE_SIZE = 50;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
+const LOCAL_AUTH_BYPASS = process.env.LOCAL_AUTH_BYPASS === 'true' && process.env.NODE_ENV !== 'production';
+const LOCAL_DEV_TELEGRAM_ID = (() => {
+  const raw = process.env.LOCAL_DEV_TELEGRAM_ID;
+  if (!raw) return 999_999_999n;
+  try {
+    return BigInt(raw);
+  } catch (error) {
+    return 999_999_999n;
+  }
+})();
+const LOCAL_DEV_USERNAME = process.env.LOCAL_DEV_USERNAME ?? 'local_teacher';
+const LOCAL_DEV_FIRST_NAME = process.env.LOCAL_DEV_FIRST_NAME ?? 'Local';
+const LOCAL_DEV_LAST_NAME = process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher';
 const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 1440);
 const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
@@ -53,6 +75,46 @@ const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const nowMs = now.getTime();
   const scheduledMs = scheduledFor.getTime();
   return scheduledMs <= nowMs && nowMs < scheduledMs + NOTIFICATION_TICK_MS;
+};
+
+const TEMPLATE_MAX_LENGTH = 1000;
+
+const validateStudentTemplate = (value: string, allowedVariables: readonly string[]) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('Текст уведомления не может быть пустым');
+  }
+  if (value.length > TEMPLATE_MAX_LENGTH) {
+    throw new Error(`Текст уведомления не должен превышать ${TEMPLATE_MAX_LENGTH} символов`);
+  }
+
+  const allowedSet = new Set(allowedVariables);
+  const variableRegex = /{{\\s*([^}]+)\\s*}}/g;
+  for (const match of value.matchAll(variableRegex)) {
+    const rawVariable = match[1]?.trim() ?? '';
+    if (!allowedSet.has(rawVariable)) {
+      throw new Error(`Неизвестная переменная: {{${rawVariable}}}`);
+    }
+  }
+
+  return value;
+};
+
+const resolveMeetingLinkValue = (value: any) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') {
+    throw new Error('Некорректная ссылка');
+  }
+  const normalized = normalizeMeetingLinkInput(value);
+  if (!normalized) return null;
+  if (normalized.length > MEETING_LINK_MAX_LENGTH) {
+    throw new Error('Ссылка слишком длинная');
+  }
+  if (!isValidMeetingLink(normalized)) {
+    throw new Error('Некорректная ссылка');
+  }
+  return normalized;
 };
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
@@ -148,10 +210,14 @@ const getBaseUrl = (req: IncomingMessage) => {
   return `${protocol}://${host}`;
 };
 
-const isSecureRequest = (req: IncomingMessage) => {
+const isLocalhostRequest = (req: IncomingMessage) => {
   const forwardedHost = getForwardedHost(req);
   const host = forwardedHost || req.headers.host || '';
-  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
+  return host.includes('localhost') || host.startsWith('127.0.0.1');
+};
+
+const isSecureRequest = (req: IncomingMessage) => {
+  const isLocalhost = isLocalhostRequest(req);
   if (isLocalhost) return false;
   const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
   const forwardedProtocol = forwardedProto.split(',')[0]?.trim();
@@ -197,6 +263,38 @@ const getSessionUser = async (req: IncomingMessage) => {
     include: { user: true },
   });
   return session?.user ?? null;
+};
+
+const ensureLocalDevUser = async () => {
+  const existing = await prisma.user.findUnique({ where: { telegramUserId: LOCAL_DEV_TELEGRAM_ID } });
+  if (existing) {
+    if (!existing.subscriptionStartAt) {
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: { subscriptionStartAt: new Date(), subscriptionEndAt: null },
+      });
+    }
+    return existing;
+  }
+  return prisma.user.create({
+    data: {
+      telegramUserId: LOCAL_DEV_TELEGRAM_ID,
+      username: LOCAL_DEV_USERNAME,
+      firstName: LOCAL_DEV_FIRST_NAME,
+      lastName: LOCAL_DEV_LAST_NAME,
+      role: 'TEACHER',
+      subscriptionStartAt: new Date(),
+    },
+  });
+};
+
+const resolveSessionUser = async (req: IncomingMessage, res: ServerResponse) => {
+  const sessionUser = await getSessionUser(req);
+  if (sessionUser) return sessionUser;
+  if (!LOCAL_AUTH_BYPASS || !isLocalhostRequest(req)) return null;
+  const localUser = await ensureLocalDevUser();
+  await createSession(localUser.id, req, res);
+  return localUser;
 };
 
 const getSessionTokenHash = (req: IncomingMessage) => {
@@ -280,6 +378,8 @@ const pickTeacherSettings = (teacher: any) => ({
   tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
   tomorrowSummaryTime: teacher.tomorrowSummaryTime,
   studentNotificationsEnabled: teacher.studentNotificationsEnabled,
+  studentUpcomingLessonTemplate: teacher.studentUpcomingLessonTemplate,
+  studentPaymentDueTemplate: teacher.studentPaymentDueTemplate,
   autoConfirmLessons: teacher.autoConfirmLessons,
   globalPaymentRemindersEnabled: teacher.globalPaymentRemindersEnabled,
   paymentReminderDelayHours: teacher.paymentReminderDelayHours,
@@ -341,6 +441,24 @@ const updateSettings = async (user: User, body: any) => {
 
   if (typeof body.studentNotificationsEnabled === 'boolean') {
     data.studentNotificationsEnabled = body.studentNotificationsEnabled;
+  }
+
+  if (typeof body.studentUpcomingLessonTemplate === 'string') {
+    data.studentUpcomingLessonTemplate = validateStudentTemplate(
+      body.studentUpcomingLessonTemplate,
+      STUDENT_LESSON_TEMPLATE_VARIABLES,
+    );
+  } else if (body.studentUpcomingLessonTemplate === null) {
+    data.studentUpcomingLessonTemplate = null;
+  }
+
+  if (typeof body.studentPaymentDueTemplate === 'string') {
+    data.studentPaymentDueTemplate = validateStudentTemplate(
+      body.studentPaymentDueTemplate,
+      STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+    );
+  } else if (body.studentPaymentDueTemplate === null) {
+    data.studentPaymentDueTemplate = null;
   }
 
   if (typeof body.autoConfirmLessons === 'boolean') {
@@ -733,6 +851,7 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
       startAt: lesson.startAt,
       status: lesson.status,
       price,
+      lastPaymentReminderAt: lesson.lastPaymentReminderAt,
     };
   });
 
@@ -1505,6 +1624,7 @@ const createLesson = async (user: User, body: any) => {
   if (!startAt) throw new Error('Заполните дату и время урока');
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
+  const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1518,6 +1638,7 @@ const createLesson = async (user: User, body: any) => {
       studentId: studentIds[0],
       price: 0,
       color: lessonColor,
+      meetingLink: meetingLink ?? null,
       startAt: new Date(startAt),
       durationMinutes: durationValue,
       status: 'SCHEDULED',
@@ -1621,6 +1742,7 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
+  const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -1684,6 +1806,7 @@ const createRecurringLessons = async (user: User, body: any) => {
         studentId: studentIds[0],
         price: 0,
         color: lessonColor,
+        meetingLink: meetingLink ?? null,
         startAt: date,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
@@ -1811,6 +1934,9 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
   const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
   const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+  const requestedMeetingLink = resolveMeetingLinkValue(body?.meetingLink);
+  const resolvedSeriesMeetingLink =
+    requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
 
   if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
     await prisma.lessonParticipant.deleteMany({
@@ -1823,6 +1949,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         studentId: ids[0],
         price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
         color: normalizedColor,
+        meetingLink: existingLesson.meetingLink ?? null,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -1881,6 +2008,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               studentId: ids[0],
               price: 0,
               color: normalizedColor,
+              meetingLink: resolvedSeriesMeetingLink,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -1960,6 +2088,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
               studentId: ids[0],
               price: 0,
               color: normalizedColor,
+              meetingLink: resolvedSeriesMeetingLink,
               startAt: start,
               durationMinutes: nextDuration,
               status: 'SCHEDULED',
@@ -2001,22 +2130,28 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     where: { lessonId },
   });
 
+  const updatePayload: Record<string, unknown> = {
+    studentId: ids[0],
+    price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
+    color: normalizedColor,
+    startAt: targetStart,
+    durationMinutes: nextDuration,
+    participants: {
+      create: students.map((student) => ({
+        studentId: student.id,
+        price: 0,
+        isPaid: false,
+      })),
+    },
+  };
+
+  if (requestedMeetingLink !== undefined) {
+    updatePayload.meetingLink = requestedMeetingLink;
+  }
+
   return prisma.lesson.update({
     where: { id: lessonId },
-    data: {
-      studentId: ids[0],
-      price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
-      color: normalizedColor,
-      startAt: targetStart,
-      durationMinutes: nextDuration,
-      participants: {
-        create: students.map((student) => ({
-          studentId: student.id,
-          price: 0,
-          isPaid: false,
-        })),
-      },
-    },
+    data: updatePayload,
     include: {
       participants: {
         include: {
@@ -2336,13 +2471,30 @@ const remindHomework = async (user: User, studentId: number) => {
   return { status: 'queued', studentId, teacherId: Number(teacher.chatId) };
 };
 
-const remindLessonPayment = async (user: User, lessonId: number, studentId?: number | null) => {
+const remindLessonPayment = async (
+  user: User,
+  lessonId: number,
+  studentId?: number | null,
+  options?: { force?: boolean },
+) => {
   const teacher = await ensureTeacher(user);
-  const lesson = await prisma.lesson.findUnique({
+  let lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { student: true, participants: true },
   });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+  if (lesson.status !== 'COMPLETED') {
+    const now = new Date();
+    if (lesson.status === 'SCHEDULED' && lesson.startAt.getTime() < now.getTime()) {
+      lesson = await prisma.lesson.update({
+        where: { id: lessonId },
+        data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
+        include: { student: true, participants: true },
+      });
+    } else {
+      throw new Error('Напоминание доступно только для завершённых занятий');
+    }
+  }
   if (lesson.status !== 'COMPLETED') {
     throw new Error('Напоминание доступно только для завершённых занятий');
   }
@@ -2363,7 +2515,7 @@ const remindLessonPayment = async (user: User, lessonId: number, studentId?: num
     throw new Error('student_not_activated');
   }
 
-  if (lesson.lastPaymentReminderAt) {
+  if (lesson.lastPaymentReminderAt && !options?.force) {
     const cooldownMs = 2 * 60 * 60 * 1000;
     if (Date.now() - lesson.lastPaymentReminderAt.getTime() < cooldownMs) {
       throw new Error('recently_sent');
@@ -2864,7 +3016,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    const sessionUser = pathname.startsWith('/api/') ? await getSessionUser(req) : null;
+    const sessionUser = pathname.startsWith('/api/') ? await resolveSessionUser(req, res) : null;
     if (pathname.startsWith('/api/') && !sessionUser) {
       return sendJson(res, 401, { message: 'unauthorized' });
     }
@@ -2938,7 +3090,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (req.method === 'GET' && pathname === '/auth/session') {
-      const user = await getSessionUser(req);
+      const user = await resolveSessionUser(req, res);
       if (!user) return sendJson(res, 401, { message: 'unauthorized' });
       return sendJson(res, 200, { user });
     }
@@ -3390,7 +3542,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const body = await readBody(req);
       const studentId = Number((body as any)?.studentId);
       const resolvedStudentId = Number.isFinite(studentId) ? studentId : null;
-      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId);
+      const force = Boolean((body as any)?.force);
+      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId, { force });
       return sendJson(res, 200, result);
     }
 

@@ -6,11 +6,8 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
-  Checkbox,
-  FormControlLabel,
+  InputAdornment,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -21,13 +18,26 @@ import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/
 import { LessonColor } from '../../../entities/types';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { ClearIcon, MeetingLinkIcon } from '../../../icons/MaterialIcons';
+import {
+  isValidMeetingLink,
+  MEETING_LINK_MAX_LENGTH,
+  normalizeMeetingLinkInput,
+} from '../../../shared/lib/meetingLink';
+import {
+  addMinutesToTime,
+  diffTimeMinutes,
+  normalizeTimeInput,
+  parseTimeToMinutes,
+} from '../../../shared/lib/timeFields';
 
 interface LessonDraft {
   studentId: number | undefined;
   studentIds: number[];
   date: string;
   time: string;
-  durationMinutes: number;
+  endTime: string;
+  meetingLink: string;
   color: LessonColor;
   isRecurring: boolean;
   repeatWeekdays: number[];
@@ -78,6 +88,21 @@ export const LessonModal: FC<LessonModalProps> = ({
     () => toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone),
     [draft.date, draft.time, timeZone],
   );
+  const normalizedMeetingLink = useMemo(
+    () => normalizeMeetingLinkInput(draft.meetingLink ?? ''),
+    [draft.meetingLink],
+  );
+  const meetingLinkError = useMemo(() => {
+    const trimmed = draft.meetingLink?.trim() ?? '';
+    if (!trimmed) return null;
+    if (normalizedMeetingLink.length > MEETING_LINK_MAX_LENGTH) {
+      return 'Ссылка слишком длинная';
+    }
+    if (!isValidMeetingLink(normalizedMeetingLink)) {
+      return 'Похоже, это не ссылка';
+    }
+    return null;
+  }, [draft.meetingLink, normalizedMeetingLink]);
 
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceLocked && !checked) return;
@@ -92,6 +117,13 @@ export const LessonModal: FC<LessonModalProps> = ({
           : [],
       repeatUntil: checked ? draft.repeatUntil : undefined,
     });
+  };
+
+  const handleWeekdayToggle = (day: number) => {
+    const nextWeekdays = draft.repeatWeekdays.includes(day)
+      ? draft.repeatWeekdays.filter((item) => item !== day)
+      : [...draft.repeatWeekdays, day];
+    onDraftChange({ ...draft, repeatWeekdays: nextWeekdays });
   };
 
   const textFieldSx = {
@@ -127,21 +159,79 @@ export const LessonModal: FC<LessonModalProps> = ({
   } as const;
 
   const accordionSx = {
-    borderRadius: '12px',
+    borderRadius: '12px !important',
     border: '1px solid var(--border)',
     boxShadow: 'none',
     '&::before': {
       display: 'none',
     },
   } as const;
+  const isSubmitDisabled = Boolean(meetingLinkError);
+
+  const handleOpenMeetingLink = () => {
+    if (!normalizedMeetingLink || meetingLinkError) return;
+    window.open(normalizedMeetingLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const resolveEndTime = (startTime: string, endTime: string) => {
+    const startMinutes = parseTimeToMinutes(startTime);
+    const endMinutes = parseTimeToMinutes(endTime);
+    if (startMinutes === null || endMinutes === null) return endTime;
+    if (endMinutes < startMinutes) {
+      return addMinutesToTime(startTime, defaultDuration) || startTime;
+    }
+    return endTime;
+  };
+
+  const handleStartTimeChange = (nextValue: string) => {
+    const previousDuration = diffTimeMinutes(draft.time, draft.endTime);
+    const durationMinutes =
+      previousDuration && previousDuration > 0 ? previousDuration : defaultDuration;
+    const nextEndTime =
+      parseTimeToMinutes(nextValue) !== null
+        ? addMinutesToTime(nextValue, durationMinutes)
+        : draft.endTime;
+    onDraftChange({ ...draft, time: nextValue, endTime: nextEndTime });
+  };
+
+  const handleStartTimeBlur = () => {
+    const normalizedStart = normalizeTimeInput(draft.time);
+    const normalizedEnd = normalizeTimeInput(draft.endTime);
+    onDraftChange({
+      ...draft,
+      time: normalizedStart,
+      endTime: resolveEndTime(normalizedStart, normalizedEnd),
+    });
+  };
+
+  const handleEndTimeChange = (nextValue: string) => {
+    const nextEndTime = resolveEndTime(draft.time, nextValue);
+    onDraftChange({ ...draft, endTime: nextEndTime });
+  };
+
+  const handleEndTimeBlur = () => {
+    const normalizedEnd = normalizeTimeInput(draft.endTime);
+    onDraftChange({
+      ...draft,
+      endTime: resolveEndTime(draft.time, normalizedEnd),
+    });
+  };
+
+  const handleMeetingLinkBlur = () => {
+    const normalized = normalizeMeetingLinkInput(draft.meetingLink ?? '');
+    if (normalized === draft.meetingLink) return;
+    onDraftChange({ ...draft, meetingLink: normalized });
+  };
 
   return (
     <div className={modalStyles.modalOverlay} onClick={onClose}>
       <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={modalStyles.modalHeader}>
           <div>
-            <div className={modalStyles.modalLabel}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
-            <div className={modalStyles.modalTitle}>По умолчанию {defaultDuration} мин</div>
+            <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
+            <div className={modalStyles.modalSubtitle}>
+              {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
+            </div>
           </div>
           <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
             ×
@@ -173,7 +263,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               />
             </div>
           </div>
-          <div className={controls.formRow} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className={modalStyles.timeRow}>
             <DatePickerField
               label="Дата"
               value={draft.date}
@@ -181,78 +271,123 @@ export const LessonModal: FC<LessonModalProps> = ({
               className={modalStyles.field}
             />
             <div className={modalStyles.field}>
-              <span className={modalStyles.fieldLabel}>Время</span>
+              <span className={modalStyles.fieldLabel}>Начало</span>
               <TextField
                 type="time"
                 value={draft.time}
-                onChange={(e) => onDraftChange({ ...draft, time: e.target.value })}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                onBlur={handleStartTimeBlur}
                 fullWidth
                 sx={textFieldSx}
+                inputProps={{ step: 60 }}
               />
             </div>
+            <span className={modalStyles.timeDivider}>—</span>
             <div className={modalStyles.field}>
-              <span className={modalStyles.fieldLabel}>Длительность (мин)</span>
+              <span className={modalStyles.fieldLabel}>Конец</span>
               <TextField
-                type="number"
-                value={draft.durationMinutes}
-                onChange={(e) => onDraftChange({ ...draft, durationMinutes: Number(e.target.value) })}
-                placeholder={`${defaultDuration}`}
+                type="time"
+                value={draft.endTime}
+                onChange={(e) => handleEndTimeChange(e.target.value)}
+                onBlur={handleEndTimeBlur}
                 fullWidth
                 sx={textFieldSx}
+                inputProps={{
+                  step: 60,
+                  min: parseTimeToMinutes(draft.time) !== null ? normalizeTimeInput(draft.time) : '00:00',
+                }}
               />
             </div>
           </div>
-          <FormControlLabel
-            control={
-              <Checkbox
+          <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
+            <div className={modalStyles.field}>
+              <span className={modalStyles.fieldLabel}>Ссылка на занятие (необязательно)</span>
+              <TextField
+                type="text"
+                value={draft.meetingLink}
+                onChange={(event) => onDraftChange({ ...draft, meetingLink: event.target.value })}
+                onBlur={handleMeetingLinkBlur}
+                placeholder="Вставьте ссылку (Zoom / Google Meet / Telegram / Teams…)"
+                fullWidth
+                sx={textFieldSx}
+                error={Boolean(meetingLinkError)}
+                inputProps={{ 'data-testid': 'lesson-modal-meeting-link-input' }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <div className={modalStyles.inputAdornment}>
+                        {draft.meetingLink && (
+                          <button
+                            type="button"
+                            className={modalStyles.inputIconButton}
+                            onClick={() => onDraftChange({ ...draft, meetingLink: '' })}
+                            aria-label="Очистить ссылку"
+                            data-testid="lesson-modal-meeting-link-clear"
+                          >
+                            <ClearIcon width={16} height={16} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={modalStyles.inputIconButton}
+                          onClick={handleOpenMeetingLink}
+                          aria-label="Открыть ссылку"
+                          disabled={!normalizedMeetingLink || Boolean(meetingLinkError)}
+                          data-testid="lesson-modal-meeting-link-open"
+                        >
+                          <MeetingLinkIcon width={16} height={16} />
+                        </button>
+                      </div>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              {meetingLinkError && (
+                <Typography variant="caption" className={controls.error}>
+                  {meetingLinkError}
+                </Typography>
+              )}
+            </div>
+          </div>
+          <div className={modalStyles.switchRow}>
+            <label className={controls.switch}>
+              <input
+                type="checkbox"
                 checked={draft.isRecurring}
                 disabled={recurrenceLocked && draft.isRecurring}
                 onChange={(e) => handleRecurringToggle(e.target.checked)}
               />
-            }
-            label={'Сделать урок повторяющимся'}
-          />
+              <span className={controls.slider} />
+            </label>
+            <span className={modalStyles.switchLabel}>Сделать урок повторяющимся</span>
+          </div>
           {draft.isRecurring && (
             <Box>
               <div className={modalStyles.field}>
-                <span className={modalStyles.fieldLabel}>Выберите дни недели для повтора</span>
-                <ToggleButtonGroup
-                  value={draft.repeatWeekdays}
-                  onChange={(_, nextValue) => onDraftChange({ ...draft, repeatWeekdays: nextValue ?? [] })}
-                  className={modalStyles.weekdayGroup}
-                  sx={{
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                    '& .MuiToggleButton-root': {
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      padding: '10px 12px',
-                      textTransform: 'none',
-                      color: 'var(--text)',
-                      minWidth: '44px',
-                    },
-                    '& .MuiToggleButton-root.Mui-selected': {
-                      background: 'var(--color-blue-600)',
-                      color: 'var(--color-white)',
-                      borderColor: 'var(--color-blue-600)',
-                    },
-                    '& .MuiToggleButton-root.Mui-selected:hover': {
-                      background: 'var(--color-blue-700)',
-                      borderColor: 'var(--color-blue-700)',
-                    },
-                  }}
-                >
-                  {weekdayOptions.map((day) => (
-                    <ToggleButton
-                      key={day.value}
-                      value={day.value}
-                      aria-label={`repeat-${day.label}`}
-                      className={modalStyles.weekdayToggle}
-                    >
-                      {day.label}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
+                <span className={modalStyles.fieldLabel}>Выберите дни недели</span>
+                <div className={modalStyles.weekdayGrid} role="group" aria-label="Дни недели">
+                  {weekdayOptions.map((day) => {
+                    const isActive = draft.repeatWeekdays.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        className={`${modalStyles.weekdayButton} ${
+                          isActive ? modalStyles.weekdayButtonActive : ''
+                        }`}
+                        onClick={() => handleWeekdayToggle(day.value)}
+                        aria-pressed={isActive}
+                      >
+                        <span>{day.label}</span>
+                        <span
+                          className={`${modalStyles.weekdayDot} ${
+                            isActive ? modalStyles.weekdayDotActive : ''
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <Box
                 style={{
@@ -323,7 +458,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           <button className={controls.secondaryButton} onClick={onClose}>
             Отмена
           </button>
-          <button className={controls.primaryButton} onClick={onSubmit}>
+          <button className={controls.primaryButton} onClick={onSubmit} disabled={isSubmitDisabled}>
             Сохранить урок
           </button>
         </div>

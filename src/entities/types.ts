@@ -14,6 +14,8 @@ export interface Teacher {
   tomorrowSummaryEnabled: boolean;
   tomorrowSummaryTime: string;
   studentNotificationsEnabled: boolean;
+  studentUpcomingLessonTemplate: string | null;
+  studentPaymentDueTemplate: string | null;
   studentPaymentRemindersEnabled: boolean;
   autoConfirmLessons: boolean;
   globalPaymentRemindersEnabled: boolean;
@@ -101,6 +103,7 @@ export interface Lesson {
   paymentReminderCount?: number;
   lastPaymentReminderSource?: 'AUTO' | 'MANUAL' | null;
   color?: LessonColor;
+  meetingLink?: string | null;
   isRecurring?: boolean;
   recurrenceUntil?: string | null;
   recurrenceGroupId?: string | null;
@@ -113,6 +116,7 @@ export interface StudentDebtItem {
   startAt: string;
   price: number | null;
   status: LessonStatus;
+  lastPaymentReminderAt?: string | null;
 }
 
 export type PaymentReminderSource = 'AUTO' | 'MANUAL';

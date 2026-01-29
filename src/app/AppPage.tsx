@@ -1,4 +1,5 @@
 import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -22,6 +23,8 @@ import {
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
+import { normalizeMeetingLinkInput } from '../shared/lib/meetingLink';
+import { addMinutesToTime, diffTimeMinutes } from '../shared/lib/timeFields';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import {
@@ -57,6 +60,8 @@ const initialTeacher: Teacher = {
   tomorrowSummaryEnabled: false,
   tomorrowSummaryTime: '20:00',
   studentNotificationsEnabled: true,
+  studentUpcomingLessonTemplate: null,
+  studentPaymentDueTemplate: null,
   studentPaymentRemindersEnabled: true,
   autoConfirmLessons: true,
   globalPaymentRemindersEnabled: true,
@@ -70,6 +75,9 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 type TabPath = (typeof tabs)[number]['path'];
+
+const resolveLessonEndTime = (startTime: string, durationMinutes: number) =>
+  addMinutesToTime(startTime, durationMinutes) || startTime;
 
 type StudentCardFiltersState = {
   homeworkFilter?: 'all' | HomeworkStatus | 'overdue';
@@ -255,7 +263,8 @@ export const AppPage = () => {
     studentIds: [] as number[],
     date: todayISO(resolvedTimeZone),
     time: '18:00',
-    durationMinutes: teacher.defaultLessonDuration,
+    endTime: resolveLessonEndTime('18:00', teacher.defaultLessonDuration),
+    meetingLink: '',
     color: DEFAULT_LESSON_COLOR,
     isRecurring: false,
     repeatWeekdays: [] as number[],
@@ -303,7 +312,10 @@ export const AppPage = () => {
         setNewLessonDraft((draft) => ({
           ...draft,
           studentId: draft.studentId ?? firstStudentId ?? undefined,
-          durationMinutes: data.teacher?.defaultLessonDuration ?? draft.durationMinutes,
+          endTime: resolveLessonEndTime(
+            draft.time,
+            data.teacher?.defaultLessonDuration ?? teacher.defaultLessonDuration,
+          ),
         }));
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -323,7 +335,10 @@ export const AppPage = () => {
   }, [studentSearch]);
 
   useEffect(() => {
-    setNewLessonDraft((draft) => ({ ...draft, durationMinutes: teacher.defaultLessonDuration }));
+    setNewLessonDraft((draft) => ({
+      ...draft,
+      endTime: resolveLessonEndTime(draft.time, teacher.defaultLessonDuration),
+    }));
   }, [teacher.defaultLessonDuration]);
 
   useEffect(() => {
@@ -1007,10 +1022,13 @@ export const AppPage = () => {
           ? [existing.studentId]
           : [];
 
+    const nextStartTime = time ?? (startDate ? format(startDate, 'HH:mm') : newLessonDraft.time);
+    const nextDuration = existing?.durationMinutes ?? teacher.defaultLessonDuration;
+
     setNewLessonDraft((draft) => ({
       ...draft,
       date: dateISO,
-      time: time ?? (startDate ? format(startDate, 'HH:mm') : draft.time),
+      time: nextStartTime,
       studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
       studentIds:
         existingStudentIds.length > 0
@@ -1020,7 +1038,8 @@ export const AppPage = () => {
               : selectedStudentId
               ? [selectedStudentId]
               : [],
-      durationMinutes: existing?.durationMinutes ?? draft.durationMinutes,
+      endTime: resolveLessonEndTime(nextStartTime, nextDuration),
+      meetingLink: existing?.meetingLink ?? '',
       color: existing?.color ?? DEFAULT_LESSON_COLOR,
       isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
       repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
@@ -1103,8 +1122,11 @@ export const AppPage = () => {
       showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
       return;
     }
-    const durationMinutes = Number(newLessonDraft.durationMinutes);
-    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return;
+    const durationMinutes = diffTimeMinutes(newLessonDraft.time, newLessonDraft.endTime);
+    if (!durationMinutes || durationMinutes <= 0) {
+      showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
+      return;
+    }
 
     if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
       showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
@@ -1113,6 +1135,8 @@ export const AppPage = () => {
 
     const startAtDate = toUtcDateFromTimeZone(newLessonDraft.date, newLessonDraft.time, resolvedTimeZone);
     const startAt = startAtDate.toISOString();
+    const meetingLinkPayload = normalizeMeetingLinkInput(newLessonDraft.meetingLink ?? '');
+    const meetingLink = meetingLinkPayload ? meetingLinkPayload : null;
 
     try {
       if (editingLessonId) {
@@ -1155,6 +1179,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
           applyToSeries,
           detachFromSeries: shouldDetach,
           repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
@@ -1199,6 +1224,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
           repeatWeekdays: newLessonDraft.repeatWeekdays,
           repeatUntil: resolvedRepeatUntil,
         });
@@ -1221,6 +1247,7 @@ export const AppPage = () => {
           startAt,
           durationMinutes,
           color: newLessonDraft.color,
+          meetingLink,
         });
 
         setLessons([...lessons, normalizeLesson(data.lesson)]);
@@ -1679,6 +1706,13 @@ export const AppPage = () => {
     try {
       await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
       showToast({ message: 'Отправлено ✅', variant: 'success' });
+      setStudentDebtItems((prev) =>
+        prev.map((item) =>
+          item.id === lessonId
+            ? { ...item, lastPaymentReminderAt: new Date().toISOString() }
+            : item,
+        ),
+      );
       if (selectedStudentId) {
         refreshPaymentReminders(selectedStudentId);
       }
@@ -1693,12 +1727,35 @@ export const AppPage = () => {
           code = error.message;
         }
       }
+      if (code === 'recently_sent' && !options?.force) {
+        const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+        const lastReminderLabel = reminderItem?.lastPaymentReminderAt
+          ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
+              locale: ru,
+              timeZone: resolvedTimeZone,
+            })
+          : null;
+        const message = lastReminderLabel
+          ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
+          : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
+        setDialogState({
+          type: 'confirm',
+          title: 'Напоминание уже отправлялось недавно',
+          message,
+          confirmText: 'Отправить',
+          cancelText: 'Отмена',
+          onConfirm: () => {
+            closeDialog();
+            remindLessonPayment(lessonId, studentId, { force: true });
+          },
+          onCancel: closeDialog,
+        });
+        return { status: 'error' as const };
+      }
       const message =
-        code === 'recently_sent'
-          ? 'Напоминание уже отправлялось недавно'
-          : code === 'student_not_activated'
-            ? 'Ученик не активировал бота — отправка невозможна'
-            : 'Не удалось отправить напоминание';
+        code === 'student_not_activated'
+          ? 'Ученик не активировал бота — отправка невозможна'
+          : 'Не удалось отправить напоминание';
       showToast({ message, variant: 'error' });
       // eslint-disable-next-line no-console
       console.error('Failed to send payment reminder', error);

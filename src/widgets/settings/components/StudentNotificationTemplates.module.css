@@ -1,0 +1,238 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  font-weight: 600;
+  color: var(--color-slate-700);
+}
+
+.tabRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tabButton {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-slate-600);
+}
+
+.tabButtonActive {
+  background: var(--color-blue-100);
+  color: var(--color-blue-700);
+  border-color: transparent;
+}
+
+.editorCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+}
+
+.editorHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.editorTitle {
+  font-weight: 600;
+  color: var(--color-slate-700);
+}
+
+.editorDescription {
+  font-size: 13px;
+  color: var(--color-slate-400);
+  margin-top: 4px;
+}
+
+.variablePanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.variableBadge {
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--color-slate-100);
+  color: var(--color-slate-700);
+  text-align: left;
+}
+
+.variableLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.variableCode {
+  font-size: 12px;
+  color: var(--color-slate-500);
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  color: var(--color-slate-500);
+}
+
+.fieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fieldError {
+  border-color: var(--color-rose-400);
+}
+
+.errorText {
+  font-size: 12px;
+  color: var(--color-rose-600);
+}
+
+.previewGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewTitle {
+  font-size: 13px;
+  color: var(--color-slate-500);
+}
+
+.exampleToggle {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.exampleButton {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-slate-600);
+}
+
+.exampleButtonActive {
+  background: var(--color-blue-100);
+  color: var(--color-blue-700);
+  border-color: transparent;
+}
+
+.previewBox {
+  border-radius: 12px;
+  border: 1px solid var(--color-slate-200);
+  padding: 12px;
+  background: var(--color-slate-50);
+}
+
+.previewText {
+  white-space: pre-wrap;
+  font-size: 14px;
+  color: var(--color-slate-700);
+}
+
+.previewMissing {
+  color: var(--color-slate-400);
+}
+
+.actionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.emojiButton {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.emojiIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.emojiPopover {
+  padding-bottom: 3px;
+  border-radius: 10px;
+  background: var(--color-white);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.emojiPickerWrapper {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.textArea {
+  min-height: 157px;
+}
+
+@media (max-width: 720px) {
+  .editorGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actionsRow {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+
+  .actionsRow button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .emojiButton {
+    display: none;
+  }
+
+  .textArea {
+    min-height: 160px;
+  }
+}

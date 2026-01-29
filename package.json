@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "./scripts/dev-local.sh",
+    "dev:local:bot": "./scripts/dev-local-bot.sh",
+    "db:local": "./scripts/db-local.sh",
     "api": "prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",
     "start:local": "./scripts/start-local-dev.sh",
@@ -23,6 +26,8 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
     "@prisma/client": "^5.20.0",
