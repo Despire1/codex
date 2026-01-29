@@ -2478,11 +2478,23 @@ const remindLessonPayment = async (
   options?: { force?: boolean },
 ) => {
   const teacher = await ensureTeacher(user);
-  const lesson = await prisma.lesson.findUnique({
+  let lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { student: true, participants: true },
   });
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+  if (lesson.status !== 'COMPLETED') {
+    const now = new Date();
+    if (lesson.status === 'SCHEDULED' && lesson.startAt.getTime() < now.getTime()) {
+      lesson = await prisma.lesson.update({
+        where: { id: lessonId },
+        data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
+        include: { student: true, participants: true },
+      });
+    } else {
+      throw new Error('Напоминание доступно только для завершённых занятий');
+    }
+  }
   if (lesson.status !== 'COMPLETED') {
     throw new Error('Напоминание доступно только для завершённых занятий');
   }
