@@ -44,7 +44,7 @@
 .viewToggleRow {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
 }
@@ -1114,6 +1114,9 @@
   .viewToggleRow {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .todayButton {
