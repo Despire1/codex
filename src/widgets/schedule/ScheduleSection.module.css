@@ -53,25 +53,30 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px;
+  justify-content: stretch;
+  gap: var(--view-toggle-gap, 6px);
+  padding: var(--view-toggle-padding, 4px);
   border-radius: 14px;
   background: var(--color-slate-50);
   border: 1px solid var(--color-slate-200);
   box-shadow: 0 6px 18px var(--shadow-slate-900-08);
   --active-index: 0;
+  --view-toggle-count: 3;
 }
 
 .viewToggleIndicator {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc((100% - 8px - 12px) / 3);
-  height: calc(100% - 8px);
+  top: var(--view-toggle-padding, 4px);
+  left: var(--view-toggle-padding, 4px);
+  width: calc(
+    (100% - (2 * var(--view-toggle-padding, 4px)) - (2 * var(--view-toggle-gap, 6px))) /
+      var(--view-toggle-count, 3)
+  );
+  height: calc(100% - (2 * var(--view-toggle-padding, 4px)));
   border-radius: 10px;
   background: var(--color-blue-600);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
-  transform: translateX(calc(var(--active-index) * 100%));
+  transform: translateX(calc(var(--active-index) * (100% + var(--view-toggle-gap, 6px))));
   transition: transform 0.25s ease;
   will-change: transform;
 }
@@ -79,6 +84,7 @@
 .viewToggleButton {
   position: relative;
   z-index: 1;
+  flex: 1 1 0;
   padding: 8px 14px;
   border-radius: 10px;
   border: none;
@@ -90,6 +96,7 @@
   transition: color 0.2s ease;
   font-weight: 700;
   font-size: 14px;
+  text-align: center;
 }
 
 .todayButton {
@@ -1119,13 +1126,18 @@
     padding: 3px;
     border-radius: 12px;
     box-shadow: 0 4px 12px var(--shadow-slate-900-08);
+    --view-toggle-gap: 4px;
+    --view-toggle-padding: 3px;
   }
 
   .viewToggleIndicator {
-    top: 3px;
-    left: 3px;
-    width: calc((100% - 6px - 12px) / 3);
-    height: calc(100% - 6px);
+    top: var(--view-toggle-padding, 3px);
+    left: var(--view-toggle-padding, 3px);
+    width: calc(
+      (100% - (2 * var(--view-toggle-padding, 3px)) - (2 * var(--view-toggle-gap, 4px))) /
+        var(--view-toggle-count, 3)
+    );
+    height: calc(100% - (2 * var(--view-toggle-padding, 3px)));
     border-radius: 9px;
   }
 
