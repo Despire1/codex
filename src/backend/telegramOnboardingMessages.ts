@@ -142,7 +142,7 @@ export const createOnboardingMessages = (deps: {
         [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
       ],
     };
-    await sendOrEdit(callTelegram, editMessage, { chatId, text, replyMarkup });
+    await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
   };
 
   const sendTeacherFinal = async (chatId: number, messageId?: OnboardingMessageId) => {
