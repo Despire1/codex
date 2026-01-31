@@ -4,6 +4,7 @@ type TelegramWebApp = {
   requestFullscreen?: () => void;
   onEvent?: (event: string, handler: (payload?: unknown) => void) => void;
   isFullscreen?: boolean;
+  platform?: string;
 };
 
 type TelegramWindow = Window & {
@@ -71,6 +72,14 @@ const warnDev = (message: string, payload?: unknown) => {
   }
 };
 
+const isDesktopPlatform = (platform?: string) => {
+  if (!platform) {
+    return false;
+  }
+
+  return ['tdesktop', 'macos', 'windows', 'linux'].includes(platform);
+};
+
 export const initTelegramFullscreen = () => {
   const tg = (window as TelegramWindow).Telegram?.WebApp;
 
@@ -99,7 +108,7 @@ export const initTelegramFullscreen = () => {
     tg.onEvent('fullscreenFailed', handleFullscreenFailed);
   }
 
-  if (typeof tg.requestFullscreen === 'function') {
+  if (typeof tg.requestFullscreen === 'function' && isDesktopPlatform(tg.platform)) {
     try {
       tg.requestFullscreen();
     } catch (error) {
