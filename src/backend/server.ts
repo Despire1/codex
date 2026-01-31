@@ -120,6 +120,9 @@ const resolveMeetingLinkValue = (value: any) => {
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.end(JSON.stringify(serializeBigInt(payload)));
 };
 
