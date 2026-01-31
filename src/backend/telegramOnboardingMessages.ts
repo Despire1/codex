@@ -6,13 +6,6 @@ type DeleteMessage = (chatId: number, messageId: number) => Promise<void>;
 
 type OnboardingMessageId = number | undefined;
 
-type SendPhoto = (payload: {
-  chatId: number;
-  photoUrl: string;
-  caption: string;
-  replyMarkup?: Record<string, unknown>;
-}) => Promise<number | undefined>;
-
 const sendOrEdit = async (
   callTelegram: CallTelegram,
   editMessage: EditMessage,
@@ -33,11 +26,9 @@ export const createOnboardingMessages = (deps: {
   callTelegram: CallTelegram;
   editMessage: EditMessage;
   deleteMessage: DeleteMessage;
-  sendPhoto: SendPhoto;
   webAppUrl: string;
-  fullscreenPhotoUrl?: string;
 }) => {
-  const { callTelegram, editMessage, deleteMessage, sendPhoto, webAppUrl, fullscreenPhotoUrl } = deps;
+  const { callTelegram, editMessage, deleteMessage, webAppUrl } = deps;
 
   const sendTeacherIntro = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
@@ -84,7 +75,7 @@ export const createOnboardingMessages = (deps: {
   const sendTeacherStep1 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '👤 Начнём с ученика\n' +
-      'Шаг 1 из 4.\n\n' +
+      'Шаг 1 из 3.\n\n' +
       'Добавьте первого ученика — с этого момента сервис начинает быть полезным.\n\n' +
       'Нужен только Telegram username ученика.\n' +
       'Без анкет, номеров и лишних данных 👍';
@@ -119,7 +110,7 @@ export const createOnboardingMessages = (deps: {
   const sendTeacherStep2 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '📅 Теперь добавим занятие\n' +
-      'Шаг 2 из 4.\n\n' +
+      'Шаг 2 из 3.\n\n' +
       'После этого Вы сразу увидите:\n' +
       '• ближайшие уроки\n' +
       '• когда и с кем занятия\n' +
@@ -137,35 +128,10 @@ export const createOnboardingMessages = (deps: {
     await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
   };
 
-  const sendTeacherFullscreenStep = async (chatId: number, messageId?: OnboardingMessageId) => {
-    const caption =
-      '💡 Удобнее на весь экран\n' +
-      'Шаг 3 из 4.\n\n' +
-      'Если вы заходите с компьютера, откройте сервис на весь экран — так работать гораздо комфортнее.\n' +
-      'Нажмите на три точки справа сверху и выберите «На весь экран».';
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          { text: 'Открыть приложение', web_app: { url: webAppUrl } },
-          { text: 'Дальше', callback_data: 'onboarding_teacher_step4' },
-        ],
-        [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-      ],
-    };
-    if (messageId) {
-      await deleteMessage(chatId, messageId);
-    }
-    if (!fullscreenPhotoUrl) {
-      await sendOrEdit(callTelegram, editMessage, { chatId, text: caption, replyMarkup });
-      return;
-    }
-    await sendPhoto({ chatId, photoUrl: fullscreenPhotoUrl, caption, replyMarkup });
-  };
-
-  const sendTeacherStep4 = async (chatId: number, messageId?: OnboardingMessageId) => {
+  const sendTeacherStep3 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '🔔 Последний шаг — напоминания\n' +
-      'Шаг 4 из 4 (по желанию).\n\n' +
+      'Шаг 3 из 3 (по желанию).\n\n' +
       'Я могу аккуратно напоминать:\n' +
       '• Вам — о занятиях\n' +
       '• ученику — об оплате (после того, как он нажмёт /start)\n\n' +
@@ -205,8 +171,7 @@ export const createOnboardingMessages = (deps: {
     sendTeacherStep1,
     sendTeacherUsernameHint,
     sendTeacherStep2,
-    sendTeacherFullscreenStep,
-    sendTeacherStep4,
+    sendTeacherStep3,
     sendTeacherFinal,
   };
 };
