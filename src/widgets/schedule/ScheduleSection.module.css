@@ -49,28 +49,65 @@
   align-items: center;
 }
 
-.viewToggleButton {
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-900);
+.viewToggleGroup {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 14px var(--shadow-slate-900-08);
-  transition: all 0.2s ease;
-  font-weight: 600;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
+  box-shadow: 0 6px 18px var(--shadow-slate-900-08);
+  --active-index: 0;
+}
+
+.viewToggleIndicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc((100% - 8px - 12px) / 3);
+  height: calc(100% - 8px);
+  border-radius: 10px;
+  background: var(--color-blue-600);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
+  transform: translateX(calc(var(--active-index) * 100%));
+  transition: transform 0.25s ease;
+  will-change: transform;
+}
+
+.viewToggleButton {
+  position: relative;
+  z-index: 1;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-slate-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  font-weight: 700;
   font-size: 14px;
 }
 
 .todayButton {
   padding: 10px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  box-shadow: 0 4px 14px var(--shadow-slate-900-08);
+  color: var(--color-slate-900);
 }
 
 .viewToggleButton:hover {
+  color: var(--color-blue-700);
+}
+
+.todayButton:hover {
   border-color: var(--color-sky-200);
   box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
+  color: var(--color-slate-900);
 }
 
 .viewToggleIcon {
@@ -93,10 +130,7 @@
 }
 
 .toggleActive {
-  background: var(--color-blue-600);
   color: var(--color-white);
-  border-color: var(--color-blue-600);
-  box-shadow: 0 8px 20px var(--shadow-sky-500-20);
 }
 
 .headerAction {
@@ -1072,41 +1106,38 @@
 
   .viewToggleRow {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: space-between;
   }
 
   .todayButton {
     margin-right: auto;
   }
 
+  .viewToggleGroup {
+    flex: 1;
+    justify-content: space-between;
+    padding: 3px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px var(--shadow-slate-900-08);
+  }
+
+  .viewToggleIndicator {
+    top: 3px;
+    left: 3px;
+    width: calc((100% - 6px - 12px) / 3);
+    height: calc(100% - 6px);
+    border-radius: 9px;
+  }
+
   .viewToggleButton {
-    flex: 0 0 auto;
-    justify-content: center;
-    padding: 6px;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .viewToggleText {
-    display: none;
-  }
-
-  .viewToggleIcon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .viewToggleButton:hover {
-    border: none;
-    box-shadow: none;
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 8px;
   }
 
   .toggleActive {
-    background: transparent;
     color: var(--color-blue-600);
-    border-color: transparent;
-    box-shadow: none;
   }
 
   .periodSwitcher {
