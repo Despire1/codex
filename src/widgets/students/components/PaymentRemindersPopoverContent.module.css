@@ -1,0 +1,122 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--color-slate-500);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-slate-50);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-white);
+}
+
+.itemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemDate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.itemReason {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-slate-600);
+}
+
+.itemLesson {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-slate-500);
+}
+
+.itemLessonStatus {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-slate-100);
+  color: var(--color-slate-600);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.itemMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-slate-600);
+}
+
+.itemBadge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-indigo-50);
+  color: var(--color-indigo-600);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.itemStatus {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .container {
+    min-width: unset;
+  }
+
+  .item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .itemMeta {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .list {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+}

@@ -873,6 +873,7 @@ const listStudentPaymentReminders = async (user: User, studentId: number, limit 
   const safeLimit = clampNumber(limit, 1, 50);
   const reminders = await prisma.notificationLog.findMany({
     where: {
+      teacherId: teacher.chatId,
       studentId,
       lessonId: { not: null },
       type: 'PAYMENT_REMINDER_STUDENT',
