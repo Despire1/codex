@@ -91,6 +91,7 @@ export const initTelegramFullscreen = () => {
     const normalizedReason = normalizeReason(reason);
     trackEvent('tg_fullscreen_failed', { reason: normalizedReason });
     warnDev('Telegram fullscreen request failed', { reason: normalizedReason });
+    tg.expand();
   };
 
   if (typeof tg.onEvent === 'function') {
