@@ -12,13 +12,10 @@ import {
 } from 'react';
 import {
   AddOutlinedIcon,
-  CalendarMonthIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   HistoryOutlinedIcon,
   MeetingLinkIcon,
-  ViewDayIcon,
-  ViewWeekIcon,
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import { Lesson, LinkedStudent } from '../../entities/types';
@@ -934,39 +931,42 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <HistoryOutlinedIcon />
               </span>
             </button>
-            <button
-              type="button"
-              className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-              onClick={() => onScheduleViewChange('month')}
-              aria-label="Перейти в вид месяца"
+            <div
+              className={styles.viewToggleGroup}
+              style={{
+                '--active-index':
+                  scheduleView === 'month' ? 0 : scheduleView === 'week' ? 1 : 2,
+              } as CSSProperties}
             >
-              <span className={styles.viewToggleIcon}>
-                <CalendarMonthIcon />
-              </span>
-              <span className={styles.viewToggleText}>Месяц</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-              onClick={() => onScheduleViewChange('week')}
-              aria-label="Перейти в вид недели"
-            >
-              <span className={styles.viewToggleIcon}>
-                <ViewWeekIcon />
-              </span>
-              <span className={styles.viewToggleText}>Неделя</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-              onClick={() => onScheduleViewChange('day')}
-              aria-label="Перейти в вид дня"
-            >
-              <span className={styles.viewToggleIcon}>
-                <ViewDayIcon />
-              </span>
-              <span className={styles.viewToggleText}>День</span>
-            </button>
+              <span className={styles.viewToggleIndicator} aria-hidden />
+              <button
+                type="button"
+                className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('month')}
+                aria-label="Перейти в вид месяца"
+                aria-pressed={scheduleView === 'month'}
+              >
+                <span className={styles.viewToggleText}>Месяц</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('week')}
+                aria-label="Перейти в вид недели"
+                aria-pressed={scheduleView === 'week'}
+              >
+                <span className={styles.viewToggleText}>Неделя</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+                onClick={() => onScheduleViewChange('day')}
+                aria-label="Перейти в вид дня"
+                aria-pressed={scheduleView === 'day'}
+              >
+                <span className={styles.viewToggleText}>День</span>
+              </button>
+            </div>
             <button
               className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonMobile}`}
               onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
