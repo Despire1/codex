@@ -324,7 +324,7 @@
   border-radius: 16px;
   background: var(--color-slate-50);
   padding: 12px;
-  box-shadow: 0 8px 22px var(--shadow-slate-900-08);
+  height: 100%;
 }
 
 .monthHeader {
@@ -354,6 +354,7 @@
   align-items: stretch;
   transition: grid-template-columns 0.25s ease;
   min-height: 0;
+  height: calc(100% - 20px);
 }
 
 .panelOpen {
@@ -517,6 +518,7 @@
   transform: translateX(14px);
   transition: transform 0.24s ease, opacity 0.18s ease;
   pointer-events: none;
+  border-radius: 14px;
   display: flex;
   min-height: 0;
 }
@@ -1171,6 +1173,7 @@
   .monthSwitcher {
     width: 100%;
     justify-content: space-between;
+    box-shadow: none;
   }
 
   .monthName {
