@@ -2,8 +2,6 @@ type CallTelegram = <T>(method: string, payload?: Record<string, unknown>) => Pr
 
 type EditMessage = (chatId: number, messageId: number, text: string, replyMarkup?: Record<string, unknown>) => Promise<void>;
 
-type DeleteMessage = (chatId: number, messageId: number) => Promise<void>;
-
 type OnboardingMessageId = number | undefined;
 
 const sendOrEdit = async (
@@ -25,10 +23,9 @@ const sendOrEdit = async (
 export const createOnboardingMessages = (deps: {
   callTelegram: CallTelegram;
   editMessage: EditMessage;
-  deleteMessage: DeleteMessage;
   webAppUrl: string;
 }) => {
-  const { callTelegram, editMessage, deleteMessage, webAppUrl } = deps;
+  const { callTelegram, editMessage, webAppUrl } = deps;
 
   const sendTeacherIntro = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
@@ -132,11 +129,12 @@ export const createOnboardingMessages = (deps: {
     const text =
       '🔔 Последний шаг — напоминания\n' +
       'Шаг 3 из 3 (по желанию).\n\n' +
-      'Я могу аккуратно напоминать:\n' +
-      '• Вам — о занятиях\n' +
-      '• ученику — об оплате (после того, как он нажмёт /start)\n\n' +
-      'Так Вы можете спокойно заниматься работой,\n' +
-      'а не держать всё в голове.';
+      'Я аккуратно напомню о важном:\n' +
+      '• Вам — о предстоящих занятиях\n' +
+      '• ученику — о занятиях и об оплате\n' +
+      '  (после того, как он нажмёт /start)\n\n' +
+      'Так и Вы, и ученик будете на одной волне,\n' +
+      'а важное не потеряется.';
     const replyMarkup = {
       inline_keyboard: [
         [{ text: 'Открыть приложение', web_app: { url: webAppUrl } }],
@@ -144,9 +142,6 @@ export const createOnboardingMessages = (deps: {
         [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
       ],
     };
-    if (messageId) {
-      await deleteMessage(chatId, messageId);
-    }
     await sendOrEdit(callTelegram, editMessage, { chatId, text, replyMarkup });
   };
 

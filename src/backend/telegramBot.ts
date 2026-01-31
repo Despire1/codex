@@ -202,7 +202,6 @@ const subscriptionPromptText =
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
   editMessage,
-  deleteMessage,
   webAppUrl: TELEGRAM_WEBAPP_URL,
 });
 
