@@ -64,6 +64,7 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
       ...(roleHeader ? { 'X-User-Role': roleHeader } : {}),
       ...(options?.headers ?? {}),
     },
+    cache: 'no-store',
     credentials: 'include',
     ...options,
   });
