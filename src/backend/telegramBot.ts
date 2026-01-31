@@ -769,11 +769,8 @@ const handleUpdate = async (update: TelegramUpdate) => {
   if (text === ROLE_TEACHER_TEXT_NORMALIZED || text === ROLE_STUDENT_TEXT_NORMALIZED) {
     if (!telegramUserId || !from) return;
     const role = text === ROLE_TEACHER_TEXT_NORMALIZED ? 'TEACHER' : 'STUDENT';
-    const messageId = onboardingMessageByChatId.get(chatId) ?? (await sendRoleSelectionMessage(chatId));
-    if (messageId) {
-      onboardingMessageByChatId.set(chatId, messageId);
-    }
-    await handleRoleSelection(chatId, role, from);
+    const messageId = onboardingMessageByChatId.get(chatId);
+    await handleRoleSelection(chatId, role, from, messageId);
     return;
   }
 
