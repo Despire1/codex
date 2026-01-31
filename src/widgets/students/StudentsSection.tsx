@@ -460,6 +460,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <PaymentsTab
                     payments={payments}
                     paymentReminders={paymentReminders}
+                    studentLessons={studentLessons}
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
                     onPaymentFilterChange={onPaymentFilterChange}

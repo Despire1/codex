@@ -105,6 +105,26 @@
   gap: 10px;
 }
 
+.paymentsActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remindersTrigger {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.remindersPopoverContent {
+  padding: 14px;
+  background: var(--color-white);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
 .lessonHeaderActions {
   display: flex;
   align-items: center;
@@ -2317,65 +2337,6 @@
   gap: 12px;
   flex: 1;
   min-height: 0;
-}
-
-.remindersPanel {
-  border: 1px solid var(--color-slate-200);
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: var(--color-slate-50);
-  margin-bottom: 16px;
-}
-
-.remindersPanelTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-slate-900);
-  margin-bottom: 8px;
-}
-
-.remindersEmpty {
-  font-size: 13px;
-  color: var(--color-slate-500);
-}
-
-.remindersList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.reminderRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-slate-700);
-}
-
-.reminderDate {
-  font-weight: 600;
-  color: var(--color-slate-900);
-}
-
-.reminderMeta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  color: var(--color-slate-600);
-}
-
-.reminderType {
-  text-transform: uppercase;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.reminderStatus {
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .paymentFilters {
