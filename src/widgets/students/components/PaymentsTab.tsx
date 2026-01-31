@@ -5,6 +5,7 @@ import { PaymentEvent, Lesson, PaymentReminderLog } from '../../../entities/type
 import { FilterAltOutlinedIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from '../../../shared/day-picker';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
+import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../StudentsSection.module.css';
 import { PaymentList } from './PaymentList';
@@ -16,6 +17,7 @@ interface PaymentsTabProps {
   payments: PaymentEvent[];
   paymentReminders: PaymentReminderLog[];
   studentLessons: Lesson[];
+  isMobile: boolean;
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -27,6 +29,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   payments,
   paymentReminders,
   studentLessons,
+  isMobile,
   paymentFilter,
   paymentDate,
   onPaymentFilterChange,
@@ -52,6 +55,8 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
     });
     return map;
   }, [studentLessons]);
+
+  const remindersContent = <PaymentRemindersPopoverContent reminders={paymentReminders} lessonsById={lessonsById} />;
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
@@ -143,23 +148,33 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
                 </label>
               </div>
             </AdaptivePopover>
-            <AdaptivePopover
-              isOpen={remindersOpen}
-              onClose={() => setRemindersOpen(false)}
-              trigger={
-                <button
-                  type="button"
-                  className={`${controls.secondaryButton} ${styles.remindersTrigger}`}
-                  onClick={() => setRemindersOpen((prev) => !prev)}
-                >
-                  {remindersLabel}
-                </button>
-              }
-              className={styles.remindersPopoverContent}
-              side="right"
-            >
-              <PaymentRemindersPopoverContent reminders={paymentReminders} lessonsById={lessonsById} />
-            </AdaptivePopover>
+            {isMobile ? (
+              <button
+                type="button"
+                className={`${controls.secondaryButton} ${styles.remindersTrigger}`}
+                onClick={() => setRemindersOpen(true)}
+              >
+                {remindersLabel}
+              </button>
+            ) : (
+              <AdaptivePopover
+                isOpen={remindersOpen}
+                onClose={() => setRemindersOpen(false)}
+                trigger={
+                  <button
+                    type="button"
+                    className={`${controls.secondaryButton} ${styles.remindersTrigger}`}
+                    onClick={() => setRemindersOpen((prev) => !prev)}
+                  >
+                    {remindersLabel}
+                  </button>
+                }
+                className={styles.remindersPopoverContent}
+                side="right"
+              >
+                {remindersContent}
+              </AdaptivePopover>
+            )}
           </div>
         </div>
       </div>
@@ -167,6 +182,11 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
         payments={payments}
         onOpenLesson={onOpenLesson}
       />
+      {isMobile && (
+        <BottomSheet isOpen={remindersOpen} onClose={() => setRemindersOpen(false)}>
+          {remindersContent}
+        </BottomSheet>
+      )}
     </div>
   );
 };
