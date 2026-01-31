@@ -51,11 +51,10 @@
 
 .viewToggleGroup {
   position: relative;
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
-  justify-content: stretch;
-  gap: var(--view-toggle-gap, 6px);
-  padding: var(--view-toggle-padding, 4px);
+  padding: var(--view-toggle-padding, 3px);
   border-radius: 14px;
   background: var(--color-slate-50);
   border: 1px solid var(--color-slate-200);
@@ -66,17 +65,17 @@
 
 .viewToggleIndicator {
   position: absolute;
-  top: var(--view-toggle-padding, 4px);
-  left: var(--view-toggle-padding, 4px);
+  top: var(--view-toggle-padding, 3px);
+  left: var(--view-toggle-padding, 3px);
   width: calc(
-    (100% - (2 * var(--view-toggle-padding, 4px)) - (2 * var(--view-toggle-gap, 6px))) /
+    (100% - (2 * var(--view-toggle-padding, 3px))) /
       var(--view-toggle-count, 3)
   );
-  height: calc(100% - (2 * var(--view-toggle-padding, 4px)));
+  height: calc(100% - (2 * var(--view-toggle-padding, 3px)));
   border-radius: 10px;
   background: var(--color-blue-600);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
-  transform: translateX(calc(var(--active-index) * (100% + var(--view-toggle-gap, 6px))));
+  transform: translateX(calc(var(--active-index) * 100%));
   transition: transform 0.25s ease;
   will-change: transform;
 }
@@ -84,7 +83,7 @@
 .viewToggleButton {
   position: relative;
   z-index: 1;
-  flex: 1 1 0;
+  width: 100%;
   padding: 8px 14px;
   border-radius: 10px;
   border: none;
@@ -105,6 +104,7 @@
   background: var(--color-white);
   box-shadow: 0 4px 14px var(--shadow-slate-900-08);
   color: var(--color-slate-900);
+  flex: 0 0 auto;
 }
 
 .viewToggleButton:hover {
@@ -1122,22 +1122,20 @@
 
   .viewToggleGroup {
     flex: 1;
-    justify-content: space-between;
-    padding: 3px;
+    padding: var(--view-toggle-padding, 2px);
     border-radius: 12px;
     box-shadow: 0 4px 12px var(--shadow-slate-900-08);
-    --view-toggle-gap: 4px;
-    --view-toggle-padding: 3px;
+    --view-toggle-padding: 2px;
   }
 
   .viewToggleIndicator {
-    top: var(--view-toggle-padding, 3px);
-    left: var(--view-toggle-padding, 3px);
+    top: var(--view-toggle-padding, 2px);
+    left: var(--view-toggle-padding, 2px);
     width: calc(
-      (100% - (2 * var(--view-toggle-padding, 3px)) - (2 * var(--view-toggle-gap, 4px))) /
+      (100% - (2 * var(--view-toggle-padding, 2px))) /
         var(--view-toggle-count, 3)
     );
-    height: calc(100% - (2 * var(--view-toggle-padding, 3px)));
+    height: calc(100% - (2 * var(--view-toggle-padding, 2px)));
     border-radius: 9px;
   }
 
