@@ -2,16 +2,7 @@ type CallTelegram = <T>(method: string, payload?: Record<string, unknown>) => Pr
 
 type EditMessage = (chatId: number, messageId: number, text: string, replyMarkup?: Record<string, unknown>) => Promise<void>;
 
-type DeleteMessage = (chatId: number, messageId: number) => Promise<void>;
-
 type OnboardingMessageId = number | undefined;
-
-type SendPhoto = (payload: {
-  chatId: number;
-  photoUrl: string;
-  caption: string;
-  replyMarkup?: Record<string, unknown>;
-}) => Promise<number | undefined>;
 
 const sendOrEdit = async (
   callTelegram: CallTelegram,
@@ -32,12 +23,9 @@ const sendOrEdit = async (
 export const createOnboardingMessages = (deps: {
   callTelegram: CallTelegram;
   editMessage: EditMessage;
-  deleteMessage: DeleteMessage;
-  sendPhoto: SendPhoto;
   webAppUrl: string;
-  fullscreenPhotoUrl?: string;
 }) => {
-  const { callTelegram, editMessage, deleteMessage, sendPhoto, webAppUrl, fullscreenPhotoUrl } = deps;
+  const { callTelegram, editMessage, webAppUrl } = deps;
 
   const sendTeacherIntro = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
@@ -84,7 +72,7 @@ export const createOnboardingMessages = (deps: {
   const sendTeacherStep1 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '👤 Начнём с ученика\n' +
-      'Шаг 1 из 4.\n\n' +
+      'Шаг 1 из 3.\n\n' +
       'Добавьте первого ученика — с этого момента сервис начинает быть полезным.\n\n' +
       'Нужен только Telegram username ученика.\n' +
       'Без анкет, номеров и лишних данных 👍';
@@ -119,7 +107,7 @@ export const createOnboardingMessages = (deps: {
   const sendTeacherStep2 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '📅 Теперь добавим занятие\n' +
-      'Шаг 2 из 4.\n\n' +
+      'Шаг 2 из 3.\n\n' +
       'После этого Вы сразу увидите:\n' +
       '• ближайшие уроки\n' +
       '• когда и с кем занятия\n' +
@@ -137,40 +125,16 @@ export const createOnboardingMessages = (deps: {
     await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
   };
 
-  const sendTeacherFullscreenStep = async (chatId: number, messageId?: OnboardingMessageId) => {
-    const caption =
-      '💡 Удобнее на весь экран\n' +
-      'Шаг 3 из 4.\n\n' +
-      'Если вы заходите с компьютера, откройте сервис на весь экран — так работать гораздо комфортнее.\n' +
-      'Нажмите на три точки справа сверху и выберите «На весь экран».';
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          { text: 'Открыть приложение', web_app: { url: webAppUrl } },
-          { text: 'Дальше', callback_data: 'onboarding_teacher_step4' },
-        ],
-        [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
-      ],
-    };
-    if (messageId) {
-      await deleteMessage(chatId, messageId);
-    }
-    if (!fullscreenPhotoUrl) {
-      await sendOrEdit(callTelegram, editMessage, { chatId, text: caption, replyMarkup });
-      return;
-    }
-    await sendPhoto({ chatId, photoUrl: fullscreenPhotoUrl, caption, replyMarkup });
-  };
-
-  const sendTeacherStep4 = async (chatId: number, messageId?: OnboardingMessageId) => {
+  const sendTeacherStep3 = async (chatId: number, messageId?: OnboardingMessageId) => {
     const text =
       '🔔 Последний шаг — напоминания\n' +
-      'Шаг 4 из 4 (по желанию).\n\n' +
-      'Я могу аккуратно напоминать:\n' +
-      '• Вам — о занятиях\n' +
-      '• ученику — об оплате (после того, как он нажмёт /start)\n\n' +
-      'Так Вы можете спокойно заниматься работой,\n' +
-      'а не держать всё в голове.';
+      'Шаг 3 из 3 (по желанию).\n\n' +
+      'Я аккуратно напомню о важном:\n' +
+      '• Вам — о предстоящих занятиях\n' +
+      '• ученику — о занятиях и об оплате\n' +
+      '  (после того, как он нажмёт /start)\n\n' +
+      'Так и Вы, и ученик будете на одной волне,\n' +
+      'а важное не потеряется.';
     const replyMarkup = {
       inline_keyboard: [
         [{ text: 'Открыть приложение', web_app: { url: webAppUrl } }],
@@ -178,10 +142,7 @@ export const createOnboardingMessages = (deps: {
         [{ text: 'Пропустить', callback_data: 'onboarding_teacher_skip' }],
       ],
     };
-    if (messageId) {
-      await deleteMessage(chatId, messageId);
-    }
-    await sendOrEdit(callTelegram, editMessage, { chatId, text, replyMarkup });
+    await sendOrEdit(callTelegram, editMessage, { chatId, messageId, text, replyMarkup });
   };
 
   const sendTeacherFinal = async (chatId: number, messageId?: OnboardingMessageId) => {
@@ -205,8 +166,7 @@ export const createOnboardingMessages = (deps: {
     sendTeacherStep1,
     sendTeacherUsernameHint,
     sendTeacherStep2,
-    sendTeacherFullscreenStep,
-    sendTeacherStep4,
+    sendTeacherStep3,
     sendTeacherFinal,
   };
 };

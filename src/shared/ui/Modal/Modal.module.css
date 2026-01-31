@@ -8,6 +8,7 @@
   justify-content: center;
   padding: 16px;
   z-index: 1000;
+  overflow-y: auto;
 }
 
 .modal {
@@ -17,6 +18,9 @@
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--border);
   overflow: hidden;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
@@ -48,6 +52,7 @@
 
 .body {
   padding: 16px;
+  overflow-y: auto;
 }
 
 .message {

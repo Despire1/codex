@@ -1,13 +1,9 @@
 import 'dotenv/config';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
-const TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL = process.env.TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
@@ -109,41 +105,6 @@ const deleteMessage = async (chatId: number, messageId: number) => {
   });
 };
 
-const sendPhoto = async (payload: {
-  chatId: number;
-  photoUrl: string;
-  caption: string;
-  replyMarkup?: Record<string, unknown>;
-}) => {
-  if (!payload.photoUrl.startsWith('http')) {
-    await fs.promises.access(payload.photoUrl);
-    const fileBuffer = await fs.promises.readFile(payload.photoUrl);
-    const formData = new FormData();
-    formData.append('chat_id', payload.chatId.toString());
-    formData.append('caption', payload.caption);
-    if (payload.replyMarkup) {
-      formData.append('reply_markup', JSON.stringify(payload.replyMarkup));
-    }
-    formData.append('photo', new Blob([fileBuffer]), path.basename(payload.photoUrl));
-    const response = await fetch(`${TELEGRAM_API_BASE}/sendPhoto`, {
-      method: 'POST',
-      body: formData,
-    });
-    const data = (await response.json()) as TelegramResponse<{ message_id: number }>;
-    if (!data.ok) {
-      throw new Error(data.description ?? 'Telegram API error: sendPhoto');
-    }
-    return data.result.message_id;
-  }
-  const result = await callTelegram<{ message_id: number }>('sendPhoto', {
-    chat_id: payload.chatId,
-    photo: payload.photoUrl,
-    caption: payload.caption,
-    reply_markup: payload.replyMarkup,
-  });
-  return result.message_id;
-};
-
 const sendWebAppMessage = async (chatId: number, messageId?: number) => {
   const reply_markup = {
     inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
@@ -238,17 +199,10 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 const subscriptionPromptText =
   'Чтобы пользоваться сервисом, оформите пробную подписку ✨\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса. 🤝';
 
-const onboardingFullscreenPhotoUrl =
-  TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL ||
-  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public/onboarding-fullscreen.png');
-
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
   editMessage,
-  deleteMessage,
-  sendPhoto,
   webAppUrl: TELEGRAM_WEBAPP_URL,
-  fullscreenPhotoUrl: onboardingFullscreenPhotoUrl,
 });
 
 const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
@@ -740,11 +694,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_step3') {
-        await onboardingMessages.sendTeacherFullscreenStep(chatId, messageId);
-        return;
-      }
-      if (update.callback_query.data === 'onboarding_teacher_step4') {
-        await onboardingMessages.sendTeacherStep4(chatId, messageId);
+        await onboardingMessages.sendTeacherStep3(chatId, messageId);
         return;
       }
       if (update.callback_query.data === 'onboarding_teacher_finish') {
@@ -819,11 +769,8 @@ const handleUpdate = async (update: TelegramUpdate) => {
   if (text === ROLE_TEACHER_TEXT_NORMALIZED || text === ROLE_STUDENT_TEXT_NORMALIZED) {
     if (!telegramUserId || !from) return;
     const role = text === ROLE_TEACHER_TEXT_NORMALIZED ? 'TEACHER' : 'STUDENT';
-    const messageId = onboardingMessageByChatId.get(chatId) ?? (await sendRoleSelectionMessage(chatId));
-    if (messageId) {
-      onboardingMessageByChatId.set(chatId, messageId);
-    }
-    await handleRoleSelection(chatId, role, from);
+    const messageId = onboardingMessageByChatId.get(chatId);
+    await handleRoleSelection(chatId, role, from, messageId);
     return;
   }
 
