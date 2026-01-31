@@ -104,7 +104,7 @@
   background: var(--color-white);
   box-shadow: 0 4px 14px var(--shadow-slate-900-08);
   color: var(--color-slate-900);
-  flex: 0 0 auto;
+  flex: 0 0 0;
 }
 
 .viewToggleButton:hover {
@@ -1125,6 +1125,7 @@
 
   .viewToggleGroup {
     flex: 1;
+    height: 100%;
     padding: var(--view-toggle-padding, 2px);
     border-radius: 12px;
     box-shadow: 0 4px 12px var(--shadow-slate-900-08);
@@ -1143,7 +1144,6 @@
   }
 
   .viewToggleButton {
-    flex: 1;
     padding: 6px 8px;
     font-size: 12px;
     border-radius: 8px;

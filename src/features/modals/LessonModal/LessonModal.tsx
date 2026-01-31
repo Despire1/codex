@@ -363,7 +363,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           </div>
           {draft.isRecurring && (
             <Box>
-              <div className={modalStyles.field}>
+              <div className={`${modalStyles.field}, ${modalStyles.weekdaysRow}`}>
                 <span className={modalStyles.fieldLabel}>Выберите дни недели</span>
                 <div className={modalStyles.weekdayGrid} role="group" aria-label="Дни недели">
                   {weekdayOptions.map((day) => {
@@ -391,10 +391,10 @@ export const LessonModal: FC<LessonModalProps> = ({
               </div>
               <Box
                 style={{
-                  marginTop: '16px',
+                  marginTop: '12px',
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '12px',
+                  gap: '8px',
                 }}
               >
                 <DatePickerField

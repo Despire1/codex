@@ -52,6 +52,7 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  margin-top: 8px;
 }
 
 .fieldLabel {
@@ -64,7 +65,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 16px;
 }
 
 .switchLabel {
@@ -148,8 +149,6 @@
 
 .weekdayButtonActive {
   border-color: var(--color-blue-600);
-  background: var(--primary-weak);
-  color: var(--color-blue-600);
 }
 
 .weekdayDot {
@@ -244,8 +243,22 @@
     padding: 16px;
   }
 
+  .field {
+    margin-top: 0;
+  }
+
+  .weekdaysRow {
+    margin-top: 4px;
+  }
+
+  .weekdayGrid {
+    margin-top: 4px;
+  }
+
   .timeRow {
     grid-template-columns: 1fr;
+    gap: 6px;
+    margin-top: 4px;
   }
 
   .timeDivider {
