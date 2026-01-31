@@ -2059,6 +2059,7 @@
   justify-content: center;
   z-index: 50;
   padding: 16px;
+  overflow-y: auto;
 }
 
 .modalCard {
@@ -2068,6 +2069,9 @@
   width: min(520px, 100%);
   box-shadow: 0 20px 40px var(--shadow-slate-900-20);
   border: 1px solid var(--border);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
 }
 
 .modalHeader {
@@ -2104,6 +2108,8 @@
   flex-direction: column;
   gap: 12px;
   margin-top: 12px;
+  overflow-y: auto;
+  flex: 1 1 auto;
 }
 
 .modalField {
