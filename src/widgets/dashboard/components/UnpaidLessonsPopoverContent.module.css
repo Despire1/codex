@@ -1,36 +1,10 @@
 .root {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 16px;
+  padding: 8px 4px;
 }
 
-.title {
-  font-weight: 600;
-}
-
-.empty {
-  color: var(--color-slate-500);
-  font-size: 13px;
-}
-
-.list {
-  display: grid;
-  gap: 12px;
-}
-
-.group {
-  border-top: 1px solid var(--color-slate-100);
-  padding-top: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.group:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.groupHeader {
+.header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -38,36 +12,221 @@
   flex-wrap: wrap;
 }
 
-.groupName {
-  font-weight: 600;
+.title {
+  font-weight: 700;
+  font-size: 18px;
 }
 
-.groupMeta {
+.empty {
+  color: var(--color-slate-500);
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.list {
+  display: grid;
+  gap: 16px;
+}
+
+.listExpanded {
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.item {
+  border-top: 1px solid var(--color-slate-100);
+  padding-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.itemHeader {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.itemHeaderInfo {
+  display: grid;
+  gap: 4px;
+}
+
+.studentName {
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 0;
+}
+
+.lessonMeta {
   color: var(--color-slate-500);
   font-size: 13px;
 }
 
-.groupLessons {
-  display: grid;
-  gap: 4px;
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-slate-100);
+  color: var(--color-slate-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.debtBadge {
+  text-transform: uppercase;
+}
+
+.reminderRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f2f7ff;
+  border-radius: 12px;
   color: var(--color-slate-600);
   font-size: 13px;
 }
 
-.lessonRow {
-  line-height: 1.3;
+.actionsRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
-.lessonMore {
+.payButton {
+  background: var(--color-emerald-50);
+  color: var(--color-green-700);
+  border: 1px solid var(--color-green-200);
+}
+
+.remindButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.remindButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.iconSpinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-slate-200);
+  border-top-color: var(--color-emerald-500);
+  animation: spin 0.8s linear infinite;
+}
+
+.iconCheck {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-emerald-500);
+  position: relative;
+  animation: checkPop 0.6s ease, checkFade 1.2s ease forwards;
+}
+
+.iconCheck::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progressTrack {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-slate-100);
+  overflow: hidden;
+}
+
+.progressFill {
+  position: absolute;
+  inset: 0;
+  background: #fbbf24;
+  border-radius: 999px;
+  transform-origin: left;
+}
+
+.progressLabel {
   color: var(--color-slate-400);
+  font-size: 13px;
 }
 
-.openStudent {
-  padding: 6px 0;
+.toggleButton {
+  margin-top: 4px;
   border: none;
   background: none;
-  color: var(--color-blue-600);
+  color: var(--color-slate-500);
   font-weight: 600;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
+  padding: 4px 0;
+  width: 100%;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.2;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes checkFade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
