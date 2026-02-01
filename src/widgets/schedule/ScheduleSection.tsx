@@ -131,6 +131,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
   const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
+  const [isMonthPanelDismissed, setIsMonthPanelDismissed] = useState(false);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
   const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
 
@@ -195,7 +196,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, [scheduleView, dayViewDate, isMobileViewport]);
 
   useEffect(() => {
-    if (scheduleView !== 'month' || selectedMonthDay) return;
+    if (scheduleView !== 'month' || selectedMonthDay || isMonthPanelDismissed) return;
 
     const daysInMonth = buildMonthDays(selectedMonth).filter((day) => day.inMonth);
     const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
@@ -212,7 +213,24 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         setSelectedMonthDay(defaultDay.iso);
       }
     }
-  }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange, isMobileViewport, timeZone]);
+  }, [
+    scheduleView,
+    selectedMonth,
+    selectedMonthDay,
+    isMonthPanelDismissed,
+    lessonsByDay,
+    onDayViewDateChange,
+    isMobileViewport,
+    timeZone,
+  ]);
+
+  useEffect(() => {
+    if (scheduleView !== 'month') {
+      setIsMonthPanelDismissed(false);
+      return;
+    }
+    setIsMonthPanelDismissed(false);
+  }, [scheduleView, selectedMonth]);
 
   useEffect(() => {
     setOpenLessonMenuId(null);
@@ -868,6 +886,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 {days.map((day) => {
                   const dayLessons = lessonsByDay[day.iso] ?? [];
                   const handleDayClick = () => {
+                    setIsMonthPanelDismissed(false);
                     setSelectedMonthDay(day.iso);
                     onDayViewDateChange(day.date);
 
@@ -904,7 +923,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
             {!isMobileMonthView && (
               <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
-                {renderDayDetails(() => setSelectedMonthDay(null))}
+                {renderDayDetails(() => {
+                  setSelectedMonthDay(null);
+                  setIsMonthPanelDismissed(true);
+                })}
               </div>
             )}
           </div>
