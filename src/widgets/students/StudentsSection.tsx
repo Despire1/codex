@@ -26,6 +26,7 @@ import { BalanceTopupModal } from './components/BalanceTopupModal';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
 import { NewHomeworkDraft, SelectedStudent } from './types';
+import { useIsMobile } from '@/shared/lib/useIsMobile';
 
 interface StudentsSectionProps {
   teacher: Teacher;
@@ -209,7 +210,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile(720);
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
@@ -218,29 +219,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const headerRef = useRef<HTMLDivElement | null>(null);
   const scrollRafRef = useRef<number | null>(null);
   const scrollProgressRef = useRef(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mediaQuery = window.matchMedia('(max-width: 720px)');
-    const handleChange = (event: MediaQueryListEvent) => {
-      setIsMobile(event.matches);
-    };
-
-    setIsMobile(mediaQuery.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.addEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!selectedStudentId && isMobile) {

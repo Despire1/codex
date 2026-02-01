@@ -1,5 +1,5 @@
 import { addDays, format, isSameDay } from 'date-fns';
-import { type FC, useEffect, useMemo, useState } from 'react';
+import { type FC, useMemo, useState } from 'react';
 import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
@@ -11,6 +11,7 @@ import { getLessonColorVars } from '@/shared/lib/lessonColors';
 import { pluralizeRu } from '@/shared/lib/pluralizeRu';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timezoneDates';
+import { useIsMobile } from '@/shared/lib/useIsMobile';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -62,28 +63,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   const todayZoned = toZonedDate(now, timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
-  const [isDashboardMobile, setIsDashboardMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mediaQuery = window.matchMedia('(max-width: 1023px)');
-    const handleChange = (event: MediaQueryListEvent) => setIsDashboardMobile(event.matches);
-
-    setIsDashboardMobile(mediaQuery.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.addEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
+  const isDashboardMobile = useIsMobile(1023);
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     return lessons.flatMap((lesson) => {

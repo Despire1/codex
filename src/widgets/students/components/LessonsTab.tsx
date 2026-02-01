@@ -21,6 +21,7 @@ import { LessonFiltersPopover } from './LessonFiltersPopover';
 import { LessonActionsSheet } from './LessonActionsSheet';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { useIsMobile } from '../../../shared/lib/useIsMobile';
 
 interface LessonsTabProps {
   studentLessons: Lesson[];
@@ -76,7 +77,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
   const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [isLessonsMobile, setIsLessonsMobile] = useState(false);
+  const isLessonsMobile = useIsMobile(768);
   const [activeLessonActions, setActiveLessonActions] = useState<Lesson | null>(null);
   const [isLessonSheetOpen, setIsLessonSheetOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -95,29 +96,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [datePickerOpen]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
-    const handleChange = (event: MediaQueryListEvent) => {
-      setIsLessonsMobile(event.matches);
-    };
-
-    setIsLessonsMobile(mediaQuery.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (mediaQuery.addEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (isLessonSheetOpen) return undefined;

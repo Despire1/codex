@@ -4,6 +4,7 @@ import data from '@emoji-mart/data';
 import { Teacher } from '../../../entities/types';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '../../../shared/lib/toast';
+import { useIsMobile } from '../../../shared/lib/useIsMobile';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
@@ -382,7 +383,7 @@ const TemplateEditor: FC<{
 export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps> = ({ teacher, onChange }) => {
   const { showToast } = useToast();
   const [activeTemplate, setActiveTemplate] = useState<TemplateId>('lesson');
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile(720);
 
   const resolvedValues = useMemo(
     () => ({
@@ -399,24 +400,6 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
   useEffect(() => {
     setValues(resolvedValues);
   }, [resolvedValues]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 720px)');
-    const handleChange = () => setIsMobile(mediaQuery.matches);
-    handleChange();
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-    return () => {
-      if (mediaQuery.addEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
 
   const updateValue = (id: TemplateId, nextValue: string) => {
     setValues((prev) => ({ ...prev, [id]: nextValue }));
