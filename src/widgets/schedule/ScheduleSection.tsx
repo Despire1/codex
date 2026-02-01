@@ -26,6 +26,8 @@ import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
+import { LessonDeleteConfirmModal } from '../students/components/LessonDeleteConfirmModal';
+import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import styles from './ScheduleSection.module.css';
 
 const DAY_START_MINUTE = 0;
@@ -56,6 +58,7 @@ interface ScheduleSectionProps {
   onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
   onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
+  onDeleteLesson: (lessonId: number) => void;
   onDayViewDateChange: (date: Date) => void;
   onGoToToday: () => void;
   autoConfirmLessons: boolean;
@@ -78,6 +81,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   onOpenLessonModal,
   onStartEditLesson,
   onTogglePaid,
+  onDeleteLesson,
   onDayViewDateChange,
   onGoToToday,
   autoConfirmLessons,
@@ -93,6 +97,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
+  const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
@@ -207,6 +213,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       }
     }
   }, [scheduleView, selectedMonth, selectedMonthDay, lessonsByDay, onDayViewDateChange, isMobileViewport, timeZone]);
+
+  useEffect(() => {
+    setOpenLessonMenuId(null);
+  }, [selectedMonthDay]);
 
   useEffect(() => {
     const handleResize = () => setIsMobileViewport(window.innerWidth <= 720);
@@ -387,6 +397,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             student: linkedStudentsById.get(lesson.studentId),
           },
         ];
+
+  const resolveLessonPrice = (lesson: Lesson, participants: any[]) => {
+    const participant = participants[0];
+    return participant?.price ?? participant?.student?.link?.pricePerLesson ?? lesson.price ?? null;
+  };
+
+  const resolveLessonPaid = (lesson: Lesson, participants: any[]) => {
+    if (participants.length === 0) return !!lesson.isPaid;
+    return participants.every((participant) => participant?.isPaid);
+  };
 
   const getParticipantName = (participant: any) => {
     const linkedStudent = linkedStudentsById.get(participant?.studentId);
@@ -785,35 +805,34 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           {selectedDayLessons.map((lesson) => {
             const date = toZonedDate(lesson.startAt, timeZone);
             const participants = buildParticipants(lesson);
-            const isGroupLesson = participants.length > 1;
             const lessonLabel = getLessonLabel(participants);
-            const awaitingConfirmation = isAwaitingConfirmation(lesson);
+            const endDate = addMinutes(date, lesson.durationMinutes);
+            const isPaid = resolveLessonPaid(lesson, participants);
+            const price = resolveLessonPrice(lesson, participants);
 
             return (
-              <div
+              <MonthDayLessonCard
                 key={lesson.id}
-                className={`${styles.monthLesson} ${lesson.status === 'CANCELED' ? styles.canceledLesson : ''}`}
+                lessonId={lesson.id}
+                lessonLabel={lessonLabel}
+                startTime={format(date, 'HH:mm')}
+                endTime={format(endDate, 'HH:mm')}
+                isPaid={isPaid}
+                price={price}
+                meetingLink={lesson.meetingLink}
                 style={buildLessonColorStyle(lesson)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onStartEditLesson(lesson);
-                }}
-              >
-                {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
-                <div className={styles.monthLessonInfo}>
-                  <div className={styles.monthLessonHeaderRow}>
-                    <span className={styles.monthLessonTime}>{format(date, 'HH:mm')}</span>
-                    {renderMeetingLinkButton(lesson, styles.monthLessonLink)}
-                  </div>
-                  <Ellipsis className={styles.monthLessonName} title={lessonLabel}>
-                    {lessonLabel}
-                  </Ellipsis>
-                </div>
-                <div className={styles.statusBadges}>
-                  {awaitingConfirmation && <Badge label="Ожидает подтверждения" variant="pending" />}
-                  {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
-                </div>
-              </div>
+                isCanceled={lesson.status === 'CANCELED'}
+                isActionsOpen={openLessonMenuId === lesson.id}
+                onEdit={() => onStartEditLesson(lesson)}
+                onTogglePaid={() => onTogglePaid(lesson.id, participants[0]?.studentId)}
+                onOpenActions={() =>
+                  setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
+                }
+                onCloseActions={() => setOpenLessonMenuId(null)}
+                onDelete={() => setLessonToDelete(lesson)}
+                onReschedule={() => {}}
+                onOpenMeetingLink={(event) => handleOpenMeetingLink(event, lesson.meetingLink as string)}
+              />
             );
           })}
         </div>
@@ -1127,6 +1146,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
+      <LessonDeleteConfirmModal
+        open={Boolean(lessonToDelete)}
+        lessonId={lessonToDelete?.id}
+        onClose={() => setLessonToDelete(null)}
+        onConfirm={() => {
+          if (!lessonToDelete) return;
+          onDeleteLesson(lessonToDelete.id);
+          setLessonToDelete(null);
+        }}
+      />
     </section>
   );
 };
