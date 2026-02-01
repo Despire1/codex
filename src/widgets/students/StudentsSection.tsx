@@ -111,6 +111,7 @@ interface StudentsSectionProps {
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onOpenPaymentReminders?: () => void;
+  onRequestDebtDetails?: () => void;
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
 }
@@ -205,9 +206,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   newHomeworkDraft,
   onActiveTabChange,
   onOpenPaymentReminders,
+  onRequestDebtDetails,
   paymentsLoading,
   paymentRemindersLoading,
 }) => {
+  void onRequestDebtDetails;
   const location = useLocation();
   const navigate = useNavigate();
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
