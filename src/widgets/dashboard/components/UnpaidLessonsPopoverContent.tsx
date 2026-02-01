@@ -110,6 +110,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 
   const visibleEntries = isExpanded ? sortedEntries : sortedEntries.slice(0, 2);
   const showToggle = sortedEntries.length > 2;
+  const isScrollable = isExpanded && sortedEntries.length > 4;
 
   return (
       <div className={styles.root}>
@@ -121,7 +122,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
             <div className={styles.empty}>Нет неоплаченных занятий</div>
         ) : (
             <>
-              <div className={`${styles.list} ${isExpanded ? styles.listExpanded : ''}`}>
+              <div className={`${styles.list} ${isScrollable ? styles.listScrollable : ''}`}>
                 {visibleEntries.map((entry) => {
                   const entryKey = `${entry.lessonId}-${entry.studentId}`;
                   const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
@@ -230,13 +231,15 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
               </div>
 
               {showToggle && (
-                  <button
-                      type="button"
-                      className={styles.toggleButton}
-                      onClick={() => setIsExpanded((prev) => !prev)}
-                  >
-                    {isExpanded ? 'Свернуть' : 'Показать все'}
-                  </button>
+                  <div className={styles.toggleWrapper}>
+                    <button
+                        type="button"
+                        className={styles.toggleButton}
+                        onClick={() => setIsExpanded((prev) => !prev)}
+                    >
+                      {isExpanded ? 'Свернуть' : 'Показать все'}
+                    </button>
+                  </div>
               )}
             </>
         )}
