@@ -28,12 +28,14 @@ interface AppRoutesProps {
   dashboard: {
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
+    teacher: Teacher;
     onAddStudent: () => void;
     onCreateLesson: () => void;
     onOpenSchedule: () => void;
     onOpenLesson: (lesson: Lesson) => void;
     onCompleteLesson: (lessonId: number) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
+    onRemindLessonPayment: (lessonId: number, studentId?: number) => Promise<void> | void;
     onOpenStudent: (studentId: number) => void;
   };
   students: {
