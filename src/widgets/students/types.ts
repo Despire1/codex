@@ -24,3 +24,5 @@ export interface HomeworkStatusInfo {
   status: HomeworkStatus;
   isOverdue: boolean;
 }
+
+export type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';

@@ -25,7 +25,7 @@ import { PaymentsTab } from './components/PaymentsTab';
 import { BalanceTopupModal } from './components/BalanceTopupModal';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
-import { NewHomeworkDraft, SelectedStudent } from './types';
+import { NewHomeworkDraft, SelectedStudent, StudentTabId } from './types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 
 interface StudentsSectionProps {
@@ -109,6 +109,10 @@ interface StudentsSectionProps {
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lessonId: number) => void;
   newHomeworkDraft: NewHomeworkDraft;
+  onActiveTabChange?: (tab: StudentTabId) => void;
+  onOpenPaymentReminders?: () => void;
+  paymentsLoading?: boolean;
+  paymentRemindersLoading?: boolean;
 }
 const getLessonStatusLabel = (status: Lesson['status']) => {
   if (status === 'COMPLETED') return 'Проведён';
@@ -116,7 +120,6 @@ const getLessonStatusLabel = (status: Lesson['status']) => {
   return 'Запланирован';
 };
 
-type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';
 // const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
 const DEFAULT_STUDENT_TAB: StudentTabId = 'overview';
 // const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
@@ -200,6 +203,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onEditLesson,
   onDeleteLesson,
   newHomeworkDraft,
+  onActiveTabChange,
+  onOpenPaymentReminders,
+  paymentsLoading,
+  paymentRemindersLoading,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -250,6 +257,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     const nextTab = resolveStudentTab(location.search);
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
   }, [location.search]);
+
+  useEffect(() => {
+    onActiveTabChange?.(activeTab);
+  }, [activeTab, onActiveTabChange]);
 
   useEffect(() => {
     const target = studentLoadMoreRef.current;
@@ -438,13 +449,16 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <PaymentsTab
                     payments={payments}
                     paymentReminders={paymentReminders}
-                    studentLessons={studentLessons}
+                    studentLessons={studentLessonsSummary}
                     isMobile={isMobile}
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
                     onOpenLesson={onEditLesson}
+                    onOpenReminders={onOpenPaymentReminders}
+                    paymentsLoading={paymentsLoading}
+                    paymentRemindersLoading={paymentRemindersLoading}
                   />
                 ) : (
                   selectedStudent && (
