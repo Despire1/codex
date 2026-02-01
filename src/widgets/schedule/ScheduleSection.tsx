@@ -25,6 +25,7 @@ import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/l
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
+import { useIsMobile } from '../../shared/lib/useIsMobile';
 import styles from './ScheduleSection.module.css';
 
 const DAY_START_MINUTE = 0;
@@ -88,9 +89,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayPickerRef = useRef<HTMLDivElement>(null);
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
-  const [isMobileViewport, setIsMobileViewport] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 720 : false,
-  );
+  const isMobileViewport = useIsMobile(720);
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);

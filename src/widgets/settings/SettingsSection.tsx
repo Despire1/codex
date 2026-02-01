@@ -5,6 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/MaterialIcons';
 import { api } from '../../shared/api/client';
 import { formatTimeZoneLabel, getResolvedTimeZone, getTimeZoneOptions } from '../../shared/lib/timezones';
 import { useToast } from '../../shared/lib/toast';
+import { useIsMobile } from '../../shared/lib/useIsMobile';
 import controls from '../../shared/styles/controls.module.css';
 import { SETTINGS_TABS, SettingsTabId } from './constants';
 import { NotificationsSettings } from './components/NotificationsSettings';
@@ -49,7 +50,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile(720);
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const teacherRef = useRef(teacher);
@@ -60,24 +61,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
   useEffect(() => {
     teacherRef.current = teacher;
   }, [teacher]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 720px)');
-    const handleChange = () => setIsMobile(mediaQuery.matches);
-    handleChange();
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-    return () => {
-      if (mediaQuery.addEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
 
   const timeZoneOptions = useMemo(() => {
     const options = getTimeZoneOptions();
