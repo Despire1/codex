@@ -2,6 +2,7 @@ import { type FC, type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Lesson, Student, StudentDebtItem, TeacherStudent } from '../../../entities/types';
+import { type StudentTabId } from '../types';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   DeleteOutlineIcon,
@@ -22,11 +23,12 @@ interface StudentHeroProps {
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   studentDebtTotal: number;
+  studentDebtSummary?: { total: number | null; count: number | null } | null;
   priceEditState: { id: number | null; value: string };
-  activeTab: 'homework' | 'overview' | 'lessons' | 'payments';
+  activeTab: StudentTabId;
   isMobile: boolean;
   onBackToList: () => void;
-  onTabChange: (tab: 'homework' | 'overview' | 'lessons' | 'payments') => void;
+  onTabChange: (tab: StudentTabId) => void;
   onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
   onPriceChange: (value: string) => void;
   onSavePrice: () => void;
@@ -37,6 +39,7 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRequestDebtDetails?: () => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -51,6 +54,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   studentLessonsSummary,
   studentDebtItems,
   studentDebtTotal,
+  studentDebtSummary,
   priceEditState,
   activeTab,
   isMobile,
@@ -66,6 +70,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onRequestDebtDetails,
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
@@ -210,8 +215,17 @@ export const StudentHero: FC<StudentHeroProps> = ({
     setIsReminderSettingsOpen(false);
   };
 
-  const hasDebt = studentDebtItems.length > 0;
-  const debtCount = studentDebtItems.length;
+  const effectiveDebtCount = studentDebtItems.length > 0
+    ? studentDebtItems.length
+    : studentDebtSummary?.count ?? 0;
+  const effectiveDebtTotal =
+    studentDebtTotal > 0
+      ? studentDebtTotal
+      : typeof studentDebtSummary?.total === 'number'
+        ? studentDebtSummary.total
+        : null;
+  const hasDebt =
+    effectiveDebtCount > 0 || (typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0);
   const formatLessonCount = (count: number) => {
     const lastTwo = count % 100;
     const last = count % 10;
@@ -220,7 +234,11 @@ export const StudentHero: FC<StudentHeroProps> = ({
     if (last >= 2 && last <= 4) return `${count} занятия`;
     return `${count} занятий`;
   };
-  const debtLabel = `${studentDebtTotal} ₽ (${formatLessonCount(debtCount)})`;
+  const debtLabel =
+    typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0
+      ? `${effectiveDebtTotal} ₽${effectiveDebtCount > 0 ? ` (${formatLessonCount(effectiveDebtCount)})` : ''}`
+      : formatLessonCount(effectiveDebtCount);
+  const shouldLoadDebtDetails = studentDebtItems.length === 0 && hasDebt;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
   const paymentReminderStatusLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
@@ -427,7 +445,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       <button
                         type="button"
                         className={styles.summaryDebtBadge}
-                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                        onClick={() => {
+                          if (shouldLoadDebtDetails) {
+                            onRequestDebtDetails?.();
+                          }
+                          setIsDebtPopoverOpen((prev) => !prev);
+                        }}
                       >
                         {debtLabel}
                       </button>
@@ -507,7 +530,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 <button
                   type="button"
                   className={styles.summaryDebtBadge}
-                  onClick={() => setIsDebtPopoverOpen(true)}
+                  onClick={() => {
+                    if (shouldLoadDebtDetails) {
+                      onRequestDebtDetails?.();
+                    }
+                    setIsDebtPopoverOpen(true);
+                  }}
                 >
                   {debtLabel}
                 </button>

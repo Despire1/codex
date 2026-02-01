@@ -21,6 +21,7 @@ import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
 import { SettingsSection } from '../../widgets/settings/SettingsSection';
 import { StudentsSection } from '../../widgets/students/StudentsSection';
+import { type StudentTabId } from '../../widgets/students/types';
 import { tabPathById } from '../tabs';
 
 interface AppRoutesProps {
@@ -138,6 +139,11 @@ interface AppRoutesProps {
     onCreateLesson: (studentId?: number) => void;
     onEditLesson: (lesson: Lesson) => void;
     onDeleteLesson: (lessonId: number) => void;
+    onActiveTabChange?: (tab: StudentTabId) => void;
+    onOpenPaymentReminders?: () => void;
+    onRequestDebtDetails?: () => void;
+    paymentsLoading?: boolean;
+    paymentRemindersLoading?: boolean;
   };
   schedule: {
     scheduleView: 'day' | 'week' | 'month';

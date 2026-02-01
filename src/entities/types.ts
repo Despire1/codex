@@ -176,6 +176,7 @@ export interface StudentListItem {
   link: TeacherStudent;
   debtRub?: number | null;
   debtLessonCount?: number | null;
+  paymentRemindersCount?: number | null;
   stats: {
     pendingHomeworkCount: number;
     overdueHomeworkCount: number;
