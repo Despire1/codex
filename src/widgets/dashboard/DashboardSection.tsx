@@ -276,18 +276,25 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       {unpaidSummary.lessonCount > 0 && (
         <div className={`${styles.unpaidCardWrapper} ${styles.unpaidArea}`}>
           {isDashboardMobile ? (
-            <button
-              type="button"
-              className={`${styles.card} ${styles.unpaidCard}`}
-              onClick={() => setIsUnpaidOpen(true)}
-            >
-              <div className={styles.cardHeader}>Неоплаченные занятия</div>
-              <div className={styles.unpaidSummary}>
-                {pluralizeRu(unpaidSummary.studentCount, { one: 'ученик', few: 'ученика', many: 'учеников' })} ·{' '}
-                {pluralizeRu(unpaidSummary.lessonCount, { one: 'занятие', few: 'занятия', many: 'занятий' })} ·{' '}
-                {unpaidSummary.total} ₽
-              </div>
-            </button>
+            <div className={`${styles.card} ${styles.unpaidCard}`}>
+              <UnpaidLessonsPopoverContent
+                entries={unpaidEntries}
+                reminderDelayHours={teacher.paymentReminderDelayHours}
+                globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
+                onOpenStudent={onOpenStudent}
+                onTogglePaid={onTogglePaid}
+                onRemindLessonPayment={onRemindLessonPayment}
+                maxVisibleEntries={1}
+                showToggle={false}
+              />
+              <button
+                type="button"
+                className={styles.unpaidShowAllButton}
+                onClick={() => setIsUnpaidOpen(true)}
+              >
+                Показать все
+              </button>
+            </div>
           ) : (
             <div className={`${styles.card} ${styles.unpaidCard} ${styles.unpaidCardFull}`}>
               <UnpaidLessonsPopoverContent
@@ -315,7 +322,11 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         </div>
       </div>
 
-      <BottomSheet isOpen={isDashboardMobile && isUnpaidOpen} onClose={() => setIsUnpaidOpen(false)}>
+      <BottomSheet
+        isOpen={isDashboardMobile && isUnpaidOpen}
+        onClose={() => setIsUnpaidOpen(false)}
+        className={styles.unpaidBottomSheet}
+      >
         <UnpaidLessonsPopoverContent
           entries={unpaidEntries}
           reminderDelayHours={teacher.paymentReminderDelayHours}
@@ -326,6 +337,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           }}
           onTogglePaid={onTogglePaid}
           onRemindLessonPayment={onRemindLessonPayment}
+          showAll
+          showToggle={false}
         />
       </BottomSheet>
     </section>
