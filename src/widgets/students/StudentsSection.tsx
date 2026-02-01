@@ -111,6 +111,7 @@ interface StudentsSectionProps {
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onOpenPaymentReminders?: () => void;
+  onRequestDebtDetails?: () => void;
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
 }
@@ -205,15 +206,24 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   newHomeworkDraft,
   onActiveTabChange,
   onOpenPaymentReminders,
+  onRequestDebtDetails,
   paymentsLoading,
   paymentRemindersLoading,
 }) => {
+  void onRequestDebtDetails;
   const location = useLocation();
   const navigate = useNavigate();
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
+  const studentDebtSummary = selectedStudentEntry
+    ? {
+        total: selectedStudentEntry.debtRub ?? null,
+        count: selectedStudentEntry.debtLessonCount ?? null,
+      }
+    : null;
+  const paymentRemindersCount = selectedStudentEntry?.paymentRemindersCount ?? null;
 
   const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
@@ -372,12 +382,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
                 onScroll={handleDetailsScroll}
               >
-          <StudentHero
+            <StudentHero
             headerRef={headerRef}
             selectedStudent={selectedStudent}
             studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
+                  studentDebtSummary={studentDebtSummary}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
                   isMobile={isMobile}
@@ -393,6 +404,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
+                  onRequestDebtDetails={onRequestDebtDetails}
                   onRemindLessonPayment={onRemindLessonPayment}
                   onTogglePaid={onTogglePaid}
                 />
@@ -453,6 +465,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     isMobile={isMobile}
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
+                    paymentRemindersCount={paymentRemindersCount}
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
                     onOpenLesson={onEditLesson}
