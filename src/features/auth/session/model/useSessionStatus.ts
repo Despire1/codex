@@ -7,6 +7,7 @@ type SessionUser = {
   subscriptionStartAt?: string | null;
   subscriptionEndAt?: string | null;
   role?: string;
+  photoUrl?: string | null;
 };
 
 export const useSessionStatus = () => {

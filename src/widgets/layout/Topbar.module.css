@@ -37,6 +37,13 @@
   min-width: 240px;
 }
 
+.topbarProfile {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 44px;
+}
+
 .topNav {
   display: inline-flex;
   background: var(--color-slate-50);
