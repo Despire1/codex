@@ -20,6 +20,7 @@ interface PaymentsTabProps {
   isMobile: boolean;
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
+  paymentRemindersCount?: number | null;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
   onPaymentDateChange: (date: string) => void;
   onOpenLesson: (lesson: Lesson) => void;
@@ -35,6 +36,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   isMobile,
   paymentFilter,
   paymentDate,
+  paymentRemindersCount,
   onPaymentFilterChange,
   onPaymentDateChange,
   onOpenLesson,
@@ -53,7 +55,8 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   }, [paymentDate, timeZone]);
   const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : 'Все';
   const isFilterActive = paymentFilter !== 'all' || Boolean(paymentDate);
-  const remindersLabel = `Напоминания (${paymentReminders.length})`;
+  const remindersCount = typeof paymentRemindersCount === 'number' ? paymentRemindersCount : paymentReminders.length;
+  const remindersLabel = `Напоминания (${remindersCount})`;
   const lessonsById = useMemo(() => {
     const map = new Map<number, Lesson>();
     studentLessons.forEach((lesson) => {
