@@ -737,6 +737,7 @@ const listStudents = async (
   });
 
   const debtSummariesByStudent = new Map<number, { total: number; count: number }>();
+  const reminderCountsByStudent = new Map<number, number>();
   if (pageItems.length) {
     const debtResults = await Promise.all(
       pageItems.map(async (item) => {
@@ -756,13 +757,40 @@ const listStudents = async (
     });
   }
 
+  if (pageItems.length) {
+    const reminderCounts = await prisma.notificationLog.findMany({
+      where: {
+        teacherId: teacher.chatId,
+        lessonId: { not: null },
+        type: 'PAYMENT_REMINDER_STUDENT',
+        studentId: { in: pageItems.map((item) => item.student.id) },
+      },
+      select: { studentId: true },
+    });
+
+    reminderCounts.forEach((reminder) => {
+      if (!reminder.studentId) return;
+      reminderCountsByStudent.set(
+        reminder.studentId,
+        (reminderCountsByStudent.get(reminder.studentId) ?? 0) + 1,
+      );
+    });
+  }
+
   const items = pageItems.map((item) => {
     const debtSummary = debtSummariesByStudent.get(item.student.id);
-    if (!debtSummary) return item;
+    const paymentRemindersCount = reminderCountsByStudent.get(item.student.id) ?? null;
+    if (!debtSummary) {
+      return {
+        ...item,
+        paymentRemindersCount,
+      };
+    }
     return {
       ...item,
       debtRub: debtSummary.total > 0 ? debtSummary.total : null,
       debtLessonCount: debtSummary.count > 0 ? debtSummary.count : null,
+      paymentRemindersCount,
     };
   });
 
@@ -861,6 +889,16 @@ const resolveStudentDebtSummary = async (teacherId: number, studentId: number) =
   const total = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
 
   return { items, total };
+};
+
+const listStudentUnpaidLessons = async (user: User, studentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+
+  return resolveStudentDebtSummary(teacher.chatId, studentId);
 };
 
 const listStudentPaymentReminders = async (user: User, studentId: number, limit = 10) => {
@@ -3377,6 +3415,13 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const startTo = searchParams.get('startTo') ?? undefined;
       const sort = (searchParams.get('sort') as 'asc' | 'desc' | null) ?? 'desc';
       const data = await listStudentLessons(requireApiUser(), studentId, { payment, status, startFrom, startTo, sort });
+      return sendJson(res, 200, data);
+    }
+
+    const studentUnpaidMatch = pathname.match(/^\/api\/students\/(\d+)\/unpaid-lessons$/);
+    if (req.method === 'GET' && studentUnpaidMatch) {
+      const studentId = Number(studentUnpaidMatch[1]);
+      const data = await listStudentUnpaidLessons(requireApiUser(), studentId);
       return sendJson(res, 200, data);
     }
 

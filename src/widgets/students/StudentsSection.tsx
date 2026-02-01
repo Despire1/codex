@@ -25,7 +25,7 @@ import { PaymentsTab } from './components/PaymentsTab';
 import { BalanceTopupModal } from './components/BalanceTopupModal';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
-import { NewHomeworkDraft, SelectedStudent } from './types';
+import { NewHomeworkDraft, SelectedStudent, StudentTabId } from './types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 
 interface StudentsSectionProps {
@@ -109,6 +109,11 @@ interface StudentsSectionProps {
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lessonId: number) => void;
   newHomeworkDraft: NewHomeworkDraft;
+  onActiveTabChange?: (tab: StudentTabId) => void;
+  onOpenPaymentReminders?: () => void;
+  onRequestDebtDetails?: () => void;
+  paymentsLoading?: boolean;
+  paymentRemindersLoading?: boolean;
 }
 const getLessonStatusLabel = (status: Lesson['status']) => {
   if (status === 'COMPLETED') return 'Проведён';
@@ -116,7 +121,6 @@ const getLessonStatusLabel = (status: Lesson['status']) => {
   return 'Запланирован';
 };
 
-type StudentTabId = 'homework' | 'overview' | 'lessons' | 'payments';
 // const DEFAULT_STUDENT_TAB: StudentTabId = 'homework';
 const DEFAULT_STUDENT_TAB: StudentTabId = 'overview';
 // const studentTabs: StudentTabId[] = ['homework', 'overview', 'lessons', 'payments'];
@@ -200,13 +204,26 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onEditLesson,
   onDeleteLesson,
   newHomeworkDraft,
+  onActiveTabChange,
+  onOpenPaymentReminders,
+  onRequestDebtDetails,
+  paymentsLoading,
+  paymentRemindersLoading,
 }) => {
+  void onRequestDebtDetails;
   const location = useLocation();
   const navigate = useNavigate();
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
     : null;
+  const studentDebtSummary = selectedStudentEntry
+    ? {
+        total: selectedStudentEntry.debtRub ?? null,
+        count: selectedStudentEntry.debtLessonCount ?? null,
+      }
+    : null;
+  const paymentRemindersCount = selectedStudentEntry?.paymentRemindersCount ?? null;
 
   const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
@@ -250,6 +267,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     const nextTab = resolveStudentTab(location.search);
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
   }, [location.search]);
+
+  useEffect(() => {
+    onActiveTabChange?.(activeTab);
+  }, [activeTab, onActiveTabChange]);
 
   useEffect(() => {
     const target = studentLoadMoreRef.current;
@@ -361,12 +382,13 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
                 onScroll={handleDetailsScroll}
               >
-          <StudentHero
+            <StudentHero
             headerRef={headerRef}
             selectedStudent={selectedStudent}
             studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
+                  studentDebtSummary={studentDebtSummary}
                   priceEditState={priceEditState}
                   activeTab={activeTab}
                   isMobile={isMobile}
@@ -438,13 +460,17 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   <PaymentsTab
                     payments={payments}
                     paymentReminders={paymentReminders}
-                    studentLessons={studentLessons}
+                    studentLessons={studentLessonsSummary}
                     isMobile={isMobile}
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
+                    paymentRemindersCount={paymentRemindersCount}
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
                     onOpenLesson={onEditLesson}
+                    onOpenReminders={onOpenPaymentReminders}
+                    paymentsLoading={paymentsLoading}
+                    paymentRemindersLoading={paymentRemindersLoading}
                   />
                 ) : (
                   selectedStudent && (

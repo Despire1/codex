@@ -20,9 +20,13 @@ interface PaymentsTabProps {
   isMobile: boolean;
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
+  paymentRemindersCount?: number | null;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
   onPaymentDateChange: (date: string) => void;
   onOpenLesson: (lesson: Lesson) => void;
+  onOpenReminders?: () => void;
+  paymentsLoading?: boolean;
+  paymentRemindersLoading?: boolean;
 }
 
 export const PaymentsTab: FC<PaymentsTabProps> = ({
@@ -32,9 +36,13 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   isMobile,
   paymentFilter,
   paymentDate,
+  paymentRemindersCount,
   onPaymentFilterChange,
   onPaymentDateChange,
   onOpenLesson,
+  onOpenReminders,
+  paymentsLoading,
+  paymentRemindersLoading,
 }) => {
   const timeZone = useTimeZone();
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -47,7 +55,8 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   }, [paymentDate, timeZone]);
   const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : 'Все';
   const isFilterActive = paymentFilter !== 'all' || Boolean(paymentDate);
-  const remindersLabel = `Напоминания (${paymentReminders.length})`;
+  const remindersCount = typeof paymentRemindersCount === 'number' ? paymentRemindersCount : paymentReminders.length;
+  const remindersLabel = `Напоминания (${remindersCount})`;
   const lessonsById = useMemo(() => {
     const map = new Map<number, Lesson>();
     studentLessons.forEach((lesson) => {
@@ -56,7 +65,28 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
     return map;
   }, [studentLessons]);
 
-  const remindersContent = <PaymentRemindersPopoverContent reminders={paymentReminders} lessonsById={lessonsById} />;
+  const remindersContent = (
+    <PaymentRemindersPopoverContent
+      reminders={paymentReminders}
+      lessonsById={lessonsById}
+      isLoading={paymentRemindersLoading}
+    />
+  );
+
+  const handleToggleReminders = () => {
+    setRemindersOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        onOpenReminders?.();
+      }
+      return next;
+    });
+  };
+
+  const handleOpenReminders = () => {
+    setRemindersOpen(true);
+    onOpenReminders?.();
+  };
 
   return (
     <div className={`${styles.card} ${styles.tabCard}`}>
@@ -152,7 +182,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
               <button
                 type="button"
                 className={`${controls.secondaryButton} ${styles.remindersTrigger}`}
-                onClick={() => setRemindersOpen(true)}
+                onClick={handleOpenReminders}
               >
                 {remindersLabel}
               </button>
@@ -164,7 +194,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
                   <button
                     type="button"
                     className={`${controls.secondaryButton} ${styles.remindersTrigger}`}
-                    onClick={() => setRemindersOpen((prev) => !prev)}
+                    onClick={handleToggleReminders}
                   >
                     {remindersLabel}
                   </button>
@@ -178,10 +208,7 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
           </div>
         </div>
       </div>
-      <PaymentList
-        payments={payments}
-        onOpenLesson={onOpenLesson}
-      />
+      <PaymentList payments={payments} onOpenLesson={onOpenLesson} isLoading={paymentsLoading} />
       {isMobile && (
         <BottomSheet isOpen={remindersOpen} onClose={() => setRemindersOpen(false)}>
           {remindersContent}
