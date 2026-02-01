@@ -246,6 +246,7 @@ export const AppPage = () => {
   const lessonLoadRequestId = useRef(0);
   const lessonSummaryLoadRequestId = useRef(0);
   const skipNextLessonLoadRef = useRef(false);
+  const [studentLessonsLoadedByStudent, setStudentLessonsLoadedByStudent] = useState<Record<number, boolean>>({});
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
   const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});

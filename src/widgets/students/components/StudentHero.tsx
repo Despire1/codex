@@ -39,6 +39,7 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRequestDebtDetails?: () => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -69,6 +70,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onRequestDebtDetails,
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
@@ -442,7 +444,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       <button
                         type="button"
                         className={styles.summaryDebtBadge}
-                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                        onClick={() => {
+                          if (shouldLoadDebtDetails) {
+                            onRequestDebtDetails?.();
+                          }
+                          setIsDebtPopoverOpen((prev) => !prev);
+                        }}
                       >
                         {debtLabel}
                       </button>
@@ -522,7 +529,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 <button
                   type="button"
                   className={styles.summaryDebtBadge}
-                  onClick={() => setIsDebtPopoverOpen(true)}
+                  onClick={() => {
+                    if (shouldLoadDebtDetails) {
+                      onRequestDebtDetails?.();
+                    }
+                    setIsDebtPopoverOpen(true);
+                  }}
                 >
                   {debtLabel}
                 </button>
