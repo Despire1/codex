@@ -294,6 +294,7 @@ export const AppPage = () => {
   const [weekLabelKey, setWeekLabelKey] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);
   const [dayViewDate, setDayViewDate] = useState<Date>(() => toZonedDate(new Date(), resolvedTimeZone));
+  const [scheduleSelectedMonthDay, setScheduleSelectedMonthDay] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>(null);
 
   const closeDialog = () => setDialogState(null);
@@ -1923,8 +1924,15 @@ export const AppPage = () => {
                     lesson,
                   ),
                 onOpenLessonDay: (lesson) => {
-                  setScheduleView('day');
-                  setDayViewDate(toZonedDate(lesson.startAt, resolvedTimeZone));
+                  const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+                  const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+                    timeZone: resolvedTimeZone,
+                  });
+                  setScheduleView('month');
+                  setDayViewDate(lessonDate);
+                  setMonthAnchor(startOfMonth(lessonDate));
+                  setMonthOffset(0);
+                  setScheduleSelectedMonthDay(lessonIso);
                   navigate(tabPathById.schedule);
                 },
                 onCompleteLesson: markLessonCompleted,
@@ -2027,6 +2035,8 @@ export const AppPage = () => {
               linkedStudents,
               monthAnchor,
               monthOffset,
+              selectedMonthDay: scheduleSelectedMonthDay,
+              onMonthDaySelect: setScheduleSelectedMonthDay,
               onOpenLessonModal: openLessonModal,
               onStartEditLesson: startEditLesson,
               onTogglePaid: togglePaid,

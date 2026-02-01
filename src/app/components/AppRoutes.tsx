@@ -159,6 +159,8 @@ interface AppRoutesProps {
     linkedStudents: LinkedStudent[];
     monthAnchor: Date;
     monthOffset: number;
+    selectedMonthDay?: string | null;
+    onMonthDaySelect?: (dayIso: string | null) => void;
     onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
     onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
