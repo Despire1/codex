@@ -45,6 +45,7 @@ import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
+import { type StudentTabId } from '../widgets/students/types';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -246,6 +247,8 @@ export const AppPage = () => {
   const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
+  const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});
+  const [paymentRemindersLoadingByStudent, setPaymentRemindersLoadingByStudent] = useState<Record<number, boolean>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
@@ -255,6 +258,7 @@ export const AppPage = () => {
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '', pricePerLesson: '' });
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -554,16 +558,12 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
-    loadStudentHomeworks();
-  }, [loadStudentHomeworks, hasAccess]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
     if (skipNextLessonLoadRef.current) {
       skipNextLessonLoadRef.current = false;
     }
+    if (studentActiveTab !== 'lessons') return;
     loadStudentLessons();
-  }, [loadStudentLessons, hasAccess]);
+  }, [loadStudentLessons, hasAccess, studentActiveTab]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -638,6 +638,7 @@ export const AppPage = () => {
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
       if (!hasAccess) return;
+      setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
       try {
         const filter = options?.filter ?? paymentFilterRef.current;
         const date = options?.date ?? paymentDateRef.current;
@@ -646,6 +647,8 @@ export const AppPage = () => {
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load payment events', error);
+      } finally {
+        setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
       }
     },
     [hasAccess],
@@ -654,12 +657,15 @@ export const AppPage = () => {
   const refreshPaymentReminders = useCallback(
     async (studentId: number) => {
       if (!hasAccess) return;
+      setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
       try {
         const data = await api.getPaymentReminders(studentId, 10);
         setPaymentRemindersByStudent((prev) => ({ ...prev, [studentId]: data.reminders }));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load payment reminders', error);
+      } finally {
+        setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
       }
     },
     [hasAccess],
@@ -667,11 +673,10 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
-    if (selectedStudentId) {
-      refreshPayments(selectedStudentId);
-      refreshPaymentReminders(selectedStudentId);
-    }
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, refreshPaymentReminders, hasAccess]);
+    if (!selectedStudentId) return;
+    if (studentActiveTab !== 'payments') return;
+    refreshPayments(selectedStudentId);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess, studentActiveTab]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
@@ -707,6 +712,17 @@ export const AppPage = () => {
     [links, students, homeworks],
   );
   const paymentEvents = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
+  const paymentEventsLoading = selectedStudentId
+    ? paymentEventsLoadingByStudent[selectedStudentId] ?? false
+    : false;
+  const paymentRemindersLoading = selectedStudentId
+    ? paymentRemindersLoadingByStudent[selectedStudentId] ?? false
+    : false;
+
+  const handleOpenPaymentReminders = useCallback(() => {
+    if (!selectedStudentId) return;
+    refreshPaymentReminders(selectedStudentId);
+  }, [refreshPaymentReminders, selectedStudentId]);
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
@@ -1931,10 +1947,14 @@ export const AppPage = () => {
               onLessonSortOrderChange: handleLessonSortOrderChange,
               payments: paymentEvents,
               paymentReminders: selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [],
+              paymentsLoading: paymentEventsLoading,
+              paymentRemindersLoading,
               paymentFilter,
               paymentDate,
               onPaymentFilterChange: handlePaymentFilterChange,
               onPaymentDateChange: handlePaymentDateChange,
+              onActiveTabChange: setStudentActiveTab,
+              onOpenPaymentReminders: handleOpenPaymentReminders,
               onCompleteLesson: markLessonCompleted,
               onChangeLessonStatus: updateLessonStatus,
               onTogglePaid: togglePaid,

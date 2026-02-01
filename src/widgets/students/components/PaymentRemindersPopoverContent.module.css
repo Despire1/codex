@@ -19,6 +19,14 @@
   background: var(--color-slate-50);
 }
 
+.loading {
+  font-size: 13px;
+  color: var(--color-slate-500);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-slate-50);
+}
+
 .list {
   display: flex;
   flex-direction: column;
