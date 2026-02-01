@@ -902,9 +902,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               </div>
             </div>
 
-            <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
-              {renderDayDetails(() => setSelectedMonthDay(null))}
-            </div>
+            {!isMobileMonthView && (
+              <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
+                {renderDayDetails(() => setSelectedMonthDay(null))}
+              </div>
+            )}
           </div>
         </div>
 
