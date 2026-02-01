@@ -1,0 +1,204 @@
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 6px auto 1fr;
+  gap: 12px;
+  padding: 14px 14px 14px 0;
+  border-radius: 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--color-slate-300);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
+.canceled {
+  border-style: dashed;
+  background: var(--color-slate-50);
+  color: var(--color-slate-400);
+  opacity: 0.7;
+}
+
+.accent {
+  width: 6px;
+  border-radius: 16px 0 0 16px;
+  background: var(--lesson-border, var(--color-blue-600));
+}
+
+.timeBadge {
+  min-width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 10px;
+  border-radius: 14px;
+  background: var(--lesson-bg, var(--color-blue-50));
+  color: var(--lesson-border, var(--color-blue-600));
+  font-weight: 700;
+}
+
+.timeStart {
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+.timeEnd {
+  font-size: 13px;
+  color: var(--color-slate-500);
+}
+
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 8px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-slate-900);
+  line-height: 1.2;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linkBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-blue-200);
+  color: var(--color-blue-600);
+  background: var(--color-blue-50);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.linkBadge:hover {
+  border-color: var(--color-blue-300);
+  background: var(--color-white);
+}
+
+.linkIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-slate-200);
+}
+
+.paymentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.paymentBadge:disabled {
+  cursor: default;
+}
+
+.paymentIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: currentColor;
+}
+
+.paymentPaid {
+  color: var(--color-emerald-600);
+}
+
+.paymentPaid .paymentIcon::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: var(--color-white);
+  clip-path: polygon(14% 52%, 0 66%, 39% 100%, 100% 28%, 86% 14%, 38% 68%);
+}
+
+.paymentUnpaid {
+  color: var(--color-red-500);
+}
+
+.paymentPrice {
+  color: var(--color-slate-500);
+  font-weight: 600;
+}
+
+.actionsButton {
+  border: none;
+  background: transparent;
+  padding: 4px;
+  border-radius: 8px;
+  color: var(--color-slate-400);
+  cursor: pointer;
+}
+
+.actionsButton:hover {
+  background: var(--color-slate-100);
+  color: var(--color-slate-600);
+}
+
+.actionsPopover {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actionItem {
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--color-slate-700);
+  cursor: pointer;
+}
+
+.actionItem:hover {
+  background: var(--color-slate-100);
+}
+
+.actionDanger {
+  color: var(--color-red-600);
+}
+
+.actionDanger:hover {
+  background: rgba(239, 68, 68, 0.12);
+}

@@ -156,6 +156,7 @@ interface AppRoutesProps {
     onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
     onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
+    onDeleteLesson: (lessonId: number) => void;
     onDayViewDateChange: (date: Date) => void;
     onGoToToday: () => void;
     autoConfirmLessons: boolean;
