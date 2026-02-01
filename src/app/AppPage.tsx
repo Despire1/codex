@@ -1728,29 +1728,34 @@ export const AppPage = () => {
         }
       }
       if (code === 'recently_sent' && !options?.force) {
-        const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
-        const lastReminderLabel = reminderItem?.lastPaymentReminderAt
-          ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
-              locale: ru,
-              timeZone: resolvedTimeZone,
-            })
-          : null;
-        const message = lastReminderLabel
-          ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
-          : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
-        setDialogState({
-          type: 'confirm',
-          title: 'Напоминание уже отправлялось недавно',
-          message,
-          confirmText: 'Отправить',
-          cancelText: 'Отмена',
-          onConfirm: () => {
-            closeDialog();
-            remindLessonPayment(lessonId, studentId, { force: true });
-          },
-          onCancel: closeDialog,
+        return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
+          const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+          const lastReminderLabel = reminderItem?.lastPaymentReminderAt
+            ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
+                locale: ru,
+                timeZone: resolvedTimeZone,
+              })
+            : null;
+          const message = lastReminderLabel
+            ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
+            : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
+          setDialogState({
+            type: 'confirm',
+            title: 'Напоминание уже отправлялось недавно',
+            message,
+            confirmText: 'Отправить',
+            cancelText: 'Отмена',
+            onConfirm: async () => {
+              closeDialog();
+              const result = await remindLessonPayment(lessonId, studentId, { force: true });
+              resolve(result);
+            },
+            onCancel: () => {
+              closeDialog();
+              resolve({ status: 'error' as const });
+            },
+          });
         });
-        return { status: 'error' as const };
       }
       const message =
         code === 'student_not_activated'
