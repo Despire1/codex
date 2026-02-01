@@ -55,6 +55,8 @@ interface ScheduleSectionProps {
   linkedStudents: LinkedStudent[];
   monthAnchor: Date;
   monthOffset: number;
+  selectedMonthDay?: string | null;
+  onMonthDaySelect?: (dayIso: string | null) => void;
   onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
   onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
@@ -78,6 +80,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   linkedStudents,
   monthAnchor,
   monthOffset,
+  selectedMonthDay,
+  onMonthDaySelect,
   onOpenLessonModal,
   onStartEditLesson,
   onTogglePaid,
@@ -130,7 +134,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
-  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
+  const [internalSelectedMonthDay, setInternalSelectedMonthDay] = useState<string | null>(null);
+  const effectiveSelectedMonthDay = selectedMonthDay ?? internalSelectedMonthDay;
+
+  useEffect(() => {
+    if (selectedMonthDay === undefined) return;
+    setInternalSelectedMonthDay(selectedMonthDay);
+  }, [selectedMonthDay]);
   const [isMonthPanelDismissed, setIsMonthPanelDismissed] = useState(false);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
   const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
@@ -196,7 +206,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, [scheduleView, dayViewDate, isMobileViewport]);
 
   useEffect(() => {
-    if (scheduleView !== 'month' || selectedMonthDay || isMonthPanelDismissed) return;
+    if (scheduleView !== 'month' || effectiveSelectedMonthDay || isMonthPanelDismissed) return;
 
     const daysInMonth = buildMonthDays(selectedMonth).filter((day) => day.inMonth);
     const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
@@ -210,18 +220,20 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       onDayViewDateChange(defaultDay.date);
 
       if (!isMobileViewport) {
-        setSelectedMonthDay(defaultDay.iso);
+        setInternalSelectedMonthDay(defaultDay.iso);
+        onMonthDaySelect?.(defaultDay.iso);
       }
     }
   }, [
     scheduleView,
     selectedMonth,
-    selectedMonthDay,
+    effectiveSelectedMonthDay,
     isMonthPanelDismissed,
     lessonsByDay,
     onDayViewDateChange,
     isMobileViewport,
     timeZone,
+    onMonthDaySelect,
   ]);
 
   useEffect(() => {
@@ -234,7 +246,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   useEffect(() => {
     setOpenLessonMenuId(null);
-  }, [selectedMonthDay]);
+  }, [effectiveSelectedMonthDay]);
 
   useEffect(() => {
     if (!isMobileWeekView) {
@@ -263,10 +275,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, [isMobileWeekView, dayViewDate, onDayViewDateChange, timeZone, todayZoned]);
 
   useEffect(() => {
-    if (selectedMonthDay) {
+    if (effectiveSelectedMonthDay) {
       setDrawerMode('half');
     }
-  }, [selectedMonthDay]);
+  }, [effectiveSelectedMonthDay]);
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -558,7 +570,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const handleGoToToday = () => {
     setDayPickerOpen(false);
-    setSelectedMonthDay(null);
+    setInternalSelectedMonthDay(null);
+    onMonthDaySelect?.(null);
     onGoToToday();
   };
 
@@ -728,15 +741,17 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
     const monthLabel = format(selectedMonth, 'LLLL yyyy', { locale: ru });
-    const selectedDayLessons = selectedMonthDay
-      ? (lessonsByDay[selectedMonthDay] ?? []).slice().sort((a, b) => a.startAt.localeCompare(b.startAt))
+    const selectedDayLessons = effectiveSelectedMonthDay
+      ? (lessonsByDay[effectiveSelectedMonthDay] ?? [])
+          .slice()
+          .sort((a, b) => a.startAt.localeCompare(b.startAt))
       : [];
-    const selectedDayDate = selectedMonthDay
-      ? toZonedDate(toUtcDateFromDate(selectedMonthDay, timeZone), timeZone)
+    const selectedDayDate = effectiveSelectedMonthDay
+      ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
       : null;
 
     const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!isMobileMonthView || !selectedMonthDay) return;
+      if (!isMobileMonthView || !effectiveSelectedMonthDay) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -773,7 +788,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         }
 
         if (delta > 120) {
-          setSelectedMonthDay(null);
+          setInternalSelectedMonthDay(null);
+          onMonthDaySelect?.(null);
         } else if (delta < -80) {
           setDrawerMode('expanded');
         } else if (drawerModeAtDragStart.current === 'expanded' && delta > 30) {
@@ -848,10 +864,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           })}
         </div>
 
-        {selectedMonthDay && (
+        {effectiveSelectedMonthDay && (
           <button
             className={`${controls.primaryButton} ${styles.panelAction}`}
-            onClick={() => onOpenLessonModal(selectedMonthDay)}
+            onClick={() => onOpenLessonModal(effectiveSelectedMonthDay)}
           >
             Создать урок
           </button>
@@ -875,7 +891,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
           </div>
 
-          <div className={`${styles.monthLayout} ${selectedMonthDay ? styles.panelOpen : ''}`}>
+          <div className={`${styles.monthLayout} ${effectiveSelectedMonthDay ? styles.panelOpen : ''}`}>
             <div className={styles.monthCalendar}>
               <div className={styles.monthGrid}>
                 {monthWeekdays.map((weekday) => (
@@ -887,7 +903,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   const dayLessons = lessonsByDay[day.iso] ?? [];
                   const handleDayClick = () => {
                     setIsMonthPanelDismissed(false);
-                    setSelectedMonthDay(day.iso);
+                    setInternalSelectedMonthDay(day.iso);
+                    onMonthDaySelect?.(day.iso);
                     onDayViewDateChange(day.date);
 
                     if (isMobileMonthView) {
@@ -902,7 +919,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       key={`${monthLabel}-${day.iso}`}
                       className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
                         isTodayCell ? styles.todayCell : ''
-                      } ${selectedMonthDay === day.iso ? styles.activeDay : ''}`}
+                      } ${effectiveSelectedMonthDay === day.iso ? styles.activeDay : ''}`}
                       onClick={handleDayClick}
                     >
                       <div className={styles.monthDateRow}>
@@ -922,9 +939,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
 
             {!isMobileMonthView && (
-              <div className={`${styles.dayPanel} ${selectedMonthDay ? styles.dayPanelOpen : ''}`}>
+              <div className={`${styles.dayPanel} ${effectiveSelectedMonthDay ? styles.dayPanelOpen : ''}`}>
                 {renderDayDetails(() => {
-                  setSelectedMonthDay(null);
+                  setInternalSelectedMonthDay(null);
+                  onMonthDaySelect?.(null);
                   setIsMonthPanelDismissed(true);
                 })}
               </div>
@@ -935,11 +953,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         {isMobileMonthView && (
           <>
             <div
-              className={`${styles.dayDrawerScrim} ${selectedMonthDay ? styles.scrimVisible : ''}`}
-              onClick={() => setSelectedMonthDay(null)}
+              className={`${styles.dayDrawerScrim} ${effectiveSelectedMonthDay ? styles.scrimVisible : ''}`}
+              onClick={() => {
+                setInternalSelectedMonthDay(null);
+                onMonthDaySelect?.(null);
+              }}
             />
             <div
-              className={`${styles.dayDrawer} ${selectedMonthDay ? styles.dayDrawerOpen : ''} ${
+              className={`${styles.dayDrawer} ${effectiveSelectedMonthDay ? styles.dayDrawerOpen : ''} ${
                 drawerMode === 'expanded' ? styles.dayDrawerExpanded : ''
               } ${isDraggingDrawer ? styles.dayDrawerDragging : ''}`}
               role="dialog"
@@ -948,7 +969,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div className={styles.drawerHandleArea} onPointerDown={startDrawerDrag}>
                 <span className={styles.drawerHandle} />
               </div>
-              {renderDayDetails(() => setSelectedMonthDay(null))}
+              {renderDayDetails(() => {
+                setInternalSelectedMonthDay(null);
+                onMonthDaySelect?.(null);
+              })}
             </div>
           </>
         )}
