@@ -219,13 +219,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, [selectedMonthDay]);
 
   useEffect(() => {
-    const handleResize = () => setIsMobileViewport(window.innerWidth <= 720);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
     if (!isMobileWeekView) {
       mobileWeekKeyRef.current = null;
       return;

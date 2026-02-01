@@ -1,5 +1,5 @@
 import { addDays, format, isSameDay } from 'date-fns';
-import { type FC, useMemo, useState } from 'react';
+import {type FC, useEffect, useMemo, useState} from 'react';
 import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';

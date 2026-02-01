@@ -1,3 +1,19 @@
+.cardWrap {
+  position: relative;
+}
+
+.cardWrap::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 1px;
+  bottom: 1px;
+  width: 30px;
+  border-radius: 999px;
+  background: var(--lesson-border, var(--color-blue-600));
+  z-index: 0;
+}
+
 .card {
   position: relative;
   border-radius: 16px;
@@ -6,22 +22,12 @@
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
   cursor: pointer;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  z-index: 1;
 }
 
 .card:hover {
   border-color: var(--color-slate-300);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  left: -5px;
-  top: 10px;
-  bottom: 10px;
-  width: 5px;
-  border-radius: 999px;
-  background: var(--lesson-border, var(--color-blue-600));
 }
 
 .canceled {
@@ -62,7 +68,7 @@
   padding: 12px 10px;
   border-radius: 14px;
   background: var(--lesson-bg, var(--color-blue-50));
-  color: var(--lesson-border, var(--color-blue-600));
+  color: var(--lesson-hover-bg, var(--color-blue-600));
   font-weight: 700;
 }
 
@@ -74,7 +80,7 @@
 
 .timeEnd {
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--lesson-border);
 }
 
 .title {
@@ -130,12 +136,12 @@
 .paymentBadge {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   border: none;
   background: transparent;
   padding: 0;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -144,8 +150,8 @@
 }
 
 .paymentIcon {
-  width: 22px;
-  height: 22px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -154,19 +160,19 @@
 }
 
 .paymentPaid {
-  color: var(--color-emerald-600);
+  color: var(--color-emerald-500) !important;
 }
 
 .paymentPaid .paymentIcon::after {
   content: '';
-  width: 10px;
-  height: 10px;
-  background: var(--color-white);
+  width: 8px;
+  height: 8px;
+  background: var(--color-white) !important;
   clip-path: polygon(14% 52%, 0 66%, 39% 100%, 100% 28%, 86% 14%, 38% 68%);
 }
 
 .paymentUnpaid {
-  color: var(--color-red-500);
+  color: var(--color-red-500) !important;
 }
 
 .paymentPrice {
@@ -216,4 +222,10 @@
 
 .actionDanger:hover {
   background: rgba(239, 68, 68, 0.12);
+}
+
+@media (max-width: 720px) {
+  .cardWrap {
+    margin-left: 4px;
+  }
 }

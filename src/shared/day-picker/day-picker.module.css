@@ -119,7 +119,7 @@
 
 .daySelected {
   background: linear-gradient(120deg, var(--primary), var(--primary-strong));
-  color: var(--color-white);
+  color: var(--color-white) !important;
   border-color: var(--primary-strong);
   box-shadow: 0 8px 18px var(--shadow-primary-25);
 }

@@ -73,12 +73,11 @@
 
 .popover {
   position: fixed;
-  z-index: 20;
+  z-index: 200;
   background: var(--color-white);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 17px;
   box-shadow: 0 12px 30px var(--shadow-slate-900-18);
-  padding: 10px;
   max-width: min(360px, calc(100vw - 24px));
   overflow: hidden;
 }
