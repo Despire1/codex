@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import styles from './DatePickerField.module.css';
@@ -33,9 +34,7 @@ export const DatePickerField = ({
   const ref = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [placement, setPlacement] = useState<{ vertical: 'top' | 'bottom'; align: 'left' | 'right' }>(
-    { vertical: 'bottom', align: 'left' },
-  );
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
 
   const parseDate = (input?: string) => {
     if (!input) return null;
@@ -56,10 +55,10 @@ export const DatePickerField = ({
     if (!open) return undefined;
 
     const handleOutside = (event: MouseEvent) => {
-      if (!ref.current) return;
-      if (!ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
 
     document.addEventListener('mousedown', handleOutside);
@@ -86,7 +85,24 @@ export const DatePickerField = ({
       const fitsRight = spaceRight >= popoverRect.width;
       const align: 'left' | 'right' = fitsRight ? 'left' : 'right';
 
-      setPlacement((prev) => (prev.vertical === vertical && prev.align === align ? prev : { vertical, align }));
+      const gap = 6;
+      const viewportPadding = 12;
+      const top =
+        vertical === 'bottom' ? controlRect.bottom + gap : controlRect.top - popoverRect.height - gap;
+      const left = align === 'left' ? controlRect.left : controlRect.right - popoverRect.width;
+      const clampedLeft = Math.min(
+        window.innerWidth - popoverRect.width - viewportPadding,
+        Math.max(viewportPadding, left),
+      );
+      const clampedTop = Math.min(
+        window.innerHeight - popoverRect.height - viewportPadding,
+        Math.max(viewportPadding, top),
+      );
+
+      setPopoverStyle((prev) =>
+        prev.top === clampedTop && prev.left === clampedLeft ? prev : { top: clampedTop, left: clampedLeft },
+      );
+
     };
 
     updatePlacement();
@@ -112,6 +128,22 @@ export const DatePickerField = ({
     setOpen(false);
   };
 
+  const portalTarget = typeof document === 'undefined' ? null : document.body;
+  const popover = open && !disabled && portalTarget
+    ? createPortal(
+      <div className={styles.popover} ref={popoverRef} style={popoverStyle}>
+        <DayPicker
+          selected={selectedDate ?? undefined}
+          onSelect={handleSelect}
+          weekStartsOn={1}
+          locale={ru}
+          defaultMonth={initialMonth}
+        />
+      </div>,
+      portalTarget,
+    )
+    : null;
+
   return (
     <div className={`${styles.field} ${className ?? ''}`} ref={ref}>
       {label && <span className={styles.label}>{label}</span>}
@@ -135,20 +167,7 @@ export const DatePickerField = ({
           </button>
         )}
       </div>
-      {open && !disabled && (
-        <div
-          className={`${styles.popover} ${placement.vertical === 'top' ? styles.popoverTop : styles.popoverBottom} ${placement.align === 'right' ? styles.popoverRight : ''}`}
-          ref={popoverRef}
-        >
-          <DayPicker
-            selected={selectedDate ?? undefined}
-            onSelect={handleSelect}
-            weekStartsOn={1}
-            locale={ru}
-            defaultMonth={initialMonth}
-          />
-        </div>
-      )}
+      {popover}
     </div>
   );
 };
