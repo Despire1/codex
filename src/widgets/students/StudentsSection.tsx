@@ -209,7 +209,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 
   const [activeTab, setActiveTab] = useState<StudentTabId>(() => resolveStudentTab(location.search));
   const [editableLessonStatusId, setEditableLessonStatusId] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 720px)').matches;
+  });
   const [mobileView, setMobileView] = useState<'list' | 'details'>('list');
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
