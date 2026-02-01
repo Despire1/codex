@@ -31,6 +31,9 @@ interface UnpaidLessonsPopoverContentProps {
     lessonId: number,
     studentId?: number,
   ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
+  maxVisibleEntries?: number;
+  showToggle?: boolean;
+  showAll?: boolean;
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -42,6 +45,9 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   onOpenStudent,
   onTogglePaid,
   onRemindLessonPayment,
+  maxVisibleEntries = 2,
+  showToggle = true,
+  showAll = false,
 }) => {
   const timeZone = useTimeZone();
   const now = new Date();
@@ -108,9 +114,13 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
     [entryKeys, onRemindLessonPayment, pendingReminderIds],
   );
 
-  const visibleEntries = isExpanded ? sortedEntries : sortedEntries.slice(0, 2);
-  const showToggle = sortedEntries.length > 2;
-  const isScrollable = isExpanded && sortedEntries.length > 4;
+  const visibleEntries = showAll
+    ? sortedEntries
+    : isExpanded
+      ? sortedEntries
+      : sortedEntries.slice(0, maxVisibleEntries);
+  const canToggle = !showAll && showToggle && sortedEntries.length > maxVisibleEntries;
+  const isScrollable = (showAll || isExpanded) && sortedEntries.length > 4;
 
   return (
       <div className={styles.root}>
@@ -230,7 +240,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                 })}
               </div>
 
-              {showToggle && (
+              {canToggle && (
                   <div className={styles.toggleWrapper}>
                     <button
                         type="button"
