@@ -1,15 +1,16 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import { type FC, useEffect, useMemo, useState } from 'react';
-import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
+import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
-import { BottomSheet } from '../../shared/ui/BottomSheet/BottomSheet';
+import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
+import { Badge } from '@/shared/ui/Badge/Badge';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import styles from './DashboardSection.module.css';
-import { getLessonColorVars } from '../../shared/lib/lessonColors';
-import { pluralizeRu } from '../../shared/lib/pluralizeRu';
-import { useTimeZone } from '../../shared/lib/timezoneContext';
-import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '../../shared/lib/timezoneDates';
+import { getLessonColorVars } from '@/shared/lib/lessonColors';
+import { pluralizeRu } from '@/shared/lib/pluralizeRu';
+import { useTimeZone } from '@/shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timezoneDates';
 
 interface DashboardSectionProps {
   lessons: Lesson[];

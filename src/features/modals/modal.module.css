@@ -41,7 +41,6 @@
 }
 
 .modalBody {
-  margin-top: 16px;
   overflow-y: auto;
   flex: 1 1 auto;
 }
@@ -132,10 +131,15 @@
   color: var(--text) !important;
 }
 
+.weekdaysRow {
+  margin-top: 6px;
+}
+
 .weekdayGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(48px, 1fr));
   gap: 10px;
+  margin-top: 6px;
 }
 
 .weekdayButton {

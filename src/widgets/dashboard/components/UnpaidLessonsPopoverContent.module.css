@@ -108,9 +108,10 @@
   align-items: center;
 }
 
-.payButton {
+.payButton.payButton {
   background: var(--color-emerald-50);
-  color: var(--color-green-700);
+  color: var(--color-green-700) !important;
+  -webkit-text-fill-color: var(--color-green-700) !important;
   border: 1px solid var(--color-green-200);
 }
 
