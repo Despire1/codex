@@ -214,6 +214,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
     onTogglePaymentReminders(selectedStudent.id, !paymentRemindersEnabled);
     setIsReminderSettingsOpen(false);
   };
+  const handleToggleDebtPopover = () => {
+    setIsDebtPopoverOpen((prev) => !prev);
+  };
 
   const effectiveDebtCount = studentDebtItems.length > 0
     ? studentDebtItems.length
@@ -444,12 +447,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       <button
                         type="button"
                         className={styles.summaryDebtBadge}
-                        onClick={() => {
-                          if (shouldLoadDebtDetails) {
-                            onRequestDebtDetails?.();
-                          }
-                          setIsDebtPopoverOpen((prev) => !prev);
-                        }}
+                        onClick={handleToggleDebtPopover}
                       >
                         {debtLabel}
                       </button>
@@ -529,12 +527,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 <button
                   type="button"
                   className={styles.summaryDebtBadge}
-                  onClick={() => {
-                    if (shouldLoadDebtDetails) {
-                      onRequestDebtDetails?.();
-                    }
-                    setIsDebtPopoverOpen(true);
-                  }}
+                  onClick={handleToggleDebtPopover}
                 >
                   {debtLabel}
                 </button>
