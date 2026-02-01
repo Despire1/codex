@@ -1911,8 +1911,19 @@ export const AppPage = () => {
                 },
                 onCreateLesson: (date) => {
                   const lessonDate = date ?? new Date();
+                  const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+
+                  if (date) {
+                    setScheduleView('month');
+                    setDayViewDate(lessonDate);
+                    setMonthAnchor(startOfMonth(lessonDate));
+                    setMonthOffset(0);
+                    setScheduleSelectedMonthDay(lessonIso);
+                    navigate(tabPathById.schedule);
+                  }
+
                   openLessonModal(
-                    formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                    lessonIso,
                     date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
                   );
                 },
