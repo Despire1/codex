@@ -1,7 +1,7 @@
 import { formatDistanceToNowStrict } from 'date-fns';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
-import { FC } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from './UnpaidLessonsPopoverContent.module.css';
@@ -42,12 +42,69 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 }) => {
   const timeZone = useTimeZone();
   const now = new Date();
+  const [pendingReminderIds, setPendingReminderIds] = useState<Set<string>>(new Set());
+  const [successReminderIds, setSuccessReminderIds] = useState<Set<string>>(new Set());
+  const [optimisticReminders, setOptimisticReminders] = useState<Record<string, string>>({});
+  const successTimeouts = useRef<Map<string, number>>(new Map());
 
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
   );
 
+  const entryKeys = useMemo(
+    () => new Map(sortedEntries.map((entry) => [`${entry.lessonId}-${entry.studentId}`, entry])),
+    [sortedEntries],
+  );
+
   const reminderDelayMs = Math.max(1, reminderDelayHours) * 60 * 60 * 1000;
+
+  useEffect(() => {
+    return () => {
+      successTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      successTimeouts.current.clear();
+    };
+  }, []);
+
+  const handleReminderSend = useCallback(
+    async (lessonId: number, studentId?: number) => {
+      if (studentId === undefined) return;
+      const key = `${lessonId}-${studentId}`;
+      if (pendingReminderIds.has(key)) return;
+      const entry = entryKeys.get(key);
+      if (!entry || !entry.isActivated) return;
+
+      setPendingReminderIds((prev) => new Set(prev).add(key));
+      const nowIso = new Date().toISOString();
+      setOptimisticReminders((prev) => ({ ...prev, [key]: nowIso }));
+      try {
+        await onRemindLessonPayment(lessonId, studentId);
+        setSuccessReminderIds((prev) => new Set(prev).add(key));
+        const timeoutId = window.setTimeout(() => {
+          setSuccessReminderIds((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+          successTimeouts.current.delete(key);
+        }, 1200);
+        successTimeouts.current.set(key, timeoutId);
+      } catch (error) {
+        setOptimisticReminders((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      } finally {
+        setPendingReminderIds((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    [entryKeys, onRemindLessonPayment, pendingReminderIds],
+  );
+
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -61,13 +118,15 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
       ) : (
         <div className={styles.list}>
           {sortedEntries.map((entry) => {
+            const entryKey = `${entry.lessonId}-${entry.studentId}`;
+            const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
             const lessonDate = capitalizeFirst(
               formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
             );
             const priceLabel = `${entry.price} ₽`;
             const reminderLabel = entry.isActivated
-              ? entry.lastPaymentReminderAt
-                ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(entry.lastPaymentReminderAt), {
+              ? reminderTimestamp
+                ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(reminderTimestamp), {
                     addSuffix: true,
                     locale: ru,
                   })}.`
@@ -75,7 +134,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
               : 'Ученик не активировал бота — отправка невозможна.';
             const showProgress =
               entry.isActivated &&
-              !entry.lastPaymentReminderAt &&
+              !reminderTimestamp &&
               globalPaymentRemindersEnabled &&
               entry.paymentRemindersEnabled &&
               entry.completedAt;
@@ -90,6 +149,8 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
             const reminderDisabledReason = entry.isActivated
               ? null
               : 'Ученик не активировал бота — отправка невозможна';
+            const isPending = pendingReminderIds.has(entryKey);
+            const isSuccess = successReminderIds.has(entryKey);
 
             return (
               <div key={`${entry.lessonId}-${entry.studentId}`} className={styles.item}>
@@ -126,11 +187,17 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                   <button
                     type="button"
                     className={styles.remindButton}
-                    onClick={() => onRemindLessonPayment(entry.lessonId, entry.studentId)}
+                    onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
                     title={reminderDisabledReason ?? 'Отправить напоминание'}
-                    disabled={Boolean(reminderDisabledReason)}
+                    disabled={Boolean(reminderDisabledReason) || isPending}
                   >
-                    <NotificationsNoneOutlinedIcon width={18} height={18} />
+                    {isPending ? (
+                      <span className={styles.iconSpinner} aria-hidden />
+                    ) : isSuccess ? (
+                      <span className={styles.iconCheck} aria-hidden />
+                    ) : (
+                      <NotificationsNoneOutlinedIcon width={18} height={18} />
+                    )}
                   </button>
                 </div>
 
