@@ -45,6 +45,7 @@ import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
+import { type StudentTabId } from '../widgets/students/types';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -226,8 +227,9 @@ export const AppPage = () => {
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonsSummary, setStudentLessonsSummary] = useState<Lesson[]>([]);
-  const [studentDebtItems, setStudentDebtItems] = useState<StudentDebtItem[]>([]);
-  const [studentDebtTotal, setStudentDebtTotal] = useState(0);
+  const [studentUnpaidLessonsByStudent, setStudentUnpaidLessonsByStudent] = useState<Record<number, StudentDebtItem[]>>({});
+  const [studentUnpaidTotalByStudent, setStudentUnpaidTotalByStudent] = useState<Record<number, number>>({});
+  const [studentUnpaidLoadedByStudent, setStudentUnpaidLoadedByStudent] = useState<Record<number, boolean>>({});
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
     storedStudentCardFilters.lessonPaymentFilter ?? 'all',
   );
@@ -246,6 +248,8 @@ export const AppPage = () => {
   const skipNextLessonLoadRef = useRef(false);
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
+  const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});
+  const [paymentRemindersLoadingByStudent, setPaymentRemindersLoadingByStudent] = useState<Record<number, boolean>>({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
@@ -255,6 +259,7 @@ export const AppPage = () => {
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '', pricePerLesson: '' });
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -366,6 +371,7 @@ export const AppPage = () => {
     }
   }, [selectedStudentId]);
 
+
   const loadStudentList = useCallback(
     async (options?: { offset?: number; append?: boolean }) => {
       if (!hasAccess) {
@@ -449,15 +455,11 @@ export const AppPage = () => {
     async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
       if (!hasAccess) {
         setStudentLessons([]);
-        setStudentDebtItems([]);
-        setStudentDebtTotal(0);
         return;
       }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
-        setStudentDebtItems([]);
-        setStudentDebtTotal(0);
         return;
       }
 
@@ -489,8 +491,6 @@ export const AppPage = () => {
         });
         if (lessonLoadRequestId.current !== requestId) return;
         setStudentLessons(data.items.map(normalizeLesson));
-        setStudentDebtItems(data.debt.items);
-        setStudentDebtTotal(data.debt.total);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
@@ -547,6 +547,25 @@ export const AppPage = () => {
     [selectedStudentId, hasAccess],
   );
 
+  const loadStudentUnpaidLessons = useCallback(
+    async (options?: { studentIdOverride?: number | null; force?: boolean }) => {
+      if (!hasAccess) return;
+      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
+      if (!targetStudentId) return;
+      if (!options?.force && studentUnpaidLoadedByStudent[targetStudentId]) return;
+      try {
+        const data = await api.listStudentUnpaidLessons(targetStudentId);
+        setStudentUnpaidLessonsByStudent((prev) => ({ ...prev, [targetStudentId]: data.items }));
+        setStudentUnpaidTotalByStudent((prev) => ({ ...prev, [targetStudentId]: data.total }));
+        setStudentUnpaidLoadedByStudent((prev) => ({ ...prev, [targetStudentId]: true }));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load student unpaid lessons', error);
+      }
+    },
+    [hasAccess, selectedStudentId, studentUnpaidLoadedByStudent],
+  );
+
   useEffect(() => {
     if (!hasAccess) return;
     loadStudentList();
@@ -554,16 +573,18 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
-    loadStudentHomeworks();
-  }, [loadStudentHomeworks, hasAccess]);
+    if (!selectedStudentId) return;
+    loadStudentUnpaidLessons({ studentIdOverride: selectedStudentId });
+  }, [hasAccess, loadStudentUnpaidLessons, selectedStudentId]);
 
   useEffect(() => {
     if (!hasAccess) return;
     if (skipNextLessonLoadRef.current) {
       skipNextLessonLoadRef.current = false;
     }
+    if (studentActiveTab !== 'lessons') return;
     loadStudentLessons();
-  }, [loadStudentLessons, hasAccess]);
+  }, [loadStudentLessons, hasAccess, studentActiveTab]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -572,11 +593,14 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!selectedStudentId) return;
+    if (!studentUnpaidLoadedByStudent[selectedStudentId]) return;
+    const unpaidItems = studentUnpaidLessonsByStudent[selectedStudentId] ?? [];
+    const unpaidTotal = studentUnpaidTotalByStudent[selectedStudentId] ?? 0;
     setStudentListItems((prev) =>
       prev.map((item) => {
         if (item.student.id !== selectedStudentId) return item;
-        const debtRub = studentDebtTotal > 0 ? studentDebtTotal : null;
-        const debtLessonCount = studentDebtItems.length > 0 ? studentDebtItems.length : null;
+        const debtRub = unpaidTotal > 0 ? unpaidTotal : null;
+        const debtLessonCount = unpaidItems.length > 0 ? unpaidItems.length : null;
         if (item.debtRub === debtRub && item.debtLessonCount === debtLessonCount) {
           return item;
         }
@@ -587,7 +611,7 @@ export const AppPage = () => {
         };
       }),
     );
-  }, [selectedStudentId, studentDebtItems.length, studentDebtTotal]);
+  }, [selectedStudentId, studentUnpaidLessonsByStudent, studentUnpaidLoadedByStudent, studentUnpaidTotalByStudent]);
 
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
@@ -638,6 +662,7 @@ export const AppPage = () => {
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
       if (!hasAccess) return;
+      setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
       try {
         const filter = options?.filter ?? paymentFilterRef.current;
         const date = options?.date ?? paymentDateRef.current;
@@ -646,6 +671,8 @@ export const AppPage = () => {
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load payment events', error);
+      } finally {
+        setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
       }
     },
     [hasAccess],
@@ -654,12 +681,15 @@ export const AppPage = () => {
   const refreshPaymentReminders = useCallback(
     async (studentId: number) => {
       if (!hasAccess) return;
+      setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
       try {
         const data = await api.getPaymentReminders(studentId, 10);
         setPaymentRemindersByStudent((prev) => ({ ...prev, [studentId]: data.reminders }));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load payment reminders', error);
+      } finally {
+        setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
       }
     },
     [hasAccess],
@@ -667,11 +697,17 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
-    if (selectedStudentId) {
-      refreshPayments(selectedStudentId);
-      refreshPaymentReminders(selectedStudentId);
-    }
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, refreshPaymentReminders, hasAccess]);
+    if (!selectedStudentId) return;
+    if (studentActiveTab !== 'payments') return;
+    refreshPayments(selectedStudentId);
+  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess, studentActiveTab]);
+
+  useEffect(() => {
+    if (!hasAccess) return;
+    if (!selectedStudentId) return;
+    if (studentActiveTab !== 'payments') return;
+    refreshPaymentReminders(selectedStudentId);
+  }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
@@ -707,6 +743,23 @@ export const AppPage = () => {
     [links, students, homeworks],
   );
   const paymentEvents = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
+  const selectedStudentUnpaidItems = selectedStudentId
+    ? studentUnpaidLessonsByStudent[selectedStudentId] ?? []
+    : [];
+  const selectedStudentUnpaidTotal = selectedStudentId
+    ? studentUnpaidTotalByStudent[selectedStudentId] ?? 0
+    : 0;
+  const paymentEventsLoading = selectedStudentId
+    ? paymentEventsLoadingByStudent[selectedStudentId] ?? false
+    : false;
+  const paymentRemindersLoading = selectedStudentId
+    ? paymentRemindersLoadingByStudent[selectedStudentId] ?? false
+    : false;
+
+  const handleOpenPaymentReminders = useCallback(() => {
+    if (!selectedStudentId) return;
+    refreshPaymentReminders(selectedStudentId);
+  }, [refreshPaymentReminders, selectedStudentId]);
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
@@ -1399,6 +1452,7 @@ export const AppPage = () => {
         }
 
         await refreshPayments(studentId);
+        await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
         showToast({
           message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
           variant: 'success',
@@ -1435,6 +1489,9 @@ export const AppPage = () => {
 
         const targetStudent = data.lesson.studentId;
         await refreshPayments(targetStudent);
+        if (targetStudent) {
+          await loadStudentUnpaidLessons({ studentIdOverride: targetStudent, force: true });
+        }
         showToast({
           message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
           variant: 'success',
@@ -1706,13 +1763,16 @@ export const AppPage = () => {
     try {
       await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
       showToast({ message: 'Отправлено ✅', variant: 'success' });
-      setStudentDebtItems((prev) =>
-        prev.map((item) =>
-          item.id === lessonId
-            ? { ...item, lastPaymentReminderAt: new Date().toISOString() }
-            : item,
-        ),
-      );
+      if (studentId) {
+        setStudentUnpaidLessonsByStudent((prev) => ({
+          ...prev,
+          [studentId]: (prev[studentId] ?? []).map((item) =>
+            item.id === lessonId
+              ? { ...item, lastPaymentReminderAt: new Date().toISOString() }
+              : item,
+          ),
+        }));
+      }
       if (selectedStudentId) {
         refreshPaymentReminders(selectedStudentId);
       }
@@ -1729,7 +1789,7 @@ export const AppPage = () => {
       }
       if (code === 'recently_sent' && !options?.force) {
         return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
-          const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+          const reminderItem = selectedStudentUnpaidItems.find((item) => item.id === lessonId);
           const lastReminderLabel = reminderItem?.lastPaymentReminderAt
             ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
                 locale: ru,
@@ -1918,8 +1978,8 @@ export const AppPage = () => {
               onRemindLessonPayment: remindLessonPayment,
               studentLessons,
               studentLessonsSummary,
-              studentDebtItems,
-              studentDebtTotal,
+              studentDebtItems: selectedStudentUnpaidItems,
+              studentDebtTotal: selectedStudentUnpaidTotal,
               lessonPaymentFilter: studentLessonPaymentFilter,
               lessonStatusFilter: studentLessonStatusFilter,
               lessonDateRange: studentLessonDateRange,
@@ -1931,10 +1991,14 @@ export const AppPage = () => {
               onLessonSortOrderChange: handleLessonSortOrderChange,
               payments: paymentEvents,
               paymentReminders: selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [],
+              paymentsLoading: paymentEventsLoading,
+              paymentRemindersLoading,
               paymentFilter,
               paymentDate,
               onPaymentFilterChange: handlePaymentFilterChange,
               onPaymentDateChange: handlePaymentDateChange,
+              onActiveTabChange: setStudentActiveTab,
+              onOpenPaymentReminders: handleOpenPaymentReminders,
               onCompleteLesson: markLessonCompleted,
               onChangeLessonStatus: updateLessonStatus,
               onTogglePaid: togglePaid,

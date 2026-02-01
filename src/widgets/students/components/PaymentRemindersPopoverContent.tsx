@@ -7,6 +7,7 @@ import styles from './PaymentRemindersPopoverContent.module.css';
 interface PaymentRemindersPopoverContentProps {
   reminders: PaymentReminderLog[];
   lessonsById: Map<number, Lesson>;
+  isLoading?: boolean;
 }
 
 const statusLabels: Record<Lesson['status'], string> = {
@@ -25,8 +26,21 @@ const statusLabelsReminder: Record<PaymentReminderLog['status'], string> = {
   FAILED: 'Не доставлено',
 };
 
-export const PaymentRemindersPopoverContent = ({ reminders, lessonsById }: PaymentRemindersPopoverContentProps) => {
+export const PaymentRemindersPopoverContent = ({
+  reminders,
+  lessonsById,
+  isLoading,
+}: PaymentRemindersPopoverContentProps) => {
   const timeZone = useTimeZone();
+
+  if (isLoading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.title}>Напоминания об оплате</div>
+        <div className={styles.loading}>Загрузка…</div>
+      </div>
+    );
+  }
 
   if (reminders.length === 0) {
     return (
