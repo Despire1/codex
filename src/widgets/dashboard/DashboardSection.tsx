@@ -7,6 +7,7 @@ import { Badge } from '@/shared/ui/Badge/Badge';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import styles from './DashboardSection.module.css';
+import { WeeklyCalendar } from './components/WeeklyCalendar/WeeklyCalendar';
 import { getLessonColorVars } from '@/shared/lib/lessonColors';
 import { pluralizeRu } from '@/shared/lib/pluralizeRu';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
@@ -64,6 +65,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const isDashboardMobile = useIsMobile(1023);
+  const showWeeklyCalendar = !isDashboardMobile;
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     return lessons.flatMap((lesson) => {
@@ -184,9 +186,15 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 
   return (
     <section
-      className={`${styles.grid} ${attentionItems.length > 0 ? styles.gridWithAttention : styles.gridNoAttention}`}
+      className={`${styles.grid} ${
+        showWeeklyCalendar
+          ? styles.gridWithCalendar
+          : attentionItems.length > 0
+            ? styles.gridWithAttention
+            : styles.gridNoAttention
+      }`}
     >
-      {attentionItems.length > 0 && (
+      {!showWeeklyCalendar && attentionItems.length > 0 && (
         <AttentionCard
           items={attentionItems}
           isOpen={isAttentionOpen}
@@ -197,21 +205,32 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         />
       )}
 
-      <div className={`${styles.card} ${styles.todayCard} ${styles.todayArea}`}>
-        <div className={styles.cardHeader}>Сегодня</div>
-        <div className={styles.todaySummary}>
-          <Badge
-            variant="groupPaid"
-            label={pluralizeRu(todayLessons.length, { one: 'занятие', few: 'занятия', many: 'занятий' })}
-            className={styles.todayCount}
-          />
-          <div className={styles.todayMeta}>
-            {todayUpcomingLesson
-              ? `Первое — в ${formatInTimeZone(todayUpcomingLesson.startAt, 'HH:mm', { timeZone })}`
-              : 'Все занятия на сегодня уже прошли'}
+      {!showWeeklyCalendar && (
+        <div className={`${styles.card} ${styles.todayCard} ${styles.todayArea}`}>
+          <div className={styles.cardHeader}>Сегодня</div>
+          <div className={styles.todaySummary}>
+            <Badge
+              variant="groupPaid"
+              label={pluralizeRu(todayLessons.length, { one: 'занятие', few: 'занятия', many: 'занятий' })}
+              className={styles.todayCount}
+            />
+            <div className={styles.todayMeta}>
+              {todayUpcomingLesson
+                ? `Первое — в ${formatInTimeZone(todayUpcomingLesson.startAt, 'HH:mm', { timeZone })}`
+                : 'Все занятия на сегодня уже прошли'}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {showWeeklyCalendar && (
+        <WeeklyCalendar
+          className={styles.calendarArea}
+          lessons={lessons}
+          linkedStudents={linkedStudents}
+          timeZone={timeZone}
+        />
+      )}
 
       <div className={`${styles.card} ${styles.upcomingCard} ${styles.upcomingArea}`}>
         <div className={styles.cardHeader}>Ближайшие уроки</div>
