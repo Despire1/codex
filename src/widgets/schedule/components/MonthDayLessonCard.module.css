@@ -65,8 +65,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 12px 10px;
-  border-radius: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
   background: var(--lesson-bg, var(--color-blue-50));
   color: var(--lesson-hover-bg, var(--color-blue-600));
   font-weight: 700;
@@ -84,8 +84,8 @@
 }
 
 .title {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--color-slate-900);
   line-height: 1.2;
 }
@@ -99,20 +99,21 @@
 .linkBadge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
   border: 1px solid var(--color-blue-200);
-  color: var(--color-blue-600);
+  color: var(--color-blue-600) !important;
   background: var(--color-blue-50);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 12px;
   cursor: pointer;
 }
 
 .linkBadge:hover {
-  border-color: var(--color-blue-300);
-  background: var(--color-white);
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-600);
+  color: var(--color-white) !important;
 }
 
 .linkIcon {
