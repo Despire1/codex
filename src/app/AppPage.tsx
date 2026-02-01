@@ -245,6 +245,7 @@ export const AppPage = () => {
   const lessonLoadRequestId = useRef(0);
   const lessonSummaryLoadRequestId = useRef(0);
   const skipNextLessonLoadRef = useRef(false);
+  const [studentLessonsLoadedByStudent, setStudentLessonsLoadedByStudent] = useState<Record<number, boolean>>({});
   const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
   const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
   const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});
@@ -368,6 +369,11 @@ export const AppPage = () => {
     if (selectedStudentId) {
       setNewLessonDraft((draft) => ({ ...draft, studentId: selectedStudentId }));
     }
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    setStudentLessonsLoadedByStudent((prev) => ({ ...prev, [selectedStudentId]: false }));
   }, [selectedStudentId]);
 
   const loadStudentList = useCallback(
@@ -495,6 +501,7 @@ export const AppPage = () => {
         setStudentLessons(data.items.map(normalizeLesson));
         setStudentDebtItems(data.debt.items);
         setStudentDebtTotal(data.debt.total);
+        setStudentLessonsLoadedByStudent((prev) => ({ ...prev, [targetStudentId]: true }));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
@@ -572,6 +579,7 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!selectedStudentId) return;
+    if (!studentLessonsLoadedByStudent[selectedStudentId]) return;
     setStudentListItems((prev) =>
       prev.map((item) => {
         if (item.student.id !== selectedStudentId) return item;
