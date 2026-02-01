@@ -339,6 +339,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           onRemindLessonPayment={onRemindLessonPayment}
           showAll
           showToggle={false}
+          stickyHeader
         />
       </BottomSheet>
     </section>

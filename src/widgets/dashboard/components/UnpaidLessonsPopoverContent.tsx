@@ -34,6 +34,7 @@ interface UnpaidLessonsPopoverContentProps {
   maxVisibleEntries?: number;
   showToggle?: boolean;
   showAll?: boolean;
+  stickyHeader?: boolean;
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -48,6 +49,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   maxVisibleEntries = 2,
   showToggle = true,
   showAll = false,
+  stickyHeader = false,
 }) => {
   const timeZone = useTimeZone();
   const now = new Date();
@@ -124,7 +126,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 
   return (
       <div className={styles.root}>
-        <div className={styles.header}>
+        <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
           <div className={styles.title}>Неоплаченные ({entries.length})</div>
         </div>
 
