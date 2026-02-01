@@ -21,7 +21,10 @@ interface DashboardSectionProps {
   onOpenLesson: (lesson: Lesson) => void;
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onRemindLessonPayment: (lessonId: number, studentId?: number) => Promise<void> | void;
+  onRemindLessonPayment: (
+    lessonId: number,
+    studentId?: number,
+  ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
   onOpenStudent: (studentId: number) => void;
 }
 

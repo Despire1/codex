@@ -27,7 +27,10 @@ interface UnpaidLessonsPopoverContentProps {
   globalPaymentRemindersEnabled: boolean;
   onOpenStudent: (studentId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onRemindLessonPayment: (lessonId: number, studentId?: number) => Promise<void> | void;
+  onRemindLessonPayment: (
+    lessonId: number,
+    studentId?: number,
+  ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -75,7 +78,10 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 
       setPendingReminderIds((prev) => new Set(prev).add(key));
       try {
-        await onRemindLessonPayment(lessonId, studentId);
+        const result = await onRemindLessonPayment(lessonId, studentId);
+        if (result && result.status !== 'sent') {
+          return;
+        }
         const nowIso = new Date().toISOString();
         setOptimisticReminders((prev) => ({ ...prev, [key]: nowIso }));
         setSuccessReminderIds((prev) => new Set(prev).add(key));
