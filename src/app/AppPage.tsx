@@ -686,6 +686,13 @@ export const AppPage = () => {
     refreshPayments(selectedStudentId);
   }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess, studentActiveTab]);
 
+  useEffect(() => {
+    if (!hasAccess) return;
+    if (!selectedStudentId) return;
+    if (studentActiveTab !== 'payments') return;
+    refreshPaymentReminders(selectedStudentId);
+  }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
+
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
   const activeTab = useMemo<TabId>(() => {
@@ -731,6 +738,11 @@ export const AppPage = () => {
     if (!selectedStudentId) return;
     refreshPaymentReminders(selectedStudentId);
   }, [refreshPaymentReminders, selectedStudentId]);
+
+  const handleRequestDebtDetails = useCallback(() => {
+    if (!selectedStudentId) return;
+    loadStudentLessons({ studentIdOverride: selectedStudentId });
+  }, [loadStudentLessons, selectedStudentId]);
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
@@ -1963,6 +1975,7 @@ export const AppPage = () => {
               onPaymentDateChange: handlePaymentDateChange,
               onActiveTabChange: setStudentActiveTab,
               onOpenPaymentReminders: handleOpenPaymentReminders,
+              onRequestDebtDetails: handleRequestDebtDetails,
               onCompleteLesson: markLessonCompleted,
               onChangeLessonStatus: updateLessonStatus,
               onTogglePaid: togglePaid,

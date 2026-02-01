@@ -39,6 +39,7 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRequestDebtDetails?: () => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -69,6 +70,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onRequestDebtDetails,
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
@@ -236,6 +238,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
     typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0
       ? `${effectiveDebtTotal} ₽${effectiveDebtCount > 0 ? ` (${formatLessonCount(effectiveDebtCount)})` : ''}`
       : formatLessonCount(effectiveDebtCount);
+  const shouldLoadDebtDetails = studentDebtItems.length === 0 && hasDebt;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
   const paymentReminderStatusLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
@@ -442,7 +445,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                       <button
                         type="button"
                         className={styles.summaryDebtBadge}
-                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                        onClick={() => {
+                          if (shouldLoadDebtDetails) {
+                            onRequestDebtDetails?.();
+                          }
+                          setIsDebtPopoverOpen((prev) => !prev);
+                        }}
                       >
                         {debtLabel}
                       </button>
@@ -522,7 +530,12 @@ export const StudentHero: FC<StudentHeroProps> = ({
                 <button
                   type="button"
                   className={styles.summaryDebtBadge}
-                  onClick={() => setIsDebtPopoverOpen(true)}
+                  onClick={() => {
+                    if (shouldLoadDebtDetails) {
+                      onRequestDebtDetails?.();
+                    }
+                    setIsDebtPopoverOpen(true);
+                  }}
                 >
                   {debtLabel}
                 </button>

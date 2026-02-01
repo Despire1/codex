@@ -141,6 +141,7 @@ interface AppRoutesProps {
     onDeleteLesson: (lessonId: number) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
     onOpenPaymentReminders?: () => void;
+    onRequestDebtDetails?: () => void;
     paymentsLoading?: boolean;
     paymentRemindersLoading?: boolean;
   };
