@@ -1,27 +1,30 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import { type FC, useEffect, useMemo, useState } from 'react';
-import { Lesson, LinkedStudent } from '../../entities/types';
+import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
 import controls from '../../shared/styles/controls.module.css';
-import { AdaptivePopover } from '../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { BottomSheet } from '../../shared/ui/BottomSheet/BottomSheet';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import styles from './DashboardSection.module.css';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
 import { pluralizeRu } from '../../shared/lib/pluralizeRu';
-import { Badge } from '../../shared/ui/Badge/Badge';
 import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '../../shared/lib/timezoneDates';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
+  teacher: Teacher;
   onAddStudent: () => void;
   onCreateLesson: () => void;
   onOpenSchedule: () => void;
   onOpenLesson: (lesson: Lesson) => void;
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
+  onRemindLessonPayment: (
+    lessonId: number,
+    studentId?: number,
+  ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
   onOpenStudent: (studentId: number) => void;
 }
 
@@ -43,12 +46,14 @@ const getLinkedStudentName = (studentId: number, linkedStudents: LinkedStudent[]
 export const DashboardSection: FC<DashboardSectionProps> = ({
   lessons,
   linkedStudents,
+  teacher,
   onAddStudent,
   onCreateLesson,
   onOpenSchedule,
   onOpenLesson,
   onCompleteLesson,
   onTogglePaid,
+  onRemindLessonPayment,
   onOpenStudent,
 }) => {
   const timeZone = useTimeZone();
@@ -144,53 +149,41 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 
   const upcomingLessonCards = upcomingLessons.slice(0, 5);
 
+  const studentMap = useMemo(() => {
+    return new Map(linkedStudents.map((student) => [student.id, student]));
+  }, [linkedStudents]);
+
   const unpaidEntries = useMemo(() => {
     return lessons.flatMap((lesson) => {
       if (lesson.status !== 'COMPLETED') return [];
+
+      const buildEntry = (studentId: number, price: number) => {
+        const student = studentMap.get(studentId);
+        return {
+          lessonId: lesson.id,
+          startAt: lesson.startAt,
+          completedAt: lesson.completedAt ?? null,
+          lastPaymentReminderAt: lesson.lastPaymentReminderAt ?? null,
+          paymentReminderCount: lesson.paymentReminderCount ?? 0,
+          studentId,
+          studentName: getLinkedStudentName(studentId, linkedStudents),
+          price,
+          isActivated: student?.isActivated ?? true,
+          paymentRemindersEnabled: student?.paymentRemindersEnabled ?? true,
+        };
+      };
+
       if (lesson.participants && lesson.participants.length > 0) {
         return lesson.participants
           .filter((participant) => !participant.isPaid)
-          .map((participant) => ({
-            lesson,
-            studentId: participant.studentId,
-            studentName: getLinkedStudentName(participant.studentId, linkedStudents),
-            price: participant.price,
-          }));
+          .map((participant) => buildEntry(participant.studentId, participant.price));
       }
       if (lesson.isPaid) return [];
-      return [
-        {
-          lesson,
-          studentId: lesson.studentId,
-          studentName: getLinkedStudentName(lesson.studentId, linkedStudents),
-          price: typeof lesson.price === 'number' ? lesson.price : 0,
-        },
-      ];
-    });
-  }, [lessons, linkedStudents]);
 
-  const unpaidGroups = useMemo(() => {
-    const map = new Map<
-      number,
-      { studentName: string; total: number; lessons: { id: number; startAt: string }[] }
-    >();
-    unpaidEntries.forEach((entry) => {
-      const existing = map.get(entry.studentId) ?? {
-        studentName: entry.studentName,
-        total: 0,
-        lessons: [],
-      };
-      existing.total += entry.price;
-      existing.lessons.push({ id: entry.lesson.id, startAt: entry.lesson.startAt });
-      map.set(entry.studentId, existing);
+      const price = typeof lesson.price === 'number' ? lesson.price : 0;
+      return [buildEntry(lesson.studentId, price)];
     });
-    return Array.from(map.entries()).map(([studentId, data]) => ({
-      studentId,
-      studentName: data.studentName,
-      total: data.total,
-      lessons: data.lessons.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
-    }));
-  }, [unpaidEntries]);
+  }, [lessons, linkedStudents, studentMap]);
 
   const unpaidSummary = useMemo(() => {
     const studentIds = new Set(unpaidEntries.map((entry) => entry.studentId));
@@ -295,37 +288,16 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
               </div>
             </button>
           ) : (
-            <AdaptivePopover
-              isOpen={isUnpaidOpen}
-              onClose={() => setIsUnpaidOpen(false)}
-              align="end"
-              side="bottom"
-              className={styles.unpaidPopover}
-              rootClassName={styles.unpaidPopoverRoot}
-              triggerClassName={styles.unpaidTrigger}
-              trigger={
-                <button
-                  type="button"
-                  className={`${styles.card} ${styles.unpaidCard}`}
-                  onClick={() => setIsUnpaidOpen((prev) => !prev)}
-                >
-                  <div className={styles.cardHeader}>Неоплаченные занятия</div>
-                  <div className={styles.unpaidSummary}>
-                    {pluralizeRu(unpaidSummary.studentCount, { one: 'ученик', few: 'ученика', many: 'учеников' })} ·{' '}
-                    {pluralizeRu(unpaidSummary.lessonCount, { one: 'занятие', few: 'занятия', many: 'занятий' })} ·{' '}
-                    {unpaidSummary.total} ₽
-                  </div>
-                </button>
-              }
-            >
+            <div className={`${styles.card} ${styles.unpaidCard} ${styles.unpaidCardFull}`}>
               <UnpaidLessonsPopoverContent
-                groups={unpaidGroups}
-                onOpenStudent={(studentId) => {
-                  setIsUnpaidOpen(false);
-                  onOpenStudent(studentId);
-                }}
+                entries={unpaidEntries}
+                reminderDelayHours={teacher.paymentReminderDelayHours}
+                globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
+                onOpenStudent={onOpenStudent}
+                onTogglePaid={onTogglePaid}
+                onRemindLessonPayment={onRemindLessonPayment}
               />
-            </AdaptivePopover>
+            </div>
           )}
         </div>
       )}
@@ -344,11 +316,15 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 
       <BottomSheet isOpen={isDashboardMobile && isUnpaidOpen} onClose={() => setIsUnpaidOpen(false)}>
         <UnpaidLessonsPopoverContent
-          groups={unpaidGroups}
+          entries={unpaidEntries}
+          reminderDelayHours={teacher.paymentReminderDelayHours}
+          globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
           onOpenStudent={(studentId) => {
             setIsUnpaidOpen(false);
             onOpenStudent(studentId);
           }}
+          onTogglePaid={onTogglePaid}
+          onRemindLessonPayment={onRemindLessonPayment}
         />
       </BottomSheet>
     </section>
