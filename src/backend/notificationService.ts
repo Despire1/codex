@@ -93,6 +93,7 @@ const buildLessonReminderMessage = ({
   startAt,
   durationMinutes,
   studentName,
+  meetingLink,
   timeZone,
   target,
   minutesBefore,
@@ -100,6 +101,7 @@ const buildLessonReminderMessage = ({
   startAt: Date;
   durationMinutes: number;
   studentName?: string | null;
+  meetingLink?: string | null;
   timeZone?: string | null;
   target: 'teacher' | 'student';
   minutesBefore?: number;
@@ -111,6 +113,7 @@ const buildLessonReminderMessage = ({
 
   if (target === 'teacher') {
     const name = studentName?.trim() || 'учеником';
+    const trimmedLink = meetingLink?.trim();
     return [
       '⏰ Напоминание о занятии',
       `📅 День: ${dayLabel}`,
@@ -118,6 +121,7 @@ const buildLessonReminderMessage = ({
       leadTimeLine,
       `👤 Ученик: ${name}`,
       `⏳ Длительность: ${durationMinutes} мин`,
+      trimmedLink ? `🔗 Ссылка: ${trimmedLink}` : null,
     ]
       .filter(Boolean)
       .join('\n');
@@ -339,6 +343,7 @@ export const sendTeacherLessonReminder = async ({
     startAt: lesson.startAt,
     durationMinutes: lesson.durationMinutes,
     studentName,
+    meetingLink: lesson.meetingLink,
     timeZone: teacher.timezone,
     target: 'teacher',
     minutesBefore,
