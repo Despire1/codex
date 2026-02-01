@@ -65,13 +65,16 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
               formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
             );
             const priceLabel = `${entry.price} ₽`;
-            const reminderLabel = entry.lastPaymentReminderAt
-              ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(entry.lastPaymentReminderAt), {
-                  addSuffix: true,
-                  locale: ru,
-                })}.`
-              : 'Напоминание не отправлялось.';
+            const reminderLabel = entry.isActivated
+              ? entry.lastPaymentReminderAt
+                ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(entry.lastPaymentReminderAt), {
+                    addSuffix: true,
+                    locale: ru,
+                  })}.`
+                : 'Напоминание не отправлялось.'
+              : 'Ученик не активировал бота — отправка невозможна.';
             const showProgress =
+              entry.isActivated &&
               !entry.lastPaymentReminderAt &&
               globalPaymentRemindersEnabled &&
               entry.paymentRemindersEnabled &&
