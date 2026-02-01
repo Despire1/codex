@@ -1,19 +1,24 @@
 import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
 import { tabs, type TabId } from '../../app/tabs';
+import { Avatar } from '../../shared/ui/Avatar/Avatar';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
   teacher: Teacher;
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  profilePhotoUrl?: string | null;
 }
 
 export const Topbar: FC<TopbarProps> = ({
   teacher,
   activeTab,
   onTabChange,
+  profilePhotoUrl,
 }) => {
+  const fallbackText = teacher.name || teacher.username || 'П';
+
   return (
     <header className={styles.topbar}>
       <div className={styles.topbarGreeting}>
@@ -35,6 +40,10 @@ export const Topbar: FC<TopbarProps> = ({
             </button>
           ))}
         </nav>
+      </div>
+
+      <div className={styles.topbarProfile}>
+        <Avatar src={profilePhotoUrl} alt="Профиль преподавателя" fallbackText={fallbackText} />
       </div>
     </header>
   );

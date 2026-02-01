@@ -1824,7 +1824,12 @@ export const AppPage = () => {
     <TimeZoneProvider timeZone={resolvedTimeZone}>
       <div className={layoutStyles.page}>
         <div className={layoutStyles.pageInner}>
-          <Topbar teacher={teacher} activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+          <Topbar
+            teacher={teacher}
+            activeTab={activeTab}
+            onTabChange={(tab) => navigate(tabPathById[tab])}
+            profilePhotoUrl={sessionUser?.photoUrl ?? null}
+          />
 
           <main className={layoutStyles.content}>
             <AppRoutes
