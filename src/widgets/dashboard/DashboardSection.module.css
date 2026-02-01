@@ -47,12 +47,11 @@
   }
 
   .gridWithCalendar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     grid-template-areas:
-      'calendar'
-      'upcoming'
-      'unpaid'
-      'actions';
+      'calendar calendar'
+      'upcoming unpaid'
+      'actions actions';
   }
 }
 
