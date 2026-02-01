@@ -1863,10 +1863,11 @@ export const AppPage = () => {
                   navigate(tabPathById.students);
                   openCreateStudentModal();
                 },
-                onCreateLesson: () => {
+                onCreateLesson: (date) => {
+                  const lessonDate = date ?? new Date();
                   openLessonModal(
-                    todayISO(resolvedTimeZone),
-                    formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                    formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                    date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
                   );
                 },
                 onOpenSchedule: () => navigate(tabPathById.schedule),
@@ -1876,6 +1877,11 @@ export const AppPage = () => {
                     undefined,
                     lesson,
                   ),
+                onOpenLessonDay: (lesson) => {
+                  setScheduleView('day');
+                  setDayViewDate(toZonedDate(lesson.startAt, resolvedTimeZone));
+                  navigate(tabPathById.schedule);
+                },
                 onCompleteLesson: markLessonCompleted,
                 onTogglePaid: togglePaid,
                 onRemindLessonPayment: remindLessonPayment,
