@@ -401,6 +401,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
+                  onRequestDebtDetails={onRequestDebtDetails}
                   onRemindLessonPayment={onRemindLessonPayment}
                   onTogglePaid={onTogglePaid}
                 />
