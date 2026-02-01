@@ -1,64 +1,70 @@
-import { addDays, addWeeks, format } from 'date-fns';
+import { addDays, addWeeks, endOfDay, format, isSameDay, isWithinInterval, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { type FC, useMemo, useState } from 'react';
+import { type CSSProperties, type FC, useMemo, useState } from 'react';
+import { Lesson, LinkedStudent } from '@/entities/types';
+import { getLessonColorTheme } from '@/shared/lib/lessonColors';
+import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
 import styles from './WeeklyCalendar.module.css';
 
 interface WeeklyCalendarProps {
+  lessons: Lesson[];
+  linkedStudents: LinkedStudent[];
+  timeZone: string;
   className?: string;
-}
-
-interface LessonEntry {
-  time: string;
-  student: string;
-  tone: 'indigo' | 'green' | 'purple' | 'orange';
 }
 
 const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 
-const lessonsByDay: Record<number, LessonEntry[]> = {
-  0: [
-    { time: '09:00', student: 'А. Смирнова', tone: 'indigo' },
-    { time: '14:00', student: 'Е. Петрова', tone: 'green' },
-  ],
-  1: [
-    { time: '11:00', student: 'М. Соколов', tone: 'purple' },
-    { time: '16:00', student: 'О. Кузнецова', tone: 'orange' },
-  ],
-  2: [
-    { time: '09:00', student: 'А. Смирнова', tone: 'indigo' },
-    { time: '11:00', student: 'Д. Иванов', tone: 'green' },
-    { time: '14:00', student: 'Е. Петрова', tone: 'purple' },
-  ],
-  3: [
-    { time: '10:00', student: 'С. Волков', tone: 'indigo' },
-    { time: '16:00', student: 'М. Новикова', tone: 'orange' },
-  ],
-  4: [
-    { time: '09:00', student: 'Д. Иванов', tone: 'green' },
-    { time: '14:00', student: 'А. Морозов', tone: 'purple' },
-    { time: '18:00', student: 'О. Кузнецова', tone: 'indigo' },
-  ],
-  5: [{ time: '10:00', student: 'А. Смирнова', tone: 'indigo' }],
-  6: [],
+const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
+  if (lesson.participants && lesson.participants.length > 1) {
+    const names = lesson.participants
+      .map((participant) =>
+        linkedStudents.find((student) => student.id === participant.studentId)?.link.customName,
+      )
+      .filter(Boolean);
+    return names.length > 0 ? names.join(', ') : 'Группа';
+  }
+  return linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик';
 };
 
-const toneClassName: Record<LessonEntry['tone'], string> = {
-  indigo: styles.lessonIndigo,
-  green: styles.lessonGreen,
-  purple: styles.lessonPurple,
-  orange: styles.lessonOrange,
-};
-
-export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ className }) => {
+export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ lessons, linkedStudents, timeZone, className }) => {
   const [weekOffset, setWeekOffset] = useState(0);
-  const weekStart = useMemo(() => addWeeks(new Date(2025, 0, 16), weekOffset), [weekOffset]);
+  const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
+  const baseWeekStart = useMemo(() => startOfWeek(todayZoned, { weekStartsOn: 1 }), [todayZoned]);
+  const weekStart = useMemo(() => addWeeks(baseWeekStart, weekOffset), [baseWeekStart, weekOffset]);
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekInterval = useMemo(
+    () => ({
+      start: weekStart,
+      end: endOfDay(weekEnd),
+    }),
+    [weekEnd, weekStart],
+  );
 
   const weekLabel = useMemo(() => {
     const startLabel = format(weekStart, 'd', { locale: ru });
     const endLabel = format(weekEnd, 'd MMMM yyyy', { locale: ru });
     return `${startLabel} - ${endLabel}`;
   }, [weekEnd, weekStart]);
+
+  const lessonsByDay = useMemo(() => {
+    const map = new Map<string, Lesson[]>();
+    lessons.forEach((lesson) => {
+      if (lesson.status === 'CANCELED') return;
+      const lessonDate = toZonedDate(lesson.startAt, timeZone);
+      if (!isWithinInterval(lessonDate, weekInterval)) return;
+      const key = format(lessonDate, 'yyyy-MM-dd');
+      const current = map.get(key) ?? [];
+      current.push(lesson);
+      map.set(key, current);
+    });
+
+    map.forEach((dayLessons) => {
+      dayLessons.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    });
+
+    return map;
+  }, [lessons, timeZone, weekInterval]);
 
   return (
     <section className={[styles.root, className].filter(Boolean).join(' ')}>
@@ -101,8 +107,9 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ className }) => {
         {dayLabels.map((label, index) => {
           const date = addDays(weekStart, index);
           const dayNumber = format(date, 'd');
-          const lessons = lessonsByDay[index] ?? [];
-          const isActive = index === 2;
+          const dayKey = format(date, 'yyyy-MM-dd');
+          const dayLessons = lessonsByDay.get(dayKey) ?? [];
+          const isActive = isSameDay(date, todayZoned);
           const isWeekend = index === 6;
 
           return (
@@ -122,16 +129,26 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ className }) => {
                 <div className={[styles.dayNumber, isActive ? styles.dayNumberActive : ''].filter(Boolean).join(' ')}>
                   {dayNumber}
                 </div>
-                {isWeekend ? (
+                {isWeekend && dayLessons.length === 0 ? (
                   <div className={styles.weekendLabel}>Выходной</div>
                 ) : (
                   <div className={styles.lessonList}>
-                    {lessons.map((lesson) => (
-                      <div key={`${lesson.time}-${lesson.student}`} className={[styles.lesson, toneClassName[lesson.tone]].join(' ')}>
-                        <div className={styles.lessonTime}>{lesson.time}</div>
-                        <div className={styles.lessonStudent}>{lesson.student}</div>
-                      </div>
-                    ))}
+                    {dayLessons.map((lesson) => {
+                      const theme = getLessonColorTheme(lesson.color);
+                      const lessonStyle = {
+                        '--lesson-bg': theme.background,
+                        '--lesson-border': theme.border,
+                        '--lesson-text': theme.hoverBackground,
+                      } as CSSProperties;
+                      return (
+                        <div key={lesson.id} className={styles.lesson} style={lessonStyle}>
+                          <div className={styles.lessonTime}>
+                            {formatInTimeZone(lesson.startAt, 'HH:mm', { timeZone })}
+                          </div>
+                          <div className={styles.lessonStudent}>{getStudentLabel(lesson, linkedStudents)}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

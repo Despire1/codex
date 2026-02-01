@@ -223,7 +223,14 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         </div>
       )}
 
-      {showWeeklyCalendar && <WeeklyCalendar className={styles.calendarArea} />}
+      {showWeeklyCalendar && (
+        <WeeklyCalendar
+          className={styles.calendarArea}
+          lessons={lessons}
+          linkedStudents={linkedStudents}
+          timeZone={timeZone}
+        />
+      )}
 
       <div className={`${styles.card} ${styles.upcomingCard} ${styles.upcomingArea}`}>
         <div className={styles.cardHeader}>Ближайшие уроки</div>

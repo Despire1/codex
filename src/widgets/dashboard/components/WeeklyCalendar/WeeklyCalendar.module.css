@@ -114,6 +114,9 @@
   padding: 6px 8px;
   font-size: 11px;
   font-weight: 600;
+  background: var(--lesson-bg, var(--color-slate-100));
+  border: 1px solid var(--lesson-border, var(--color-slate-200));
+  color: var(--lesson-text, var(--color-slate-600));
 }
 
 .lessonTime {
@@ -124,26 +127,6 @@
 .lessonStudent {
   font-size: 10px;
   font-weight: 500;
-}
-
-.lessonIndigo {
-  background: rgba(99, 102, 241, 0.16);
-  color: var(--color-indigo-600);
-}
-
-.lessonGreen {
-  background: rgba(34, 197, 94, 0.16);
-  color: var(--color-green-600);
-}
-
-.lessonPurple {
-  background: rgba(168, 85, 247, 0.16);
-  color: var(--color-purple-600);
-}
-
-.lessonOrange {
-  background: rgba(251, 146, 60, 0.2);
-  color: var(--color-orange-600);
 }
 
 .weekendLabel {
