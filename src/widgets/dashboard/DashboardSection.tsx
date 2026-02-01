@@ -19,9 +19,10 @@ interface DashboardSectionProps {
   linkedStudents: LinkedStudent[];
   teacher: Teacher;
   onAddStudent: () => void;
-  onCreateLesson: () => void;
+  onCreateLesson: (date?: Date) => void;
   onOpenSchedule: () => void;
   onOpenLesson: (lesson: Lesson) => void;
+  onOpenLessonDay: (lesson: Lesson) => void;
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onRemindLessonPayment: (
@@ -54,6 +55,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   onCreateLesson,
   onOpenSchedule,
   onOpenLesson,
+  onOpenLessonDay,
   onCompleteLesson,
   onTogglePaid,
   onRemindLessonPayment,
@@ -229,6 +231,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           lessons={lessons}
           linkedStudents={linkedStudents}
           timeZone={timeZone}
+          onCreateLesson={(date) => onCreateLesson(date)}
+          onOpenLessonDay={onOpenLessonDay}
         />
       )}
 
@@ -315,7 +319,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           <button className={controls.secondaryButton} onClick={onAddStudent}>
             Добавить ученика
           </button>
-          <button className={controls.secondaryButton} onClick={onCreateLesson}>
+          <button className={controls.secondaryButton} onClick={() => onCreateLesson()}>
             Создать урок
           </button>
         </div>

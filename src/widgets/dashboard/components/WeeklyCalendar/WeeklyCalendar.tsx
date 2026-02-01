@@ -10,6 +10,8 @@ interface WeeklyCalendarProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   timeZone: string;
+  onCreateLesson: (date: Date) => void;
+  onOpenLessonDay: (lesson: Lesson) => void;
   className?: string;
 }
 
@@ -27,7 +29,14 @@ const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
   return linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик';
 };
 
-export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ lessons, linkedStudents, timeZone, className }) => {
+export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
+  lessons,
+  linkedStudents,
+  timeZone,
+  onCreateLesson,
+  onOpenLessonDay,
+  className,
+}) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const baseWeekStart = useMemo(() => startOfWeek(todayZoned, { weekStartsOn: 1 }), [todayZoned]);
@@ -110,7 +119,7 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ lessons, linkedStudent
           const dayKey = format(date, 'yyyy-MM-dd');
           const dayLessons = lessonsByDay.get(dayKey) ?? [];
           const isActive = isSameDay(date, todayZoned);
-          const isWeekend = index === 6;
+          const isEmpty = dayLessons.length === 0;
 
           return (
             <div className={styles.day} key={label}>
@@ -118,19 +127,30 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ lessons, linkedStudent
                 {label}
               </div>
               <div
+                role="button"
+                tabIndex={0}
                 className={[
                   styles.dayCard,
                   isActive ? styles.dayCardActive : '',
-                  isWeekend ? styles.dayCardWeekend : '',
+                  styles.dayCardInteractive,
                 ]
                   .filter(Boolean)
                   .join(' ')}
+                onClick={() => onCreateLesson(date)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onCreateLesson(date);
+                  }
+                }}
               >
                 <div className={[styles.dayNumber, isActive ? styles.dayNumberActive : ''].filter(Boolean).join(' ')}>
                   {dayNumber}
                 </div>
-                {isWeekend && dayLessons.length === 0 ? (
-                  <div className={styles.weekendLabel}>Выходной</div>
+                {isEmpty ? (
+                  <div className={styles.emptyState}>
+                    <span className={styles.emptyIcon}>+</span>
+                  </div>
                 ) : (
                   <div className={styles.lessonList}>
                     {dayLessons.map((lesson) => {
@@ -141,12 +161,21 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({ lessons, linkedStudent
                         '--lesson-text': theme.hoverBackground,
                       } as CSSProperties;
                       return (
-                        <div key={lesson.id} className={styles.lesson} style={lessonStyle}>
+                        <button
+                          key={lesson.id}
+                          type="button"
+                          className={styles.lesson}
+                          style={lessonStyle}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenLessonDay(lesson);
+                          }}
+                        >
                           <div className={styles.lessonTime}>
                             {formatInTimeZone(lesson.startAt, 'HH:mm', { timeZone })}
                           </div>
                           <div className={styles.lessonStudent}>{getStudentLabel(lesson, linkedStudents)}</div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>

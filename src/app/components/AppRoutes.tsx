@@ -31,9 +31,10 @@ interface AppRoutesProps {
     linkedStudents: LinkedStudent[];
     teacher: Teacher;
     onAddStudent: () => void;
-    onCreateLesson: () => void;
+    onCreateLesson: (date?: Date) => void;
     onOpenSchedule: () => void;
     onOpenLesson: (lesson: Lesson) => void;
+    onOpenLessonDay: (lesson: Lesson) => void;
     onCompleteLesson: (lessonId: number) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
     onRemindLessonPayment: (

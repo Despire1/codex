@@ -84,13 +84,19 @@
   min-height: 140px;
 }
 
+.dayCardInteractive {
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dayCardInteractive:hover {
+  box-shadow: 0 8px 18px var(--shadow-slate-900-08);
+  transform: translateY(-1px);
+}
+
 .dayCardActive {
   background: rgba(99, 102, 241, 0.08);
   border: 2px solid rgba(99, 102, 241, 0.25);
-}
-
-.dayCardWeekend {
-  opacity: 0.55;
 }
 
 .dayNumber {
@@ -117,6 +123,8 @@
   background: var(--lesson-bg, var(--color-slate-100));
   border: 1px solid var(--lesson-border, var(--color-slate-200));
   color: var(--lesson-text, var(--color-slate-600));
+  text-align: center;
+  cursor: pointer;
 }
 
 .lessonTime {
@@ -129,9 +137,24 @@
   font-weight: 500;
 }
 
-.weekendLabel {
-  font-size: 11px;
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+}
+
+.emptyIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px dashed var(--color-slate-300);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-slate-400);
+  font-size: 16px;
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
