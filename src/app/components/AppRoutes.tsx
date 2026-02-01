@@ -30,6 +30,7 @@ interface AppRoutesProps {
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
     teacher: Teacher;
+    onWeekRangeChange?: (start: Date, end: Date) => void;
     onAddStudent: () => void;
     onCreateLesson: (date?: Date) => void;
     onOpenSchedule: () => void;

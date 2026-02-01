@@ -1,6 +1,6 @@
 import { addDays, addWeeks, endOfDay, format, isSameDay, isWithinInterval, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { type CSSProperties, type FC, useMemo, useState } from 'react';
+import { type CSSProperties, type FC, useEffect, useMemo, useState } from 'react';
 import { Lesson, LinkedStudent } from '@/entities/types';
 import { getLessonColorTheme } from '@/shared/lib/lessonColors';
 import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
@@ -12,6 +12,7 @@ interface WeeklyCalendarProps {
   timeZone: string;
   onCreateLesson: (date: Date) => void;
   onOpenLessonDay: (lesson: Lesson) => void;
+  onWeekRangeChange?: (start: Date, end: Date) => void;
   className?: string;
 }
 
@@ -35,6 +36,7 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   timeZone,
   onCreateLesson,
   onOpenLessonDay,
+  onWeekRangeChange,
   className,
 }) => {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -49,6 +51,10 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
     }),
     [weekEnd, weekStart],
   );
+
+  useEffect(() => {
+    onWeekRangeChange?.(weekStart, weekEnd);
+  }, [onWeekRangeChange, weekEnd, weekStart]);
 
   const weekLabel = useMemo(() => {
     const startLabel = format(weekStart, 'd', { locale: ru });

@@ -1,4 +1,4 @@
-import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth } from 'date-fns';
+import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -95,6 +95,14 @@ const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
   to: '',
   fromTime: '00:00',
   toTime: '23:59',
+};
+
+type LessonRange = {
+  key: string;
+  startAt: Date;
+  endAt: Date;
+  startIso: string;
+  endIso: string;
 };
 
 const parseTimeSpentMinutes = (value: string): number | null => {
@@ -211,6 +219,15 @@ export const AppPage = () => {
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessonsByRange, setLessonsByRange] = useState<Record<string, Lesson[]>>({});
+  const lessonsByRangeRef = useRef(lessonsByRange);
+  const lessonRangeRef = useRef<LessonRange | null>(null);
+  const lessonRangeRequestId = useRef(0);
+  const [dashboardWeekRange, setDashboardWeekRange] = useState<{ start: Date; end: Date } | null>(() => {
+    const nowZoned = toZonedDate(new Date(), resolvedTimeZone);
+    const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
+    return { start: weekStart, end: addDays(weekStart, 6) };
+  });
   const [studentSearch, setStudentSearch] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentFilter, setStudentFilter] = useState<'all' | 'debt' | 'overdue'>('all');
@@ -297,22 +314,136 @@ export const AppPage = () => {
   const [scheduleSelectedMonthDay, setScheduleSelectedMonthDay] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>(null);
 
+  useEffect(() => {
+    lessonsByRangeRef.current = lessonsByRange;
+  }, [lessonsByRange]);
+
   const closeDialog = () => setDialogState(null);
 
   const showInfoDialog = (title: string, message: string, confirmText?: string) =>
     setDialogState({ type: 'info', title, message, confirmText });
 
+  const buildLessonRange = useCallback(
+    (startDate: Date, endDate: Date): LessonRange => {
+      const startIso = formatInTimeZone(startDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+      const endIso = formatInTimeZone(endDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+      const startAt = toUtcDateFromDate(startIso, resolvedTimeZone);
+      const endAt = toUtcEndOfDay(endIso, resolvedTimeZone);
+      return {
+        key: `${startIso}_${endIso}`,
+        startAt,
+        endAt,
+        startIso,
+        endIso,
+      };
+    },
+    [resolvedTimeZone],
+  );
+
+  const buildWeekRange = useCallback(
+    (date: Date) => {
+      const zoned = toZonedDate(date, resolvedTimeZone);
+      const weekStart = startOfWeek(zoned, { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      return buildLessonRange(weekStart, weekEnd);
+    },
+    [buildLessonRange, resolvedTimeZone],
+  );
+
+  const buildDayRange = useCallback(
+    (date: Date) => {
+      const zoned = toZonedDate(date, resolvedTimeZone);
+      return buildLessonRange(zoned, zoned);
+    },
+    [buildLessonRange, resolvedTimeZone],
+  );
+
+  const buildMonthRange = useCallback(() => {
+    const targetMonth = addMonths(monthAnchor, monthOffset);
+    const monthStart = startOfMonth(targetMonth);
+    const monthEnd = endOfMonth(targetMonth);
+    return buildLessonRange(monthStart, monthEnd);
+  }, [buildLessonRange, monthAnchor, monthOffset]);
+
+  const isLessonInRange = useCallback((lesson: Lesson, range: LessonRange) => {
+    const startAt = new Date(lesson.startAt).getTime();
+    return startAt >= range.startAt.getTime() && startAt <= range.endAt.getTime();
+  }, []);
+
+  const filterLessonsForCurrentRange = useCallback(
+    (items: Lesson[]) => {
+      const range = lessonRangeRef.current;
+      if (!range) return items;
+      return items.filter((lesson) => isLessonInRange(lesson, range));
+    },
+    [isLessonInRange],
+  );
+
+  const applyLessonsForRange = useCallback((range: LessonRange, items: Lesson[]) => {
+    const normalized = items.map(normalizeLesson);
+    setLessons(normalized);
+    setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
+    lessonRangeRef.current = range;
+  }, []);
+
+  const updateLessonsForCurrentRange = useCallback((updater: (prev: Lesson[]) => Lesson[]) => {
+    const range = lessonRangeRef.current;
+    setLessons((prev) => {
+      const next = updater(prev);
+      if (range) {
+        setLessonsByRange((cache) => ({ ...cache, [range.key]: next }));
+      }
+      return next;
+    });
+  }, []);
+
+  const loadLessonsForRange = useCallback(
+    async (range: LessonRange) => {
+      if (!hasAccess) return;
+      lessonRangeRef.current = range;
+      const cached = lessonsByRangeRef.current[range.key];
+      if (cached) {
+        setLessons(cached);
+        return;
+      }
+      const requestId = (lessonRangeRequestId.current += 1);
+      try {
+        const data = await api.listLessonsForRange({
+          start: range.startAt.toISOString(),
+          end: range.endAt.toISOString(),
+        });
+        const normalized = (data.lessons ?? []).map(normalizeLesson);
+        setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
+        if (lessonRangeRequestId.current === requestId) {
+          setLessons(normalized);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load lessons for range', error);
+      }
+    },
+    [hasAccess],
+  );
+
+  const handleDashboardWeekRangeChange = useCallback((start: Date, end: Date) => {
+    setDashboardWeekRange({ start, end });
+  }, []);
+
   useEffect(() => {
     if (!hasAccess) return;
     const loadInitial = async () => {
       try {
-        const data = await api.bootstrap();
+        const initialRange = buildWeekRange(new Date());
+        const data = await api.bootstrap({
+          lessonsStart: initialRange.startAt.toISOString(),
+          lessonsEnd: initialRange.endAt.toISOString(),
+        });
 
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
         setLinks(data.links ?? []);
         setHomeworks((data.homeworks ?? []).map((homework) => normalizeHomework(homework, resolvedTimeZone)));
-        setLessons((data.lessons ?? []).map(normalizeLesson));
+        applyLessonsForRange(initialRange, data.lessons ?? []);
 
         const firstStudentId = data.students?.[0]?.id ?? null;
         setSelectedStudentId((prev) => prev ?? firstStudentId);
@@ -331,7 +462,7 @@ export const AppPage = () => {
     };
 
     loadInitial();
-  }, [hasAccess]);
+  }, [applyLessonsForRange, buildWeekRange, hasAccess, resolvedTimeZone]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -719,6 +850,35 @@ export const AppPage = () => {
     const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
     return matchedTab?.id ?? 'dashboard';
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!hasAccess) return;
+    if (activeTab === 'dashboard') {
+      if (!dashboardWeekRange) return;
+      loadLessonsForRange(buildLessonRange(dashboardWeekRange.start, dashboardWeekRange.end));
+      return;
+    }
+    if (activeTab === 'schedule') {
+      const range =
+        scheduleView === 'month'
+          ? buildMonthRange()
+          : scheduleView === 'week'
+            ? buildWeekRange(dayViewDate)
+            : buildDayRange(dayViewDate);
+      loadLessonsForRange(range);
+    }
+  }, [
+    activeTab,
+    buildDayRange,
+    buildLessonRange,
+    buildMonthRange,
+    buildWeekRange,
+    dashboardWeekRange,
+    dayViewDate,
+    hasAccess,
+    loadLessonsForRange,
+    scheduleView,
+  ]);
 
   const resolveLastVisitedPath = useCallback(() => {
     const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;
@@ -1122,7 +1282,7 @@ export const AppPage = () => {
 
     try {
       await api.deleteLesson(editingLessonId, { applyToSeries });
-      setLessons((prev) => {
+      updateLessonsForCurrentRange((prev) => {
         if (applyToSeries && recurrenceGroupId) {
           return prev.filter((lesson) => lesson.recurrenceGroupId !== recurrenceGroupId);
         }
@@ -1249,18 +1409,27 @@ export const AppPage = () => {
         }
 
         if (data.lessons && data.lessons.length > 0) {
-          const normalized = data.lessons.map(normalizeLesson);
-          setLessons((prev) => {
-            const groupId = normalized[0].recurrenceGroupId;
+          const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
+          updateLessonsForCurrentRange((prev) => {
+            const groupId = data.lessons?.[0]?.recurrenceGroupId;
             const filtered = groupId
               ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId && lesson.id !== editingLessonId)
               : prev.filter((lesson) => lesson.id !== editingLessonId);
             return [...filtered, ...normalized];
           });
         } else if (data.lesson) {
-          setLessons((prevLessons) =>
-            prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizeLesson(data.lesson) : lesson)),
-          );
+          const normalizedLesson = normalizeLesson(data.lesson);
+          updateLessonsForCurrentRange((prevLessons) => {
+            const range = lessonRangeRef.current;
+            if (range && !isLessonInRange(normalizedLesson, range)) {
+              return prevLessons.filter((lesson) => lesson.id !== editingLessonId);
+            }
+            const exists = prevLessons.some((lesson) => lesson.id === editingLessonId);
+            if (exists) {
+              return prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizedLesson : lesson));
+            }
+            return [...prevLessons, normalizedLesson];
+          });
         }
       } else if (newLessonDraft.isRecurring) {
         if (newLessonDraft.repeatWeekdays.length === 0) {
@@ -1284,8 +1453,8 @@ export const AppPage = () => {
           repeatUntil: resolvedRepeatUntil,
         });
 
-        const normalized = data.lessons.map(normalizeLesson);
-        setLessons((prev) => {
+        const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
+        updateLessonsForCurrentRange((prev) => {
           const existingKeys = new Set(prev.map((lesson) => `${lesson.id}`));
           const next = [...prev];
           normalized.forEach((lesson) => {
@@ -1305,7 +1474,14 @@ export const AppPage = () => {
           meetingLink,
         });
 
-        setLessons([...lessons, normalizeLesson(data.lesson)]);
+        const normalizedLesson = normalizeLesson(data.lesson);
+        updateLessonsForCurrentRange((prev) => {
+          const range = lessonRangeRef.current;
+          if (range && !isLessonInRange(normalizedLesson, range)) {
+            return prev;
+          }
+          return [...prev, normalizedLesson];
+        });
       }
 
       await loadStudentLessons();
@@ -1331,7 +1507,7 @@ export const AppPage = () => {
   const markLessonCompleted = async (lessonId: number) => {
     try {
       const data = await api.markLessonCompleted(lessonId);
-      setLessons((prev) =>
+      updateLessonsForCurrentRange((prev) =>
         prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
       );
 
@@ -1376,7 +1552,9 @@ export const AppPage = () => {
   const updateLessonStatus = async (lessonId: number, status: Lesson['status']) => {
     try {
       const data = await api.updateLessonStatus(lessonId, status);
-      setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)));
+      updateLessonsForCurrentRange((prev) =>
+        prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)),
+      );
 
       if (data.links && data.links.length > 0) {
         const previousLinks = new Map(
@@ -1432,7 +1610,7 @@ export const AppPage = () => {
             selectedStudentId === studentId
             || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
           );
-        setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
         if (shouldUpdateStudentLists) {
           setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
           setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
@@ -1468,7 +1646,7 @@ export const AppPage = () => {
             selectedStudentId === targetStudentId
             || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
           );
-        setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
+        updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
         if (shouldUpdateStudentLists) {
           setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
           setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
@@ -1592,7 +1770,7 @@ export const AppPage = () => {
   const deleteLessonById = async (lessonId: number) => {
     try {
       await api.deleteLesson(lessonId);
-      setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId));
+      updateLessonsForCurrentRange((prev) => prev.filter((lesson) => lesson.id !== lessonId));
       await loadStudentLessons();
       await loadStudentLessonsSummary();
     } catch (error) {
@@ -1905,6 +2083,7 @@ export const AppPage = () => {
                 teacher,
                 lessons,
                 linkedStudents,
+                onWeekRangeChange: handleDashboardWeekRangeChange,
                 onAddStudent: () => {
                   navigate(tabPathById.students);
                   openCreateStudentModal();
