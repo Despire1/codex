@@ -48,16 +48,17 @@ export const MonthDayLessonCard = ({
 
   return (
     <div className={`${styles.card} ${isCanceled ? styles.canceled : ''}`} style={style} onClick={onEdit}>
-      <span className={styles.accent} aria-hidden="true" />
-      <div className={styles.timeBadge}>
-        <span className={styles.timeStart}>{startTime}</span>
-        <span className={styles.timeEnd}>{endTime}</span>
-      </div>
       <div className={styles.content}>
         <div className={styles.headerRow}>
-          <Ellipsis className={styles.title} title={lessonLabel}>
-            {lessonLabel}
-          </Ellipsis>
+          <div className={styles.headerInfo}>
+            <div className={styles.timeBadge}>
+              <span className={styles.timeStart}>{startTime}</span>
+              <span className={styles.timeEnd}>{endTime}</span>
+            </div>
+            <Ellipsis className={styles.title} title={lessonLabel}>
+              {lessonLabel}
+            </Ellipsis>
+          </div>
           <AdaptivePopover
             isOpen={isActionsOpen}
             onClose={onCloseActions}
@@ -114,28 +115,30 @@ export const MonthDayLessonCard = ({
             </div>
           </AdaptivePopover>
         </div>
-        <div className={styles.metaRow}>
-          {meetingLink && (
+        {meetingLink && (
+          <div className={styles.metaRow}>
             <button type="button" className={styles.linkBadge} onClick={onOpenMeetingLink}>
               <MeetingLinkIcon className={styles.linkIcon} />
               Ссылка
             </button>
-          )}
-        </div>
+          </div>
+        )}
         <div className={styles.divider} />
-        <button
-          type="button"
-          className={`${styles.paymentBadge} ${isPaid ? styles.paymentPaid : styles.paymentUnpaid}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onTogglePaid();
-          }}
-          title={paymentLabel}
-        >
-          <span className={styles.paymentIcon} aria-hidden="true" />
-          <span>{paymentLabel}</span>
-          {showPrice && <span className={styles.paymentPrice}>({price} ₽)</span>}
-        </button>
+        <div className={styles.paymentRow}>
+          <button
+            type="button"
+            className={`${styles.paymentBadge} ${isPaid ? styles.paymentPaid : styles.paymentUnpaid}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePaid();
+            }}
+            title={paymentLabel}
+          >
+            <span className={styles.paymentIcon} aria-hidden="true" />
+            <span>{paymentLabel}</span>
+            {showPrice && <span className={styles.paymentPrice}>({price} ₽)</span>}
+          </button>
+        </div>
       </div>
     </div>
   );
