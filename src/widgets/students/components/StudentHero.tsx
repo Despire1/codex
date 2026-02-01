@@ -39,6 +39,7 @@ interface StudentHeroProps {
   onOpenBalanceTopup: () => void;
   onEditStudent: () => void;
   onRequestDeleteStudent: (studentId: number) => void;
+  onRequestDebtDetails?: () => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -69,6 +70,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
+  onRequestDebtDetails,
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
