@@ -12,6 +12,7 @@ import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates
 interface PaymentListProps {
   payments: PaymentEvent[];
   onOpenLesson?: (lesson: Lesson) => void;
+  isLoading?: boolean;
 }
 
 const getEventTitle = (event: PaymentEvent) => {
@@ -133,6 +134,7 @@ const formatEventValue = (event: PaymentEvent) => {
 export const PaymentList: FC<PaymentListProps> = ({
   payments,
   onOpenLesson,
+  isLoading,
 }) => {
   const timeZone = useTimeZone();
   const todayZoned = toZonedDate(new Date(), timeZone);
@@ -157,7 +159,9 @@ export const PaymentList: FC<PaymentListProps> = ({
   return (
     <div className={styles.paymentList}>
       <div className={styles.tabContentScroll}>
-        {!payments.length ? (
+        {isLoading ? (
+          <div className={styles.loadingRow}>Загрузка…</div>
+        ) : !payments.length ? (
           <div className={styles.emptyState}>
             <p>По выбранному фильтру ничего нет</p>
           </div>
