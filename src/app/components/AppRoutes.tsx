@@ -31,9 +31,10 @@ interface AppRoutesProps {
     linkedStudents: LinkedStudent[];
     teacher: Teacher;
     onAddStudent: () => void;
-    onCreateLesson: () => void;
+    onCreateLesson: (date?: Date) => void;
     onOpenSchedule: () => void;
     onOpenLesson: (lesson: Lesson) => void;
+    onOpenLessonDay: (lesson: Lesson) => void;
     onCompleteLesson: (lessonId: number) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
     onRemindLessonPayment: (
@@ -158,6 +159,8 @@ interface AppRoutesProps {
     linkedStudents: LinkedStudent[];
     monthAnchor: Date;
     monthOffset: number;
+    selectedMonthDay?: string | null;
+    onMonthDaySelect?: (dayIso: string | null) => void;
     onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
     onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;

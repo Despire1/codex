@@ -21,6 +21,14 @@
     'actions';
 }
 
+.gridWithCalendar {
+  grid-template-areas:
+    'calendar'
+    'upcoming'
+    'unpaid'
+    'actions';
+}
+
 @media (min-width: 1024px) {
   .gridWithAttention {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
@@ -36,6 +44,14 @@
       'upcoming today'
       'upcoming unpaid'
       'upcoming actions';
+  }
+
+  .gridWithCalendar {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-areas:
+      'calendar calendar'
+      'upcoming unpaid'
+      'actions actions';
   }
 }
 
@@ -203,4 +219,8 @@
 
 .actionsArea {
   grid-area: actions;
+}
+
+.calendarArea {
+  grid-area: calendar;
 }
