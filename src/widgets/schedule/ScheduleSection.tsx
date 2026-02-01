@@ -843,7 +843,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
     const drawerStyle = {
       '--drawer-dh': `${-drawerDragOffset}px`,
-      '--drawer-base-height': drawerMode === 'expanded' ? '66vh' : '50vh',
+      '--drawer-base-height': drawerMode === 'expanded' ? '80vh' : '50vh',
     } as CSSProperties;
 
     return (
@@ -870,6 +870,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   const handleDayClick = () => {
                     setSelectedMonthDay(day.iso);
                     onDayViewDateChange(day.date);
+
+                    if (isMobileMonthView) {
+                      setDrawerMode('expanded');
+                      setDrawerDragOffset(0);
+                    }
                   };
                   const isTodayCell = isSameDay(day.date, todayZoned);
 

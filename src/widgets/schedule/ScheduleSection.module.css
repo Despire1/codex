@@ -639,7 +639,7 @@
 }
 
 .dayDrawerExpanded {
-  --drawer-base-height: 66vh;
+  --drawer-base-height: 80vh;
 }
 
 .dayDrawerDragging {
