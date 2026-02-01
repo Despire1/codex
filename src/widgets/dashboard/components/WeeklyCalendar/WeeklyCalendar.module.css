@@ -1,0 +1,162 @@
+.root {
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-slate-500);
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.controlButton {
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-slate-500);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.controlButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.controlButton:hover {
+  background: var(--color-slate-100);
+  color: var(--color-slate-700);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.day {
+  text-align: center;
+}
+
+.dayLabel {
+  font-size: 11px;
+  color: var(--color-slate-400);
+  margin-bottom: 10px;
+}
+
+.dayLabelActive {
+  color: var(--color-indigo-500);
+  font-weight: 600;
+}
+
+.dayCard {
+  background: var(--color-slate-50);
+  border-radius: 14px;
+  padding: 12px 10px;
+  min-height: 140px;
+}
+
+.dayCardActive {
+  background: rgba(99, 102, 241, 0.08);
+  border: 2px solid rgba(99, 102, 241, 0.25);
+}
+
+.dayCardWeekend {
+  opacity: 0.55;
+}
+
+.dayNumber {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-slate-400);
+  margin-bottom: 10px;
+}
+
+.dayNumberActive {
+  color: var(--color-indigo-600);
+}
+
+.lessonList {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson {
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lessonTime {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lessonStudent {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.lessonIndigo {
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--color-indigo-600);
+}
+
+.lessonGreen {
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--color-green-600);
+}
+
+.lessonPurple {
+  background: rgba(168, 85, 247, 0.16);
+  color: var(--color-purple-600);
+}
+
+.lessonOrange {
+  background: rgba(251, 146, 60, 0.2);
+  color: var(--color-orange-600);
+}
+
+.weekendLabel {
+  font-size: 11px;
+  color: var(--color-slate-400);
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    gap: 8px;
+  }
+
+  .dayCard {
+    min-height: 120px;
+  }
+}
