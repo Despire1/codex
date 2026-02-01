@@ -111,7 +111,6 @@ interface StudentsSectionProps {
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onOpenPaymentReminders?: () => void;
-  onRequestDebtDetails?: () => void;
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
 }
@@ -206,7 +205,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   newHomeworkDraft,
   onActiveTabChange,
   onOpenPaymentReminders,
-  onRequestDebtDetails,
   paymentsLoading,
   paymentRemindersLoading,
 }) => {

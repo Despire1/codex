@@ -324,6 +324,8 @@ export const api = {
 
     return apiFetch<{ items: Lesson[]; debt: StudentDebtSummary }>(path);
   },
+  listStudentUnpaidLessons: (studentId: number) =>
+    apiFetch<StudentDebtSummary>(`/api/students/${studentId}/unpaid-lessons`),
 };
 
 export type ApiClient = typeof api;

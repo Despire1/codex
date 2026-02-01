@@ -238,7 +238,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
     typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0
       ? `${effectiveDebtTotal} ₽${effectiveDebtCount > 0 ? ` (${formatLessonCount(effectiveDebtCount)})` : ''}`
       : formatLessonCount(effectiveDebtCount);
-  const shouldLoadDebtDetails = studentDebtItems.length === 0 && hasDebt;
   const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
   const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
   const paymentReminderStatusLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
