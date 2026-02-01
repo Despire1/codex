@@ -49,6 +49,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   const [successReminderIds, setSuccessReminderIds] = useState<Set<string>>(new Set());
   const [optimisticReminders, setOptimisticReminders] = useState<Record<string, string>>({});
   const successTimeouts = useRef<Map<string, number>>(new Map());
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
@@ -107,114 +108,125 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
     [entryKeys, onRemindLessonPayment, pendingReminderIds],
   );
 
+  const visibleEntries = isExpanded ? sortedEntries : sortedEntries.slice(0, 2);
+  const showToggle = sortedEntries.length > 2;
+
   return (
     <div className={styles.root}>
       <div className={styles.header}>
         <div className={styles.title}>Неоплаченные ({entries.length})</div>
-        <button type="button" className={styles.allPaymentsButton}>
-          Все оплаты
-        </button>
       </div>
       {entries.length === 0 ? (
         <div className={styles.empty}>Нет неоплаченных занятий</div>
       ) : (
-        <div className={styles.list}>
-          {sortedEntries.map((entry) => {
-            const entryKey = `${entry.lessonId}-${entry.studentId}`;
-            const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
-            const lessonDate = capitalizeFirst(
-              formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
-            );
-            const priceLabel = `${entry.price} ₽`;
-            const reminderLabel = entry.isActivated
-              ? reminderTimestamp
-                ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(reminderTimestamp), {
-                    addSuffix: true,
-                    locale: ru,
-                  })}.`
-                : 'Напоминание не отправлялось.'
-              : 'Ученик не активировал бота — отправка невозможна.';
-            const showProgress =
-              entry.isActivated &&
-              !reminderTimestamp &&
-              globalPaymentRemindersEnabled &&
-              entry.paymentRemindersEnabled &&
-              entry.completedAt;
-            const progressValue = showProgress
-              ? Math.min(
-                  (now.getTime() - new Date(entry.completedAt ?? entry.startAt).getTime()) / reminderDelayMs,
-                  1,
-                )
-              : 0;
-            const waitLabel = `Ждём ${Math.max(1, reminderDelayHours)}ч`;
-            const avatarLetter = entry.studentName.trim().charAt(0).toUpperCase() || 'У';
-            const reminderDisabledReason = entry.isActivated
-              ? null
-              : 'Ученик не активировал бота — отправка невозможна';
-            const isPending = pendingReminderIds.has(entryKey);
-            const isSuccess = successReminderIds.has(entryKey);
+        <>
+          <div className={`${styles.list} ${isExpanded ? styles.listExpanded : ''}`}>
+            {visibleEntries.map((entry) => {
+              const entryKey = `${entry.lessonId}-${entry.studentId}`;
+              const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
+              const lessonDate = capitalizeFirst(
+                formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
+              );
+              const priceLabel = `${entry.price} ₽`;
+              const reminderLabel = entry.isActivated
+                ? reminderTimestamp
+                  ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(reminderTimestamp), {
+                      addSuffix: true,
+                      locale: ru,
+                    })}.`
+                  : 'Напоминание не отправлялось.'
+                : 'Ученик не активировал бота — отправка невозможна.';
+              const showProgress =
+                entry.isActivated &&
+                !reminderTimestamp &&
+                globalPaymentRemindersEnabled &&
+                entry.paymentRemindersEnabled &&
+                entry.completedAt;
+              const progressValue = showProgress
+                ? Math.min(
+                    (now.getTime() - new Date(entry.completedAt ?? entry.startAt).getTime()) / reminderDelayMs,
+                    1,
+                  )
+                : 0;
+              const waitLabel = `Ждём ${Math.max(1, reminderDelayHours)}ч`;
+              const avatarLetter = entry.studentName.trim().charAt(0).toUpperCase() || 'У';
+              const reminderDisabledReason = entry.isActivated
+                ? null
+                : 'Ученик не активировал бота — отправка невозможна';
+              const isPending = pendingReminderIds.has(entryKey);
+              const isSuccess = successReminderIds.has(entryKey);
 
-            return (
-              <div key={`${entry.lessonId}-${entry.studentId}`} className={styles.item}>
-                <div className={styles.itemHeader}>
-                  <div className={styles.avatar}>{avatarLetter}</div>
-                  <div className={styles.itemHeaderInfo}>
+              return (
+                <div key={`${entry.lessonId}-${entry.studentId}`} className={styles.item}>
+                  <div className={styles.itemHeader}>
+                    <div className={styles.avatar}>{avatarLetter}</div>
+                    <div className={styles.itemHeaderInfo}>
+                      <button
+                        type="button"
+                        className={styles.studentName}
+                        onClick={() => onOpenStudent(entry.studentId)}
+                      >
+                        {entry.studentName}
+                      </button>
+                      <div className={styles.lessonMeta}>
+                        Урок {lessonDate} • {priceLabel}
+                      </div>
+                    </div>
+                    <Badge className={styles.debtBadge} label="долг" variant="unpaid" />
+                  </div>
+
+                  <div className={styles.reminderRow}>
+                    <NotificationsNoneOutlinedIcon width={16} height={16} />
+                    <span>{reminderLabel}</span>
+                  </div>
+
+                  <div className={styles.actionsRow}>
                     <button
                       type="button"
-                      className={styles.studentName}
-                      onClick={() => onOpenStudent(entry.studentId)}
+                      className={`${controls.primaryButton} ${styles.payButton}`}
+                      onClick={() => onTogglePaid(entry.lessonId, entry.studentId)}
                     >
-                      {entry.studentName}
+                      Отметить оплату
                     </button>
-                    <div className={styles.lessonMeta}>
-                      Урок {lessonDate} • {priceLabel}
-                    </div>
+                    <button
+                      type="button"
+                      className={styles.remindButton}
+                      onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
+                      title={reminderDisabledReason ?? 'Отправить напоминание'}
+                      disabled={Boolean(reminderDisabledReason) || isPending}
+                    >
+                      {isPending ? (
+                        <span className={styles.iconSpinner} aria-hidden />
+                      ) : isSuccess ? (
+                        <span className={styles.iconCheck} aria-hidden />
+                      ) : (
+                        <NotificationsNoneOutlinedIcon width={18} height={18} />
+                      )}
+                    </button>
                   </div>
-                  <Badge className={styles.debtBadge} label="долг" variant="unpaid" />
-                </div>
 
-                <div className={styles.reminderRow}>
-                  <NotificationsNoneOutlinedIcon width={16} height={16} />
-                  <span>{reminderLabel}</span>
-                </div>
-
-                <div className={styles.actionsRow}>
-                  <button
-                    type="button"
-                    className={`${controls.primaryButton} ${styles.payButton}`}
-                    onClick={() => onTogglePaid(entry.lessonId, entry.studentId)}
-                  >
-                    Отметить оплату
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.remindButton}
-                    onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
-                    title={reminderDisabledReason ?? 'Отправить напоминание'}
-                    disabled={Boolean(reminderDisabledReason) || isPending}
-                  >
-                    {isPending ? (
-                      <span className={styles.iconSpinner} aria-hidden />
-                    ) : isSuccess ? (
-                      <span className={styles.iconCheck} aria-hidden />
-                    ) : (
-                      <NotificationsNoneOutlinedIcon width={18} height={18} />
-                    )}
-                  </button>
-                </div>
-
-                {showProgress && (
-                  <div className={styles.progressRow}>
-                    <div className={styles.progressTrack}>
-                      <span className={styles.progressFill} style={{ width: `${progressValue * 100}%` }} />
+                  {showProgress && (
+                    <div className={styles.progressRow}>
+                      <div className={styles.progressTrack}>
+                        <span className={styles.progressFill} style={{ width: `${progressValue * 100}%` }} />
+                      </div>
+                      <div className={styles.progressLabel}>{waitLabel}</div>
                     </div>
-                    <div className={styles.progressLabel}>{waitLabel}</div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {showToggle && (
+            <button
+              type="button"
+              className={styles.toggleButton}
+              onClick={() => setIsExpanded((prev) => !prev)}
+            >
+              {isExpanded ? 'Свернуть' : 'Показать все'}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
