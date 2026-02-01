@@ -99,14 +99,27 @@ export const api = {
     apiFetch<{ status: string }>('/auth/logout', {
       method: 'POST',
     }),
-  bootstrap: () =>
-    apiFetch<{
+  bootstrap: (params?: { lessonsStart?: string; lessonsEnd?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.lessonsStart) search.set('lessonsStart', params.lessonsStart);
+    if (params?.lessonsEnd) search.set('lessonsEnd', params.lessonsEnd);
+    const suffix = search.toString();
+    const path = suffix ? `/api/bootstrap?${suffix}` : '/api/bootstrap';
+    return apiFetch<{
       teacher: Teacher;
       students: Student[];
       links: TeacherStudent[];
       homeworks: Homework[];
       lessons: Lesson[];
-    }>('/api/bootstrap'),
+    }>(path);
+  },
+  listLessonsForRange: (payload: { start: string; end: string }) => {
+    const search = new URLSearchParams({
+      start: payload.start,
+      end: payload.end,
+    });
+    return apiFetch<{ lessons: Lesson[] }>(`/api/lessons?${search.toString()}`);
+  },
   getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
   updateSettings: (payload: Partial<SettingsPayload>) =>
     apiFetch<{ settings: SettingsPayload }>('/api/settings', {

@@ -18,6 +18,7 @@ interface DashboardSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   teacher: Teacher;
+  onWeekRangeChange?: (start: Date, end: Date) => void;
   onAddStudent: () => void;
   onCreateLesson: (date?: Date) => void;
   onOpenSchedule: () => void;
@@ -51,6 +52,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   lessons,
   linkedStudents,
   teacher,
+  onWeekRangeChange,
   onAddStudent,
   onCreateLesson,
   onOpenSchedule,
@@ -233,6 +235,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           timeZone={timeZone}
           onCreateLesson={(date) => onCreateLesson(date)}
           onOpenLessonDay={onOpenLessonDay}
+          onWeekRangeChange={onWeekRangeChange}
         />
       )}
 
