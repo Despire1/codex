@@ -1728,29 +1728,34 @@ export const AppPage = () => {
         }
       }
       if (code === 'recently_sent' && !options?.force) {
-        const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
-        const lastReminderLabel = reminderItem?.lastPaymentReminderAt
-          ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
-              locale: ru,
-              timeZone: resolvedTimeZone,
-            })
-          : null;
-        const message = lastReminderLabel
-          ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
-          : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
-        setDialogState({
-          type: 'confirm',
-          title: 'Напоминание уже отправлялось недавно',
-          message,
-          confirmText: 'Отправить',
-          cancelText: 'Отмена',
-          onConfirm: () => {
-            closeDialog();
-            remindLessonPayment(lessonId, studentId, { force: true });
-          },
-          onCancel: closeDialog,
+        return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
+          const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+          const lastReminderLabel = reminderItem?.lastPaymentReminderAt
+            ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
+                locale: ru,
+                timeZone: resolvedTimeZone,
+              })
+            : null;
+          const message = lastReminderLabel
+            ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
+            : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
+          setDialogState({
+            type: 'confirm',
+            title: 'Напоминание уже отправлялось недавно',
+            message,
+            confirmText: 'Отправить',
+            cancelText: 'Отмена',
+            onConfirm: async () => {
+              closeDialog();
+              const result = await remindLessonPayment(lessonId, studentId, { force: true });
+              resolve(result);
+            },
+            onCancel: () => {
+              closeDialog();
+              resolve({ status: 'error' as const });
+            },
+          });
         });
-        return { status: 'error' as const };
       }
       const message =
         code === 'student_not_activated'
@@ -1833,76 +1838,78 @@ export const AppPage = () => {
 
           <main className={layoutStyles.content}>
             <AppRoutes
-            resolveLastVisitedPath={resolveLastVisitedPath}
-            dashboard={{
-              lessons,
-              linkedStudents,
-              onAddStudent: () => {
-                navigate(tabPathById.students);
-                openCreateStudentModal();
-              },
-              onCreateLesson: () => {
-                openLessonModal(
-                  todayISO(resolvedTimeZone),
-                  formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
-                );
-              },
-              onOpenSchedule: () => navigate(tabPathById.schedule),
-              onOpenLesson: (lesson) =>
-                openLessonModal(
-                  formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                  undefined,
-                  lesson,
-                ),
-              onCompleteLesson: markLessonCompleted,
-              onTogglePaid: togglePaid,
-              onOpenStudent: (studentId) => {
-                setSelectedStudentId(studentId);
-                navigate(tabPathById.students);
-              },
-            }}
-            students={{
-              teacher,
-              studentListItems,
-              studentListCounts,
-              studentListTotal,
-              studentListLoading,
-              studentListHasMore,
-              studentSearch,
-              studentFilter,
-              lessons,
-              selectedStudentId,
-              priceEditState,
-              studentHomeworks,
-              homeworkFilter: studentHomeworkFilter,
-              homeworkListLoading: studentHomeworkLoading,
-              homeworkListHasMore: studentHomeworkHasMore,
-              newHomeworkDraft,
-              onSelectStudent: setSelectedStudentId,
-              onStudentSearchChange: setStudentSearch,
-              onStudentFilterChange: setStudentFilter,
-              onLoadMoreStudents: loadMoreStudents,
-              onHomeworkFilterChange: setStudentHomeworkFilter,
-              onLoadMoreHomeworks: loadMoreStudentHomeworks,
-              onToggleAutoReminder: toggleAutoReminder,
-              onTogglePaymentReminders: togglePaymentReminders,
-              onAdjustBalance: adjustBalance,
-              onBalanceTopup: topupBalance,
-              onStartEditPrice: startEditPrice,
-              onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
-              onSavePrice: savePrice,
-              onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
-              onRemindHomework: remindHomework,
-              onRemindHomeworkById: remindHomeworkById,
-              onSendHomework: sendHomeworkToStudent,
-              onDuplicateHomework: duplicateHomework,
-              onDeleteHomework: deleteHomework,
-              onAddHomework: addHomework,
-              onHomeworkDraftChange: (draft) =>
-                setNewHomeworkDraft({
-                  ...draft,
-                  baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
-                }),
+              resolveLastVisitedPath={resolveLastVisitedPath}
+              dashboard={{
+                teacher,
+                lessons,
+                linkedStudents,
+                onAddStudent: () => {
+                  navigate(tabPathById.students);
+                  openCreateStudentModal();
+                },
+                onCreateLesson: () => {
+                  openLessonModal(
+                    todayISO(resolvedTimeZone),
+                    formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                  );
+                },
+                onOpenSchedule: () => navigate(tabPathById.schedule),
+                onOpenLesson: (lesson) =>
+                  openLessonModal(
+                    formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                    undefined,
+                    lesson,
+                  ),
+                onCompleteLesson: markLessonCompleted,
+                onTogglePaid: togglePaid,
+                onRemindLessonPayment: remindLessonPayment,
+                onOpenStudent: (studentId) => {
+                  setSelectedStudentId(studentId);
+                  navigate(tabPathById.students);
+                },
+              }}
+              students={{
+                teacher,
+                studentListItems,
+                studentListCounts,
+                studentListTotal,
+                studentListLoading,
+                studentListHasMore,
+                studentSearch,
+                studentFilter,
+                lessons,
+                selectedStudentId,
+                priceEditState,
+                studentHomeworks,
+                homeworkFilter: studentHomeworkFilter,
+                homeworkListLoading: studentHomeworkLoading,
+                homeworkListHasMore: studentHomeworkHasMore,
+                newHomeworkDraft,
+                onSelectStudent: setSelectedStudentId,
+                onStudentSearchChange: setStudentSearch,
+                onStudentFilterChange: setStudentFilter,
+                onLoadMoreStudents: loadMoreStudents,
+                onHomeworkFilterChange: setStudentHomeworkFilter,
+                onLoadMoreHomeworks: loadMoreStudentHomeworks,
+                onToggleAutoReminder: toggleAutoReminder,
+                onTogglePaymentReminders: togglePaymentReminders,
+                onAdjustBalance: adjustBalance,
+                onBalanceTopup: topupBalance,
+                onStartEditPrice: startEditPrice,
+                onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
+                onSavePrice: savePrice,
+                onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
+                onRemindHomework: remindHomework,
+                onRemindHomeworkById: remindHomeworkById,
+                onSendHomework: sendHomeworkToStudent,
+                onDuplicateHomework: duplicateHomework,
+                onDeleteHomework: deleteHomework,
+                onAddHomework: addHomework,
+                onHomeworkDraftChange: (draft) =>
+                  setNewHomeworkDraft({
+                    ...draft,
+                    baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
+                  }),
               onToggleHomework: toggleHomeworkDone,
               onUpdateHomework: updateHomework,
               onAddStudent: openCreateStudentModal,

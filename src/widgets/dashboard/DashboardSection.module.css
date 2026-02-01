@@ -123,6 +123,11 @@
   width: 100%;
 }
 
+.unpaidCardFull {
+  cursor: default;
+  padding: 18px;
+}
+
 .unpaidCardWrapper {
   width: 100%;
 }
