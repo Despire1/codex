@@ -9,6 +9,13 @@
   background: var(--color-white);
 }
 
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  border-color: var(--color-blue-600);
+  box-shadow: 0 0 0 1px var(--shadow-blue-600-12);
+}
+
 .textArea {
   width: 100%;
   padding: 12px;

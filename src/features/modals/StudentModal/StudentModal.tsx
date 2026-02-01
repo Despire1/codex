@@ -68,7 +68,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                   onChange={(e) =>
                     onDraftChange({
                       ...draft,
-                      username: e.target.value.replace(/^@+/, ''),
+                      username: e.target.value.replace(/[@\u0400-\u04ff]/g, ''),
                     })
                   }
                 />
@@ -80,16 +80,19 @@ export const StudentModal: FC<StudentModalProps> = ({
               <label className={modalStyles.fieldLabel} htmlFor="student-price">
                 Цена занятия
               </label>
-              <input
-                id="student-price"
-                className={controls.input}
-                placeholder="Цена занятия"
-                type="number"
-                min={0}
-                required
-                value={draft.pricePerLesson}
-                onChange={(e) => onDraftChange({ ...draft, pricePerLesson: e.target.value })}
-              />
+              <div className={styles.priceField}>
+                <span className={styles.pricePrefix}>₽</span>
+                <input
+                  id="student-price"
+                  className={`${controls.input} ${styles.priceInput}`}
+                  placeholder="Цена занятия"
+                  type="number"
+                  min={0}
+                  required
+                  value={draft.pricePerLesson}
+                  onChange={(e) => onDraftChange({ ...draft, pricePerLesson: e.target.value })}
+                />
+              </div>
             </div>
           </div>
         </div>
