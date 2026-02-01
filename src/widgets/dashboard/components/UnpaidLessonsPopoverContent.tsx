@@ -152,7 +152,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                             locale: ru,
                           })}.`
                           : 'Напоминание не отправлялось.'
-                      : 'Ученик не активировал бота — отправка невозможна.';
+                      : 'Ученик не активировал бота — отправка напоминаний невозможна.';
 
                   const showProgress =
                       entry.isActivated &&
@@ -174,7 +174,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 
                   const reminderDisabledReason = entry.isActivated
                       ? null
-                      : 'Ученик не активировал бота — отправка невозможна';
+                      : 'Ученик не активировал бота — отправка напоминаний невозможна';
 
                   const isPending = pendingReminderIds.has(entryKey);
                   const isSuccess = successReminderIds.has(entryKey);

@@ -85,7 +85,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const activationHint =
     'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
   const reminderDisabledReason = !selectedStudent.isActivated
-    ? 'Ученик не активировал бота — отправка невозможна'
+    ? 'Ученик не активировал бота — отправка напоминаний невозможна'
     : null;
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);

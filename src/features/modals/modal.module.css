@@ -266,9 +266,9 @@
   }
 
   .timeRow {
-    grid-template-columns: 1fr;
+    display: flex;
     gap: 6px;
-    margin-top: 4px;
+    margin-top: 12px;
   }
 
   .timeDivider {

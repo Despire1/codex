@@ -1759,7 +1759,7 @@ export const AppPage = () => {
       }
       const message =
         code === 'student_not_activated'
-          ? 'Ученик не активировал бота — отправка невозможна'
+          ? 'Ученик не активировал бота — отправка напоминаний невозможна'
           : 'Не удалось отправить напоминание';
       showToast({ message, variant: 'error' });
       // eslint-disable-next-line no-console
