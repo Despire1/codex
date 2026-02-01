@@ -74,10 +74,10 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
       if (!entry || !entry.isActivated) return;
 
       setPendingReminderIds((prev) => new Set(prev).add(key));
-      const nowIso = new Date().toISOString();
-      setOptimisticReminders((prev) => ({ ...prev, [key]: nowIso }));
       try {
         await onRemindLessonPayment(lessonId, studentId);
+        const nowIso = new Date().toISOString();
+        setOptimisticReminders((prev) => ({ ...prev, [key]: nowIso }));
         setSuccessReminderIds((prev) => new Set(prev).add(key));
         const timeoutId = window.setTimeout(() => {
           setSuccessReminderIds((prev) => {
@@ -89,11 +89,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
         }, 1200);
         successTimeouts.current.set(key, timeoutId);
       } catch (error) {
-        setOptimisticReminders((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
+        // keep previous reminder timestamp on failure
       } finally {
         setPendingReminderIds((prev) => {
           const next = new Set(prev);
