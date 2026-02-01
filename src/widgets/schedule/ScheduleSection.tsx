@@ -843,7 +843,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
     const drawerStyle = {
       '--drawer-dh': `${-drawerDragOffset}px`,
-      '--drawer-base-height': drawerMode === 'expanded' ? '80vh' : '50vh',
+      '--drawer-base-height': '80vh',
     } as CSSProperties;
 
     return (

@@ -618,7 +618,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: clamp(320px, calc(var(--drawer-base-height, 50vh) + var(--drawer-dh, 0px)), 640px);
+  height: clamp(320px, calc(var(--drawer-base-height, 80vh) + var(--drawer-dh, 0px)), 80vh);
   background: var(--color-white);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -10px 26px var(--shadow-slate-900-18);
@@ -628,7 +628,7 @@
   overflow: hidden;
   display: none;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-  max-height: 640px;
+  max-height: 80vh;
   will-change: transform, height;
   contain: layout paint;
   backface-visibility: hidden;
