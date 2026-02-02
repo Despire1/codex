@@ -408,6 +408,13 @@ const sendTelegramMessage = async (chatId: bigint, text: string) => {
   });
 };
 
+const deleteTelegramMessage = async (chatId: bigint, messageId: number) => {
+  await callTelegram('deleteMessage', {
+    chat_id: Number(chatId),
+    message_id: messageId,
+  });
+};
+
 const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
   formatInTimeZone(date, "yyyy-MM-dd'T'HH:mm", { timeZone: resolveTimeZone(timeZone) });
 
@@ -3219,6 +3226,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const status = typeof object?.status === 'string' ? object.status : null;
       const metadata = object?.metadata ?? {};
       const telegramUserIdRaw = metadata?.telegramUserId;
+      const messageIdRaw = metadata?.messageId;
 
       if (!paymentId || !event || status !== 'succeeded' || event !== 'payment.succeeded') {
         return sendJson(res, 200, { ok: true });
@@ -3261,6 +3269,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       markYookassaPaymentProcessed(paymentId);
 
       try {
+        try {
+          if (typeof messageIdRaw === 'number') {
+            await deleteTelegramMessage(telegramUserId, messageIdRaw);
+          } else if (typeof messageIdRaw === 'string') {
+            const parsedMessageId = Number(messageIdRaw);
+            if (Number.isFinite(parsedMessageId)) {
+              await deleteTelegramMessage(telegramUserId, parsedMessageId);
+            }
+          }
+        } catch (error) {
+          console.error('[yookassa] Failed to delete subscription prompt message', error);
+        }
         await sendTelegramMessage(
           telegramUserId,
           `✅ Оплата прошла успешно!\n🎉 Подписка активирована — полный доступ открыт.\n\n📅 Активна до: ${formatSubscriptionDate(nextEnd)}\n\n🧠 Меньше рутины — больше фокуса на занятиях.`,

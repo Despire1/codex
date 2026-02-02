@@ -365,7 +365,7 @@ const isSubscriptionActive = (user: { subscriptionStartAt: Date | null; subscrip
   return user.subscriptionEndAt.getTime() > Date.now();
 };
 
-const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
+const createYookassaPayment = async (payload: { telegramUserId: bigint; messageId?: number }) => {
   if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY || !YOOKASSA_RETURN_URL) {
     throw new Error('YOOKASSA credentials are not configured');
   }
@@ -382,7 +382,10 @@ const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
       capture: true,
       confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
       description: 'Подписка на 30 дней',
-      metadata: { telegramUserId: payload.telegramUserId.toString() },
+      metadata: {
+        telegramUserId: payload.telegramUserId.toString(),
+        messageId: typeof payload.messageId === 'number' ? payload.messageId : undefined,
+      },
     }),
   });
   if (!response.ok) {
@@ -397,18 +400,27 @@ const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
   return confirmationUrl;
 };
 
-const sendSubscriptionPurchaseConfirmation = async (chatId: number, telegramUserId: bigint) => {
+const sendSubscriptionPurchaseConfirmation = async (
+  chatId: number,
+  telegramUserId: bigint,
+  messageId?: number,
+) => {
   try {
-    const confirmationUrl = await createYookassaPayment({ telegramUserId });
+    const confirmationUrl = await createYookassaPayment({ telegramUserId, messageId });
     const text =
       `💳 Подтвердите покупку подписки — ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽\nПосле подтверждения подписка сразу активируется ✅\n\n` +
       `📄 Пользовательское соглашение: ${TERMS_AGREEMENT_URL}\n\nНажимая «Подтвердить покупку», вы соглашаетесь с пользовательским соглашением.`;
+    const replyMarkup = {
+      inline_keyboard: [[{ text: 'Подтвердить покупку', url: confirmationUrl }]],
+    };
+    if (messageId) {
+      await editMessage(chatId, messageId, text, replyMarkup);
+      return;
+    }
     await callTelegram('sendMessage', {
       chat_id: chatId,
       text,
-      reply_markup: {
-        inline_keyboard: [[{ text: 'Подтвердить покупку', url: confirmationUrl }]],
-      },
+      reply_markup: replyMarkup,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -775,7 +787,8 @@ const handleUpdate = async (update: TelegramUpdate) => {
     if (update.callback_query.data === 'subscription_monthly') {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
       const telegramUserId = BigInt(update.callback_query.from.id);
-      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId);
+      const messageId = update.callback_query.message?.message_id;
+      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId, messageId);
       return;
     }
     if (update.callback_query.data === 'terms_accept') {
