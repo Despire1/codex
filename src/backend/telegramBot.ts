@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
@@ -7,7 +8,9 @@ const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
-const TELEGRAM_SUBSCRIPTION_PAYMENT_URL = process.env.TELEGRAM_SUBSCRIPTION_PAYMENT_URL ?? '';
+const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID ?? '';
+const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY ?? '';
+const YOOKASSA_RETURN_URL = process.env.YOOKASSA_RETURN_URL ?? '';
 const TERMS_PRIVACY_URL = 'https://bot.politdev.ru/privacy';
 const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
 const SUPPORT_BOT_HANDLE = '@teacherbot_help';
@@ -19,6 +22,7 @@ const ROLE_TEACHER_TEXT_NORMALIZED = ROLE_TEACHER_TEXT.toLowerCase();
 const ROLE_STUDENT_TEXT_NORMALIZED = ROLE_STUDENT_TEXT.toLowerCase();
 const SUBSCRIPTION_TRIAL_DAYS = 14;
 const SUBSCRIPTION_MONTH_PRICE_RUB = 790;
+const SUBSCRIPTION_CURRENCY = 'RUB';
 
 const onboardingMessageByChatId = new Map<number, number>();
 
@@ -321,22 +325,56 @@ const isSubscriptionActive = (user: { subscriptionStartAt: Date | null; subscrip
   return user.subscriptionEndAt.getTime() > Date.now();
 };
 
-const sendSubscriptionPurchaseConfirmation = async (chatId: number) => {
-  if (!TELEGRAM_SUBSCRIPTION_PAYMENT_URL) {
-    console.error('[telegram-bot] TELEGRAM_SUBSCRIPTION_PAYMENT_URL is not configured');
-    await sendStudentInfoMessage(chatId, 'Не удалось открыть оплату. Напишите в поддержку.');
-    return;
+const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
+  if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY || !YOOKASSA_RETURN_URL) {
+    throw new Error('YOOKASSA credentials are not configured');
   }
-  const text =
-    `Подтвердите покупку подписки за ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽.\n\n` +
-    `Пользовательское соглашение: ${TERMS_AGREEMENT_URL}`;
-  await callTelegram('sendMessage', {
-    chat_id: chatId,
-    text,
-    reply_markup: {
-      inline_keyboard: [[{ text: 'Подтвердить покупку', url: TELEGRAM_SUBSCRIPTION_PAYMENT_URL }]],
+  const amount = `${SUBSCRIPTION_MONTH_PRICE_RUB}.00`;
+  const response = await fetch('https://api.yookassa.ru/v3/payments', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64')}`,
+      'Content-Type': 'application/json',
+      'Idempotence-Key': crypto.randomUUID(),
     },
+    body: JSON.stringify({
+      amount: { value: amount, currency: SUBSCRIPTION_CURRENCY },
+      capture: true,
+      confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
+      description: 'Подписка на 1 месяц',
+      metadata: { telegramUserId: payload.telegramUserId.toString() },
+    }),
   });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`YooKassa payment failed: ${response.status} ${body}`);
+  }
+  const data = (await response.json()) as { confirmation?: { confirmation_url?: string } };
+  const confirmationUrl = data.confirmation?.confirmation_url;
+  if (!confirmationUrl) {
+    throw new Error('YooKassa confirmation_url is missing');
+  }
+  return confirmationUrl;
+};
+
+const sendSubscriptionPurchaseConfirmation = async (chatId: number, telegramUserId: bigint) => {
+  try {
+    const confirmationUrl = await createYookassaPayment({ telegramUserId });
+    const text =
+      `Подтвердите покупку подписки за ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽.\n\n` +
+      `Пользовательское соглашение: ${TERMS_AGREEMENT_URL}`;
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text,
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Подтвердить покупку', url: confirmationUrl }]],
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[telegram-bot] Failed to create subscription payment: ${message}`);
+    await sendStudentInfoMessage(chatId, 'Не удалось сформировать ссылку на оплату. Напишите в поддержку.');
+  }
 };
 
 
@@ -696,7 +734,8 @@ const handleUpdate = async (update: TelegramUpdate) => {
     }
     if (update.callback_query.data === 'subscription_monthly') {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      await sendSubscriptionPurchaseConfirmation(chatId);
+      const telegramUserId = BigInt(update.callback_query.from.id);
+      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId);
       return;
     }
     if (update.callback_query.data === 'terms_accept') {
