@@ -401,8 +401,8 @@ const sendSubscriptionPurchaseConfirmation = async (chatId: number, telegramUser
   try {
     const confirmationUrl = await createYookassaPayment({ telegramUserId });
     const text =
-      `Подтвердите покупку подписки за ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽.\n\n` +
-      `Пользовательское соглашение: ${TERMS_AGREEMENT_URL}`;
+      `💳 Подтвердите покупку подписки — ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽\nПосле подтверждения подписка сразу активируется ✅\n\n` +
+      `📄 Пользовательское соглашение: ${TERMS_AGREEMENT_URL}\n\nНажимая «Подтвердить покупку», вы соглашаетесь с пользовательским соглашением.`;
     await callTelegram('sendMessage', {
       chat_id: chatId,
       text,
