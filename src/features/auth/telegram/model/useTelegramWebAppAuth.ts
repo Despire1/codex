@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
+export const useTelegramWebAppAuth = (onAuthenticated?: () => void, onAuthFailed?: () => void) => {
   const { showToast } = useToast();
   const [state, setState] = useState<AuthState>('idle');
 
@@ -51,18 +51,25 @@ export const useTelegramWebAppAuth = (onAuthenticated?: () => void) => {
       })
       .catch(() => {
         if (cancelled) return;
-        setState('error');
-        showToast({
-          message: 'Не удалось подтвердить вход через Telegram.',
-          variant: 'error',
-        });
+        api
+          .logout()
+          .catch(() => undefined)
+          .finally(() => {
+            if (cancelled) return;
+            setState('error');
+            showToast({
+              message: 'Не удалось подтвердить вход через Telegram.',
+              variant: 'error',
+            });
+            onAuthFailed?.();
+          });
       });
 
     return () => {
       cancelled = true;
       document.body.classList.remove('telegram-webapp');
     };
-  }, [onAuthenticated, showToast]);
+  }, [onAuthenticated, onAuthFailed, showToast]);
 
   return { state };
 };

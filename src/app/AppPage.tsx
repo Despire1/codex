@@ -211,7 +211,7 @@ export const AppPage = () => {
   const location = useLocation();
   const { showToast } = useToast();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
-  const { state: telegramState } = useTelegramWebAppAuth(refreshSession);
+  const { state: telegramState } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasAccess = sessionState === 'authenticated' && hasSubscription;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
