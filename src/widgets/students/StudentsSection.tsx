@@ -50,7 +50,6 @@ interface StudentsSectionProps {
   onLoadMoreStudents: () => void;
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onLoadMoreHomeworks: () => void;
-  onToggleAutoReminder: (studentId: number) => void;
   onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onBalanceTopup: (
@@ -157,7 +156,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onLoadMoreStudents,
   onHomeworkFilterChange,
   onLoadMoreHomeworks,
-  onToggleAutoReminder,
   onTogglePaymentReminders,
   onAdjustBalance,
   onBalanceTopup,
@@ -398,7 +396,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onPriceChange={onPriceChange}
                   onSavePrice={onSavePrice}
             onCancelPriceEdit={onCancelPriceEdit}
-            onToggleAutoReminder={onToggleAutoReminder}
             onTogglePaymentReminders={onTogglePaymentReminders}
             onAdjustBalance={onAdjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
