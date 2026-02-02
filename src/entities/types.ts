@@ -119,6 +119,19 @@ export interface StudentDebtItem {
   lastPaymentReminderAt?: string | null;
 }
 
+export interface UnpaidLessonEntry {
+  lessonId: number;
+  startAt: string;
+  completedAt: string | null;
+  lastPaymentReminderAt: string | null;
+  paymentReminderCount: number;
+  studentId: number;
+  studentName: string;
+  price: number;
+  isActivated: boolean;
+  paymentRemindersEnabled: boolean;
+}
+
 export type PaymentReminderSource = 'AUTO' | 'MANUAL';
 export type PaymentReminderStatus = 'SENT' | 'FAILED';
 

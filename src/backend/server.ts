@@ -4,7 +4,7 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
-import type { User } from '@prisma/client';
+import type { Student, User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
@@ -996,7 +996,7 @@ const listStudentLessons = async (
   return { items, debt };
 };
 
-const bootstrap = async (user: User) => {
+const bootstrap = async (user: User, filters?: { lessonsStart?: Date | null; lessonsEnd?: Date | null }) => {
   const teacher = await ensureTeacher(user);
   const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } });
   const students = await prisma.student.findMany({
@@ -1010,8 +1010,14 @@ const bootstrap = async (user: User) => {
     },
   });
   const homeworks = await prisma.homework.findMany({ where: { teacherId: teacher.chatId } });
+  const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId };
+  if (filters?.lessonsStart || filters?.lessonsEnd) {
+    lessonsWhere.startAt = {};
+    if (filters.lessonsStart) lessonsWhere.startAt.gte = filters.lessonsStart;
+    if (filters.lessonsEnd) lessonsWhere.startAt.lte = filters.lessonsEnd;
+  }
   const lessons = await prisma.lesson.findMany({
-    where: { teacherId: teacher.chatId },
+    where: lessonsWhere,
     include: {
       participants: {
         include: {
@@ -1022,6 +1028,95 @@ const bootstrap = async (user: User) => {
   });
 
   return { teacher, students, links, homeworks, lessons };
+};
+
+const listLessonsForRange = async (
+  user: User,
+  filters: {
+    start?: string | null;
+    end?: string | null;
+  },
+) => {
+  const teacher = await ensureTeacher(user);
+  const where: Record<string, any> = { teacherId: teacher.chatId };
+  const startFrom = parseDateFilter(filters.start ?? undefined);
+  const startTo = parseDateFilter(filters.end ?? undefined);
+  if (startFrom || startTo) {
+    where.startAt = {};
+    if (startFrom) where.startAt.gte = startFrom;
+    if (startTo) where.startAt.lte = startTo;
+  }
+
+  const lessons = await prisma.lesson.findMany({
+    where,
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
+
+  return { lessons };
+};
+
+const listUnpaidLessons = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  const now = new Date();
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: { not: 'CANCELED' },
+      OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
+      AND: [
+        {
+          OR: [{ isPaid: false }, { participants: { some: { isPaid: false } } }],
+        },
+      ],
+    },
+    include: {
+      student: true,
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+
+  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
+  const linkMap = new Map(links.map((link) => [link.studentId, link]));
+
+  const entries = lessons.flatMap((lesson) => {
+    const buildEntry = (studentId: number, price: number, student?: Student | null) => {
+      const link = linkMap.get(studentId);
+      return {
+        lessonId: lesson.id,
+        startAt: lesson.startAt,
+        completedAt: lesson.completedAt ?? null,
+        lastPaymentReminderAt: lesson.lastPaymentReminderAt ?? null,
+        paymentReminderCount: lesson.paymentReminderCount ?? 0,
+        studentId,
+        studentName: link?.customName ?? student?.username ?? 'Ученик',
+        price,
+        isActivated: student?.isActivated ?? false,
+        paymentRemindersEnabled: student?.paymentRemindersEnabled ?? true,
+      };
+    };
+
+    if (lesson.participants && lesson.participants.length > 0) {
+      return lesson.participants
+        .filter((participant) => !participant.isPaid)
+        .map((participant) => buildEntry(participant.studentId, participant.price, participant.student));
+    }
+    if (lesson.isPaid) return [];
+
+    return [buildEntry(lesson.studentId, lesson.price ?? 0, lesson.student)];
+  });
+
+  return { entries };
 };
 
 const addStudent = async (user: User, body: any) => {
@@ -3291,7 +3386,9 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
-      const data = await bootstrap(requireApiUser());
+      const lessonsStart = parseDateFilter(url.searchParams.get('lessonsStart'));
+      const lessonsEnd = parseDateFilter(url.searchParams.get('lessonsEnd'));
+      const data = await bootstrap(requireApiUser(), { lessonsStart, lessonsEnd });
       const filteredStudents =
         role === 'STUDENT' && requestedStudentId
           ? data.students.filter((student) => student.id === requestedStudentId)
@@ -3345,6 +3442,31 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       if (!Number.isFinite(sessionId)) return badRequest(res, 'invalid_session_id');
       const data = await revokeSession(requireApiUser(), sessionId);
       return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/lessons/unpaid') {
+      const data = await listUnpaidLessons(requireApiUser());
+      const filteredEntries =
+        role === 'STUDENT' && requestedStudentId
+          ? data.entries.filter((entry) => entry.studentId === requestedStudentId)
+          : data.entries;
+      return sendJson(res, 200, { entries: filteredEntries });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/lessons') {
+      const data = await listLessonsForRange(requireApiUser(), {
+        start: url.searchParams.get('start'),
+        end: url.searchParams.get('end'),
+      });
+      const filteredLessons =
+        role === 'STUDENT' && requestedStudentId
+          ? data.lessons.filter(
+              (lesson) =>
+                lesson.studentId === requestedStudentId ||
+                lesson.participants?.some((participant) => participant.studentId === requestedStudentId),
+            )
+          : data.lessons;
+      return sendJson(res, 200, { lessons: filteredLessons });
     }
 
     if (req.method === 'GET' && pathname === '/api/students') {
