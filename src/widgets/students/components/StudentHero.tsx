@@ -540,7 +540,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
           <div className={styles.reminderRow}>
             <div>
               <div className={styles.reminderLabel}>Авто-напоминания об оплате</div>
-              <div className={styles.reminderHelper}>Сейчас: {paymentReminderLabel}</div>
             </div>
             <label className={controls.switch}>
               <input
@@ -569,7 +568,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
             <div className={styles.reminderRow}>
               <div>
                 <div className={styles.reminderLabel}>Авто-напоминания об оплате</div>
-                <div className={styles.reminderHelper}>Сейчас: {paymentReminderLabel}</div>
               </div>
               <label className={controls.switch}>
                 <input
