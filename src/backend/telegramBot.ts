@@ -16,6 +16,8 @@ const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
 const SUPPORT_BOT_HANDLE = '@teacherbot_help';
 const SUPPORT_BUTTON_TEXT = '🛟 Поддержка';
 const SUPPORT_BUTTON_TEXT_NORMALIZED = SUPPORT_BUTTON_TEXT.toLowerCase();
+const SUBSCRIPTION_BUTTON_TEXT = '💎 Моя подписка';
+const SUBSCRIPTION_BUTTON_TEXT_NORMALIZED = SUBSCRIPTION_BUTTON_TEXT.toLowerCase();
 const ROLE_TEACHER_TEXT = '🧑‍🏫 Я учитель';
 const ROLE_STUDENT_TEXT = '🧑‍🎓 Я ученик';
 const ROLE_TEACHER_TEXT_NORMALIZED = ROLE_TEACHER_TEXT.toLowerCase();
@@ -169,7 +171,10 @@ const roleSelectionKeyboardHint =
   'Выберите роль кнопками ниже или через inline-кнопки в сообщении.';
 
 const buildRoleKeyboard = () => ({
-  keyboard: [[{ text: ROLE_TEACHER_TEXT }, { text: ROLE_STUDENT_TEXT }], [{ text: SUPPORT_BUTTON_TEXT }]],
+  keyboard: [
+    [{ text: ROLE_TEACHER_TEXT }, { text: ROLE_STUDENT_TEXT }],
+    [{ text: SUPPORT_BUTTON_TEXT }, { text: SUBSCRIPTION_BUTTON_TEXT }],
+  ],
   resize_keyboard: true,
   one_time_keyboard: false,
   is_persistent: true,
@@ -319,6 +324,41 @@ const formatDate = (date: Date) =>
     year: 'numeric',
   });
 
+const formatSubscriptionStatus = (user: { subscriptionStartAt: Date | null; subscriptionEndAt: Date | null } | null) => {
+  if (!user?.subscriptionStartAt) {
+    return (
+      '🚪 Подписка не активна\n\n' +
+      'Оформите доступ, чтобы пользоваться всеми возможностями бота.\n' +
+      '• 🎁 Пробный период на 14 дней\n' +
+      '• 💳 Подписка на месяц — 790 ₽'
+    );
+  }
+
+  const now = new Date();
+  const endAt = user.subscriptionEndAt;
+  if (!endAt) {
+    return (
+      '✅ Подписка активна\n\n' +
+      '🧠 Доступ: без даты окончания\n' +
+      'Если нужно продление — просто оформите новую подписку.'
+    );
+  }
+
+  const isActive = endAt.getTime() > now.getTime();
+  const daysLeftRaw = Math.ceil((endAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+  const daysLeft = Math.max(daysLeftRaw, 0);
+  const durationDays = Math.ceil((endAt.getTime() - user.subscriptionStartAt.getTime()) / (24 * 60 * 60 * 1000));
+  const typeLabel = durationDays <= SUBSCRIPTION_TRIAL_DAYS + 1 ? '🎁 Пробный период' : '💳 Подписка на месяц';
+
+  return [
+    isActive ? '✅ Подписка активна' : '⛔️ Подписка истекла',
+    '',
+    `${typeLabel}`,
+    `📅 Действует до: ${formatDate(endAt)}`,
+    isActive ? `⏳ Осталось: ${daysLeft} дн.` : '⚡️ Продлите подписку, чтобы вернуть доступ',
+  ].join('\n');
+};
+
 const isSubscriptionActive = (user: { subscriptionStartAt: Date | null; subscriptionEndAt: Date | null } | null) => {
   if (!user?.subscriptionStartAt) return false;
   if (!user.subscriptionEndAt) return true;
@@ -341,7 +381,7 @@ const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
       amount: { value: amount, currency: SUBSCRIPTION_CURRENCY },
       capture: true,
       confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
-      description: 'Подписка на 1 месяц',
+      description: 'Подписка на 30 дней',
       metadata: { telegramUserId: payload.telegramUserId.toString() },
     }),
   });
@@ -844,6 +884,13 @@ const handleUpdate = async (update: TelegramUpdate) => {
     if (messageId) {
       onboardingMessageByChatId.set(chatId, messageId);
     }
+    return;
+  }
+
+  if (text === SUBSCRIPTION_BUTTON_TEXT_NORMALIZED) {
+    if (!telegramUserId) return;
+    const user = await prisma.user.findUnique({ where: { telegramUserId } });
+    await sendStudentInfoMessage(chatId, formatSubscriptionStatus(user));
     return;
   }
 
