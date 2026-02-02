@@ -142,7 +142,7 @@ interface AppRoutesProps {
     onTogglePaid: (lessonId: number, studentId?: number) => void;
     onCreateLesson: (studentId?: number) => void;
     onEditLesson: (lesson: Lesson) => void;
-    onDeleteLesson: (lessonId: number) => void;
+    onRequestDeleteLesson: (lesson: Lesson) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
     onOpenPaymentReminders?: () => void;
     paymentsLoading?: boolean;
