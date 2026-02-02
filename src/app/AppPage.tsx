@@ -225,6 +225,7 @@ export const AppPage = () => {
   const lessonsByRangeRef = useRef(lessonsByRange);
   const lessonRangeRef = useRef<LessonRange | null>(null);
   const lessonRangeRequestId = useRef(0);
+  const initialBootstrapDone = useRef(false);
   const [dashboardWeekRange, setDashboardWeekRange] = useState<{ start: Date; end: Date } | null>(() => {
     const nowZoned = toZonedDate(new Date(), resolvedTimeZone);
     const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
@@ -444,9 +445,20 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
+    if (initialBootstrapDone.current) return;
     const loadInitial = async () => {
       try {
-        const initialRange = buildWeekRange(new Date());
+        const initialRange =
+          activeTab === 'schedule'
+            ? scheduleView === 'month'
+              ? buildMonthRange()
+              : scheduleView === 'week'
+                ? buildWeekRange(dayViewDate)
+                : buildDayRange(dayViewDate)
+            : activeTab === 'dashboard' && dashboardWeekRange
+              ? buildLessonRange(dashboardWeekRange.start, dashboardWeekRange.end)
+              : buildWeekRange(new Date());
+        initialBootstrapDone.current = true;
         const data = await api.bootstrap({
           lessonsStart: initialRange.startAt.toISOString(),
           lessonsEnd: initialRange.endAt.toISOString(),
@@ -475,7 +487,19 @@ export const AppPage = () => {
     };
 
     loadInitial();
-  }, [applyLessonsForRange, buildWeekRange, hasAccess, resolvedTimeZone]);
+  }, [
+    activeTab,
+    applyLessonsForRange,
+    buildDayRange,
+    buildLessonRange,
+    buildMonthRange,
+    buildWeekRange,
+    dashboardWeekRange,
+    dayViewDate,
+    hasAccess,
+    resolvedTimeZone,
+    scheduleView,
+  ]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
