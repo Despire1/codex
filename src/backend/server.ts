@@ -3263,7 +3263,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       try {
         await sendTelegramMessage(
           telegramUserId,
-          `Оплата прошла успешно. Подписка активна до ${formatSubscriptionDate(nextEnd)}.`,
+          `✅ Оплата прошла успешно!\n🎉 Подписка активирована — полный доступ открыт.\n\n📅 Активна до: ${formatSubscriptionDate(nextEnd)}\n\n🧠 Меньше рутины — больше фокуса на занятиях.`,
         );
       } catch (error) {
         console.error('[yookassa] Failed to send subscription confirmation message', error);
