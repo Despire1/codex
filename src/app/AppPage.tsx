@@ -19,6 +19,7 @@ import {
   StudentListItem,
   Teacher,
   TeacherStudent,
+  UnpaidLessonEntry,
 } from '../entities/types';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
@@ -219,6 +220,7 @@ export const AppPage = () => {
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [unpaidLessonEntries, setUnpaidLessonEntries] = useState<UnpaidLessonEntry[]>([]);
   const [lessonsByRange, setLessonsByRange] = useState<Record<string, Lesson[]>>({});
   const lessonsByRangeRef = useRef(lessonsByRange);
   const lessonRangeRef = useRef<LessonRange | null>(null);
@@ -428,6 +430,17 @@ export const AppPage = () => {
   const handleDashboardWeekRangeChange = useCallback((start: Date, end: Date) => {
     setDashboardWeekRange({ start, end });
   }, []);
+
+  const loadDashboardUnpaidLessons = useCallback(async () => {
+    if (!hasAccess) return;
+    try {
+      const data = await api.listUnpaidLessons();
+      setUnpaidLessonEntries(data.entries ?? []);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load unpaid lessons', error);
+    }
+  }, [hasAccess]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -879,6 +892,12 @@ export const AppPage = () => {
     loadLessonsForRange,
     scheduleView,
   ]);
+
+  useEffect(() => {
+    if (!hasAccess) return;
+    if (activeTab !== 'dashboard') return;
+    loadDashboardUnpaidLessons();
+  }, [activeTab, hasAccess, loadDashboardUnpaidLessons]);
 
   const resolveLastVisitedPath = useCallback(() => {
     const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;
@@ -1539,6 +1558,7 @@ export const AppPage = () => {
 
       await loadStudentLessons();
       await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
     } catch (error) {
       showToast({
         message: 'Не удалось отметить занятие проведённым',
@@ -1587,6 +1607,7 @@ export const AppPage = () => {
 
       await loadStudentLessons();
       await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update lesson status', error);
@@ -1680,6 +1701,7 @@ export const AppPage = () => {
 
       await loadStudentLessons();
       await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
     } catch (error) {
       showToast({
         message: 'Не удалось обновить оплату',
@@ -1773,6 +1795,7 @@ export const AppPage = () => {
       updateLessonsForCurrentRange((prev) => prev.filter((lesson) => lesson.id !== lessonId));
       await loadStudentLessons();
       await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete lesson', error);
@@ -2083,6 +2106,7 @@ export const AppPage = () => {
                 teacher,
                 lessons,
                 linkedStudents,
+                unpaidEntries: unpaidLessonEntries,
                 onWeekRangeChange: handleDashboardWeekRangeChange,
                 onAddStudent: () => {
                   navigate(tabPathById.students);

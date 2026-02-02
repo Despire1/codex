@@ -7,19 +7,7 @@ import { Badge } from '../../../shared/ui/Badge/Badge';
 import styles from './UnpaidLessonsPopoverContent.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { NotificationsNoneOutlinedIcon } from '../../../icons/MaterialIcons';
-
-interface UnpaidLessonEntry {
-  lessonId: number;
-  startAt: string;
-  completedAt: string | null;
-  lastPaymentReminderAt: string | null;
-  paymentReminderCount: number;
-  studentId: number;
-  studentName: string;
-  price: number;
-  isActivated: boolean;
-  paymentRemindersEnabled: boolean;
-}
+import { UnpaidLessonEntry } from '../../../entities/types';
 
 interface UnpaidLessonsPopoverContentProps {
   entries: UnpaidLessonEntry[];

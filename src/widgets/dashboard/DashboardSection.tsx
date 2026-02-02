@@ -1,6 +1,6 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import {type FC, useEffect, useMemo, useState} from 'react';
-import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
+import { Lesson, LinkedStudent, Teacher, UnpaidLessonEntry } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Badge } from '@/shared/ui/Badge/Badge';
@@ -18,6 +18,7 @@ interface DashboardSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   teacher: Teacher;
+  unpaidEntries: UnpaidLessonEntry[];
   onWeekRangeChange?: (start: Date, end: Date) => void;
   onAddStudent: () => void;
   onCreateLesson: (date?: Date) => void;
@@ -52,6 +53,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   lessons,
   linkedStudents,
   teacher,
+  unpaidEntries,
   onWeekRangeChange,
   onAddStudent,
   onCreateLesson,
@@ -135,42 +137,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   }, [lessons, now, timeZone, todayZoned]);
 
   const upcomingLessonCards = upcomingLessons.slice(0, 5);
-
-  const studentMap = useMemo(() => {
-    return new Map(linkedStudents.map((student) => [student.id, student]));
-  }, [linkedStudents]);
-
-  const unpaidEntries = useMemo(() => {
-    return lessons.flatMap((lesson) => {
-      if (lesson.status !== 'COMPLETED') return [];
-
-      const buildEntry = (studentId: number, price: number) => {
-        const student = studentMap.get(studentId);
-        return {
-          lessonId: lesson.id,
-          startAt: lesson.startAt,
-          completedAt: lesson.completedAt ?? null,
-          lastPaymentReminderAt: lesson.lastPaymentReminderAt ?? null,
-          paymentReminderCount: lesson.paymentReminderCount ?? 0,
-          studentId,
-          studentName: getLinkedStudentName(studentId, linkedStudents),
-          price,
-          isActivated: student?.isActivated ?? true,
-          paymentRemindersEnabled: student?.paymentRemindersEnabled ?? true,
-        };
-      };
-
-      if (lesson.participants && lesson.participants.length > 0) {
-        return lesson.participants
-          .filter((participant) => !participant.isPaid)
-          .map((participant) => buildEntry(participant.studentId, participant.price));
-      }
-      if (lesson.isPaid) return [];
-
-      const price = typeof lesson.price === 'number' ? lesson.price : 0;
-      return [buildEntry(lesson.studentId, price)];
-    });
-  }, [lessons, linkedStudents, studentMap]);
 
   const unpaidSummary = useMemo(() => {
     const studentIds = new Set(unpaidEntries.map((entry) => entry.studentId));

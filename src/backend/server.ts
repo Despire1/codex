@@ -4,7 +4,7 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
 import prisma from './prismaClient';
-import type { User } from '@prisma/client';
+import type { Student, User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
@@ -1059,6 +1059,64 @@ const listLessonsForRange = async (
   });
 
   return { lessons };
+};
+
+const listUnpaidLessons = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  const now = new Date();
+  const lessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: { not: 'CANCELED' },
+      OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
+      AND: [
+        {
+          OR: [{ isPaid: false }, { participants: { some: { isPaid: false } } }],
+        },
+      ],
+    },
+    include: {
+      student: true,
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+
+  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
+  const linkMap = new Map(links.map((link) => [link.studentId, link]));
+
+  const entries = lessons.flatMap((lesson) => {
+    const buildEntry = (studentId: number, price: number, student?: Student | null) => {
+      const link = linkMap.get(studentId);
+      return {
+        lessonId: lesson.id,
+        startAt: lesson.startAt,
+        completedAt: lesson.completedAt ?? null,
+        lastPaymentReminderAt: lesson.lastPaymentReminderAt ?? null,
+        paymentReminderCount: lesson.paymentReminderCount ?? 0,
+        studentId,
+        studentName: link?.customName ?? student?.username ?? 'Ученик',
+        price,
+        isActivated: student?.isActivated ?? false,
+        paymentRemindersEnabled: student?.paymentRemindersEnabled ?? true,
+      };
+    };
+
+    if (lesson.participants && lesson.participants.length > 0) {
+      return lesson.participants
+        .filter((participant) => !participant.isPaid)
+        .map((participant) => buildEntry(participant.studentId, participant.price, participant.student));
+    }
+    if (lesson.isPaid) return [];
+
+    return [buildEntry(lesson.studentId, lesson.price ?? 0, lesson.student)];
+  });
+
+  return { entries };
 };
 
 const addStudent = async (user: User, body: any) => {
@@ -3384,6 +3442,15 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       if (!Number.isFinite(sessionId)) return badRequest(res, 'invalid_session_id');
       const data = await revokeSession(requireApiUser(), sessionId);
       return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/lessons/unpaid') {
+      const data = await listUnpaidLessons(requireApiUser());
+      const filteredEntries =
+        role === 'STUDENT' && requestedStudentId
+          ? data.entries.filter((entry) => entry.studentId === requestedStudentId)
+          : data.entries;
+      return sendJson(res, 200, { entries: filteredEntries });
     }
 
     if (req.method === 'GET' && pathname === '/api/lessons') {

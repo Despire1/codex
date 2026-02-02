@@ -15,6 +15,7 @@ import {
   StudentListItem,
   Teacher,
   TeacherStudent,
+  UnpaidLessonEntry,
 } from '../../entities/types';
 
 type SettingsPayload = Pick<
@@ -120,6 +121,7 @@ export const api = {
     });
     return apiFetch<{ lessons: Lesson[] }>(`/api/lessons?${search.toString()}`);
   },
+  listUnpaidLessons: () => apiFetch<{ entries: UnpaidLessonEntry[] }>('/api/lessons/unpaid'),
   getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
   updateSettings: (payload: Partial<SettingsPayload>) =>
     apiFetch<{ settings: SettingsPayload }>('/api/settings', {

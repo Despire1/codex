@@ -16,6 +16,7 @@ import {
   StudentListItem,
   Teacher,
   TeacherStudent,
+  UnpaidLessonEntry,
 } from '../../entities/types';
 import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
@@ -30,6 +31,7 @@ interface AppRoutesProps {
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
     teacher: Teacher;
+    unpaidEntries: UnpaidLessonEntry[];
     onWeekRangeChange?: (start: Date, end: Date) => void;
     onAddStudent: () => void;
     onCreateLesson: (date?: Date) => void;
