@@ -1,39 +1,37 @@
+import { addMinutes, format } from 'date-fns';
 import { CSSProperties, MouseEvent } from 'react';
+import { Lesson, LinkedStudent } from '../../../entities/types';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
+import { toZonedDate } from '../../../shared/lib/timezoneDates';
+import {
+  buildParticipants,
+  getLessonLabel,
+  resolveLessonPaid,
+} from '../lib/lessonCardDetails';
 import styles from './MonthDayLessonCard.module.css';
 
 interface MonthDayLessonCardProps {
-  lessonId: number;
-  lessonLabel: string;
-  startTime: string;
-  endTime: string;
-  isPaid: boolean;
-  price?: number | null;
-  meetingLink?: string | null;
+  lesson: Lesson;
+  linkedStudentsById: Map<number, LinkedStudent>;
+  timeZone: string;
   style?: CSSProperties;
-  isCanceled?: boolean;
   isActionsOpen: boolean;
   onEdit: () => void;
-  onTogglePaid: () => void;
+  onTogglePaid: (studentId?: number) => void;
   onOpenActions: () => void;
   onCloseActions: () => void;
   onDelete: () => void;
   onReschedule: () => void;
-  onOpenMeetingLink: (event: MouseEvent<HTMLButtonElement>) => void;
+  onOpenMeetingLink: (event: MouseEvent<HTMLButtonElement>, meetingLink: string) => void;
 }
 
 export const MonthDayLessonCard = ({
-  lessonId,
-  lessonLabel,
-  startTime,
-  endTime,
-  isPaid,
-  price,
-  meetingLink,
+  lesson,
+  linkedStudentsById,
+  timeZone,
   style,
-  isCanceled = false,
   isActionsOpen,
   onEdit,
   onTogglePaid,
@@ -43,6 +41,15 @@ export const MonthDayLessonCard = ({
   onReschedule,
   onOpenMeetingLink,
 }: MonthDayLessonCardProps) => {
+  const participants = buildParticipants(lesson, linkedStudentsById);
+  const lessonLabel = getLessonLabel(participants, linkedStudentsById);
+  const startDate = toZonedDate(lesson.startAt, timeZone);
+  const endDate = addMinutes(startDate, lesson.durationMinutes);
+  const startTime = format(startDate, 'HH:mm');
+  const endTime = format(endDate, 'HH:mm');
+  const isPaid = resolveLessonPaid(lesson, participants);
+  const participant = participants[0];
+  const isCanceled = lesson.status === 'CANCELED';
   const paymentLabel = isPaid ? 'Оплачено' : 'Не оплачено';
 
   return (
@@ -78,7 +85,7 @@ export const MonthDayLessonCard = ({
                   </button>
                 }
               >
-                <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lessonId}`}>
+                <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lesson.id}`}>
                   <button
                     type="button"
                     className={styles.actionItem}
@@ -115,9 +122,13 @@ export const MonthDayLessonCard = ({
                 </div>
               </AdaptivePopover>
             </div>
-            {meetingLink && (
+            {lesson.meetingLink && (
               <div className={styles.metaRow}>
-                <button type="button" className={styles.linkBadge} onClick={onOpenMeetingLink}>
+                <button
+                  type="button"
+                  className={styles.linkBadge}
+                  onClick={(event) => onOpenMeetingLink(event, lesson.meetingLink as string)}
+                >
                   <MeetingLinkIcon className={styles.linkIcon} />
                   Ссылка
                 </button>
@@ -130,7 +141,7 @@ export const MonthDayLessonCard = ({
                 className={`${styles.paymentBadge} ${isPaid ? styles.paymentPaid : styles.paymentUnpaid}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onTogglePaid();
+                  onTogglePaid(participant?.studentId);
                 }}
                 title={paymentLabel}
               >
