@@ -42,6 +42,14 @@
   align-items: center;
   justify-content: flex-end;
   min-width: 44px;
+  gap: 10px;
+}
+
+.teacherName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-900);
+  white-space: nowrap;
 }
 
 .topNav {

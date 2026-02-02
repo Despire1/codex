@@ -18,6 +18,7 @@ export const Topbar: FC<TopbarProps> = ({
   profilePhotoUrl,
 }) => {
   const fallbackText = teacher.name || teacher.username || 'П';
+  const teacherDisplayName = teacher.name ?? teacher.username ?? 'Преподаватель';
 
   return (
     <header className={styles.topbar}>
@@ -43,6 +44,7 @@ export const Topbar: FC<TopbarProps> = ({
       </div>
 
       <div className={styles.topbarProfile}>
+        <span className={styles.teacherName}>{teacherDisplayName}</span>
         <Avatar src={profilePhotoUrl} alt="Профиль преподавателя" fallbackText={fallbackText} />
       </div>
     </header>
