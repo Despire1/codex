@@ -26,8 +26,8 @@ import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
-import { LessonDeleteConfirmModal } from '../students/components/LessonDeleteConfirmModal';
 import { MonthDayLessonCard } from './components/MonthDayLessonCard';
+import { buildParticipants, getLessonLabel } from './lib/lessonCardDetails';
 import styles from './ScheduleSection.module.css';
 
 const DAY_START_MINUTE = 0;
@@ -60,7 +60,7 @@ interface ScheduleSectionProps {
   onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
   onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onDeleteLesson: (lessonId: number) => void;
+  onDeleteLesson: (lesson: Lesson) => void;
   onDayViewDateChange: (date: Date) => void;
   onGoToToday: () => void;
   autoConfirmLessons: boolean;
@@ -102,7 +102,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
-  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
@@ -410,42 +409,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     [linkedStudents],
   );
 
-  const buildParticipants = (lesson: Lesson) =>
-    lesson.participants && lesson.participants.length > 0
-      ? lesson.participants
-      : [
-          {
-            studentId: lesson.studentId,
-            isPaid: lesson.isPaid,
-            student: linkedStudentsById.get(lesson.studentId),
-          },
-        ];
-
-  const resolveLessonPrice = (lesson: Lesson, participants: any[]) => {
-    const participant = participants[0];
-    return participant?.price ?? participant?.student?.link?.pricePerLesson ?? lesson.price ?? null;
-  };
-
-  const resolveLessonPaid = (lesson: Lesson, participants: any[]) => {
-    if (participants.length === 0) return !!lesson.isPaid;
-    return participants.every((participant) => participant?.isPaid);
-  };
-
-  const getParticipantName = (participant: any) => {
-    const linkedStudent = linkedStudentsById.get(participant?.studentId);
-    return (
-      linkedStudent?.link?.customName ??
-      participant?.student?.username ??
-      participant?.student?.name ??
-      'Ученик'
-    );
-  };
-
-  const getLessonLabel = (participants: any[]) => {
-    const names = participants.map(getParticipantName).filter((name) => name);
-    return names.length > 0 ? names.join(', ') : 'Урок';
-  };
-
   const isAwaitingConfirmation = (lesson: Lesson) => {
     if (autoConfirmLessons) return false;
     if (lesson.status !== 'SCHEDULED') return false;
@@ -515,13 +478,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     layoutStyle: CSSProperties,
     className?: string,
   ) => {
-    const participants = buildParticipants(lesson);
+    const participants = buildParticipants(lesson, linkedStudentsById);
     const isGroupLesson = participants.length > 1;
     const awaitingConfirmation = isAwaitingConfirmation(lesson);
     const startDate = toZonedDate(lesson.startAt, timeZone);
     const endDate = addMinutes(startDate, lesson.durationMinutes);
     const timeLabel = `${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`;
-    const lessonLabel = getLessonLabel(participants);
+    const lessonLabel = getLessonLabel(participants, linkedStudentsById);
     const lessonMeta = isGroupLesson ? `${participants.length} ученик${participants.length === 1 ? '' : 'а'}` : '';
 
     return (
@@ -830,35 +793,23 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         <div className={styles.dayPanelList}>
           {selectedDayLessons.map((lesson) => {
-            const date = toZonedDate(lesson.startAt, timeZone);
-            const participants = buildParticipants(lesson);
-            const lessonLabel = getLessonLabel(participants);
-            const endDate = addMinutes(date, lesson.durationMinutes);
-            const isPaid = resolveLessonPaid(lesson, participants);
-            const price = resolveLessonPrice(lesson, participants);
-
             return (
               <MonthDayLessonCard
                 key={lesson.id}
-                lessonId={lesson.id}
-                lessonLabel={lessonLabel}
-                startTime={format(date, 'HH:mm')}
-                endTime={format(endDate, 'HH:mm')}
-                isPaid={isPaid}
-                price={price}
-                meetingLink={lesson.meetingLink}
+                lesson={lesson}
+                linkedStudentsById={linkedStudentsById}
+                timeZone={timeZone}
                 style={buildLessonColorStyle(lesson)}
-                isCanceled={lesson.status === 'CANCELED'}
                 isActionsOpen={openLessonMenuId === lesson.id}
                 onEdit={() => onStartEditLesson(lesson)}
-                onTogglePaid={() => onTogglePaid(lesson.id, participants[0]?.studentId)}
+                onTogglePaid={(studentId) => onTogglePaid(lesson.id, studentId)}
                 onOpenActions={() =>
                   setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
                 }
                 onCloseActions={() => setOpenLessonMenuId(null)}
-                onDelete={() => setLessonToDelete(lesson)}
+                onDelete={() => onDeleteLesson(lesson)}
                 onReschedule={() => {}}
-                onOpenMeetingLink={(event) => handleOpenMeetingLink(event, lesson.meetingLink as string)}
+                onOpenMeetingLink={handleOpenMeetingLink}
               />
             );
           })}
@@ -1192,16 +1143,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
-      <LessonDeleteConfirmModal
-        open={Boolean(lessonToDelete)}
-        lessonId={lessonToDelete?.id}
-        onClose={() => setLessonToDelete(null)}
-        onConfirm={() => {
-          if (!lessonToDelete) return;
-          onDeleteLesson(lessonToDelete.id);
-          setLessonToDelete(null);
-        }}
-      />
     </section>
   );
 };
