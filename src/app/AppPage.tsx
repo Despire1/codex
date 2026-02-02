@@ -211,8 +211,9 @@ export const AppPage = () => {
   const location = useLocation();
   const { showToast } = useToast();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
-  const { state: telegramState } = useTelegramWebAppAuth(refreshSession, refreshSession);
-  const hasAccess = sessionState === 'authenticated' && hasSubscription;
+  const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
+  const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
+  const hasAccess = sessionState === 'authenticated' && hasSubscription && hasTelegramAccess;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
@@ -2114,8 +2115,9 @@ export const AppPage = () => {
     setMonthLabelKey((key) => key + 1);
   };
 
-  if (sessionState !== 'authenticated') {
-    const fallbackState = sessionState === 'checking' || telegramState === 'pending' ? 'checking' : 'unauthenticated';
+  if (sessionState !== 'authenticated' || !hasTelegramAccess) {
+    const fallbackState =
+      sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending') ? 'checking' : 'unauthenticated';
     return <SessionFallback state={fallbackState} />;
   }
 

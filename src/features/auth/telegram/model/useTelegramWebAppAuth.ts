@@ -20,6 +20,7 @@ declare global {
 export const useTelegramWebAppAuth = (onAuthenticated?: () => void, onAuthFailed?: () => void) => {
   const { showToast } = useToast();
   const [state, setState] = useState<AuthState>('idle');
+  const hasInitData = typeof window !== 'undefined' && Boolean(window.Telegram?.WebApp?.initData);
 
   useEffect(() => {
     const webApp = window.Telegram?.WebApp;
@@ -71,5 +72,5 @@ export const useTelegramWebAppAuth = (onAuthenticated?: () => void, onAuthFailed
     };
   }, [onAuthenticated, onAuthFailed, showToast]);
 
-  return { state };
+  return { state, hasInitData };
 };
