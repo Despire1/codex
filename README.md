@@ -181,6 +181,7 @@ server {
    - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда.
    - `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` — данные магазина YooKassa для генерации ссылки оплаты подписки.
    - `YOOKASSA_RETURN_URL` — URL возврата после оплаты (страница “успех/ошибка”).
+3. В YooKassa настройте webhook на `https://<ваш-домен>/api/payments/yookassa/webhook`, чтобы бот видел успешные оплаты.
 
 ### 2. Запустите API и фронтенд
 В отдельных терминалах:

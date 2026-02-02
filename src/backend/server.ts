@@ -40,6 +40,10 @@ const MAX_PAGE_SIZE = 50;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
+const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+const SUBSCRIPTION_MONTH_DAYS = 30;
+const YOOKASSA_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
+const processedYookassaPayments = new Map<string, number>();
 const LOCAL_AUTH_BYPASS = process.env.LOCAL_AUTH_BYPASS === 'true' && process.env.NODE_ENV !== 'production';
 const LOCAL_DEV_TELEGRAM_ID = (() => {
   const raw = process.env.LOCAL_DEV_TELEGRAM_ID;
@@ -356,6 +360,52 @@ const hasActiveSubscription = (user: User | null) => {
   if (!user?.subscriptionStartAt) return false;
   if (!user.subscriptionEndAt) return true;
   return user.subscriptionEndAt.getTime() > Date.now();
+};
+
+const formatSubscriptionDate = (date: Date) =>
+  date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const cleanupProcessedYookassaPayments = () => {
+  const cutoff = Date.now() - YOOKASSA_EVENT_TTL_MS;
+  for (const [paymentId, timestamp] of processedYookassaPayments.entries()) {
+    if (timestamp < cutoff) {
+      processedYookassaPayments.delete(paymentId);
+    }
+  }
+};
+
+const markYookassaPaymentProcessed = (paymentId: string) => {
+  processedYookassaPayments.set(paymentId, Date.now());
+  cleanupProcessedYookassaPayments();
+};
+
+const wasYookassaPaymentProcessed = (paymentId: string) => processedYookassaPayments.has(paymentId);
+
+const callTelegram = async <T>(method: string, payload?: Record<string, unknown>): Promise<T> => {
+  if (!TELEGRAM_BOT_TOKEN) {
+    throw new Error('TELEGRAM_BOT_TOKEN is required');
+  }
+  const response = await fetch(`${TELEGRAM_API_BASE}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
+  const data = (await response.json()) as { ok: boolean; result: T; description?: string };
+  if (!data.ok) {
+    throw new Error(data.description ?? `Telegram API error: ${method}`);
+  }
+  return data.result;
+};
+
+const sendTelegramMessage = async (chatId: bigint, text: string) => {
+  await callTelegram('sendMessage', {
+    chat_id: Number(chatId),
+    text,
+  });
 };
 
 const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
@@ -3154,6 +3204,74 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
+    if (req.method === 'POST' && pathname === '/api/payments/yookassa/webhook') {
+      let payload: any;
+      try {
+        payload = await readBody(req);
+      } catch (error) {
+        console.error('[yookassa] Invalid webhook payload', error);
+        return sendJson(res, 200, { ok: true });
+      }
+
+      const event = typeof payload?.event === 'string' ? payload.event : null;
+      const object = payload?.object ?? null;
+      const paymentId = typeof object?.id === 'string' ? object.id : null;
+      const status = typeof object?.status === 'string' ? object.status : null;
+      const metadata = object?.metadata ?? {};
+      const telegramUserIdRaw = metadata?.telegramUserId;
+
+      if (!paymentId || !event || status !== 'succeeded' || event !== 'payment.succeeded') {
+        return sendJson(res, 200, { ok: true });
+      }
+
+      if (wasYookassaPaymentProcessed(paymentId)) {
+        return sendJson(res, 200, { ok: true });
+      }
+
+      if (typeof telegramUserIdRaw !== 'string' && typeof telegramUserIdRaw !== 'number') {
+        markYookassaPaymentProcessed(paymentId);
+        return sendJson(res, 200, { ok: true });
+      }
+
+      let telegramUserId: bigint;
+      try {
+        telegramUserId = BigInt(telegramUserIdRaw);
+      } catch (error) {
+        markYookassaPaymentProcessed(paymentId);
+        return sendJson(res, 200, { ok: true });
+      }
+
+      const user = await prisma.user.findUnique({ where: { telegramUserId } });
+      if (!user) {
+        markYookassaPaymentProcessed(paymentId);
+        return sendJson(res, 200, { ok: true });
+      }
+
+      const now = new Date();
+      const baseDate = user.subscriptionEndAt && user.subscriptionEndAt > now ? user.subscriptionEndAt : now;
+      const nextEnd = addDays(baseDate, SUBSCRIPTION_MONTH_DAYS);
+      await prisma.user.update({
+        where: { telegramUserId },
+        data: {
+          subscriptionStartAt: user.subscriptionStartAt ?? now,
+          subscriptionEndAt: nextEnd,
+        },
+      });
+
+      markYookassaPaymentProcessed(paymentId);
+
+      try {
+        await sendTelegramMessage(
+          telegramUserId,
+          `Оплата прошла успешно. Подписка активна до ${formatSubscriptionDate(nextEnd)}.`,
+        );
+      } catch (error) {
+        console.error('[yookassa] Failed to send subscription confirmation message', error);
+      }
+
+      return sendJson(res, 200, { ok: true });
+    }
+
     const sessionUser = pathname.startsWith('/api/') ? await resolveSessionUser(req, res) : null;
     if (pathname.startsWith('/api/') && !sessionUser) {
       return sendJson(res, 401, { message: 'unauthorized' });
