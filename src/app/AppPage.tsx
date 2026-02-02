@@ -1,4 +1,4 @@
-import { addDays, addMonths, addYears, endOfMonth, format, startOfMonth, startOfWeek } from 'date-fns';
+import { addDays, addMonths, addYears, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -363,8 +363,8 @@ export const AppPage = () => {
 
   const buildMonthRange = useCallback(() => {
     const targetMonth = addMonths(monthAnchor, monthOffset);
-    const monthStart = startOfMonth(targetMonth);
-    const monthEnd = endOfMonth(targetMonth);
+    const monthStart = startOfWeek(startOfMonth(targetMonth), { weekStartsOn: 1 });
+    const monthEnd = endOfWeek(endOfMonth(targetMonth), { weekStartsOn: 1 });
     return buildLessonRange(monthStart, monthEnd);
   }, [buildLessonRange, monthAnchor, monthOffset]);
 
