@@ -764,7 +764,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
         return;
       }
       const subscriptionEndAt = user.subscriptionEndAt ?? addDays(new Date(), SUBSCRIPTION_TRIAL_DAYS);
-      const successText = `Пробный период активирован до ${formatDate(subscriptionEndAt)}.`;
+      const successText = `🎉 Пробный период активирован!\n\nТеперь вам доступны все функции сервиса.\n\n⏳ Доступ открыт до ${formatDate(subscriptionEndAt)}.\n\nУспейте попробовать сервис в деле 🚀`;
       if (messageId) {
         await editMessage(chatId, messageId, successText);
       } else {
