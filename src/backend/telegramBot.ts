@@ -224,7 +224,7 @@ const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number)
     reply_markup: {
       inline_keyboard: [
         [{ text: '🎁 Оформить 14 дней', callback_data: 'subscription_trial' }],
-        [{ text: `${SUBSCRIPTION_MONTH_PRICE_RUB} ₽`, callback_data: 'subscription_monthly' }],
+        [{ text: `1 месяц - ${SUBSCRIPTION_MONTH_PRICE_RUB}₽ (9\u03369\u03360\u0336₽\u0336)`, callback_data: 'subscription_monthly' }],
       ],
     },
   };
