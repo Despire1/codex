@@ -2073,6 +2073,8 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
 
   if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
+    const detachedMeetingLink =
+      requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
     await prisma.lessonParticipant.deleteMany({
       where: { lessonId },
     });
@@ -2083,7 +2085,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         studentId: ids[0],
         price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
         color: normalizedColor,
-        meetingLink: existingLesson.meetingLink ?? null,
+        meetingLink: detachedMeetingLink,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
