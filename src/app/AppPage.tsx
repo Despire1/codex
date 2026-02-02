@@ -225,6 +225,7 @@ export const AppPage = () => {
   const lessonsByRangeRef = useRef(lessonsByRange);
   const lessonRangeRef = useRef<LessonRange | null>(null);
   const lessonRangeRequestId = useRef(0);
+  const initialBootstrapDone = useRef(false);
   const [dashboardWeekRange, setDashboardWeekRange] = useState<{ start: Date; end: Date } | null>(() => {
     const nowZoned = toZonedDate(new Date(), resolvedTimeZone);
     const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
@@ -442,11 +443,31 @@ export const AppPage = () => {
     }
   }, [hasAccess]);
 
+  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
+
+  const activeTab = useMemo<TabId>(() => {
+    const directMatch = tabIdByPath[location.pathname];
+    if (directMatch) return directMatch;
+    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
+    return matchedTab?.id ?? 'dashboard';
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!hasAccess) return;
+    if (initialBootstrapDone.current) return;
     const loadInitial = async () => {
       try {
-        const initialRange = buildWeekRange(new Date());
+        const initialRange =
+          activeTab === 'schedule'
+            ? scheduleView === 'month'
+              ? buildMonthRange()
+              : scheduleView === 'week'
+                ? buildWeekRange(dayViewDate)
+                : buildDayRange(dayViewDate)
+            : activeTab === 'dashboard' && dashboardWeekRange
+              ? buildLessonRange(dashboardWeekRange.start, dashboardWeekRange.end)
+              : buildWeekRange(new Date());
+        initialBootstrapDone.current = true;
         const data = await api.bootstrap({
           lessonsStart: initialRange.startAt.toISOString(),
           lessonsEnd: initialRange.endAt.toISOString(),
@@ -475,7 +496,19 @@ export const AppPage = () => {
     };
 
     loadInitial();
-  }, [applyLessonsForRange, buildWeekRange, hasAccess, resolvedTimeZone]);
+  }, [
+    activeTab,
+    applyLessonsForRange,
+    buildDayRange,
+    buildLessonRange,
+    buildMonthRange,
+    buildWeekRange,
+    dashboardWeekRange,
+    dayViewDate,
+    hasAccess,
+    resolvedTimeZone,
+    scheduleView,
+  ]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -854,15 +887,6 @@ export const AppPage = () => {
     if (studentActiveTab !== 'payments') return;
     refreshPaymentReminders(selectedStudentId);
   }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
-
-  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
-
-  const activeTab = useMemo<TabId>(() => {
-    const directMatch = tabIdByPath[location.pathname];
-    if (directMatch) return directMatch;
-    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
-    return matchedTab?.id ?? 'dashboard';
-  }, [location.pathname]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -1802,6 +1826,54 @@ export const AppPage = () => {
     }
   };
 
+  const deleteLessonWithOptions = async (lesson: Lesson, applyToSeries: boolean) => {
+    try {
+      await api.deleteLesson(lesson.id, applyToSeries ? { applyToSeries } : undefined);
+      updateLessonsForCurrentRange((prev) => {
+        if (applyToSeries && lesson.recurrenceGroupId) {
+          return prev.filter((item) => item.recurrenceGroupId !== lesson.recurrenceGroupId);
+        }
+        return prev.filter((item) => item.id !== lesson.id);
+      });
+      await loadStudentLessons();
+      await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete lesson', error);
+    }
+  };
+
+  const requestDeleteLessonFromList = (lesson: Lesson) => {
+    if (lesson.isRecurring && lesson.recurrenceGroupId) {
+      setDialogState({
+        type: 'recurring-delete',
+        title: 'Удалить урок?',
+        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
+        applyToSeries: false,
+        onConfirm: (applyToSeries) => {
+          closeDialog();
+          void deleteLessonWithOptions(lesson, applyToSeries);
+        },
+        onCancel: closeDialog,
+      });
+      return;
+    }
+
+    setDialogState({
+      type: 'confirm',
+      title: 'Удалить урок?',
+      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      onConfirm: () => {
+        closeDialog();
+        void deleteLessonWithOptions(lesson, false);
+      },
+      onCancel: closeDialog,
+    });
+  };
+
   const sendHomeworkToStudent = async (homeworkId: number) => {
     try {
       const result = await api.sendHomework(homeworkId);
@@ -2233,7 +2305,7 @@ export const AppPage = () => {
               onTogglePaid: togglePaid,
               onCreateLesson: openCreateLessonForStudent,
               onEditLesson: startEditLesson,
-              onDeleteLesson: deleteLessonById,
+              onRequestDeleteLesson: requestDeleteLessonFromList,
             }}
             schedule={{
               scheduleView,

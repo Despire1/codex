@@ -1874,8 +1874,7 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const startDate = new Date(startAt);
   if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата начала');
-  const now = new Date();
-  const seriesStart = startDate > now ? startDate : now;
+  const seriesStart = startDate;
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
@@ -1907,9 +1906,7 @@ const createRecurringLessons = async (user: User, body: any) => {
       const withTime = new Date(
         Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), startDate.getUTCHours(), startDate.getUTCMinutes()),
       );
-      if (withTime > now) {
-        occurrences.push(withTime);
-      }
+      occurrences.push(withTime);
     }
     if (occurrences.length > 500) break;
   }
@@ -2076,6 +2073,8 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
 
   if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
+    const detachedMeetingLink =
+      requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
     await prisma.lessonParticipant.deleteMany({
       where: { lessonId },
     });
@@ -2086,7 +2085,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         studentId: ids[0],
         price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
         color: normalizedColor,
-        meetingLink: existingLesson.meetingLink ?? null,
+        meetingLink: detachedMeetingLink,
         startAt: targetStart,
         durationMinutes: nextDuration,
         isRecurring: false,
@@ -2114,7 +2113,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   if (!existingLesson.isRecurring && weekdays.length > 0 && repeatWeekdays) {
     if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
 
-    const seriesStart = targetStart > now ? targetStart : now;
+    const seriesStart = targetStart;
     const maxEnd = addYears(seriesStart, 1);
     const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
     const recurrenceEnd =
@@ -2138,40 +2137,38 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
           Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
         );
 
-        if (start > now) {
-          const created = await prisma.lesson.create({
-            data: {
-              teacherId: teacher.chatId,
-              studentId: ids[0],
-              price: 0,
-              color: normalizedColor,
-              meetingLink: resolvedSeriesMeetingLink,
-              startAt: start,
-              durationMinutes: nextDuration,
-              status: 'SCHEDULED',
-              isPaid: false,
-              isRecurring: true,
-              recurrenceUntil: recurrenceEnd,
-              recurrenceGroupId,
-              recurrenceWeekdays: weekdaysPayload,
-              participants: {
-                create: students.map((student) => ({
-                  studentId: student.id,
-                  price: 0,
-                  isPaid: false,
-                })),
+        const created = await prisma.lesson.create({
+          data: {
+            teacherId: teacher.chatId,
+            studentId: ids[0],
+            price: 0,
+            color: normalizedColor,
+            meetingLink: resolvedSeriesMeetingLink,
+            startAt: start,
+            durationMinutes: nextDuration,
+            status: 'SCHEDULED',
+            isPaid: false,
+            isRecurring: true,
+            recurrenceUntil: recurrenceEnd,
+            recurrenceGroupId,
+            recurrenceWeekdays: weekdaysPayload,
+            participants: {
+              create: students.map((student) => ({
+                studentId: student.id,
+                price: 0,
+                isPaid: false,
+              })),
+            },
+          },
+          include: {
+            participants: {
+              include: {
+                student: true,
               },
             },
-            include: {
-              participants: {
-                include: {
-                  student: true,
-                },
-              },
-            },
-          });
-          seriesLessons.push(created);
-        }
+          },
+        });
+        seriesLessons.push(created);
       }
       if (seriesLessons.length > 500) break;
     }
