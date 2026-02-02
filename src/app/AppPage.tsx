@@ -443,6 +443,15 @@ export const AppPage = () => {
     }
   }, [hasAccess]);
 
+  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
+
+  const activeTab = useMemo<TabId>(() => {
+    const directMatch = tabIdByPath[location.pathname];
+    if (directMatch) return directMatch;
+    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
+    return matchedTab?.id ?? 'dashboard';
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!hasAccess) return;
     if (initialBootstrapDone.current) return;
@@ -878,15 +887,6 @@ export const AppPage = () => {
     if (studentActiveTab !== 'payments') return;
     refreshPaymentReminders(selectedStudentId);
   }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
-
-  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
-
-  const activeTab = useMemo<TabId>(() => {
-    const directMatch = tabIdByPath[location.pathname];
-    if (directMatch) return directMatch;
-    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
-    return matchedTab?.id ?? 'dashboard';
-  }, [location.pathname]);
 
   useEffect(() => {
     if (!hasAccess) return;
