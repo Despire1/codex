@@ -1802,6 +1802,54 @@ export const AppPage = () => {
     }
   };
 
+  const deleteLessonWithOptions = async (lesson: Lesson, applyToSeries: boolean) => {
+    try {
+      await api.deleteLesson(lesson.id, applyToSeries ? { applyToSeries } : undefined);
+      updateLessonsForCurrentRange((prev) => {
+        if (applyToSeries && lesson.recurrenceGroupId) {
+          return prev.filter((item) => item.recurrenceGroupId !== lesson.recurrenceGroupId);
+        }
+        return prev.filter((item) => item.id !== lesson.id);
+      });
+      await loadStudentLessons();
+      await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete lesson', error);
+    }
+  };
+
+  const requestDeleteLessonFromList = (lesson: Lesson) => {
+    if (lesson.isRecurring && lesson.recurrenceGroupId) {
+      setDialogState({
+        type: 'recurring-delete',
+        title: 'Удалить урок?',
+        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
+        applyToSeries: false,
+        onConfirm: (applyToSeries) => {
+          closeDialog();
+          void deleteLessonWithOptions(lesson, applyToSeries);
+        },
+        onCancel: closeDialog,
+      });
+      return;
+    }
+
+    setDialogState({
+      type: 'confirm',
+      title: 'Удалить урок?',
+      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      onConfirm: () => {
+        closeDialog();
+        void deleteLessonWithOptions(lesson, false);
+      },
+      onCancel: closeDialog,
+    });
+  };
+
   const sendHomeworkToStudent = async (homeworkId: number) => {
     try {
       const result = await api.sendHomework(homeworkId);
@@ -2233,7 +2281,7 @@ export const AppPage = () => {
               onTogglePaid: togglePaid,
               onCreateLesson: openCreateLessonForStudent,
               onEditLesson: startEditLesson,
-              onDeleteLesson: deleteLessonById,
+              onRequestDeleteLesson: requestDeleteLessonFromList,
             }}
             schedule={{
               scheduleView,

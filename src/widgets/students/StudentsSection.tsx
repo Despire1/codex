@@ -107,7 +107,7 @@ interface StudentsSectionProps {
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onCreateLesson: (studentId?: number) => void;
   onEditLesson: (lesson: Lesson) => void;
-  onDeleteLesson: (lessonId: number) => void;
+  onRequestDeleteLesson: (lesson: Lesson) => void;
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onOpenPaymentReminders?: () => void;
@@ -202,7 +202,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onTogglePaid,
   onCreateLesson,
   onEditLesson,
-  onDeleteLesson,
+  onRequestDeleteLesson,
   newHomeworkDraft,
   onActiveTabChange,
   onOpenPaymentReminders,
@@ -453,7 +453,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onCompleteLesson={onCompleteLesson}
                     onTogglePaid={onTogglePaid}
                     onEditLesson={onEditLesson}
-                    onDeleteLesson={onDeleteLesson}
+                    onRequestDeleteLesson={onRequestDeleteLesson}
                     getLessonStatusLabel={getLessonStatusLabel}
                     autoConfirmLessons={teacher.autoConfirmLessons}
                   />
