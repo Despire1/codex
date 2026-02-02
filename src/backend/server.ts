@@ -352,7 +352,11 @@ const formatTeacherName = (user: User) => {
   return fullName || user.username || 'Teacher';
 };
 
-const hasActiveSubscription = (user: User | null) => Boolean(user?.subscriptionStartAt);
+const hasActiveSubscription = (user: User | null) => {
+  if (!user?.subscriptionStartAt) return false;
+  if (!user.subscriptionEndAt) return true;
+  return user.subscriptionEndAt.getTime() > Date.now();
+};
 
 const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
   formatInTimeZone(date, "yyyy-MM-dd'T'HH:mm", { timeZone: resolveTimeZone(timeZone) });

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
 
@@ -7,6 +8,9 @@ const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 const POLL_TIMEOUT_SEC = Number(process.env.TELEGRAM_POLL_TIMEOUT_SEC ?? 30);
 const POLL_RETRY_DELAY_MS = Number(process.env.TELEGRAM_POLL_RETRY_DELAY_MS ?? 1000);
+const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID ?? '';
+const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY ?? '';
+const YOOKASSA_RETURN_URL = process.env.YOOKASSA_RETURN_URL ?? '';
 const TERMS_PRIVACY_URL = 'https://bot.politdev.ru/privacy';
 const TERMS_AGREEMENT_URL = 'https://bot.politdev.ru/offer';
 const SUPPORT_BOT_HANDLE = '@teacherbot_help';
@@ -16,6 +20,9 @@ const ROLE_TEACHER_TEXT = '🧑‍🏫 Я учитель';
 const ROLE_STUDENT_TEXT = '🧑‍🎓 Я ученик';
 const ROLE_TEACHER_TEXT_NORMALIZED = ROLE_TEACHER_TEXT.toLowerCase();
 const ROLE_STUDENT_TEXT_NORMALIZED = ROLE_STUDENT_TEXT.toLowerCase();
+const SUBSCRIPTION_TRIAL_DAYS = 14;
+const SUBSCRIPTION_MONTH_PRICE_RUB = 790;
+const SUBSCRIPTION_CURRENCY = 'RUB';
 
 const onboardingMessageByChatId = new Map<number, number>();
 
@@ -197,7 +204,8 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 };
 
 const subscriptionPromptText =
-  'Чтобы пользоваться сервисом, оформите пробную подписку ✨\n\nЭто бесплатно: никаких карт, оплат и платежных данных — просто быстрый доступ к возможностям сервиса. 🤝';
+  'Вам доступно 14 дней пробного периода 🎁\n\n' +
+  'Оформите пробный доступ кнопкой ниже или выберите подписку на месяц.';
 
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
@@ -209,7 +217,10 @@ const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number)
   const payload = {
     text: subscriptionPromptText,
     reply_markup: {
-      inline_keyboard: [[{ text: 'Оформить пробную подписку', callback_data: 'subscription_trial' }]],
+      inline_keyboard: [
+        [{ text: '🎁 Оформить 14 дней', callback_data: 'subscription_trial' }],
+        [{ text: `${SUBSCRIPTION_MONTH_PRICE_RUB} ₽`, callback_data: 'subscription_monthly' }],
+      ],
     },
   };
   if (messageId) {
@@ -297,6 +308,73 @@ const sendOnboardingTeacherStep3 = async (chatId: number) => {
       ],
     },
   });
+};
+
+const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const isSubscriptionActive = (user: { subscriptionStartAt: Date | null; subscriptionEndAt: Date | null } | null) => {
+  if (!user?.subscriptionStartAt) return false;
+  if (!user.subscriptionEndAt) return true;
+  return user.subscriptionEndAt.getTime() > Date.now();
+};
+
+const createYookassaPayment = async (payload: { telegramUserId: bigint }) => {
+  if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY || !YOOKASSA_RETURN_URL) {
+    throw new Error('YOOKASSA credentials are not configured');
+  }
+  const amount = `${SUBSCRIPTION_MONTH_PRICE_RUB}.00`;
+  const response = await fetch('https://api.yookassa.ru/v3/payments', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64')}`,
+      'Content-Type': 'application/json',
+      'Idempotence-Key': crypto.randomUUID(),
+    },
+    body: JSON.stringify({
+      amount: { value: amount, currency: SUBSCRIPTION_CURRENCY },
+      capture: true,
+      confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
+      description: 'Подписка на 1 месяц',
+      metadata: { telegramUserId: payload.telegramUserId.toString() },
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`YooKassa payment failed: ${response.status} ${body}`);
+  }
+  const data = (await response.json()) as { confirmation?: { confirmation_url?: string } };
+  const confirmationUrl = data.confirmation?.confirmation_url;
+  if (!confirmationUrl) {
+    throw new Error('YooKassa confirmation_url is missing');
+  }
+  return confirmationUrl;
+};
+
+const sendSubscriptionPurchaseConfirmation = async (chatId: number, telegramUserId: bigint) => {
+  try {
+    const confirmationUrl = await createYookassaPayment({ telegramUserId });
+    const text =
+      `Подтвердите покупку подписки за ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽.\n\n` +
+      `Пользовательское соглашение: ${TERMS_AGREEMENT_URL}`;
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text,
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Подтвердить покупку', url: confirmationUrl }]],
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[telegram-bot] Failed to create subscription payment: ${message}`);
+    await sendStudentInfoMessage(chatId, 'Не удалось сформировать ссылку на оплату. Напишите в поддержку.');
+  }
 };
 
 
@@ -537,7 +615,7 @@ const activateStudentByUsername = async (
 const canOpenTeacherApp = async (telegramUserId: bigint) => {
   const user = await prisma.user.findUnique({ where: { telegramUserId } });
   if (user?.role === 'STUDENT') return { allowed: true, reason: 'student' as const };
-  const hasSubscription = Boolean(user?.subscriptionStartAt);
+  const hasSubscription = isSubscriptionActive(user);
   if (hasSubscription) return { allowed: true, reason: 'ok' as const };
   return { allowed: false, reason: 'subscription' as const };
 };
@@ -562,7 +640,7 @@ const handleRoleSelection = async (
   });
 
   if (role === 'TEACHER') {
-    if (!user.subscriptionStartAt) {
+    if (!isSubscriptionActive(user)) {
       await setDefaultMenuButton(chatId);
       await sendSubscriptionPromptMessage(chatId, messageId);
       return;
@@ -597,13 +675,13 @@ const ensureTrialSubscription = async (payload: {
     lastName: payload.lastName,
     role: 'TEACHER',
   });
-  if (user.subscriptionStartAt) return user;
+  if (isSubscriptionActive(user)) return user;
   const now = new Date();
   return prisma.user.update({
     where: { telegramUserId: payload.telegramUserId },
     data: {
       subscriptionStartAt: now,
-      subscriptionEndAt: now,
+      subscriptionEndAt: addDays(now, SUBSCRIPTION_TRIAL_DAYS),
     },
   });
 };
@@ -645,11 +723,19 @@ const handleUpdate = async (update: TelegramUpdate) => {
         await onboardingMessages.sendTeacherIntro(chatId, messageId);
         return;
       }
+      const subscriptionEndAt = user.subscriptionEndAt ?? addDays(new Date(), SUBSCRIPTION_TRIAL_DAYS);
+      const successText = `Пробный период активирован до ${formatDate(subscriptionEndAt)}.`;
       if (messageId) {
-        await editMessage(chatId, messageId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+        await editMessage(chatId, messageId, successText);
       } else {
-        await sendStudentInfoMessage(chatId, 'Пробная подписка оформлена. Можете пользоваться сервисом.');
+        await sendStudentInfoMessage(chatId, successText);
       }
+      return;
+    }
+    if (update.callback_query.data === 'subscription_monthly') {
+      await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
+      const telegramUserId = BigInt(update.callback_query.from.id);
+      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId);
       return;
     }
     if (update.callback_query.data === 'terms_accept') {
