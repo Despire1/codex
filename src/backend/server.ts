@@ -3204,7 +3204,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    if (req.method === 'POST' && pathname === '/api/payments/yookassa/webhook') {
+    if (req.method === 'POST' && pathname === '/api/yookassa/webhook') {
       let payload: any;
       try {
         payload = await readBody(req);
