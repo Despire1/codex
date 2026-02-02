@@ -2363,7 +2363,7 @@
 
 .paymentFilterActive {
   background: var(--color-gray-900);
-  color: var(--color-white);
+  color: var(--color-white) !important;
   border-color: var(--color-gray-900);
 }
 

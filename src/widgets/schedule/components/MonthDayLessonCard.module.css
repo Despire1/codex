@@ -1,5 +1,6 @@
 .cardWrap {
   position: relative;
+  margin-left: 4px;
 }
 
 .cardWrap::before {
@@ -18,8 +19,8 @@
   position: relative;
   border-radius: 16px;
   background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  border: 1.5px solid var(--color-slate-200);
+  border-left: none;
   cursor: pointer;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
   z-index: 1;
@@ -228,10 +229,4 @@
 
 .actionDanger:hover {
   background: rgba(239, 68, 68, 0.12);
-}
-
-@media (max-width: 720px) {
-  .cardWrap {
-    margin-left: 4px;
-  }
 }
