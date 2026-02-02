@@ -15,7 +15,6 @@ import { Badge } from '../../../shared/ui/Badge/Badge';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
-import { LessonDeleteConfirmModal } from './LessonDeleteConfirmModal';
 import { SelectedStudent } from '../types';
 import { LessonFiltersPopover } from './LessonFiltersPopover';
 import { LessonActionsSheet } from './LessonActionsSheet';
@@ -44,7 +43,7 @@ interface LessonsTabProps {
   onCompleteLesson: (lessonId: number) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
   onEditLesson: (lesson: Lesson) => void;
-  onDeleteLesson: (lessonId: number) => void;
+  onRequestDeleteLesson: (lesson: Lesson) => void;
   getLessonStatusLabel: (status: Lesson['status']) => string;
   autoConfirmLessons: boolean;
 }
@@ -70,12 +69,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   onCompleteLesson,
   onTogglePaid,
   onEditLesson,
-  onDeleteLesson,
+  onRequestDeleteLesson,
   getLessonStatusLabel,
   autoConfirmLessons,
 }) => {
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
-  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const isLessonsMobile = useIsMobile(768);
   const [activeLessonActions, setActiveLessonActions] = useState<Lesson | null>(null);
@@ -142,10 +140,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
 
   const handleCloseLessonMenu = useCallback(() => {
     setOpenLessonMenuId(null);
-  }, []);
-
-  const handleCloseDeleteModal = useCallback(() => {
-    setLessonToDelete(null);
   }, []);
 
   const handleToggleDateSort = useCallback(() => {
@@ -260,7 +254,10 @@ export const LessonsTab: FC<LessonsTabProps> = ({
             },
             {
               label: 'Удалить',
-              onClick: () => setLessonToDelete(lesson),
+              onClick: () => {
+                handleCloseLessonMenu();
+                onRequestDeleteLesson(lesson);
+              },
               variant: 'danger',
             },
           ]}
@@ -514,17 +511,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
         }}
         onDelete={() => {
           if (!activeLessonActions) return;
-          setLessonToDelete(activeLessonActions);
-        }}
-      />
-      <LessonDeleteConfirmModal
-        open={Boolean(lessonToDelete)}
-        lessonId={lessonToDelete?.id}
-        onClose={handleCloseDeleteModal}
-        onConfirm={() => {
-          if (!lessonToDelete) return;
-          onDeleteLesson(lessonToDelete.id);
-          setLessonToDelete(null);
+          setIsLessonSheetOpen(false);
+          onRequestDeleteLesson(activeLessonActions);
         }}
       />
     </div>
