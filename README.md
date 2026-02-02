@@ -179,6 +179,7 @@ server {
 2. Откройте `.env` и заполните:
    - `TELEGRAM_BOT_TOKEN` — токен из BotFather.
    - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда.
+   - `TELEGRAM_SUBSCRIPTION_PAYMENT_URL` — ссылка на оплату подписки (страница YooKassa/платёжного провайдера).
 
 ### 2. Запустите API и фронтенд
 В отдельных терминалах:
