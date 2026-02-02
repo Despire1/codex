@@ -1107,29 +1107,6 @@ export const AppPage = () => {
     }
   };
 
-  const toggleAutoReminder = async (studentId: number) => {
-    const link = links.find((l) => l.studentId === studentId);
-    if (!link) return;
-
-    try {
-      const data = await api.toggleAutoRemind(studentId, !link.autoRemindHomework);
-
-      setLinks(links.map((l) => (l.studentId === studentId ? data.link : l)));
-      setStudentListItems((prev) =>
-        prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link } : item)),
-      );
-      showToast({
-        message: data.link.autoRemindHomework ? 'Автонапоминания включены' : 'Автонапоминания выключены',
-        variant: 'success',
-      });
-    } catch (error) {
-      showToast({
-        message: 'Не удалось обновить автонапоминания',
-        variant: 'error',
-      });
-    }
-  };
-
   const togglePaymentReminders = async (studentId: number, enabled: boolean) => {
     try {
       const data = await api.updateStudentPaymentReminders(studentId, enabled);
@@ -2252,7 +2229,6 @@ export const AppPage = () => {
                 onLoadMoreStudents: loadMoreStudents,
                 onHomeworkFilterChange: setStudentHomeworkFilter,
                 onLoadMoreHomeworks: loadMoreStudentHomeworks,
-                onToggleAutoReminder: toggleAutoReminder,
                 onTogglePaymentReminders: togglePaymentReminders,
                 onAdjustBalance: adjustBalance,
                 onBalanceTopup: topupBalance,

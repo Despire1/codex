@@ -77,7 +77,6 @@ interface AppRoutesProps {
     onLoadMoreStudents: () => void;
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
     onLoadMoreHomeworks: () => void;
-    onToggleAutoReminder: (studentId: number) => void;
     onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
     onAdjustBalance: (studentId: number, delta: number) => void;
     onBalanceTopup: (

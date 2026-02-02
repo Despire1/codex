@@ -33,7 +33,6 @@ interface StudentHeroProps {
   onPriceChange: (value: string) => void;
   onSavePrice: () => void;
   onCancelPriceEdit: () => void;
-  onToggleAutoReminder: (studentId: number) => void;
   onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onOpenBalanceTopup: () => void;
@@ -64,7 +63,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onPriceChange,
   onSavePrice,
   onCancelPriceEdit,
-  onToggleAutoReminder,
   onTogglePaymentReminders,
   onAdjustBalance,
   onOpenBalanceTopup,
@@ -205,14 +203,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
     setIsReminderSettingsOpen(true);
   };
 
-  const handleToggleReminderSettings = () => {
-    onToggleAutoReminder(selectedStudent.id);
-    setIsReminderSettingsOpen(false);
-  };
   const paymentRemindersEnabled = selectedStudent.paymentRemindersEnabled !== false;
   const handleTogglePaymentReminderSettings = () => {
     onTogglePaymentReminders(selectedStudent.id, !paymentRemindersEnabled);
-    setIsReminderSettingsOpen(false);
   };
   const handleToggleDebtPopover = () => {
     setIsDebtPopoverOpen((prev) => !prev);
@@ -241,10 +234,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
     typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0
       ? `${effectiveDebtTotal} ₽${effectiveDebtCount > 0 ? ` (${formatLessonCount(effectiveDebtCount)})` : ''}`
       : formatLessonCount(effectiveDebtCount);
-  const reminderStatusLabel = selectedStudent.link.autoRemindHomework ? 'Включены' : 'Выключены';
-  const reminderActionLabel = selectedStudent.link.autoRemindHomework ? 'Выключить' : 'Включить';
-  const paymentReminderStatusLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
-  const paymentReminderActionLabel = paymentRemindersEnabled ? 'Выключить' : 'Включить';
+  const paymentReminderLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
 
   return (
     <div
@@ -303,7 +293,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
           </div>
         </div>
         <div className={styles.heroActions}>
-          {!selectedStudent.link.autoRemindHomework && (
+          {!paymentRemindersEnabled && (
             <button
               type="button"
               className={styles.remindersBadge}
@@ -547,26 +537,26 @@ export const StudentHero: FC<StudentHeroProps> = ({
           title="Напоминания"
           onClose={() => setIsReminderSettingsOpen(false)}
         >
-          <p className={styles.reminderStatus}>Домашние задания: {reminderStatusLabel}</p>
-          <div className={styles.reminderActions}>
-            <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
-              Закрыть
-            </button>
-            <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
-              {reminderActionLabel}
-            </button>
+          <div className={styles.reminderRow}>
+            <div>
+              <div className={styles.reminderLabel}>Авто-напоминания об оплате</div>
+              <div className={styles.reminderHelper}>Сейчас: {paymentReminderLabel}</div>
+            </div>
+            <label className={controls.switch}>
+              <input
+                type="checkbox"
+                checked={paymentRemindersEnabled}
+                onChange={handleTogglePaymentReminderSettings}
+              />
+              <span className={controls.slider} />
+            </label>
           </div>
-          <div className={styles.reminderDivider} />
-          <p className={styles.reminderStatus}>Оплата: {paymentReminderStatusLabel}</p>
           {!selectedStudent.isActivated && (
             <p className={styles.reminderHint}>Ученик не активировал бота — отправка напоминаний в Telegram невозможна.</p>
           )}
           <div className={styles.reminderActions}>
             <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
               Закрыть
-            </button>
-            <button type="button" className={controls.primaryButton} onClick={handleTogglePaymentReminderSettings}>
-              {paymentReminderActionLabel}
             </button>
           </div>
         </Modal>
@@ -576,26 +566,26 @@ export const StudentHero: FC<StudentHeroProps> = ({
         <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
           <div className={styles.reminderSheet}>
             <h3 className={styles.reminderTitle}>Напоминания</h3>
-            <p className={styles.reminderStatus}>Домашние задания: {reminderStatusLabel}</p>
-            <div className={styles.reminderActions}>
-              <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
-                Закрыть
-              </button>
-              <button type="button" className={controls.primaryButton} onClick={handleToggleReminderSettings}>
-                {reminderActionLabel}
-              </button>
+            <div className={styles.reminderRow}>
+              <div>
+                <div className={styles.reminderLabel}>Авто-напоминания об оплате</div>
+                <div className={styles.reminderHelper}>Сейчас: {paymentReminderLabel}</div>
+              </div>
+              <label className={controls.switch}>
+                <input
+                  type="checkbox"
+                  checked={paymentRemindersEnabled}
+                  onChange={handleTogglePaymentReminderSettings}
+                />
+                <span className={controls.slider} />
+              </label>
             </div>
-            <div className={styles.reminderDivider} />
-            <p className={styles.reminderStatus}>Оплата: {paymentReminderStatusLabel}</p>
             {!selectedStudent.isActivated && (
               <p className={styles.reminderHint}>Ученик не активировал бота — отправка напоминаний в Telegram невозможна.</p>
             )}
             <div className={styles.reminderActions}>
               <button type="button" className={controls.secondaryButton} onClick={() => setIsReminderSettingsOpen(false)}>
                 Закрыть
-              </button>
-              <button type="button" className={controls.primaryButton} onClick={handleTogglePaymentReminderSettings}>
-                {paymentReminderActionLabel}
               </button>
             </div>
           </div>
