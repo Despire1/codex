@@ -213,7 +213,7 @@ export const AppPage = () => {
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
   const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
-  const hasAccess = sessionState === 'authenticated' && hasSubscription && hasTelegramAccess;
+  const hasAccess = sessionState === 'authenticated' && hasTelegramAccess;
   const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
@@ -2135,9 +2135,7 @@ export const AppPage = () => {
     );
   }
 
-  if (!hasSubscription && !isStudentRole) {
-    return <SubscriptionGate />;
-  }
+  const showSubscriptionGate = !hasSubscription && !isStudentRole;
 
   return (
     <TimeZoneProvider timeZone={resolvedTimeZone}>
@@ -2338,6 +2336,7 @@ export const AppPage = () => {
           onDialogStateChange={setDialogState}
         />
       </div>
+      {showSubscriptionGate ? <SubscriptionGate /> : null}
     </TimeZoneProvider>
   );
 };
