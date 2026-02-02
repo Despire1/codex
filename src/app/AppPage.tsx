@@ -2326,7 +2326,7 @@ export const AppPage = () => {
               onOpenLessonModal: openLessonModal,
               onStartEditLesson: startEditLesson,
               onTogglePaid: togglePaid,
-              onDeleteLesson: deleteLessonById,
+              onDeleteLesson: requestDeleteLessonFromList,
               onDayViewDateChange: setDayViewDate,
               onGoToToday: handleGoToToday,
               autoConfirmLessons: teacher.autoConfirmLessons,

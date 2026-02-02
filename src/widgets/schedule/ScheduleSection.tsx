@@ -26,7 +26,6 @@ import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
-import { LessonDeleteConfirmModal } from '../students/components/LessonDeleteConfirmModal';
 import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import { buildParticipants, getLessonLabel } from './lib/lessonCardDetails';
 import styles from './ScheduleSection.module.css';
@@ -61,7 +60,7 @@ interface ScheduleSectionProps {
   onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
   onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onDeleteLesson: (lessonId: number) => void;
+  onDeleteLesson: (lesson: Lesson) => void;
   onDayViewDateChange: (date: Date) => void;
   onGoToToday: () => void;
   autoConfirmLessons: boolean;
@@ -103,7 +102,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
-  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
@@ -809,7 +807,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
                 }
                 onCloseActions={() => setOpenLessonMenuId(null)}
-                onDelete={() => setLessonToDelete(lesson)}
+                onDelete={() => onDeleteLesson(lesson)}
                 onReschedule={() => {}}
                 onOpenMeetingLink={handleOpenMeetingLink}
               />
@@ -1145,16 +1143,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
-      <LessonDeleteConfirmModal
-        open={Boolean(lessonToDelete)}
-        lessonId={lessonToDelete?.id}
-        onClose={() => setLessonToDelete(null)}
-        onConfirm={() => {
-          if (!lessonToDelete) return;
-          onDeleteLesson(lessonToDelete.id);
-          setLessonToDelete(null);
-        }}
-      />
     </section>
   );
 };
