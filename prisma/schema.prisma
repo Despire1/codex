@@ -198,6 +198,7 @@ model User {
   username        String?
   firstName       String?
   lastName        String?
+  receiptEmail    String?
   photoUrl        String?
   lastAuthDate    Int?
   role            String          @default("TEACHER")

@@ -4,6 +4,7 @@ export interface Teacher {
   chatId: number;
   name?: string;
   username?: string;
+  receiptEmail?: string | null;
   timezone: string | null;
   defaultLessonDuration: number;
   reminderMinutesBefore: number;

@@ -119,6 +119,7 @@ declare module '@prisma/client' {
     username: string | null;
     firstName: string | null;
     lastName: string | null;
+    receiptEmail: string | null;
     photoUrl: string | null;
     lastAuthDate: number | null;
     role: string;

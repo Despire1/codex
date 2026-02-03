@@ -23,6 +23,7 @@ type SettingsPatch = Partial<
   Pick<
     Teacher,
     | 'timezone'
+    | 'receiptEmail'
     | 'defaultLessonDuration'
     | 'lessonReminderEnabled'
     | 'lessonReminderMinutes'

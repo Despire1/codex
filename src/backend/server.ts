@@ -12,6 +12,7 @@ import {
   MEETING_LINK_MAX_LENGTH,
   normalizeMeetingLinkInput,
 } from '../shared/lib/meetingLink';
+import { isValidEmail, normalizeEmail } from '../shared/lib/email';
 import {
   formatInTimeZone,
   getTimeZoneStartOfDay,
@@ -456,12 +457,13 @@ const pickTeacherSettings = (teacher: any) => ({
 
 const getSettings = async (user: User) => {
   const teacher = await ensureTeacher(user);
-  return { settings: pickTeacherSettings(teacher) };
+  return { settings: { ...pickTeacherSettings(teacher), receiptEmail: user.receiptEmail ?? null } };
 };
 
 const updateSettings = async (user: User, body: any) => {
   const teacher = await ensureTeacher(user);
   const data: Record<string, any> = {};
+  const userData: Record<string, any> = {};
 
   if (typeof body.timezone === 'string') {
     const trimmed = body.timezone.trim();
@@ -563,16 +565,39 @@ const updateSettings = async (user: User, body: any) => {
     data.notifyTeacherOnManualPaymentReminder = body.notifyTeacherOnManualPaymentReminder;
   }
 
-  if (Object.keys(data).length === 0) {
-    return { settings: pickTeacherSettings(teacher) };
+  if (typeof body.receiptEmail === 'string') {
+    const normalized = normalizeEmail(body.receiptEmail);
+    if (!normalized) {
+      userData.receiptEmail = null;
+    } else if (!isValidEmail(normalized)) {
+      throw new Error('Некорректный e-mail');
+    } else {
+      userData.receiptEmail = normalized;
+    }
+  } else if (body.receiptEmail === null) {
+    userData.receiptEmail = null;
   }
 
-  const updatedTeacher = await prisma.teacher.update({
-    where: { chatId: teacher.chatId },
-    data,
-  });
+  const shouldUpdateTeacher = Object.keys(data).length > 0;
+  const shouldUpdateUser = Object.keys(userData).length > 0;
 
-  return { settings: pickTeacherSettings(updatedTeacher) };
+  const updatedTeacher = shouldUpdateTeacher
+    ? await prisma.teacher.update({
+        where: { chatId: teacher.chatId },
+        data,
+      })
+    : teacher;
+
+  const updatedUser = shouldUpdateUser
+    ? await prisma.user.update({
+        where: { id: user.id },
+        data: userData,
+      })
+    : user;
+
+  return {
+    settings: { ...pickTeacherSettings(updatedTeacher), receiptEmail: updatedUser.receiptEmail ?? null },
+  };
 };
 
 const listSessions = async (user: User, req: IncomingMessage) => {

@@ -113,6 +113,16 @@
   color: var(--color-slate-400);
 }
 
+.inputError {
+  border-color: var(--color-red-500);
+  box-shadow: 0 0 0 1px var(--color-red-500);
+}
+
+.errorText {
+  font-size: 13px;
+  color: var(--color-red-600);
+}
+
 .readonlyValue {
   font-weight: 600;
 }

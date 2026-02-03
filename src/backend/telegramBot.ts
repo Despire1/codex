@@ -2,6 +2,7 @@ import 'dotenv/config';
 import crypto from 'node:crypto';
 import prisma from './prismaClient';
 import { createOnboardingMessages } from './telegramOnboardingMessages';
+import { isValidEmail, normalizeEmail } from '../shared/lib/email';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
@@ -25,8 +26,11 @@ const ROLE_STUDENT_TEXT_NORMALIZED = ROLE_STUDENT_TEXT.toLowerCase();
 const SUBSCRIPTION_TRIAL_DAYS = 14;
 const SUBSCRIPTION_MONTH_PRICE_RUB = 790;
 const SUBSCRIPTION_CURRENCY = 'RUB';
+const RECEIPT_EMAIL_REQUEST_TEXT = 'Чтобы отправить чек, укажите e-mail. Напишите его одним сообщением.';
+const RECEIPT_EMAIL_INVALID_TEXT = 'Некорректный e-mail. Проверьте формат и отправьте ещё раз.';
 
 const onboardingMessageByChatId = new Map<number, number>();
+const pendingReceiptEmailByChatId = new Map<number, { telegramUserId: bigint; messageId?: number }>();
 
 type TelegramUpdate = {
   update_id: number;
@@ -365,7 +369,11 @@ const isSubscriptionActive = (user: { subscriptionStartAt: Date | null; subscrip
   return user.subscriptionEndAt.getTime() > Date.now();
 };
 
-const createYookassaPayment = async (payload: { telegramUserId: bigint; messageId?: number }) => {
+const createYookassaPayment = async (payload: {
+  telegramUserId: bigint;
+  messageId?: number;
+  receiptEmail: string;
+}) => {
   if (!YOOKASSA_SHOP_ID || !YOOKASSA_SECRET_KEY || !YOOKASSA_RETURN_URL) {
     throw new Error('YOOKASSA credentials are not configured');
   }
@@ -382,6 +390,19 @@ const createYookassaPayment = async (payload: { telegramUserId: bigint; messageI
       capture: true,
       confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
       description: 'Подписка на 30 дней',
+      receipt: {
+        customer: { email: payload.receiptEmail },
+        items: [
+          {
+            description: 'Подписка на 30 дней',
+            quantity: '1.00',
+            amount: { value: amount, currency: SUBSCRIPTION_CURRENCY },
+            vat_code: 1,
+            payment_mode: 'full_payment',
+            payment_subject: 'service',
+          },
+        ],
+      },
       metadata: {
         telegramUserId: payload.telegramUserId.toString(),
         messageId: typeof payload.messageId === 'number' ? payload.messageId : undefined,
@@ -403,10 +424,11 @@ const createYookassaPayment = async (payload: { telegramUserId: bigint; messageI
 const sendSubscriptionPurchaseConfirmation = async (
   chatId: number,
   telegramUserId: bigint,
+  receiptEmail: string,
   messageId?: number,
 ) => {
   try {
-    const confirmationUrl = await createYookassaPayment({ telegramUserId, messageId });
+    const confirmationUrl = await createYookassaPayment({ telegramUserId, messageId, receiptEmail });
     const text =
       `💳 Подтвердите покупку подписки — ${SUBSCRIPTION_MONTH_PRICE_RUB} ₽\nПосле подтверждения подписка сразу активируется ✅\n\n` +
       `📄 Пользовательское соглашение: ${TERMS_AGREEMENT_URL}\n\nНажимая «Подтвердить покупку», вы соглашаетесь с пользовательским соглашением.`;
@@ -786,9 +808,26 @@ const handleUpdate = async (update: TelegramUpdate) => {
     }
     if (update.callback_query.data === 'subscription_monthly') {
       await callTelegram('answerCallbackQuery', { callback_query_id: update.callback_query.id });
-      const telegramUserId = BigInt(update.callback_query.from.id);
+      const from = update.callback_query.from;
+      const telegramUserId = BigInt(from.id);
       const messageId = update.callback_query.message?.message_id;
-      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId, messageId);
+      const { user } = await ensureTelegramUser({
+        telegramUserId,
+        username: from.username ?? undefined,
+        firstName: from.first_name ?? undefined,
+        lastName: from.last_name ?? undefined,
+      });
+      const normalizedReceiptEmail = normalizeEmail(user.receiptEmail);
+      if (!normalizedReceiptEmail || !isValidEmail(normalizedReceiptEmail)) {
+        pendingReceiptEmailByChatId.set(chatId, { telegramUserId, messageId });
+        await callTelegram('sendMessage', {
+          chat_id: chatId,
+          text: RECEIPT_EMAIL_REQUEST_TEXT,
+        });
+        return;
+      }
+      pendingReceiptEmailByChatId.delete(chatId);
+      await sendSubscriptionPurchaseConfirmation(chatId, telegramUserId, normalizedReceiptEmail, messageId);
       return;
     }
     if (update.callback_query.data === 'terms_accept') {
@@ -871,6 +910,30 @@ const handleUpdate = async (update: TelegramUpdate) => {
 
   const from = update.message?.from;
   const telegramUserId = from?.id ? BigInt(from.id) : null;
+  const pendingReceiptEmail = pendingReceiptEmailByChatId.get(chatId);
+
+  if (pendingReceiptEmail) {
+    const normalized = normalizeEmail(text);
+    if (!normalized || !isValidEmail(normalized)) {
+      await callTelegram('sendMessage', {
+        chat_id: chatId,
+        text: RECEIPT_EMAIL_INVALID_TEXT,
+      });
+      return;
+    }
+    await prisma.user.update({
+      where: { telegramUserId: pendingReceiptEmail.telegramUserId },
+      data: { receiptEmail: normalized },
+    });
+    pendingReceiptEmailByChatId.delete(chatId);
+    await sendSubscriptionPurchaseConfirmation(
+      chatId,
+      pendingReceiptEmail.telegramUserId,
+      normalized,
+      pendingReceiptEmail.messageId,
+    );
+    return;
+  }
 
   if (text === '/start') {
     if (telegramUserId) {

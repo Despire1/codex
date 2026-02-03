@@ -21,6 +21,7 @@ import {
 type SettingsPayload = Pick<
   Teacher,
   | 'timezone'
+  | 'receiptEmail'
   | 'defaultLessonDuration'
   | 'lessonReminderEnabled'
   | 'lessonReminderMinutes'
