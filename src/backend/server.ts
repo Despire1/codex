@@ -75,6 +75,7 @@ const ONBOARDING_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 30);
 const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
 const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
+let isLessonAutomationRunning = false;
 const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const nowMs = now.getTime();
   const scheduledMs = scheduledFor.getTime();
@@ -2816,6 +2817,9 @@ const resolveQuietHoursResume = (now: Date, timeZone?: string | null) => {
 };
 
 const runLessonAutomationTick = async () => {
+  if (isLessonAutomationRunning) return;
+  isLessonAutomationRunning = true;
+  try {
   const now = new Date();
   const teachers = await prisma.teacher.findMany();
 
@@ -2863,14 +2867,25 @@ const runLessonAutomationTick = async () => {
     }
 
     if (!teacher.globalPaymentRemindersEnabled) continue;
+    if (!teacher.studentNotificationsEnabled) continue;
+
+    const maxCount = Math.max(0, teacher.paymentReminderMaxCount ?? 0);
+    if (maxCount <= 0) continue;
+    const delayHours = Number(teacher.paymentReminderDelayHours ?? 0);
+    const repeatHours = Number(teacher.paymentReminderRepeatHours ?? 0);
+    const delayMs = Math.max(0, delayHours) * 60 * 60 * 1000;
+    const repeatMs = Math.max(0, repeatHours) * 60 * 60 * 1000;
+    const completedBefore = new Date(now.getTime() - delayMs);
+    const repeatBefore = new Date(now.getTime() - repeatMs);
 
     const reminderCandidates = await prisma.lesson.findMany({
       where: {
         teacherId: teacher.chatId,
         status: 'COMPLETED',
         paymentStatus: 'UNPAID',
-        completedAt: { not: null },
-        paymentReminderCount: { lt: teacher.paymentReminderMaxCount },
+        completedAt: { lte: completedBefore },
+        paymentReminderCount: { lt: maxCount },
+        OR: [{ lastPaymentReminderAt: null }, { lastPaymentReminderAt: { lte: repeatBefore } }],
       },
       include: { student: true },
     });
@@ -2883,20 +2898,6 @@ const runLessonAutomationTick = async () => {
     for (const lesson of reminderCandidates) {
       if (!lesson.student) continue;
       if (!lesson.student.paymentRemindersEnabled) continue;
-      if (!lesson.student.isActivated || !lesson.student.telegramId) continue;
-      if (!lesson.completedAt) continue;
-
-      const delayMs = teacher.paymentReminderDelayHours * 60 * 60 * 1000;
-      if (now.getTime() < lesson.completedAt.getTime() + delayMs) {
-        continue;
-      }
-
-      if (lesson.lastPaymentReminderAt) {
-        const repeatMs = teacher.paymentReminderRepeatHours * 60 * 60 * 1000;
-        if (now.getTime() < lesson.lastPaymentReminderAt.getTime() + repeatMs) {
-          continue;
-        }
-      }
 
       try {
         const result = await sendStudentPaymentReminder({
@@ -2906,10 +2907,11 @@ const runLessonAutomationTick = async () => {
         });
 
         if (result.status === 'sent') {
+          const currentCount = lesson.paymentReminderCount ?? 0;
           await prisma.lesson.update({
             where: { id: lesson.id },
             data: {
-              paymentReminderCount: lesson.paymentReminderCount + 1,
+              paymentReminderCount: currentCount + 1,
               lastPaymentReminderAt: now,
               lastPaymentReminderSource: 'AUTO',
             },
@@ -2923,20 +2925,15 @@ const runLessonAutomationTick = async () => {
               source: 'AUTO',
             });
           }
-        } else if (result.status === 'failed') {
-          await prisma.lesson.update({
-            where: { id: lesson.id },
-            data: {
-              lastPaymentReminderAt: now,
-              lastPaymentReminderSource: 'AUTO',
-            },
-          });
         }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Не удалось отправить авто-напоминание об оплате', error);
       }
     }
+  }
+  } finally {
+    isLessonAutomationRunning = false;
   }
 };
 
