@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { type Dispatch, type FC, type SetStateAction } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
   Homework,
@@ -13,7 +13,6 @@ import {
   PaymentReminderLog,
   Student,
   StudentDebtItem,
-  StudentListItem,
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
@@ -47,13 +46,10 @@ interface AppRoutesProps {
     onOpenStudent: (studentId: number) => void;
   };
   students: {
+    hasAccess: boolean;
     teacher: Teacher;
-    studentListItems: StudentListItem[];
-    studentListCounts: { withDebt: number; overdue: number };
-    studentListTotal: number;
-    studentListLoading: boolean;
-    studentListHasMore: boolean;
     studentSearch: string;
+    studentQuery: string;
     studentFilter: 'all' | 'debt' | 'overdue';
     lessons: Lesson[];
     selectedStudentId: number | null;
@@ -71,10 +67,9 @@ interface AppRoutesProps {
       remindBefore: boolean;
       timeSpentMinutes: string;
     };
-    onSelectStudent: (id: number) => void;
+    onSelectStudent: Dispatch<SetStateAction<number | null>>;
     onStudentSearchChange: (value: string) => void;
     onStudentFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
-    onLoadMoreStudents: () => void;
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
     onLoadMoreHomeworks: () => void;
     onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
@@ -146,6 +141,7 @@ interface AppRoutesProps {
     onOpenPaymentReminders?: () => void;
     paymentsLoading?: boolean;
     paymentRemindersLoading?: boolean;
+    studentListReloadKey: number;
   };
   schedule: {
     scheduleView: 'day' | 'week' | 'month';

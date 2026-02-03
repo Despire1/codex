@@ -16,7 +16,6 @@ import {
   PaymentReminderLog,
   Student,
   StudentDebtItem,
-  StudentListItem,
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
@@ -247,11 +246,7 @@ export const AppPage = () => {
   const [studentSearch, setStudentSearch] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentFilter, setStudentFilter] = useState<'all' | 'debt' | 'overdue'>('all');
-  const [studentListItems, setStudentListItems] = useState<StudentListItem[]>([]);
-  const [studentListCounts, setStudentListCounts] = useState({ withDebt: 0, overdue: 0 });
-  const [studentListTotal, setStudentListTotal] = useState(0);
-  const [studentListHasMore, setStudentListHasMore] = useState(false);
-  const [studentListLoading, setStudentListLoading] = useState(false);
+  const [studentListReloadKey, setStudentListReloadKey] = useState(0);
   const [studentHomeworks, setStudentHomeworks] = useState<Homework[]>([]);
   const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>(
     storedStudentCardFilters.homeworkFilter ?? 'all',
@@ -569,47 +564,9 @@ export const AppPage = () => {
     }
   }, [selectedStudentId]);
 
-
-  const loadStudentList = useCallback(
-    async (options?: { offset?: number; append?: boolean }) => {
-      if (!hasAccess) {
-        setStudentListItems([]);
-        setStudentListCounts({ withDebt: 0, overdue: 0 });
-        setStudentListTotal(0);
-        setStudentListHasMore(false);
-        return;
-      }
-      const offset = options?.offset ?? 0;
-      const append = options?.append ?? false;
-      setStudentListLoading(true);
-      try {
-        const data = await api.listStudents({
-          query: studentQuery || undefined,
-          filter: studentFilter,
-          limit: 15,
-          offset,
-        });
-        setStudentListCounts(data.counts);
-        setStudentListTotal(data.total);
-        setStudentListHasMore(data.nextOffset !== null);
-        setStudentListItems((prev) => (append ? [...prev, ...data.items] : data.items));
-        if (!append) {
-          setSelectedStudentId((prev) => {
-            if (prev && data.items.some((item) => item.student.id === prev)) {
-              return prev;
-            }
-            return data.items[0]?.student.id ?? null;
-          });
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load students list', error);
-      } finally {
-        setStudentListLoading(false);
-      }
-    },
-    [hasAccess, studentFilter, studentQuery],
-  );
+  const triggerStudentsListReload = useCallback(() => {
+    setStudentListReloadKey((prev) => prev + 1);
+  }, []);
 
   const loadStudentHomeworks = useCallback(
     async (options?: { offset?: number; append?: boolean; studentIdOverride?: number | null }) => {
@@ -766,11 +723,6 @@ export const AppPage = () => {
 
   useEffect(() => {
     if (!hasAccess) return;
-    loadStudentList();
-  }, [loadStudentList, hasAccess]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
     if (!selectedStudentId) return;
     loadStudentUnpaidLessons({ studentIdOverride: selectedStudentId });
   }, [hasAccess, loadStudentUnpaidLessons, selectedStudentId]);
@@ -789,28 +741,6 @@ export const AppPage = () => {
     loadStudentLessonsSummary();
   }, [loadStudentLessonsSummary, hasAccess]);
 
-  useEffect(() => {
-    if (!selectedStudentId) return;
-    if (!studentUnpaidLoadedByStudent[selectedStudentId]) return;
-    const unpaidItems = studentUnpaidLessonsByStudent[selectedStudentId] ?? [];
-    const unpaidTotal = studentUnpaidTotalByStudent[selectedStudentId] ?? 0;
-    setStudentListItems((prev) =>
-      prev.map((item) => {
-        if (item.student.id !== selectedStudentId) return item;
-        const debtRub = unpaidTotal > 0 ? unpaidTotal : null;
-        const debtLessonCount = unpaidItems.length > 0 ? unpaidItems.length : null;
-        if (item.debtRub === debtRub && item.debtLessonCount === debtLessonCount) {
-          return item;
-        }
-        return {
-          ...item,
-          debtRub,
-          debtLessonCount,
-        };
-      }),
-    );
-  }, [selectedStudentId, studentUnpaidLessonsByStudent, studentUnpaidLoadedByStudent, studentUnpaidTotalByStudent]);
-
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
       if (order === studentLessonSortOrder) return;
@@ -818,11 +748,6 @@ export const AppPage = () => {
     },
     [studentLessonSortOrder],
   );
-
-  const loadMoreStudents = useCallback(() => {
-    if (studentListLoading || !studentListHasMore) return;
-    loadStudentList({ offset: studentListItems.length, append: true });
-  }, [loadStudentList, studentListHasMore, studentListItems.length, studentListLoading]);
 
   const loadMoreStudentHomeworks = useCallback(() => {
     if (studentHomeworkLoading || !studentHomeworkHasMore) return;
@@ -1009,8 +934,16 @@ export const AppPage = () => {
 
   const handleOpenPaymentReminders = useCallback(() => {
     if (!selectedStudentId) return;
+    const hasRemindersLoaded = paymentRemindersByStudent[selectedStudentId] !== undefined;
+    const isLoading = paymentRemindersLoadingByStudent[selectedStudentId] ?? false;
+    if (hasRemindersLoaded || isLoading) return;
     refreshPaymentReminders(selectedStudentId);
-  }, [refreshPaymentReminders, selectedStudentId]);
+  }, [
+    paymentRemindersByStudent,
+    paymentRemindersLoadingByStudent,
+    refreshPaymentReminders,
+    selectedStudentId,
+  ]);
 
   const handleLoadMorePaymentReminders = useCallback(() => {
     if (!selectedStudentId) return;
@@ -1109,7 +1042,7 @@ export const AppPage = () => {
       setSelectedStudentId(student.id);
       navigate(tabPathById.students);
       closeStudentModal();
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add student', error);
@@ -1144,14 +1077,9 @@ export const AppPage = () => {
           l.studentId === data.link.studentId && l.teacherId === data.link.teacherId ? data.link : l,
         ),
       );
-      setStudentListItems((prev) =>
-        prev.map((item) =>
-          item.student.id === data.student.id ? { ...item, student: data.student, link: data.link } : item,
-        ),
-      );
       resetStudentDraft();
       closeStudentModal();
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update student', error);
@@ -1170,9 +1098,7 @@ export const AppPage = () => {
     try {
       const data = await api.updateStudentPaymentReminders(studentId, enabled);
       setStudents((prev) => prev.map((student) => (student.id === studentId ? data.student : student)));
-      setStudentListItems((prev) =>
-        prev.map((item) => (item.student.id === studentId ? { ...item, student: data.student } : item)),
-      );
+      triggerStudentsListReload();
       showToast({
         message: data.student.paymentRemindersEnabled ? 'Авто-напоминания об оплате включены' : 'Авто-напоминания об оплате выключены',
         variant: 'success',
@@ -1189,11 +1115,8 @@ export const AppPage = () => {
     try {
       const data = await api.adjustBalance(studentId, { delta });
       setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
-      setStudentListItems((prev) =>
-        prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link } : item)),
-      );
       await refreshPayments(studentId);
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to adjust balance', error);
@@ -1207,11 +1130,8 @@ export const AppPage = () => {
     try {
       const data = await api.adjustBalance(studentId, payload);
       setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
-      setStudentListItems((prev) =>
-        prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link } : item)),
-      );
       await refreshPayments(studentId);
-      loadStudentList();
+      triggerStudentsListReload();
       showToast({
         message:
           payload.delta > 0
@@ -1228,10 +1148,7 @@ export const AppPage = () => {
     async (studentId: number) => {
       try {
         await api.deleteStudent(studentId);
-        const remainingItems = studentListItems.filter((item) => item.student.id !== studentId);
         setLinks((prev) => prev.filter((link) => link.studentId !== studentId));
-        setStudentListItems(remainingItems);
-        setStudentListTotal((prev) => Math.max(prev - 1, 0));
         setPaymentEventsByStudent((prev) => {
           if (!prev[studentId]) return prev;
           const next = { ...prev };
@@ -1239,9 +1156,9 @@ export const AppPage = () => {
           return next;
         });
         if (selectedStudentId === studentId) {
-          setSelectedStudentId(remainingItems[0]?.student.id ?? null);
+          setSelectedStudentId(null);
         }
-        loadStudentList();
+        triggerStudentsListReload();
         showToast({ message: 'Ученик удалён из списка', variant: 'success' });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить ученика';
@@ -1250,13 +1167,12 @@ export const AppPage = () => {
         console.error('Failed to delete student', error);
       }
     },
-    [loadStudentList, selectedStudentId, showInfoDialog, showToast, studentListItems],
+    [selectedStudentId, showInfoDialog, showToast, triggerStudentsListReload],
   );
 
   const requestDeleteStudent = useCallback(
     (studentId: number) => {
-      const studentEntry = studentListItems.find((item) => item.student.id === studentId);
-      const studentName = studentEntry?.link.customName ?? 'ученика';
+      const studentName = links.find((link) => link.studentId === studentId)?.customName ?? 'ученика';
       setDialogState({
         type: 'confirm',
         title: `Удалить ${studentName}?`,
@@ -1271,7 +1187,7 @@ export const AppPage = () => {
         onCancel: closeDialog,
       });
     },
-    [closeDialog, performDeleteStudent, studentListItems],
+    [closeDialog, links, performDeleteStudent],
   );
 
   const startEditPrice = (student: Student & { link: TeacherStudent }) => {
@@ -1287,12 +1203,8 @@ export const AppPage = () => {
       setLinks((prev) =>
         prev.map((link) => (link.id === data.link.id ? data.link : link)),
       );
-      setStudentListItems((prev) =>
-        prev.map((item) =>
-          item.link.id === data.link.id ? { ...item, link: data.link } : item,
-        ),
-      );
       setPriceEditState({ id: null, value: '' });
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update price', error);
@@ -1602,11 +1514,7 @@ export const AppPage = () => {
             link.studentId === data.link.studentId && link.teacherId === data.link.teacherId ? data.link : link,
           ),
         );
-        setStudentListItems((prev) =>
-          prev.map((item) =>
-            item.student.id === data.link.studentId ? { ...item, link: data.link } : item,
-          ),
-        );
+        triggerStudentsListReload();
 
         if (balanceDelta < 0) {
           showToast({
@@ -1650,12 +1558,7 @@ export const AppPage = () => {
           data.links!.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
           return Array.from(map.values());
         });
-        setStudentListItems((prev) =>
-          prev.map((item) => {
-            const updatedLink = data.links!.find((link) => link.studentId === item.student.id);
-            return updatedLink ? { ...item, link: updatedLink } : item;
-          }),
-        );
+        triggerStudentsListReload();
 
         chargedLinks.forEach((link) => {
           showToast({
@@ -1707,9 +1610,7 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
-          setStudentListItems((prev) =>
-            prev.map((item) => (item.student.id === studentId ? { ...item, link: data.link! } : item)),
-          );
+          triggerStudentsListReload();
         }
 
         await refreshPayments(studentId);
@@ -1743,9 +1644,7 @@ export const AppPage = () => {
               link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
             );
           });
-          setStudentListItems((prev) =>
-            prev.map((item) => (item.student.id === data.link!.studentId ? { ...item, link: data.link! } : item)),
-          );
+          triggerStudentsListReload();
         }
 
         const targetStudent = data.lesson.studentId;
@@ -1917,7 +1816,7 @@ export const AppPage = () => {
         prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework, resolvedTimeZone) : hw)),
       );
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
       showInfoDialog('Отправлено ученику', 'Задание опубликовано и отправлено ученику.');
     } catch (error) {
       setDialogState({
@@ -1955,7 +1854,7 @@ export const AppPage = () => {
       const normalized = normalizeHomework(data.homework, resolvedTimeZone);
       setHomeworks([...homeworks, normalized]);
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
 
       if (newHomeworkDraft.sendNow) {
         await sendHomeworkToStudent(normalized.id);
@@ -1991,7 +1890,7 @@ export const AppPage = () => {
       const normalized = normalizeHomework(data.homework, resolvedTimeZone);
       setHomeworks([...homeworks, normalized]);
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
       showInfoDialog('Черновик создан', 'Копия задания сохранена в черновики.');
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -2006,7 +1905,7 @@ export const AppPage = () => {
         homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
       );
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to toggle homework', error);
@@ -2026,7 +1925,7 @@ export const AppPage = () => {
         homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
       );
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update homework', error);
@@ -2038,7 +1937,7 @@ export const AppPage = () => {
       await api.deleteHomework(homeworkId);
       setHomeworks(homeworks.filter((hw) => hw.id !== homeworkId));
       loadStudentHomeworks();
-      loadStudentList();
+      triggerStudentsListReload();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete homework', error);
@@ -2265,13 +2164,10 @@ export const AppPage = () => {
                 },
               }}
               students={{
+                hasAccess,
                 teacher,
-                studentListItems,
-                studentListCounts,
-                studentListTotal,
-                studentListLoading,
-                studentListHasMore,
                 studentSearch,
+                studentQuery,
                 studentFilter,
                 lessons,
                 selectedStudentId,
@@ -2284,7 +2180,6 @@ export const AppPage = () => {
                 onSelectStudent: setSelectedStudentId,
                 onStudentSearchChange: setStudentSearch,
                 onStudentFilterChange: setStudentFilter,
-                onLoadMoreStudents: loadMoreStudents,
                 onHomeworkFilterChange: setStudentHomeworkFilter,
                 onLoadMoreHomeworks: loadMoreStudentHomeworks,
                 onTogglePaymentReminders: togglePaymentReminders,
@@ -2341,9 +2236,10 @@ export const AppPage = () => {
               onChangeLessonStatus: updateLessonStatus,
               onTogglePaid: togglePaid,
               onCreateLesson: openCreateLessonForStudent,
-              onEditLesson: startEditLesson,
-              onRequestDeleteLesson: requestDeleteLessonFromList,
-            }}
+                onEditLesson: startEditLesson,
+                onRequestDeleteLesson: requestDeleteLessonFromList,
+                studentListReloadKey,
+              }}
             schedule={{
               scheduleView,
               onScheduleViewChange: setScheduleView,

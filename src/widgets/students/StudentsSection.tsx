@@ -1,4 +1,4 @@
-import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
+import { type Dispatch, type FC, type SetStateAction, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Homework,
@@ -13,7 +13,6 @@ import {
   PaymentReminderLog,
   Student,
   StudentDebtItem,
-  StudentListItem,
   Teacher,
   TeacherStudent,
 } from '../../entities/types';
@@ -27,15 +26,13 @@ import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
 import { NewHomeworkDraft, SelectedStudent, StudentTabId } from './types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
+import { useStudentsList } from './model/useStudentsList';
 
 interface StudentsSectionProps {
+  hasAccess: boolean;
   teacher: Teacher;
-  studentListItems: StudentListItem[];
-  studentListCounts: { withDebt: number; overdue: number };
-  studentListTotal: number;
-  studentListLoading: boolean;
-  studentListHasMore: boolean;
   studentSearch: string;
+  studentQuery: string;
   studentFilter: 'all' | 'debt' | 'overdue';
   lessons: Lesson[];
   selectedStudentId: number | null;
@@ -44,10 +41,9 @@ interface StudentsSectionProps {
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
   homeworkListLoading: boolean;
   homeworkListHasMore: boolean;
-  onSelectStudent: (id: number) => void;
+  onSelectStudent: Dispatch<SetStateAction<number | null>>;
   onStudentSearchChange: (value: string) => void;
   onStudentFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
-  onLoadMoreStudents: () => void;
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
   onLoadMoreHomeworks: () => void;
   onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
@@ -116,6 +112,7 @@ interface StudentsSectionProps {
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
   paymentRemindersLoadingMore?: boolean;
+  studentListReloadKey: number;
 }
 const getLessonStatusLabel = (status: Lesson['status']) => {
   if (status === 'COMPLETED') return 'Проведён';
@@ -138,13 +135,10 @@ const resolveStudentTab = (search: string): StudentTabId => {
 };
 
 export const StudentsSection: FC<StudentsSectionProps> = ({
+  hasAccess,
   teacher,
-  studentListItems,
-  studentListCounts,
-  studentListTotal,
-  studentListLoading,
-  studentListHasMore,
   studentSearch,
+  studentQuery,
   studentFilter,
   lessons,
   selectedStudentId,
@@ -156,7 +150,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onSelectStudent,
   onStudentSearchChange,
   onStudentFilterChange,
-  onLoadMoreStudents,
   onHomeworkFilterChange,
   onLoadMoreHomeworks,
   onTogglePaymentReminders,
@@ -213,10 +206,27 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   paymentRemindersHasMore,
   paymentRemindersLoadingMore,
   onLoadMorePaymentReminders,
+  studentListReloadKey,
 }) => {
   void onRequestDebtDetails;
   const location = useLocation();
   const navigate = useNavigate();
+  const {
+    items: studentListItems,
+    counts: studentListCounts,
+    total: studentListTotal,
+    hasMore: studentListHasMore,
+    isLoading: studentListLoading,
+    loadMore: loadMoreStudents,
+    updateItem: updateStudentListItem,
+  } = useStudentsList({
+    hasAccess,
+    studentQuery,
+    studentFilter,
+    selectedStudentId,
+    setSelectedStudentId: onSelectStudent,
+    reloadKey: studentListReloadKey,
+  });
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
   const selectedStudent: SelectedStudent | null = selectedStudentEntry
     ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link }
@@ -240,6 +250,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const headerRef = useRef<HTMLDivElement | null>(null);
   const scrollRafRef = useRef<number | null>(null);
   const scrollProgressRef = useRef(0);
+
+  useEffect(() => {
+    if (!selectedStudentId) return;
+    const debtRub = studentDebtTotal > 0 ? studentDebtTotal : null;
+    const debtLessonCount = studentDebtItems.length > 0 ? studentDebtItems.length : null;
+    updateStudentListItem(selectedStudentId, (item) => {
+      if (item.debtRub === debtRub && item.debtLessonCount === debtLessonCount) {
+        return item;
+      }
+      return { ...item, debtRub, debtLessonCount };
+    });
+  }, [selectedStudentId, studentDebtItems, studentDebtTotal, updateStudentListItem]);
 
   useEffect(() => {
     if (!selectedStudentId && isMobile) {
@@ -282,14 +304,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
-          onLoadMoreStudents();
+          loadMoreStudents();
         }
       },
       { root: studentListRef.current, rootMargin: '120px' },
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [onLoadMoreStudents, studentListHasMore]);
+  }, [loadMoreStudents, studentListHasMore]);
 
   const handleStartEditLessonStatus = (lessonId: number) => {
     setEditableLessonStatusId(lessonId);
