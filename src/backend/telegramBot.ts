@@ -930,7 +930,6 @@ const handleUpdate = async (update: TelegramUpdate) => {
       chatId,
       pendingReceiptEmail.telegramUserId,
       normalized,
-      pendingReceiptEmail.messageId,
     );
     return;
   }
