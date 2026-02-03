@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ru } from 'date-fns/locale';
 import { Lesson, PaymentReminderLog } from '../../../entities/types';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
@@ -8,6 +9,9 @@ interface PaymentRemindersPopoverContentProps {
   reminders: PaymentReminderLog[];
   lessonsById: Map<number, Lesson>;
   isLoading?: boolean;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const statusLabels: Record<Lesson['status'], string> = {
@@ -30,8 +34,30 @@ export const PaymentRemindersPopoverContent = ({
   reminders,
   lessonsById,
   isLoading,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: PaymentRemindersPopoverContentProps) => {
   const timeZone = useTimeZone();
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return;
+    if (!onLoadMore) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { root: listRef.current, rootMargin: '120px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, onLoadMore]);
 
   if (isLoading) {
     return (
@@ -54,7 +80,7 @@ export const PaymentRemindersPopoverContent = ({
   return (
     <div className={styles.container}>
       <div className={styles.title}>Напоминания об оплате</div>
-      <div className={styles.list}>
+      <div className={styles.list} ref={listRef}>
         {reminders.map((reminder) => {
           const lesson = lessonsById.get(reminder.lessonId);
           const reminderDate = formatInTimeZone(reminder.createdAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
@@ -87,6 +113,8 @@ export const PaymentRemindersPopoverContent = ({
             </div>
           );
         })}
+        {isLoadingMore && <div className={styles.loadMore}>Загрузка…</div>}
+        {hasMore && <div className={styles.loadMoreSentinel} ref={loadMoreRef} aria-hidden />}
       </div>
     </div>
   );

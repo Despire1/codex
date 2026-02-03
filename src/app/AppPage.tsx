@@ -97,6 +97,7 @@ const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
   fromTime: '00:00',
   toTime: '23:59',
 };
+const PAYMENT_REMINDERS_PAGE_SIZE = 10;
 
 type LessonRange = {
   key: string;
@@ -111,6 +112,17 @@ const parseTimeSpentMinutes = (value: string): number | null => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) return null;
   return Math.round(numericValue);
+};
+
+const mergePaymentReminders = (current: PaymentReminderLog[], incoming: PaymentReminderLog[]) => {
+  const seen = new Set<number>();
+  const merged: PaymentReminderLog[] = [];
+  for (const reminder of [...current, ...incoming]) {
+    if (seen.has(reminder.id)) continue;
+    seen.add(reminder.id);
+    merged.push(reminder);
+  }
+  return merged;
 };
 
 const resolveDeadlinePayload = (deadline: string | null | undefined, timeZone: string) => {
@@ -272,6 +284,12 @@ export const AppPage = () => {
   const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
   const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});
   const [paymentRemindersLoadingByStudent, setPaymentRemindersLoadingByStudent] = useState<Record<number, boolean>>({});
+  const [paymentRemindersLoadingMoreByStudent, setPaymentRemindersLoadingMoreByStudent] = useState<
+    Record<number, boolean>
+  >({});
+  const [paymentRemindersNextOffsetByStudent, setPaymentRemindersNextOffsetByStudent] = useState<
+    Record<number, number | null>
+  >({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
@@ -858,21 +876,42 @@ export const AppPage = () => {
     [hasAccess],
   );
 
-  const refreshPaymentReminders = useCallback(
-    async (studentId: number) => {
+  const fetchPaymentRemindersPage = useCallback(
+    async (studentId: number, options: { offset?: number; append?: boolean } = {}) => {
       if (!hasAccess) return;
-      setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
+      const offset = options.offset ?? 0;
+      const append = Boolean(options.append);
+      if (append) {
+        setPaymentRemindersLoadingMoreByStudent((prev) => ({ ...prev, [studentId]: true }));
+      } else {
+        setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
+      }
       try {
-        const data = await api.getPaymentReminders(studentId, 10);
-        setPaymentRemindersByStudent((prev) => ({ ...prev, [studentId]: data.reminders }));
+        const data = await api.getPaymentReminders(studentId, { limit: PAYMENT_REMINDERS_PAGE_SIZE, offset });
+        setPaymentRemindersByStudent((prev) => ({
+          ...prev,
+          [studentId]: append ? mergePaymentReminders(prev[studentId] ?? [], data.reminders) : data.reminders,
+        }));
+        setPaymentRemindersNextOffsetByStudent((prev) => ({ ...prev, [studentId]: data.nextOffset }));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load payment reminders', error);
       } finally {
-        setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
+        if (append) {
+          setPaymentRemindersLoadingMoreByStudent((prev) => ({ ...prev, [studentId]: false }));
+        } else {
+          setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
+        }
       }
     },
     [hasAccess],
+  );
+
+  const refreshPaymentReminders = useCallback(
+    async (studentId: number) => {
+      await fetchPaymentRemindersPage(studentId, { offset: 0, append: false });
+    },
+    [fetchPaymentRemindersPage],
   );
 
   useEffect(() => {
@@ -961,11 +1000,30 @@ export const AppPage = () => {
   const paymentRemindersLoading = selectedStudentId
     ? paymentRemindersLoadingByStudent[selectedStudentId] ?? false
     : false;
+  const paymentRemindersLoadingMore = selectedStudentId
+    ? paymentRemindersLoadingMoreByStudent[selectedStudentId] ?? false
+    : false;
+  const paymentRemindersHasMore = selectedStudentId
+    ? paymentRemindersNextOffsetByStudent[selectedStudentId] != null
+    : false;
 
   const handleOpenPaymentReminders = useCallback(() => {
     if (!selectedStudentId) return;
     refreshPaymentReminders(selectedStudentId);
   }, [refreshPaymentReminders, selectedStudentId]);
+
+  const handleLoadMorePaymentReminders = useCallback(() => {
+    if (!selectedStudentId) return;
+    const nextOffset = paymentRemindersNextOffsetByStudent[selectedStudentId];
+    if (typeof nextOffset !== 'number') return;
+    if (paymentRemindersLoadingMoreByStudent[selectedStudentId]) return;
+    void fetchPaymentRemindersPage(selectedStudentId, { offset: nextOffset, append: true });
+  }, [
+    fetchPaymentRemindersPage,
+    paymentRemindersLoadingMoreByStudent,
+    paymentRemindersNextOffsetByStudent,
+    selectedStudentId,
+  ]);
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
@@ -2268,14 +2326,17 @@ export const AppPage = () => {
               onLessonSortOrderChange: handleLessonSortOrderChange,
               payments: paymentEvents,
               paymentReminders: selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [],
+              paymentRemindersHasMore,
               paymentsLoading: paymentEventsLoading,
               paymentRemindersLoading,
+              paymentRemindersLoadingMore,
               paymentFilter,
               paymentDate,
               onPaymentFilterChange: handlePaymentFilterChange,
               onPaymentDateChange: handlePaymentDateChange,
               onActiveTabChange: setStudentActiveTab,
               onOpenPaymentReminders: handleOpenPaymentReminders,
+              onLoadMorePaymentReminders: handleLoadMorePaymentReminders,
               onCompleteLesson: markLessonCompleted,
               onChangeLessonStatus: updateLessonStatus,
               onTogglePaid: togglePaid,

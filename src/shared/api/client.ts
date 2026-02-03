@@ -249,10 +249,15 @@ export const api = {
       `/api/students/${studentId}/payments${suffix ? `?${suffix}` : ''}`,
     );
   },
-  getPaymentReminders: (studentId: number, limit = 10) =>
-    apiFetch<{ reminders: PaymentReminderLog[] }>(
-      `/api/students/${studentId}/payment-reminders?limit=${limit}`,
-    ),
+  getPaymentReminders: (studentId: number, params?: { limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const suffix = query.toString();
+    return apiFetch<{ reminders: PaymentReminderLog[]; nextOffset: number | null }>(
+      `/api/students/${studentId}/payment-reminders${suffix ? `?${suffix}` : ''}`,
+    );
+  },
   createHomework: (payload: {
     studentId: number;
     text: string;
