@@ -962,14 +962,19 @@ const listStudentUnpaidLessons = async (user: User, studentId: number) => {
   return resolveStudentDebtSummary(teacher.chatId, studentId);
 };
 
-const listStudentPaymentReminders = async (user: User, studentId: number, limit = 10) => {
+const listStudentPaymentReminders = async (
+  user: User,
+  studentId: number,
+  options: { limit?: number; offset?: number } = {},
+) => {
   const teacher = await ensureTeacher(user);
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
-  const safeLimit = clampNumber(limit, 1, 50);
+  const safeLimit = clampNumber(options.limit ?? 10, 1, 50);
+  const safeOffset = clampNumber(options.offset ?? 0, 0, 10_000);
   const reminders = await prisma.notificationLog.findMany({
     where: {
       teacherId: teacher.chatId,
@@ -978,17 +983,21 @@ const listStudentPaymentReminders = async (user: User, studentId: number, limit 
       type: 'PAYMENT_REMINDER_STUDENT',
     },
     orderBy: { createdAt: 'desc' },
-    take: safeLimit,
+    take: safeLimit + 1,
+    skip: safeOffset,
   });
+  const hasMore = reminders.length > safeLimit;
+  const slicedReminders = hasMore ? reminders.slice(0, safeLimit) : reminders;
 
   return {
-    reminders: reminders.map((reminder) => ({
+    reminders: slicedReminders.map((reminder) => ({
       id: reminder.id,
       lessonId: reminder.lessonId!,
       createdAt: reminder.createdAt,
       status: reminder.status,
       source: reminder.source ?? 'AUTO',
     })),
+    nextOffset: hasMore ? safeOffset + safeLimit : null,
   };
 };
 
@@ -3691,7 +3700,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const studentId = Number(studentRemindersMatch[1]);
       if (req.method === 'GET') {
         const limit = Number(url.searchParams.get('limit') ?? 10);
-        const data = await listStudentPaymentReminders(requireApiUser(), studentId, limit);
+        const offset = Number(url.searchParams.get('offset') ?? 0);
+        const data = await listStudentPaymentReminders(requireApiUser(), studentId, { limit, offset });
         return sendJson(res, 200, data);
       }
       if (req.method === 'POST') {

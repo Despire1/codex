@@ -97,6 +97,7 @@ interface StudentsSectionProps {
   onLessonSortOrderChange: (order: LessonSortOrder) => void;
   payments: PaymentEvent[];
   paymentReminders: PaymentReminderLog[];
+  paymentRemindersHasMore: boolean;
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -110,9 +111,11 @@ interface StudentsSectionProps {
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onOpenPaymentReminders?: () => void;
+  onLoadMorePaymentReminders?: () => void;
   onRequestDebtDetails?: () => void;
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
+  paymentRemindersLoadingMore?: boolean;
 }
 const getLessonStatusLabel = (status: Lesson['status']) => {
   if (status === 'COMPLETED') return 'Проведён';
@@ -207,6 +210,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onRequestDebtDetails,
   paymentsLoading,
   paymentRemindersLoading,
+  paymentRemindersHasMore,
+  paymentRemindersLoadingMore,
+  onLoadMorePaymentReminders,
 }) => {
   void onRequestDebtDetails;
   const location = useLocation();
@@ -463,12 +469,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     paymentFilter={paymentFilter}
                     paymentDate={paymentDate}
                     paymentRemindersCount={paymentRemindersCount}
+                    paymentRemindersHasMore={paymentRemindersHasMore}
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
                     onOpenLesson={onEditLesson}
                     onOpenReminders={onOpenPaymentReminders}
+                    onLoadMoreReminders={onLoadMorePaymentReminders}
                     paymentsLoading={paymentsLoading}
                     paymentRemindersLoading={paymentRemindersLoading}
+                    paymentRemindersLoadingMore={paymentRemindersLoadingMore}
                   />
                 ) : (
                   selectedStudent && (

@@ -21,12 +21,15 @@ interface PaymentsTabProps {
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   paymentRemindersCount?: number | null;
+  paymentRemindersHasMore: boolean;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
   onPaymentDateChange: (date: string) => void;
   onOpenLesson: (lesson: Lesson) => void;
   onOpenReminders?: () => void;
+  onLoadMoreReminders?: () => void;
   paymentsLoading?: boolean;
   paymentRemindersLoading?: boolean;
+  paymentRemindersLoadingMore?: boolean;
 }
 
 export const PaymentsTab: FC<PaymentsTabProps> = ({
@@ -37,12 +40,15 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
   paymentFilter,
   paymentDate,
   paymentRemindersCount,
+  paymentRemindersHasMore,
   onPaymentFilterChange,
   onPaymentDateChange,
   onOpenLesson,
   onOpenReminders,
+  onLoadMoreReminders,
   paymentsLoading,
   paymentRemindersLoading,
+  paymentRemindersLoadingMore,
 }) => {
   const timeZone = useTimeZone();
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -70,6 +76,9 @@ export const PaymentsTab: FC<PaymentsTabProps> = ({
       reminders={paymentReminders}
       lessonsById={lessonsById}
       isLoading={paymentRemindersLoading}
+      hasMore={paymentRemindersHasMore}
+      isLoadingMore={paymentRemindersLoadingMore}
+      onLoadMore={onLoadMoreReminders}
     />
   );
 
