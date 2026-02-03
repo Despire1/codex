@@ -8,6 +8,7 @@ import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
 import { LessonModal, type LessonDraft } from '../../features/modals/LessonModal/LessonModal';
 import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
 import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
+import { useStudentsActions } from '../../widgets/students/model/useStudentsActions';
 
 export type DialogState =
   | {
@@ -52,12 +53,6 @@ export type DialogState =
   | null;
 
 interface AppModalsProps {
-  studentModalOpen: boolean;
-  onCloseStudentModal: () => void;
-  newStudentDraft: { customName: string; username: string; pricePerLesson: string };
-  isEditingStudent: boolean;
-  onStudentDraftChange: (draft: { customName: string; username: string; pricePerLesson: string }) => void;
-  onSubmitStudent: () => void;
   lessonModalOpen: boolean;
   onCloseLessonModal: () => void;
   editingLessonId: number | null;
@@ -74,12 +69,6 @@ interface AppModalsProps {
 }
 
 export const AppModals: FC<AppModalsProps> = ({
-  studentModalOpen,
-  onCloseStudentModal,
-  newStudentDraft,
-  isEditingStudent,
-  onStudentDraftChange,
-  onSubmitStudent,
   lessonModalOpen,
   onCloseLessonModal,
   editingLessonId,
@@ -94,15 +83,24 @@ export const AppModals: FC<AppModalsProps> = ({
   onCloseDialog,
   onDialogStateChange,
 }) => {
+  const {
+    studentModalOpen,
+    newStudentDraft,
+    isEditingStudent,
+    setStudentDraft,
+    submitStudent,
+    closeStudentModal,
+  } = useStudentsActions();
+
   return (
     <>
       <StudentModal
         open={studentModalOpen}
-        onClose={onCloseStudentModal}
+        onClose={closeStudentModal}
         draft={newStudentDraft}
         isEditing={isEditingStudent}
-        onDraftChange={onStudentDraftChange}
-        onSubmit={onSubmitStudent}
+        onDraftChange={setStudentDraft}
+        onSubmit={submitStudent}
       />
 
       <LessonModal

@@ -12,7 +12,6 @@ import {
   LessonStatusFilter,
   LinkedStudent,
   PaymentCancelBehavior,
-  PaymentEvent,
   Student,
   Teacher,
   TeacherStudent,
@@ -46,6 +45,7 @@ import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
 import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
+import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
 import { type LessonDraft } from '../features/modals/LessonModal/LessonModal';
 
 const initialTeacher: Teacher = {
@@ -255,9 +255,6 @@ export const AppPage = () => {
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
-  const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '', pricePerLesson: '' });
-  const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
-  const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const [newLessonDraft, setNewLessonDraft] = useState<LessonDraft>({
     studentId: undefined as number | undefined,
     studentIds: [] as number[],
@@ -279,7 +276,6 @@ export const AppPage = () => {
     remindBefore: true,
     timeSpentMinutes: '',
   });
-  const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
   const [monthAnchor, setMonthAnchor] = useState<Date>(() => startOfMonth(toZonedDate(new Date(), resolvedTimeZone)));
@@ -290,6 +286,9 @@ export const AppPage = () => {
   const [dayViewDate, setDayViewDate] = useState<Date>(() => toZonedDate(new Date(), resolvedTimeZone));
   const [scheduleSelectedMonthDay, setScheduleSelectedMonthDay] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>(null);
+  const triggerStudentsListReload = useCallback(() => {
+    setStudentListReloadKey((prev) => prev + 1);
+  }, []);
 
   const studentsData = useStudentsDataInternal({
     hasAccess,
@@ -328,6 +327,54 @@ export const AppPage = () => {
 
   const showInfoDialog = (title: string, message: string, confirmText?: string) =>
     setDialogState({ type: 'info', title, message, confirmText });
+
+  const openConfirmDialog = useCallback(
+    (options: {
+      title: string;
+      message: string;
+      confirmText?: string;
+      cancelText?: string;
+      onConfirm: () => void;
+      onCancel?: () => void;
+    }) => {
+      setDialogState({
+        type: 'confirm',
+        title: options.title,
+        message: options.message,
+        confirmText: options.confirmText,
+        cancelText: options.cancelText,
+        onConfirm: () => {
+          closeDialog();
+          options.onConfirm();
+        },
+        onCancel: () => {
+          closeDialog();
+          options.onCancel?.();
+        },
+      });
+    },
+    [closeDialog],
+  );
+
+  const navigateToStudents = useCallback(() => {
+    navigate(tabPathById.students);
+  }, [navigate]);
+
+  const studentsActions = useStudentsActionsInternal({
+    students,
+    links,
+    setStudents,
+    setLinks,
+    selectedStudentId,
+    setSelectedStudentId,
+    showToast,
+    showInfoDialog,
+    openConfirmDialog,
+    navigateToStudents,
+    triggerStudentsListReload,
+    refreshPayments,
+    clearStudentData,
+  });
 
   const buildLessonRange = useCallback(
     (startDate: Date, endDate: Date): LessonRange => {
@@ -540,10 +587,6 @@ export const AppPage = () => {
     }
   }, [selectedStudentId]);
 
-  const triggerStudentsListReload = useCallback(() => {
-    setStudentListReloadKey((prev) => prev + 1);
-  }, []);
-
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
       if (order === studentLessonSortOrder) return;
@@ -638,246 +681,6 @@ export const AppPage = () => {
 
   const handlePaymentDateChange = (nextDate: string) => {
     setPaymentDate(nextDate);
-  };
-
-  const resetStudentDraft = () => setNewStudentDraft({ customName: '', username: '', pricePerLesson: '' });
-
-  const openCreateStudentModal = () => {
-    resetStudentDraft();
-    setEditingStudentId(null);
-    setStudentModalOpen(true);
-  };
-
-  const openEditStudentModal = () => {
-    if (!selectedStudentId) return;
-    const student = students.find((entry) => entry.id === selectedStudentId);
-    const link = links.find((entry) => entry.studentId === selectedStudentId && !entry.isArchived);
-    if (!student || !link) return;
-    setNewStudentDraft({
-      customName: link.customName,
-      username: student.username ?? '',
-      pricePerLesson:
-        typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
-    });
-    setEditingStudentId(selectedStudentId);
-    setStudentModalOpen(true);
-  };
-
-  const closeStudentModal = () => {
-    setStudentModalOpen(false);
-    setEditingStudentId(null);
-  };
-
-  const parseStudentPrice = (value: string) => {
-    if (!value.trim()) return null;
-    const numericValue = Number(value);
-    if (!Number.isFinite(numericValue) || numericValue < 0) return null;
-    return Math.round(numericValue);
-  };
-
-  const handleAddStudent = async () => {
-    if (!newStudentDraft.customName.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
-      return;
-    }
-    if (!newStudentDraft.username.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите Telegram username ученика.');
-      return;
-    }
-    const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
-    if (pricePerLesson === null) {
-      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
-      return;
-    }
-
-    try {
-      const data = await api.addStudent({
-        customName: newStudentDraft.customName,
-        username: newStudentDraft.username || undefined,
-        pricePerLesson,
-      });
-
-      const { student, link } = data;
-
-      setStudents((prev) => {
-        if (prev.find((s) => s.id === student.id)) return prev;
-        return [...prev, student];
-      });
-
-      setLinks((prev) => {
-        const exists = prev.find((l) => l.studentId === link.studentId && l.teacherId === link.teacherId);
-        if (exists) {
-          return prev.map((l) => (l.studentId === link.studentId && l.teacherId === link.teacherId ? link : l));
-        }
-        return [...prev, link];
-      });
-
-      resetStudentDraft();
-      setSelectedStudentId(student.id);
-      navigate(tabPathById.students);
-      closeStudentModal();
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to add student', error);
-    }
-  };
-
-  const handleUpdateStudent = async () => {
-    if (!editingStudentId) return;
-    if (!newStudentDraft.customName.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
-      return;
-    }
-    if (!newStudentDraft.username.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите Telegram username ученика.');
-      return;
-    }
-    const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
-    if (pricePerLesson === null) {
-      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
-      return;
-    }
-    try {
-      const data = await api.updateStudent(editingStudentId, {
-        customName: newStudentDraft.customName,
-        username: newStudentDraft.username || undefined,
-        pricePerLesson,
-      });
-
-      setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
-      setLinks((prev) =>
-        prev.map((l) =>
-          l.studentId === data.link.studentId && l.teacherId === data.link.teacherId ? data.link : l,
-        ),
-      );
-      resetStudentDraft();
-      closeStudentModal();
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to update student', error);
-    }
-  };
-
-  const handleSubmitStudent = () => {
-    if (editingStudentId) {
-      void handleUpdateStudent();
-    } else {
-      void handleAddStudent();
-    }
-  };
-
-  const togglePaymentReminders = async (studentId: number, enabled: boolean) => {
-    try {
-      const data = await api.updateStudentPaymentReminders(studentId, enabled);
-      setStudents((prev) => prev.map((student) => (student.id === studentId ? data.student : student)));
-      triggerStudentsListReload();
-      showToast({
-        message: data.student.paymentRemindersEnabled ? 'Авто-напоминания об оплате включены' : 'Авто-напоминания об оплате выключены',
-        variant: 'success',
-      });
-    } catch (error) {
-      showToast({
-        message: 'Не удалось обновить настройки напоминаний',
-        variant: 'error',
-      });
-    }
-  };
-
-  const adjustBalance = async (studentId: number, delta: number) => {
-    try {
-      const data = await api.adjustBalance(studentId, { delta });
-      setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
-      await refreshPayments(studentId);
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to adjust balance', error);
-    }
-  };
-
-  const topupBalance = async (
-    studentId: number,
-    payload: { delta: number; type: PaymentEvent['type']; comment?: string; createdAt?: string },
-  ) => {
-    try {
-      const data = await api.adjustBalance(studentId, payload);
-      setLinks(links.map((link) => (link.studentId === studentId ? data.link : link)));
-      await refreshPayments(studentId);
-      triggerStudentsListReload();
-      showToast({
-        message:
-          payload.delta > 0
-            ? `Баланс пополнен на ${payload.delta} занятий`
-            : `Списано ${Math.abs(payload.delta)} занятий`,
-        variant: 'success',
-      });
-    } catch (error) {
-      throw error instanceof Error ? error : new Error('Не удалось пополнить баланс.');
-    }
-  };
-
-  const performDeleteStudent = useCallback(
-    async (studentId: number) => {
-      try {
-        await api.deleteStudent(studentId);
-        setLinks((prev) => prev.filter((link) => link.studentId !== studentId));
-        clearStudentData(studentId);
-        if (selectedStudentId === studentId) {
-          setSelectedStudentId(null);
-        }
-        triggerStudentsListReload();
-        showToast({ message: 'Ученик удалён из списка', variant: 'success' });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Не удалось удалить ученика';
-        showInfoDialog('Ошибка', message);
-        // eslint-disable-next-line no-console
-        console.error('Failed to delete student', error);
-      }
-    },
-    [clearStudentData, selectedStudentId, setSelectedStudentId, showInfoDialog, showToast, triggerStudentsListReload],
-  );
-
-  const requestDeleteStudent = useCallback(
-    (studentId: number) => {
-      const studentName = links.find((link) => link.studentId === studentId)?.customName ?? 'ученика';
-      setDialogState({
-        type: 'confirm',
-        title: `Удалить ${studentName}?`,
-        message:
-          'Связь с учеником будет удалена из вашего списка. Данные ученика сохранятся и восстановятся при повторном добавлении.',
-        confirmText: 'Удалить',
-        cancelText: 'Отмена',
-        onConfirm: () => {
-          closeDialog();
-          performDeleteStudent(studentId);
-        },
-        onCancel: closeDialog,
-      });
-    },
-    [closeDialog, links, performDeleteStudent],
-  );
-
-  const startEditPrice = (student: Student & { link: TeacherStudent }) => {
-    setPriceEditState({ id: student.id, value: String(student.link.pricePerLesson ?? '') });
-  };
-
-  const savePrice = async () => {
-    if (!priceEditState.id) return;
-    const numeric = Number(priceEditState.value);
-    if (Number.isNaN(numeric) || numeric < 0) return;
-    try {
-      const data = await api.updatePrice(priceEditState.id, numeric);
-      setLinks((prev) =>
-        prev.map((link) => (link.id === data.link.id ? data.link : link)),
-      );
-      setPriceEditState({ id: null, value: '' });
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to update price', error);
-    }
   };
 
   const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
@@ -1739,8 +1542,9 @@ export const AppPage = () => {
 
   return (
     <StudentsDataProvider value={studentsData}>
-      <TimeZoneProvider timeZone={resolvedTimeZone}>
-        <div className={layoutStyles.page}>
+      <StudentsActionsProvider value={studentsActions}>
+        <TimeZoneProvider timeZone={resolvedTimeZone}>
+          <div className={layoutStyles.page}>
           <div className={layoutStyles.pageInner}>
             <Topbar
               teacher={teacher}
@@ -1760,7 +1564,7 @@ export const AppPage = () => {
                   onWeekRangeChange: handleDashboardWeekRangeChange,
                   onAddStudent: () => {
                     navigate(tabPathById.students);
-                    openCreateStudentModal();
+                    studentsActions.openCreateStudentModal();
                   },
                   onCreateLesson: (date) => {
                     const lessonDate = date ?? new Date();
@@ -1811,17 +1615,9 @@ export const AppPage = () => {
                   hasAccess,
                   teacher,
                   lessons,
-                  priceEditState,
                   homeworkFilter: studentHomeworkFilter,
                   newHomeworkDraft,
                   onHomeworkFilterChange: setStudentHomeworkFilter,
-                  onTogglePaymentReminders: togglePaymentReminders,
-                  onAdjustBalance: adjustBalance,
-                  onBalanceTopup: topupBalance,
-                  onStartEditPrice: startEditPrice,
-                  onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
-                  onSavePrice: savePrice,
-                  onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
                   onRemindHomework: remindHomework,
                   onRemindHomeworkById: remindHomeworkById,
                   onSendHomework: sendHomeworkToStudent,
@@ -1835,9 +1631,6 @@ export const AppPage = () => {
                     }),
                   onToggleHomework: toggleHomeworkDone,
                   onUpdateHomework: updateHomework,
-                  onAddStudent: openCreateStudentModal,
-                  onEditStudent: openEditStudentModal,
-                  onRequestDeleteStudent: requestDeleteStudent,
                   onRemindLessonPayment: remindLessonPayment,
                   lessonPaymentFilter: studentLessonPaymentFilter,
                   lessonStatusFilter: studentLessonStatusFilter,
@@ -1892,12 +1685,6 @@ export const AppPage = () => {
           <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
           <AppModals
-            studentModalOpen={studentModalOpen}
-            onCloseStudentModal={closeStudentModal}
-            newStudentDraft={newStudentDraft}
-            isEditingStudent={Boolean(editingStudentId)}
-            onStudentDraftChange={setNewStudentDraft}
-            onSubmitStudent={handleSubmitStudent}
             lessonModalOpen={lessonModalOpen}
             onCloseLessonModal={closeLessonModal}
             editingLessonId={editingLessonId}
@@ -1912,9 +1699,10 @@ export const AppPage = () => {
             onCloseDialog={closeDialog}
             onDialogStateChange={setDialogState}
           />
-        </div>
-        {showSubscriptionGate ? <SubscriptionGate /> : null}
-      </TimeZoneProvider>
+          </div>
+          {showSubscriptionGate ? <SubscriptionGate /> : null}
+        </TimeZoneProvider>
+      </StudentsActionsProvider>
     </StudentsDataProvider>
   );
 };

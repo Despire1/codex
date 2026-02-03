@@ -9,10 +9,7 @@ import {
   LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
-  PaymentEvent,
-  Student,
   Teacher,
-  TeacherStudent,
   UnpaidLessonEntry,
 } from '../../entities/types';
 import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
@@ -47,7 +44,6 @@ interface AppRoutesProps {
     hasAccess: boolean;
     teacher: Teacher;
     lessons: Lesson[];
-    priceEditState: { id: number | null; value: string };
     homeworkFilter: 'all' | HomeworkStatus | 'overdue';
     newHomeworkDraft: {
       text: string;
@@ -59,21 +55,6 @@ interface AppRoutesProps {
       timeSpentMinutes: string;
     };
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-    onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
-    onAdjustBalance: (studentId: number, delta: number) => void;
-    onBalanceTopup: (
-      studentId: number,
-      payload: {
-        delta: number;
-        type: Extract<PaymentEvent['type'], 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER' | 'ADJUSTMENT'>;
-        comment?: string;
-        createdAt?: string;
-      },
-    ) => Promise<void>;
-    onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
-    onPriceChange: (value: string) => void;
-    onSavePrice: () => void;
-    onCancelPriceEdit: () => void;
     onRemindHomework: (studentId: number) => void;
     onRemindHomeworkById?: (homeworkId: number) => void;
     onSendHomework?: (homeworkId: number) => void;
@@ -91,9 +72,6 @@ interface AppRoutesProps {
     }) => void;
     onToggleHomework: (homeworkId: number) => void;
     onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
-    onAddStudent: () => void;
-    onEditStudent: () => void;
-    onRequestDeleteStudent: (studentId: number) => void;
     onRemindLessonPayment: (
       lessonId: number,
       studentId?: number,

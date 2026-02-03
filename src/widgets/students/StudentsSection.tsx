@@ -8,10 +8,7 @@ import {
   LessonPaymentFilter,
   LessonSortOrder,
   LessonStatusFilter,
-  PaymentEventType,
-  Student,
   Teacher,
-  TeacherStudent,
 } from '../../entities/types';
 import styles from './StudentsSection.module.css';
 // import { HomeworkPanel } from './components/HomeworkPanel';
@@ -27,29 +24,14 @@ import { useStudentsList } from './model/useStudentsList';
 import { useStudentsFilters } from './model/useStudentsFilters';
 import { useSelectedStudent } from '@/entities/student/model/selectedStudent';
 import { useStudentsData } from './model/useStudentsData';
+import { useStudentsActions } from './model/useStudentsActions';
 
 interface StudentsSectionProps {
   hasAccess: boolean;
   teacher: Teacher;
   lessons: Lesson[];
-  priceEditState: { id: number | null; value: string };
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-  onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
-  onAdjustBalance: (studentId: number, delta: number) => void;
-  onBalanceTopup: (
-    studentId: number,
-    payload: {
-      delta: number;
-      type: Extract<PaymentEventType, 'TOP_UP' | 'MANUAL_PAID' | 'SUBSCRIPTION' | 'OTHER' | 'ADJUSTMENT'>;
-      comment?: string;
-      createdAt?: string;
-    },
-  ) => Promise<void>;
-  onStartEditPrice: (student: Student & { link: TeacherStudent }) => void;
-  onPriceChange: (value: string) => void;
-  onSavePrice: () => void;
-  onCancelPriceEdit: () => void;
   onRemindHomework: (studentId: number) => void;
   onRemindHomeworkById?: (homeworkId: number) => void;
   onSendHomework?: (homeworkId: number) => void;
@@ -59,9 +41,6 @@ interface StudentsSectionProps {
   onHomeworkDraftChange: (draft: NewHomeworkDraft) => void;
   onToggleHomework: (homeworkId: number) => void;
   onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
-  onAddStudent: () => void;
-  onEditStudent: () => void;
-  onRequestDeleteStudent: (studentId: number) => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -114,16 +93,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   hasAccess,
   teacher,
   lessons,
-  priceEditState,
   homeworkFilter,
   onHomeworkFilterChange,
-  onTogglePaymentReminders,
-  onAdjustBalance,
-  onBalanceTopup,
-  onStartEditPrice,
-  onPriceChange,
-  onSavePrice,
-  onCancelPriceEdit,
   onRemindHomework,
   onRemindHomeworkById,
   onSendHomework,
@@ -133,9 +104,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onHomeworkDraftChange,
   onToggleHomework,
   onUpdateHomework,
-  onAddStudent,
-  onEditStudent,
-  onRequestDeleteStudent,
   onRemindLessonPayment,
   lessonPaymentFilter,
   lessonStatusFilter,
@@ -182,6 +150,19 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     openPaymentReminders,
     loadMorePaymentReminders,
   } = useStudentsData();
+  const {
+    priceEditState,
+    openCreateStudentModal,
+    openEditStudentModal,
+    requestDeleteStudent,
+    startEditPrice,
+    setPriceValue,
+    savePrice,
+    cancelPriceEdit,
+    togglePaymentReminders,
+    adjustBalance,
+    topupBalance,
+  } = useStudentsActions();
   const { search: studentSearch, filter: studentFilter, query: studentQuery, setSearch, setFilter } =
     useStudentsFilters();
   const {
@@ -368,7 +349,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             onSelectStudent={handleSelectStudent}
             onSearchChange={setSearch}
             onFilterChange={setFilter}
-            onAddStudent={onAddStudent}
+            onAddStudent={openCreateStudentModal}
           />
         )}
 
@@ -393,15 +374,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   isMobile={isMobile}
                   onBackToList={handleBackToList}
                   onTabChange={handleTabChange}
-                  onStartEditPrice={onStartEditPrice}
-                  onPriceChange={onPriceChange}
-                  onSavePrice={onSavePrice}
-                  onCancelPriceEdit={onCancelPriceEdit}
-                  onTogglePaymentReminders={onTogglePaymentReminders}
-                  onAdjustBalance={onAdjustBalance}
+                  onStartEditPrice={startEditPrice}
+                  onPriceChange={setPriceValue}
+                  onSavePrice={savePrice}
+                  onCancelPriceEdit={cancelPriceEdit}
+                  onTogglePaymentReminders={togglePaymentReminders}
+                  onAdjustBalance={adjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
-                  onEditStudent={onEditStudent}
-                  onRequestDeleteStudent={onRequestDeleteStudent}
+                  onEditStudent={openEditStudentModal}
+                  onRequestDeleteStudent={requestDeleteStudent}
                   onRequestDebtDetails={onRequestDebtDetails}
                   onRemindLessonPayment={onRemindLessonPayment}
                   onTogglePaid={onTogglePaid}
@@ -499,7 +480,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
         onClose={handleCloseBalanceTopup}
         onSubmit={(payload) =>
           selectedStudent
-            ? onBalanceTopup(selectedStudent.id, payload)
+            ? topupBalance(selectedStudent.id, payload)
             : Promise.resolve()
         }
       />
