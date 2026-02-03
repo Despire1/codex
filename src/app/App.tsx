@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { initTelegramFullscreen } from '@/shared/telegram/fullscreen';
+import { SelectedStudentProvider } from '@/entities/student/model/selectedStudent';
 import { AppPage } from './AppPage';
 
 export const App = () => {
@@ -7,5 +8,9 @@ export const App = () => {
     initTelegramFullscreen();
   }, []);
 
-  return <AppPage />;
+  return (
+    <SelectedStudentProvider>
+      <AppPage />
+    </SelectedStudentProvider>
+  );
 };

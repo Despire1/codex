@@ -13,13 +13,12 @@ import {
   LinkedStudent,
   PaymentCancelBehavior,
   PaymentEvent,
-  PaymentReminderLog,
   Student,
-  StudentDebtItem,
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
 } from '../entities/types';
+import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api } from '../shared/api/client';
 import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
 import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
@@ -46,6 +45,8 @@ import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
 import { type StudentTabId } from '../widgets/students/types';
+import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
+import { type LessonDraft } from '../features/modals/LessonModal/LessonModal';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -96,8 +97,6 @@ const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
   fromTime: '00:00',
   toTime: '23:59',
 };
-const PAYMENT_REMINDERS_PAGE_SIZE = 10;
-
 type LessonRange = {
   key: string;
   startAt: Date;
@@ -111,17 +110,6 @@ const parseTimeSpentMinutes = (value: string): number | null => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) return null;
   return Math.round(numericValue);
-};
-
-const mergePaymentReminders = (current: PaymentReminderLog[], incoming: PaymentReminderLog[]) => {
-  const seen = new Set<number>();
-  const merged: PaymentReminderLog[] = [];
-  for (const reminder of [...current, ...incoming]) {
-    if (seen.has(reminder.id)) continue;
-    seen.add(reminder.id);
-    merged.push(reminder);
-  }
-  return merged;
 };
 
 const resolveDeadlinePayload = (deadline: string | null | undefined, timeZone: string) => {
@@ -243,21 +231,10 @@ export const AppPage = () => {
     const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
     return { start: weekStart, end: addDays(weekStart, 6) };
   });
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentQuery, setStudentQuery] = useState('');
-  const [studentFilter, setStudentFilter] = useState<'all' | 'debt' | 'overdue'>('all');
   const [studentListReloadKey, setStudentListReloadKey] = useState(0);
-  const [studentHomeworks, setStudentHomeworks] = useState<Homework[]>([]);
   const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>(
     storedStudentCardFilters.homeworkFilter ?? 'all',
   );
-  const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
-  const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
-  const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
-  const [studentLessonsSummary, setStudentLessonsSummary] = useState<Lesson[]>([]);
-  const [studentUnpaidLessonsByStudent, setStudentUnpaidLessonsByStudent] = useState<Record<number, StudentDebtItem[]>>({});
-  const [studentUnpaidTotalByStudent, setStudentUnpaidTotalByStudent] = useState<Record<number, number>>({});
-  const [studentUnpaidLoadedByStudent, setStudentUnpaidLoadedByStudent] = useState<Record<number, boolean>>({});
   const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
     storedStudentCardFilters.lessonPaymentFilter ?? 'all',
   );
@@ -270,35 +247,18 @@ export const AppPage = () => {
   const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>(
     storedStudentCardFilters.lessonDateRange ?? DEFAULT_LESSON_DATE_RANGE,
   );
-  const [studentLessonLoading, setStudentLessonLoading] = useState(false);
-  const lessonLoadRequestId = useRef(0);
-  const lessonSummaryLoadRequestId = useRef(0);
-  const skipNextLessonLoadRef = useRef(false);
-  const [studentLessonsLoadedByStudent, setStudentLessonsLoadedByStudent] = useState<Record<number, boolean>>({});
-  const [paymentEventsByStudent, setPaymentEventsByStudent] = useState<Record<number, PaymentEvent[]>>({});
-  const [paymentRemindersByStudent, setPaymentRemindersByStudent] = useState<Record<number, PaymentReminderLog[]>>({});
-  const [paymentEventsLoadingByStudent, setPaymentEventsLoadingByStudent] = useState<Record<number, boolean>>({});
-  const [paymentRemindersLoadingByStudent, setPaymentRemindersLoadingByStudent] = useState<Record<number, boolean>>({});
-  const [paymentRemindersLoadingMoreByStudent, setPaymentRemindersLoadingMoreByStudent] = useState<
-    Record<number, boolean>
-  >({});
-  const [paymentRemindersNextOffsetByStudent, setPaymentRemindersNextOffsetByStudent] = useState<
-    Record<number, number | null>
-  >({});
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
   const [paymentDate, setPaymentDate] = useState(storedStudentCardFilters.paymentDate ?? '');
-  const paymentFilterRef = useRef(paymentFilter);
-  const paymentDateRef = useRef(paymentDate);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
   const [newStudentDraft, setNewStudentDraft] = useState({ customName: '', username: '', pricePerLesson: '' });
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
-  const [newLessonDraft, setNewLessonDraft] = useState({
+  const [newLessonDraft, setNewLessonDraft] = useState<LessonDraft>({
     studentId: undefined as number | undefined,
     studentIds: [] as number[],
     date: todayISO(resolvedTimeZone),
@@ -331,11 +291,40 @@ export const AppPage = () => {
   const [scheduleSelectedMonthDay, setScheduleSelectedMonthDay] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>(null);
 
+  const studentsData = useStudentsDataInternal({
+    hasAccess,
+    timeZone: resolvedTimeZone,
+    selectedStudentId,
+    studentActiveTab,
+    homeworkFilter: studentHomeworkFilter,
+    lessonPaymentFilter: studentLessonPaymentFilter,
+    lessonStatusFilter: studentLessonStatusFilter,
+    lessonDateRange: studentLessonDateRange,
+    lessonSortOrder: studentLessonSortOrder,
+    paymentFilter,
+    paymentDate,
+  });
+
+  const {
+    loadStudentHomeworks,
+    loadStudentLessons,
+    loadStudentLessonsSummary,
+    loadStudentUnpaidLessons,
+    studentDebtItems,
+    refreshPayments,
+    refreshPaymentReminders,
+    clearStudentData,
+  } = studentsData;
+
   useEffect(() => {
     lessonsByRangeRef.current = lessonsByRange;
   }, [lessonsByRange]);
 
   const closeDialog = () => setDialogState(null);
+
+  const handleLessonDraftChange = (draft: LessonDraft) => {
+    setNewLessonDraft(draft);
+  };
 
   const showInfoDialog = (title: string, message: string, confirmText?: string) =>
     setDialogState({ type: 'info', title, message, confirmText });
@@ -525,14 +514,6 @@ export const AppPage = () => {
   ]);
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setStudentQuery(studentSearch.trim());
-    }, 350);
-
-    return () => clearTimeout(handler);
-  }, [studentSearch]);
-
-  useEffect(() => {
     setNewLessonDraft((draft) => ({
       ...draft,
       endTime: resolveLessonEndTime(draft.time, teacher.defaultLessonDuration),
@@ -551,11 +532,6 @@ export const AppPage = () => {
         normalizeHomework({ ...homework, deadline: homework.deadlineAt ?? homework.deadline }, resolvedTimeZone),
       ),
     );
-    setStudentHomeworks((prev) =>
-      prev.map((homework) =>
-        normalizeHomework({ ...homework, deadline: homework.deadlineAt ?? homework.deadline }, resolvedTimeZone),
-      ),
-    );
   }, [resolvedTimeZone]);
 
   useEffect(() => {
@@ -568,179 +544,6 @@ export const AppPage = () => {
     setStudentListReloadKey((prev) => prev + 1);
   }, []);
 
-  const loadStudentHomeworks = useCallback(
-    async (options?: { offset?: number; append?: boolean; studentIdOverride?: number | null }) => {
-      if (!hasAccess) {
-        setStudentHomeworks([]);
-        setStudentHomeworkHasMore(false);
-        return;
-      }
-      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
-      if (!targetStudentId) {
-        setStudentHomeworks([]);
-        setStudentHomeworkHasMore(false);
-        return;
-      }
-      const offset = options?.offset ?? 0;
-      const append = options?.append ?? false;
-      setStudentHomeworkLoading(true);
-      try {
-        const data = await api.listStudentHomeworks(targetStudentId, {
-          filter: studentHomeworkFilter,
-          limit: 15,
-          offset,
-        });
-        setStudentHomeworkHasMore(data.nextOffset !== null);
-        setStudentHomeworks((prev) =>
-          append
-            ? [...prev, ...data.items.map((homework) => normalizeHomework(homework, resolvedTimeZone))]
-            : data.items.map((homework) => normalizeHomework(homework, resolvedTimeZone)),
-        );
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student homeworks', error);
-      } finally {
-        setStudentHomeworkLoading(false);
-      }
-    },
-    [resolvedTimeZone, selectedStudentId, hasAccess, studentHomeworkFilter],
-  );
-
-  const loadStudentLessons = useCallback(
-    async (options?: { studentIdOverride?: number | null; sortOverride?: LessonSortOrder }) => {
-      if (!hasAccess) {
-        setStudentLessons([]);
-        return;
-      }
-      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
-      if (!targetStudentId) {
-        setStudentLessons([]);
-        return;
-      }
-
-      const requestId = lessonLoadRequestId.current + 1;
-      lessonLoadRequestId.current = requestId;
-      setStudentLessonLoading(true);
-      try {
-        const startFrom = studentLessonDateRange.from
-          ? toUtcDateFromTimeZone(
-              studentLessonDateRange.from,
-              studentLessonDateRange.fromTime || '00:00',
-              resolvedTimeZone,
-            ).toISOString()
-          : undefined;
-        const startTo = studentLessonDateRange.to
-          ? toUtcDateFromTimeZone(
-              studentLessonDateRange.to,
-              studentLessonDateRange.toTime || '23:59',
-              resolvedTimeZone,
-            ).toISOString()
-          : undefined;
-        const sortOrder = options?.sortOverride ?? studentLessonSortOrder;
-        const data = await api.listStudentLessons(targetStudentId, {
-          payment: studentLessonPaymentFilter,
-          status: studentLessonStatusFilter,
-          startFrom,
-          startTo,
-          sort: sortOrder,
-        });
-        if (lessonLoadRequestId.current !== requestId) return;
-        setStudentLessons(data.items.map(normalizeLesson));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student lessons', error);
-      } finally {
-        if (lessonLoadRequestId.current === requestId) {
-          setStudentLessonLoading(false);
-        }
-      }
-    },
-    [
-      selectedStudentId,
-      hasAccess,
-      studentLessonDateRange.from,
-      studentLessonDateRange.fromTime,
-      studentLessonDateRange.to,
-      studentLessonDateRange.toTime,
-      studentLessonPaymentFilter,
-      studentLessonStatusFilter,
-      studentLessonSortOrder,
-      resolvedTimeZone,
-    ],
-  );
-
-  const loadStudentLessonsSummary = useCallback(
-    async (options?: { studentIdOverride?: number | null }) => {
-      if (!hasAccess) {
-        setStudentLessonsSummary([]);
-        return;
-      }
-      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
-      if (!targetStudentId) {
-        setStudentLessonsSummary([]);
-        return;
-      }
-
-      const requestId = lessonSummaryLoadRequestId.current + 1;
-      lessonSummaryLoadRequestId.current = requestId;
-      try {
-        const data = await api.listStudentLessons(targetStudentId, {
-          payment: 'all',
-          status: 'all',
-          sort: 'asc',
-        });
-        if (lessonSummaryLoadRequestId.current !== requestId) return;
-        setStudentLessonsSummary(data.items.map(normalizeLesson));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student lessons summary', error);
-        if (lessonSummaryLoadRequestId.current === requestId) {
-          setStudentLessonsSummary([]);
-        }
-      }
-    },
-    [selectedStudentId, hasAccess],
-  );
-
-  const loadStudentUnpaidLessons = useCallback(
-    async (options?: { studentIdOverride?: number | null; force?: boolean }) => {
-      if (!hasAccess) return;
-      const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
-      if (!targetStudentId) return;
-      if (!options?.force && studentUnpaidLoadedByStudent[targetStudentId]) return;
-      try {
-        const data = await api.listStudentUnpaidLessons(targetStudentId);
-        setStudentUnpaidLessonsByStudent((prev) => ({ ...prev, [targetStudentId]: data.items }));
-        setStudentUnpaidTotalByStudent((prev) => ({ ...prev, [targetStudentId]: data.total }));
-        setStudentUnpaidLoadedByStudent((prev) => ({ ...prev, [targetStudentId]: true }));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student unpaid lessons', error);
-      }
-    },
-    [hasAccess, selectedStudentId, studentUnpaidLoadedByStudent],
-  );
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    loadStudentUnpaidLessons({ studentIdOverride: selectedStudentId });
-  }, [hasAccess, loadStudentUnpaidLessons, selectedStudentId]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (skipNextLessonLoadRef.current) {
-      skipNextLessonLoadRef.current = false;
-    }
-    if (studentActiveTab !== 'lessons') return;
-    loadStudentLessons();
-  }, [loadStudentLessons, hasAccess, studentActiveTab]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    loadStudentLessonsSummary();
-  }, [loadStudentLessonsSummary, hasAccess]);
-
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
       if (order === studentLessonSortOrder) return;
@@ -748,19 +551,6 @@ export const AppPage = () => {
     },
     [studentLessonSortOrder],
   );
-
-  const loadMoreStudentHomeworks = useCallback(() => {
-    if (studentHomeworkLoading || !studentHomeworkHasMore) return;
-    loadStudentHomeworks({ offset: studentHomeworks.length, append: true });
-  }, [loadStudentHomeworks, studentHomeworkHasMore, studentHomeworkLoading, studentHomeworks.length]);
-
-  useEffect(() => {
-    paymentFilterRef.current = paymentFilter;
-  }, [paymentFilter]);
-
-  useEffect(() => {
-    paymentDateRef.current = paymentDate;
-  }, [paymentDate]);
 
   useEffect(() => {
     saveStudentCardFilters({
@@ -781,77 +571,6 @@ export const AppPage = () => {
     studentLessonSortOrder,
     studentLessonStatusFilter,
   ]);
-
-  const refreshPayments = useCallback(
-    async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
-      if (!hasAccess) return;
-      setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
-      try {
-        const filter = options?.filter ?? paymentFilterRef.current;
-        const date = options?.date ?? paymentDateRef.current;
-        const data = await api.getPaymentEvents(studentId, { filter, date: date || undefined });
-        setPaymentEventsByStudent((prev) => ({ ...prev, [studentId]: data.events }));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load payment events', error);
-      } finally {
-        setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
-      }
-    },
-    [hasAccess],
-  );
-
-  const fetchPaymentRemindersPage = useCallback(
-    async (studentId: number, options: { offset?: number; append?: boolean } = {}) => {
-      if (!hasAccess) return;
-      const offset = options.offset ?? 0;
-      const append = Boolean(options.append);
-      if (append) {
-        setPaymentRemindersLoadingMoreByStudent((prev) => ({ ...prev, [studentId]: true }));
-      } else {
-        setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: true }));
-      }
-      try {
-        const data = await api.getPaymentReminders(studentId, { limit: PAYMENT_REMINDERS_PAGE_SIZE, offset });
-        setPaymentRemindersByStudent((prev) => ({
-          ...prev,
-          [studentId]: append ? mergePaymentReminders(prev[studentId] ?? [], data.reminders) : data.reminders,
-        }));
-        setPaymentRemindersNextOffsetByStudent((prev) => ({ ...prev, [studentId]: data.nextOffset }));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load payment reminders', error);
-      } finally {
-        if (append) {
-          setPaymentRemindersLoadingMoreByStudent((prev) => ({ ...prev, [studentId]: false }));
-        } else {
-          setPaymentRemindersLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
-        }
-      }
-    },
-    [hasAccess],
-  );
-
-  const refreshPaymentReminders = useCallback(
-    async (studentId: number) => {
-      await fetchPaymentRemindersPage(studentId, { offset: 0, append: false });
-    },
-    [fetchPaymentRemindersPage],
-  );
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    if (studentActiveTab !== 'payments') return;
-    refreshPayments(selectedStudentId);
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess, studentActiveTab]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    if (studentActiveTab !== 'payments') return;
-    refreshPaymentReminders(selectedStudentId);
-  }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -912,51 +631,6 @@ export const AppPage = () => {
       })),
     [links, students, homeworks],
   );
-  const paymentEvents = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
-  const selectedStudentUnpaidItems = selectedStudentId
-    ? studentUnpaidLessonsByStudent[selectedStudentId] ?? []
-    : [];
-  const selectedStudentUnpaidTotal = selectedStudentId
-    ? studentUnpaidTotalByStudent[selectedStudentId] ?? 0
-    : 0;
-  const paymentEventsLoading = selectedStudentId
-    ? paymentEventsLoadingByStudent[selectedStudentId] ?? false
-    : false;
-  const paymentRemindersLoading = selectedStudentId
-    ? paymentRemindersLoadingByStudent[selectedStudentId] ?? false
-    : false;
-  const paymentRemindersLoadingMore = selectedStudentId
-    ? paymentRemindersLoadingMoreByStudent[selectedStudentId] ?? false
-    : false;
-  const paymentRemindersHasMore = selectedStudentId
-    ? paymentRemindersNextOffsetByStudent[selectedStudentId] != null
-    : false;
-
-  const handleOpenPaymentReminders = useCallback(() => {
-    if (!selectedStudentId) return;
-    const hasRemindersLoaded = paymentRemindersByStudent[selectedStudentId] !== undefined;
-    const isLoading = paymentRemindersLoadingByStudent[selectedStudentId] ?? false;
-    if (hasRemindersLoaded || isLoading) return;
-    refreshPaymentReminders(selectedStudentId);
-  }, [
-    paymentRemindersByStudent,
-    paymentRemindersLoadingByStudent,
-    refreshPaymentReminders,
-    selectedStudentId,
-  ]);
-
-  const handleLoadMorePaymentReminders = useCallback(() => {
-    if (!selectedStudentId) return;
-    const nextOffset = paymentRemindersNextOffsetByStudent[selectedStudentId];
-    if (typeof nextOffset !== 'number') return;
-    if (paymentRemindersLoadingMoreByStudent[selectedStudentId]) return;
-    void fetchPaymentRemindersPage(selectedStudentId, { offset: nextOffset, append: true });
-  }, [
-    fetchPaymentRemindersPage,
-    paymentRemindersLoadingMoreByStudent,
-    paymentRemindersNextOffsetByStudent,
-    selectedStudentId,
-  ]);
 
   const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
     setPaymentFilter(nextFilter);
@@ -1149,12 +823,7 @@ export const AppPage = () => {
       try {
         await api.deleteStudent(studentId);
         setLinks((prev) => prev.filter((link) => link.studentId !== studentId));
-        setPaymentEventsByStudent((prev) => {
-          if (!prev[studentId]) return prev;
-          const next = { ...prev };
-          delete next[studentId];
-          return next;
-        });
+        clearStudentData(studentId);
         if (selectedStudentId === studentId) {
           setSelectedStudentId(null);
         }
@@ -1167,7 +836,7 @@ export const AppPage = () => {
         console.error('Failed to delete student', error);
       }
     },
-    [selectedStudentId, showInfoDialog, showToast, triggerStudentsListReload],
+    [clearStudentData, selectedStudentId, setSelectedStudentId, showInfoDialog, showToast, triggerStudentsListReload],
   );
 
   const requestDeleteStudent = useCallback(
@@ -1589,16 +1258,7 @@ export const AppPage = () => {
       if (studentId !== undefined) {
         const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
         const normalizedLesson = normalizeLesson(data.lesson);
-        const shouldUpdateStudentLists = selectedStudentId !== null
-          && (
-            selectedStudentId === studentId
-            || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
-          );
         updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-        if (shouldUpdateStudentLists) {
-          setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-          setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-        }
 
         if (data.link) {
           setLinks((prev) => {
@@ -1622,17 +1282,7 @@ export const AppPage = () => {
       } else {
         const data = await api.togglePaid(lessonId, payload);
         const normalizedLesson = normalizeLesson(data.lesson);
-        const targetStudentId = data.lesson.studentId ?? null;
-        const shouldUpdateStudentLists = selectedStudentId !== null
-          && (
-            selectedStudentId === targetStudentId
-            || normalizedLesson.participants?.some((participant) => participant.studentId === selectedStudentId)
-          );
         updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-        if (shouldUpdateStudentLists) {
-          setStudentLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-          setStudentLessonsSummary((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-        }
 
         if (data.link) {
           setLinks((prev) => {
@@ -1974,14 +1624,7 @@ export const AppPage = () => {
       await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
       showToast({ message: 'Отправлено ✅', variant: 'success' });
       if (studentId) {
-        setStudentUnpaidLessonsByStudent((prev) => ({
-          ...prev,
-          [studentId]: (prev[studentId] ?? []).map((item) =>
-            item.id === lessonId
-              ? { ...item, lastPaymentReminderAt: new Date().toISOString() }
-              : item,
-          ),
-        }));
+        await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
       }
       if (selectedStudentId) {
         refreshPaymentReminders(selectedStudentId);
@@ -1999,7 +1642,7 @@ export const AppPage = () => {
       }
       if (code === 'recently_sent' && !options?.force) {
         return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
-          const reminderItem = selectedStudentUnpaidItems.find((item) => item.id === lessonId);
+          const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
           const lastReminderLabel = reminderItem?.lastPaymentReminderAt
             ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
                 locale: ru,
@@ -2095,205 +1738,183 @@ export const AppPage = () => {
   const showSubscriptionGate = !hasSubscription && !isStudentRole;
 
   return (
-    <TimeZoneProvider timeZone={resolvedTimeZone}>
-      <div className={layoutStyles.page}>
-        <div className={layoutStyles.pageInner}>
-          <Topbar
-            teacher={teacher}
-            activeTab={activeTab}
-            onTabChange={(tab) => navigate(tabPathById[tab])}
-            profilePhotoUrl={sessionUser?.photoUrl ?? null}
-          />
+    <StudentsDataProvider value={studentsData}>
+      <TimeZoneProvider timeZone={resolvedTimeZone}>
+        <div className={layoutStyles.page}>
+          <div className={layoutStyles.pageInner}>
+            <Topbar
+              teacher={teacher}
+              activeTab={activeTab}
+              onTabChange={(tab) => navigate(tabPathById[tab])}
+              profilePhotoUrl={sessionUser?.photoUrl ?? null}
+            />
 
-          <main className={layoutStyles.content}>
-            <AppRoutes
-              resolveLastVisitedPath={resolveLastVisitedPath}
-              dashboard={{
-                teacher,
-                lessons,
-                linkedStudents,
-                unpaidEntries: unpaidLessonEntries,
-                onWeekRangeChange: handleDashboardWeekRangeChange,
-                onAddStudent: () => {
-                  navigate(tabPathById.students);
-                  openCreateStudentModal();
-                },
-                onCreateLesson: (date) => {
-                  const lessonDate = date ?? new Date();
-                  const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+            <main className={layoutStyles.content}>
+              <AppRoutes
+                resolveLastVisitedPath={resolveLastVisitedPath}
+                dashboard={{
+                  teacher,
+                  lessons,
+                  linkedStudents,
+                  unpaidEntries: unpaidLessonEntries,
+                  onWeekRangeChange: handleDashboardWeekRangeChange,
+                  onAddStudent: () => {
+                    navigate(tabPathById.students);
+                    openCreateStudentModal();
+                  },
+                  onCreateLesson: (date) => {
+                    const lessonDate = date ?? new Date();
+                    const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
 
-                  if (date) {
+                    if (date) {
+                      setScheduleView('month');
+                      setDayViewDate(lessonDate);
+                      setMonthAnchor(startOfMonth(lessonDate));
+                      setMonthOffset(0);
+                      setScheduleSelectedMonthDay(lessonIso);
+                      navigate(tabPathById.schedule);
+                    }
+
+                    openLessonModal(
+                      lessonIso,
+                      date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                    );
+                  },
+                  onOpenSchedule: () => navigate(tabPathById.schedule),
+                  onOpenLesson: (lesson) =>
+                    openLessonModal(
+                      formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                      undefined,
+                      lesson,
+                    ),
+                  onOpenLessonDay: (lesson) => {
+                    const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+                    const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+                      timeZone: resolvedTimeZone,
+                    });
                     setScheduleView('month');
                     setDayViewDate(lessonDate);
                     setMonthAnchor(startOfMonth(lessonDate));
                     setMonthOffset(0);
                     setScheduleSelectedMonthDay(lessonIso);
                     navigate(tabPathById.schedule);
-                  }
+                  },
+                  onCompleteLesson: markLessonCompleted,
+                  onTogglePaid: togglePaid,
+                  onRemindLessonPayment: remindLessonPayment,
+                  onOpenStudent: (studentId) => {
+                    setSelectedStudentId(studentId);
+                    navigate(tabPathById.students);
+                  },
+                }}
+                students={{
+                  hasAccess,
+                  teacher,
+                  lessons,
+                  priceEditState,
+                  homeworkFilter: studentHomeworkFilter,
+                  newHomeworkDraft,
+                  onHomeworkFilterChange: setStudentHomeworkFilter,
+                  onTogglePaymentReminders: togglePaymentReminders,
+                  onAdjustBalance: adjustBalance,
+                  onBalanceTopup: topupBalance,
+                  onStartEditPrice: startEditPrice,
+                  onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
+                  onSavePrice: savePrice,
+                  onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
+                  onRemindHomework: remindHomework,
+                  onRemindHomeworkById: remindHomeworkById,
+                  onSendHomework: sendHomeworkToStudent,
+                  onDuplicateHomework: duplicateHomework,
+                  onDeleteHomework: deleteHomework,
+                  onAddHomework: addHomework,
+                  onHomeworkDraftChange: (draft) =>
+                    setNewHomeworkDraft({
+                      ...draft,
+                      baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
+                    }),
+                  onToggleHomework: toggleHomeworkDone,
+                  onUpdateHomework: updateHomework,
+                  onAddStudent: openCreateStudentModal,
+                  onEditStudent: openEditStudentModal,
+                  onRequestDeleteStudent: requestDeleteStudent,
+                  onRemindLessonPayment: remindLessonPayment,
+                  lessonPaymentFilter: studentLessonPaymentFilter,
+                  lessonStatusFilter: studentLessonStatusFilter,
+                  lessonDateRange: studentLessonDateRange,
+                  lessonSortOrder: studentLessonSortOrder,
+                  onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
+                  onLessonStatusFilterChange: setStudentLessonStatusFilter,
+                  onLessonDateRangeChange: setStudentLessonDateRange,
+                  onLessonSortOrderChange: handleLessonSortOrderChange,
+                  paymentFilter,
+                  paymentDate,
+                  onPaymentFilterChange: handlePaymentFilterChange,
+                  onPaymentDateChange: handlePaymentDateChange,
+                  onActiveTabChange: setStudentActiveTab,
+                  onCompleteLesson: markLessonCompleted,
+                  onChangeLessonStatus: updateLessonStatus,
+                  onTogglePaid: togglePaid,
+                  onCreateLesson: openCreateLessonForStudent,
+                  onEditLesson: startEditLesson,
+                  onRequestDeleteLesson: requestDeleteLessonFromList,
+                  studentListReloadKey,
+                }}
+                schedule={{
+                  scheduleView,
+                  onScheduleViewChange: setScheduleView,
+                  dayViewDate,
+                  onDayShift: handleDayShift,
+                  onWeekShift: handleWeekShift,
+                  onMonthShift: handleMonthShift,
+                  dayLabelKey,
+                  weekLabelKey,
+                  monthLabelKey,
+                  lessons,
+                  linkedStudents,
+                  monthAnchor,
+                  monthOffset,
+                  selectedMonthDay: scheduleSelectedMonthDay,
+                  onMonthDaySelect: setScheduleSelectedMonthDay,
+                  onOpenLessonModal: openLessonModal,
+                  onStartEditLesson: startEditLesson,
+                  onTogglePaid: togglePaid,
+                  onDeleteLesson: requestDeleteLessonFromList,
+                  onDayViewDateChange: setDayViewDate,
+                  onGoToToday: handleGoToToday,
+                  autoConfirmLessons: teacher.autoConfirmLessons,
+                }}
+                settings={{ teacher, onTeacherChange: setTeacher }}
+              />
+            </main>
+          </div>
 
-                  openLessonModal(
-                    lessonIso,
-                    date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
-                  );
-                },
-                onOpenSchedule: () => navigate(tabPathById.schedule),
-                onOpenLesson: (lesson) =>
-                  openLessonModal(
-                    formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                    undefined,
-                    lesson,
-                  ),
-                onOpenLessonDay: (lesson) => {
-                  const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
-                  const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
-                    timeZone: resolvedTimeZone,
-                  });
-                  setScheduleView('month');
-                  setDayViewDate(lessonDate);
-                  setMonthAnchor(startOfMonth(lessonDate));
-                  setMonthOffset(0);
-                  setScheduleSelectedMonthDay(lessonIso);
-                  navigate(tabPathById.schedule);
-                },
-                onCompleteLesson: markLessonCompleted,
-                onTogglePaid: togglePaid,
-                onRemindLessonPayment: remindLessonPayment,
-                onOpenStudent: (studentId) => {
-                  setSelectedStudentId(studentId);
-                  navigate(tabPathById.students);
-                },
-              }}
-              students={{
-                hasAccess,
-                teacher,
-                studentSearch,
-                studentQuery,
-                studentFilter,
-                lessons,
-                selectedStudentId,
-                priceEditState,
-                studentHomeworks,
-                homeworkFilter: studentHomeworkFilter,
-                homeworkListLoading: studentHomeworkLoading,
-                homeworkListHasMore: studentHomeworkHasMore,
-                newHomeworkDraft,
-                onSelectStudent: setSelectedStudentId,
-                onStudentSearchChange: setStudentSearch,
-                onStudentFilterChange: setStudentFilter,
-                onHomeworkFilterChange: setStudentHomeworkFilter,
-                onLoadMoreHomeworks: loadMoreStudentHomeworks,
-                onTogglePaymentReminders: togglePaymentReminders,
-                onAdjustBalance: adjustBalance,
-                onBalanceTopup: topupBalance,
-                onStartEditPrice: startEditPrice,
-                onPriceChange: (value) => setPriceEditState((prev) => ({ ...prev, value })),
-                onSavePrice: savePrice,
-                onCancelPriceEdit: () => setPriceEditState({ id: null, value: '' }),
-                onRemindHomework: remindHomework,
-                onRemindHomeworkById: remindHomeworkById,
-                onSendHomework: sendHomeworkToStudent,
-                onDuplicateHomework: duplicateHomework,
-                onDeleteHomework: deleteHomework,
-                onAddHomework: addHomework,
-                onHomeworkDraftChange: (draft) =>
-                  setNewHomeworkDraft({
-                    ...draft,
-                    baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
-                  }),
-              onToggleHomework: toggleHomeworkDone,
-              onUpdateHomework: updateHomework,
-              onAddStudent: openCreateStudentModal,
-              onEditStudent: openEditStudentModal,
-              onRequestDeleteStudent: requestDeleteStudent,
-              onRemindLessonPayment: remindLessonPayment,
-              studentLessons,
-              studentLessonsSummary,
-              studentDebtItems: selectedStudentUnpaidItems,
-              studentDebtTotal: selectedStudentUnpaidTotal,
-              lessonPaymentFilter: studentLessonPaymentFilter,
-              lessonStatusFilter: studentLessonStatusFilter,
-              lessonDateRange: studentLessonDateRange,
-              lessonListLoading: studentLessonLoading,
-              lessonSortOrder: studentLessonSortOrder,
-              onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
-              onLessonStatusFilterChange: setStudentLessonStatusFilter,
-              onLessonDateRangeChange: setStudentLessonDateRange,
-              onLessonSortOrderChange: handleLessonSortOrderChange,
-              payments: paymentEvents,
-              paymentReminders: selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [],
-              paymentRemindersHasMore,
-              paymentsLoading: paymentEventsLoading,
-              paymentRemindersLoading,
-              paymentRemindersLoadingMore,
-              paymentFilter,
-              paymentDate,
-              onPaymentFilterChange: handlePaymentFilterChange,
-              onPaymentDateChange: handlePaymentDateChange,
-              onActiveTabChange: setStudentActiveTab,
-              onOpenPaymentReminders: handleOpenPaymentReminders,
-              onLoadMorePaymentReminders: handleLoadMorePaymentReminders,
-              onCompleteLesson: markLessonCompleted,
-              onChangeLessonStatus: updateLessonStatus,
-              onTogglePaid: togglePaid,
-              onCreateLesson: openCreateLessonForStudent,
-                onEditLesson: startEditLesson,
-                onRequestDeleteLesson: requestDeleteLessonFromList,
-                studentListReloadKey,
-              }}
-            schedule={{
-              scheduleView,
-              onScheduleViewChange: setScheduleView,
-              dayViewDate,
-              onDayShift: handleDayShift,
-              onWeekShift: handleWeekShift,
-              onMonthShift: handleMonthShift,
-              dayLabelKey,
-              weekLabelKey,
-              monthLabelKey,
-              lessons,
-              linkedStudents,
-              monthAnchor,
-              monthOffset,
-              selectedMonthDay: scheduleSelectedMonthDay,
-              onMonthDaySelect: setScheduleSelectedMonthDay,
-              onOpenLessonModal: openLessonModal,
-              onStartEditLesson: startEditLesson,
-              onTogglePaid: togglePaid,
-              onDeleteLesson: requestDeleteLessonFromList,
-              onDayViewDateChange: setDayViewDate,
-              onGoToToday: handleGoToToday,
-              autoConfirmLessons: teacher.autoConfirmLessons,
-            }}
-            settings={{ teacher, onTeacherChange: setTeacher }}
-            />
-          </main>
+          <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+
+          <AppModals
+            studentModalOpen={studentModalOpen}
+            onCloseStudentModal={closeStudentModal}
+            newStudentDraft={newStudentDraft}
+            isEditingStudent={Boolean(editingStudentId)}
+            onStudentDraftChange={setNewStudentDraft}
+            onSubmitStudent={handleSubmitStudent}
+            lessonModalOpen={lessonModalOpen}
+            onCloseLessonModal={closeLessonModal}
+            editingLessonId={editingLessonId}
+            defaultLessonDuration={teacher.defaultLessonDuration}
+            linkedStudents={linkedStudents}
+            lessonDraft={newLessonDraft}
+            recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
+            onLessonDraftChange={handleLessonDraftChange}
+            onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
+            onSubmitLesson={saveLesson}
+            dialogState={dialogState}
+            onCloseDialog={closeDialog}
+            onDialogStateChange={setDialogState}
+          />
         </div>
-
-        <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
-
-        <AppModals
-          studentModalOpen={studentModalOpen}
-          onCloseStudentModal={closeStudentModal}
-          newStudentDraft={newStudentDraft}
-          isEditingStudent={Boolean(editingStudentId)}
-          onStudentDraftChange={setNewStudentDraft}
-          onSubmitStudent={handleSubmitStudent}
-          lessonModalOpen={lessonModalOpen}
-          onCloseLessonModal={closeLessonModal}
-          editingLessonId={editingLessonId}
-          defaultLessonDuration={teacher.defaultLessonDuration}
-          linkedStudents={linkedStudents}
-          lessonDraft={newLessonDraft}
-          recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
-          onLessonDraftChange={setNewLessonDraft}
-          onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
-          onSubmitLesson={saveLesson}
-          dialogState={dialogState}
-          onCloseDialog={closeDialog}
-          onDialogStateChange={setDialogState}
-        />
-      </div>
-      {showSubscriptionGate ? <SubscriptionGate /> : null}
-    </TimeZoneProvider>
+        {showSubscriptionGate ? <SubscriptionGate /> : null}
+      </TimeZoneProvider>
+    </StudentsDataProvider>
   );
 };

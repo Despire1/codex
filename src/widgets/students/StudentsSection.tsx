@@ -1,4 +1,4 @@
-import { type Dispatch, type FC, type SetStateAction, type UIEvent, useEffect, useRef, useState } from 'react';
+import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Homework,
@@ -8,11 +8,8 @@ import {
   LessonPaymentFilter,
   LessonSortOrder,
   LessonStatusFilter,
-  PaymentEvent,
   PaymentEventType,
-  PaymentReminderLog,
   Student,
-  StudentDebtItem,
   Teacher,
   TeacherStudent,
 } from '../../entities/types';
@@ -27,25 +24,17 @@ import { StudentsSidebar } from './components/StudentsSidebar';
 import { NewHomeworkDraft, SelectedStudent, StudentTabId } from './types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useStudentsList } from './model/useStudentsList';
+import { useStudentsFilters } from './model/useStudentsFilters';
+import { useSelectedStudent } from '@/entities/student/model/selectedStudent';
+import { useStudentsData } from './model/useStudentsData';
 
 interface StudentsSectionProps {
   hasAccess: boolean;
   teacher: Teacher;
-  studentSearch: string;
-  studentQuery: string;
-  studentFilter: 'all' | 'debt' | 'overdue';
   lessons: Lesson[];
-  selectedStudentId: number | null;
   priceEditState: { id: number | null; value: string };
-  studentHomeworks: Homework[];
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
-  homeworkListLoading: boolean;
-  homeworkListHasMore: boolean;
-  onSelectStudent: Dispatch<SetStateAction<number | null>>;
-  onStudentSearchChange: (value: string) => void;
-  onStudentFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-  onLoadMoreHomeworks: () => void;
   onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
   onAdjustBalance: (studentId: number, delta: number) => void;
   onBalanceTopup: (
@@ -78,22 +67,14 @@ interface StudentsSectionProps {
     studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
-  studentLessons: Lesson[];
-  studentLessonsSummary: Lesson[];
-  studentDebtItems: StudentDebtItem[];
-  studentDebtTotal: number;
   lessonPaymentFilter: LessonPaymentFilter;
   lessonStatusFilter: LessonStatusFilter;
   lessonDateRange: LessonDateRange;
-  lessonListLoading: boolean;
   lessonSortOrder: LessonSortOrder;
   onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
   onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
   onLessonDateRangeChange: (range: LessonDateRange) => void;
   onLessonSortOrderChange: (order: LessonSortOrder) => void;
-  payments: PaymentEvent[];
-  paymentReminders: PaymentReminderLog[];
-  paymentRemindersHasMore: boolean;
   paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -106,12 +87,7 @@ interface StudentsSectionProps {
   onRequestDeleteLesson: (lesson: Lesson) => void;
   newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
-  onOpenPaymentReminders?: () => void;
-  onLoadMorePaymentReminders?: () => void;
   onRequestDebtDetails?: () => void;
-  paymentsLoading?: boolean;
-  paymentRemindersLoading?: boolean;
-  paymentRemindersLoadingMore?: boolean;
   studentListReloadKey: number;
 }
 const getLessonStatusLabel = (status: Lesson['status']) => {
@@ -137,21 +113,10 @@ const resolveStudentTab = (search: string): StudentTabId => {
 export const StudentsSection: FC<StudentsSectionProps> = ({
   hasAccess,
   teacher,
-  studentSearch,
-  studentQuery,
-  studentFilter,
   lessons,
-  selectedStudentId,
   priceEditState,
-  studentHomeworks,
   homeworkFilter,
-  homeworkListLoading,
-  homeworkListHasMore,
-  onSelectStudent,
-  onStudentSearchChange,
-  onStudentFilterChange,
   onHomeworkFilterChange,
-  onLoadMoreHomeworks,
   onTogglePaymentReminders,
   onAdjustBalance,
   onBalanceTopup,
@@ -172,21 +137,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onEditStudent,
   onRequestDeleteStudent,
   onRemindLessonPayment,
-  studentLessons,
-  studentLessonsSummary,
-  studentDebtItems,
-  studentDebtTotal,
   lessonPaymentFilter,
   lessonStatusFilter,
   lessonDateRange,
-  lessonListLoading,
   lessonSortOrder,
   onLessonPaymentFilterChange,
   onLessonStatusFilterChange,
   onLessonDateRangeChange,
   onLessonSortOrderChange,
-  payments,
-  paymentReminders,
   paymentFilter,
   paymentDate,
   onPaymentFilterChange,
@@ -199,18 +157,33 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onRequestDeleteLesson,
   newHomeworkDraft,
   onActiveTabChange,
-  onOpenPaymentReminders,
   onRequestDebtDetails,
-  paymentsLoading,
-  paymentRemindersLoading,
-  paymentRemindersHasMore,
-  paymentRemindersLoadingMore,
-  onLoadMorePaymentReminders,
   studentListReloadKey,
 }) => {
-  void onRequestDebtDetails;
   const location = useLocation();
   const navigate = useNavigate();
+  const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
+  const {
+    studentHomeworks,
+    studentHomeworkHasMore,
+    studentHomeworkLoading,
+    loadMoreStudentHomeworks,
+    studentLessons,
+    studentLessonsSummary,
+    studentDebtItems,
+    studentDebtTotal,
+    studentLessonLoading,
+    payments,
+    paymentReminders,
+    paymentRemindersHasMore,
+    paymentsLoading,
+    paymentRemindersLoading,
+    paymentRemindersLoadingMore,
+    openPaymentReminders,
+    loadMorePaymentReminders,
+  } = useStudentsData();
+  const { search: studentSearch, filter: studentFilter, query: studentQuery, setSearch, setFilter } =
+    useStudentsFilters();
   const {
     items: studentListItems,
     counts: studentListCounts,
@@ -224,7 +197,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     studentQuery,
     studentFilter,
     selectedStudentId,
-    setSelectedStudentId: onSelectStudent,
+    setSelectedStudentId,
     reloadKey: studentListReloadKey,
   });
   const selectedStudentEntry = studentListItems.find((item) => item.student.id === selectedStudentId);
@@ -327,7 +300,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   };
 
   const handleSelectStudent = (id: number) => {
-    onSelectStudent(id);
+    setSelectedStudentId(id);
     if (isMobile) {
       setMobileView('details');
     }
@@ -393,8 +366,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
             listRef={studentListRef}
             loadMoreRef={studentLoadMoreRef}
             onSelectStudent={handleSelectStudent}
-            onSearchChange={onStudentSearchChange}
-            onFilterChange={onStudentFilterChange}
+            onSearchChange={setSearch}
+            onFilterChange={setFilter}
             onAddStudent={onAddStudent}
           />
         )}
@@ -408,10 +381,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 className={`${styles.detailsBody} ${isMobile ? styles.mobileScrollArea : ''}`}
                 onScroll={handleDetailsScroll}
               >
-            <StudentHero
-            headerRef={headerRef}
-            selectedStudent={selectedStudent}
-            studentLessonsSummary={studentLessonsSummary}
+                <StudentHero
+                  headerRef={headerRef}
+                  selectedStudent={selectedStudent}
+                  studentLessonsSummary={studentLessonsSummary}
                   studentDebtItems={studentDebtItems}
                   studentDebtTotal={studentDebtTotal}
                   studentDebtSummary={studentDebtSummary}
@@ -423,9 +396,9 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onStartEditPrice={onStartEditPrice}
                   onPriceChange={onPriceChange}
                   onSavePrice={onSavePrice}
-            onCancelPriceEdit={onCancelPriceEdit}
-            onTogglePaymentReminders={onTogglePaymentReminders}
-            onAdjustBalance={onAdjustBalance}
+                  onCancelPriceEdit={onCancelPriceEdit}
+                  onTogglePaymentReminders={onTogglePaymentReminders}
+                  onAdjustBalance={onAdjustBalance}
                   onOpenBalanceTopup={handleOpenBalanceTopup}
                   onEditStudent={onEditStudent}
                   onRequestDeleteStudent={onRequestDeleteStudent}
@@ -440,11 +413,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     selectedStudent={selectedStudent}
                     studentHomeworks={studentHomeworks}
                     homeworkFilter={homeworkFilter}
-                    homeworkListLoading={homeworkListLoading}
-                    homeworkListHasMore={homeworkListHasMore}
+                    homeworkListLoading={studentHomeworkLoading}
+                    homeworkListHasMore={studentHomeworkHasMore}
                     isMobile={isMobile}
                     onHomeworkFilterChange={onHomeworkFilterChange}
-                    onLoadMoreHomeworks={onLoadMoreHomeworks}
+                    onLoadMoreHomeworks={loadMoreStudentHomeworks}
                     onToggleHomework={onToggleHomework}
                     onUpdateHomework={onUpdateHomework}
                     onRemindHomework={onRemindHomework}
@@ -465,7 +438,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     lessonPaymentFilter={lessonPaymentFilter}
                     lessonStatusFilter={lessonStatusFilter}
                     lessonDateRange={lessonDateRange}
-                    lessonListLoading={lessonListLoading}
+                    lessonListLoading={studentLessonLoading}
                     lessonSortOrder={lessonSortOrder}
                     onLessonPaymentFilterChange={onLessonPaymentFilterChange}
                     onLessonStatusFilterChange={onLessonStatusFilterChange}
@@ -495,8 +468,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
                     onOpenLesson={onEditLesson}
-                    onOpenReminders={onOpenPaymentReminders}
-                    onLoadMoreReminders={onLoadMorePaymentReminders}
+                    onOpenReminders={openPaymentReminders}
+                    onLoadMoreReminders={loadMorePaymentReminders}
                     paymentsLoading={paymentsLoading}
                     paymentRemindersLoading={paymentRemindersLoading}
                     paymentRemindersLoadingMore={paymentRemindersLoadingMore}

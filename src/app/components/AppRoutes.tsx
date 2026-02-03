@@ -1,4 +1,4 @@
-import { type Dispatch, type FC, type SetStateAction } from 'react';
+import { type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
   Homework,
@@ -10,9 +10,7 @@ import {
   LessonStatusFilter,
   LinkedStudent,
   PaymentEvent,
-  PaymentReminderLog,
   Student,
-  StudentDebtItem,
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
@@ -48,16 +46,9 @@ interface AppRoutesProps {
   students: {
     hasAccess: boolean;
     teacher: Teacher;
-    studentSearch: string;
-    studentQuery: string;
-    studentFilter: 'all' | 'debt' | 'overdue';
     lessons: Lesson[];
-    selectedStudentId: number | null;
     priceEditState: { id: number | null; value: string };
-    studentHomeworks: Homework[];
     homeworkFilter: 'all' | HomeworkStatus | 'overdue';
-    homeworkListLoading: boolean;
-    homeworkListHasMore: boolean;
     newHomeworkDraft: {
       text: string;
       deadline: string;
@@ -67,11 +58,7 @@ interface AppRoutesProps {
       remindBefore: boolean;
       timeSpentMinutes: string;
     };
-    onSelectStudent: Dispatch<SetStateAction<number | null>>;
-    onStudentSearchChange: (value: string) => void;
-    onStudentFilterChange: (value: 'all' | 'debt' | 'overdue') => void;
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-    onLoadMoreHomeworks: () => void;
     onTogglePaymentReminders: (studentId: number, enabled: boolean) => void;
     onAdjustBalance: (studentId: number, delta: number) => void;
     onBalanceTopup: (
@@ -112,21 +99,14 @@ interface AppRoutesProps {
       studentId?: number,
       options?: { force?: boolean },
     ) => Promise<{ status: 'sent' | 'error' }>;
-    studentLessons: Lesson[];
-    studentLessonsSummary: Lesson[];
-    studentDebtItems: StudentDebtItem[];
-    studentDebtTotal: number;
     lessonPaymentFilter: LessonPaymentFilter;
     lessonStatusFilter: LessonStatusFilter;
     lessonDateRange: LessonDateRange;
-    lessonListLoading: boolean;
     lessonSortOrder: LessonSortOrder;
     onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
     onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
     onLessonDateRangeChange: (range: LessonDateRange) => void;
     onLessonSortOrderChange: (order: LessonSortOrder) => void;
-    payments: PaymentEvent[];
-    paymentReminders: PaymentReminderLog[];
     paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
     paymentDate: string;
     onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
@@ -138,9 +118,6 @@ interface AppRoutesProps {
     onEditLesson: (lesson: Lesson) => void;
     onRequestDeleteLesson: (lesson: Lesson) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
-    onOpenPaymentReminders?: () => void;
-    paymentsLoading?: boolean;
-    paymentRemindersLoading?: boolean;
     studentListReloadKey: number;
   };
   schedule: {
@@ -162,7 +139,7 @@ interface AppRoutesProps {
     onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
     onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
-    onDeleteLesson: (lessonId: number) => void;
+    onDeleteLesson: (lesson: Lesson) => void;
     onDayViewDateChange: (date: Date) => void;
     onGoToToday: () => void;
     autoConfirmLessons: boolean;

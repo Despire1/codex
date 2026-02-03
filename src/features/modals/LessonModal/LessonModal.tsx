@@ -31,7 +31,7 @@ import {
   parseTimeToMinutes,
 } from '../../../shared/lib/timeFields';
 
-interface LessonDraft {
+export interface LessonDraft {
   studentId: number | undefined;
   studentIds: number[];
   date: string;

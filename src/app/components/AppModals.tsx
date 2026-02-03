@@ -1,11 +1,11 @@
 import { FC } from 'react';
-import { LessonColor, LinkedStudent } from '../../entities/types';
+import { LinkedStudent } from '../../entities/types';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { Modal } from '../../shared/ui/Modal/Modal';
 import modalStyles from '../../shared/ui/Modal/Modal.module.css';
 import controls from '../../shared/styles/controls.module.css';
 import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
-import { LessonModal } from '../../features/modals/LessonModal/LessonModal';
+import { LessonModal, type LessonDraft } from '../../features/modals/LessonModal/LessonModal';
 import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
 import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
 
@@ -50,19 +50,6 @@ export type DialogState =
       onCancel: () => void;
     }
   | null;
-
-type LessonDraft = {
-  studentId?: number;
-  studentIds: number[];
-  date: string;
-  time: string;
-  endTime: string;
-  meetingLink: string;
-  color: LessonColor;
-  isRecurring: boolean;
-  repeatWeekdays: number[];
-  repeatUntil?: string;
-};
 
 interface AppModalsProps {
   studentModalOpen: boolean;
