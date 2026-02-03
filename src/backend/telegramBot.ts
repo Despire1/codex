@@ -215,6 +215,7 @@ const sendRoleSelectionMessage = async (chatId: number, messageId?: number) => {
 const subscriptionPromptText =
   'Вам доступно 14 дней пробного периода 🎁\n\n' +
   'Оформите пробный доступ кнопкой ниже или выберите подписку на месяц.';
+const subscriptionPromptPaidOnlyText = 'Оформите подписку на месяц, чтобы получить полный доступ.';
 
 const onboardingMessages = createOnboardingMessages({
   callTelegram,
@@ -222,16 +223,22 @@ const onboardingMessages = createOnboardingMessages({
   webAppUrl: TELEGRAM_WEBAPP_URL,
 });
 
-const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number) => {
-  const payload = {
-    text: subscriptionPromptText,
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🎁 Оформить 14 дней', callback_data: 'subscription_trial' }],
-        [{ text: `1 месяц - ${SUBSCRIPTION_MONTH_PRICE_RUB}₽ (9\u03369\u03360\u0336₽\u0336)`, callback_data: 'subscription_monthly' }],
-      ],
-    },
+const buildSubscriptionPromptPayload = (canUseTrial: boolean) => {
+  const inline_keyboard = [];
+  if (canUseTrial) {
+    inline_keyboard.push([{ text: '🎁 Оформить 14 дней', callback_data: 'subscription_trial' }]);
+  }
+  inline_keyboard.push([
+    { text: `1 месяц - ${SUBSCRIPTION_MONTH_PRICE_RUB}₽ (9\u03369\u03360\u0336₽\u0336)`, callback_data: 'subscription_monthly' },
+  ]);
+  return {
+    text: canUseTrial ? subscriptionPromptText : subscriptionPromptPaidOnlyText,
+    reply_markup: { inline_keyboard },
   };
+};
+
+const sendSubscriptionPromptMessage = async (chatId: number, messageId?: number, canUseTrial = true) => {
+  const payload = buildSubscriptionPromptPayload(canUseTrial);
   if (messageId) {
     await editMessage(chatId, messageId, payload.text, payload.reply_markup);
     return;
@@ -716,7 +723,7 @@ const handleRoleSelection = async (
   if (role === 'TEACHER') {
     if (!isSubscriptionActive(user)) {
       await setDefaultMenuButton(chatId);
-      await sendSubscriptionPromptMessage(chatId, messageId);
+      await sendSubscriptionPromptMessage(chatId, messageId, !user.subscriptionTrialUsed);
       return;
     }
     await setTeacherMenuButton(chatId);
@@ -749,15 +756,22 @@ const ensureTrialSubscription = async (payload: {
     lastName: payload.lastName,
     role: 'TEACHER',
   });
-  if (isSubscriptionActive(user)) return user;
+  if (user.subscriptionTrialUsed) {
+    return { user, status: 'already_used' as const };
+  }
+  if (isSubscriptionActive(user)) {
+    return { user, status: 'active' as const };
+  }
   const now = new Date();
-  return prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { telegramUserId: payload.telegramUserId },
     data: {
       subscriptionStartAt: now,
       subscriptionEndAt: addDays(now, SUBSCRIPTION_TRIAL_DAYS),
+      subscriptionTrialUsed: true,
     },
   });
+  return { user: updatedUser, status: 'activated' as const };
 };
 
 const handleUpdate = async (update: TelegramUpdate) => {
@@ -785,12 +799,22 @@ const handleUpdate = async (update: TelegramUpdate) => {
       const from = update.callback_query.from;
       const telegramUserId = BigInt(from.id);
       const messageId = update.callback_query.message?.message_id;
-      const user = await ensureTrialSubscription({
+      const trialResult = await ensureTrialSubscription({
         telegramUserId,
         username: from.username ?? undefined,
         firstName: from.first_name ?? undefined,
         lastName: from.last_name ?? undefined,
       });
+      const user = trialResult.user;
+      if (trialResult.status === 'already_used') {
+        await sendStudentInfoMessage(chatId, 'Пробный период уже был использован. Выберите подписку на месяц.');
+        await sendSubscriptionPromptMessage(chatId, undefined, false);
+        return;
+      }
+      if (trialResult.status === 'active') {
+        await sendStudentInfoMessage(chatId, formatSubscriptionStatus(user));
+        return;
+      }
       await setTeacherMenuButton(chatId);
       if (!user.onboardingTeacherCompleted) {
         await ensureTeacherOnboardingStarted(telegramUserId);
@@ -965,7 +989,11 @@ const handleUpdate = async (update: TelegramUpdate) => {
   if (text === SUBSCRIPTION_BUTTON_TEXT_NORMALIZED) {
     if (!telegramUserId) return;
     const user = await prisma.user.findUnique({ where: { telegramUserId } });
-    await sendStudentInfoMessage(chatId, formatSubscriptionStatus(user));
+    if (isSubscriptionActive(user)) {
+      await sendStudentInfoMessage(chatId, formatSubscriptionStatus(user));
+      return;
+    }
+    await sendSubscriptionPromptMessage(chatId, undefined, !user?.subscriptionTrialUsed);
     return;
   }
 

@@ -204,6 +204,7 @@ model User {
   role            String          @default("TEACHER")
   subscriptionStartAt DateTime?
   subscriptionEndAt   DateTime?
+  subscriptionTrialUsed Boolean   @default(false)
   onboardingTeacherCompleted Boolean @default(false)
   onboardingStudentCompleted Boolean @default(false)
   onboardingTeacherStartedAt DateTime?
