@@ -1,7 +1,6 @@
 import { type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
-  Homework,
   HomeworkStatus,
   Lesson,
   LessonDateRange,
@@ -45,33 +44,7 @@ interface AppRoutesProps {
     teacher: Teacher;
     lessons: Lesson[];
     homeworkFilter: 'all' | HomeworkStatus | 'overdue';
-    newHomeworkDraft: {
-      text: string;
-      deadline: string;
-      status: HomeworkStatus;
-      baseStatus: HomeworkStatus;
-      sendNow: boolean;
-      remindBefore: boolean;
-      timeSpentMinutes: string;
-    };
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-    onRemindHomework: (studentId: number) => void;
-    onRemindHomeworkById?: (homeworkId: number) => void;
-    onSendHomework?: (homeworkId: number) => void;
-    onDuplicateHomework?: (homeworkId: number) => void;
-    onDeleteHomework?: (homeworkId: number) => void;
-    onAddHomework: () => void;
-    onHomeworkDraftChange: (draft: {
-      text: string;
-      deadline: string;
-      status: HomeworkStatus;
-      baseStatus: HomeworkStatus;
-      sendNow: boolean;
-      remindBefore: boolean;
-      timeSpentMinutes: string;
-    }) => void;
-    onToggleHomework: (homeworkId: number) => void;
-    onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
     onRemindLessonPayment: (
       lessonId: number,
       studentId?: number,
@@ -92,9 +65,6 @@ interface AppRoutesProps {
     onCompleteLesson: (lessonId: number) => void;
     onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
-    onCreateLesson: (studentId?: number) => void;
-    onEditLesson: (lesson: Lesson) => void;
-    onRequestDeleteLesson: (lesson: Lesson) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
     studentListReloadKey: number;
   };
@@ -114,10 +84,7 @@ interface AppRoutesProps {
     monthOffset: number;
     selectedMonthDay?: string | null;
     onMonthDaySelect?: (dayIso: string | null) => void;
-    onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
-    onStartEditLesson: (lesson: Lesson) => void;
     onTogglePaid: (lessonId: number, studentId?: number) => void;
-    onDeleteLesson: (lesson: Lesson) => void;
     onDayViewDateChange: (date: Date) => void;
     onGoToToday: () => void;
     autoConfirmLessons: boolean;

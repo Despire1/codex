@@ -1,9 +1,8 @@
-import { addDays, addMonths, addYears, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
+import { addDays, addMonths, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Homework,
   HomeworkStatus,
   Lesson,
   LessonDateRange,
@@ -19,10 +18,7 @@ import {
 } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api } from '../shared/api/client';
-import { normalizeHomework, normalizeLesson, todayISO } from '../shared/lib/normalizers';
-import { DEFAULT_LESSON_COLOR } from '../shared/lib/lessonColors';
-import { normalizeMeetingLinkInput } from '../shared/lib/meetingLink';
-import { addMinutesToTime, diffTimeMinutes } from '../shared/lib/timeFields';
+import { normalizeLesson } from '../shared/lib/normalizers';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import {
@@ -30,7 +26,6 @@ import {
   resolveTimeZone,
   toUtcEndOfDay,
   toUtcDateFromDate,
-  toUtcDateFromTimeZone,
   toZonedDate,
 } from '../shared/lib/timezoneDates';
 import layoutStyles from './styles/layout.module.css';
@@ -46,7 +41,8 @@ import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
 import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
-import { type LessonDraft } from '../features/modals/LessonModal/LessonModal';
+import { StudentsHomeworkProvider, useStudentsHomeworkInternal } from '../widgets/students/model/useStudentsHomework';
+import { LessonActionsProvider, useLessonActionsInternal } from '../features/lessons/model/useLessonActions';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -78,9 +74,6 @@ const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 type TabPath = (typeof tabs)[number]['path'];
 
-const resolveLessonEndTime = (startTime: string, durationMinutes: number) =>
-  addMinutesToTime(startTime, durationMinutes) || startTime;
-
 type StudentCardFiltersState = {
   homeworkFilter?: 'all' | HomeworkStatus | 'overdue';
   lessonPaymentFilter?: LessonPaymentFilter;
@@ -103,20 +96,6 @@ type LessonRange = {
   endAt: Date;
   startIso: string;
   endIso: string;
-};
-
-const parseTimeSpentMinutes = (value: string): number | null => {
-  if (!value.trim()) return null;
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue) || numericValue < 0) return null;
-  return Math.round(numericValue);
-};
-
-const resolveDeadlinePayload = (deadline: string | null | undefined, timeZone: string) => {
-  if (!deadline) return undefined;
-  const resolved = toUtcDateFromDate(deadline, timeZone);
-  if (Number.isNaN(resolved.getTime())) return undefined;
-  return resolved.toISOString();
 };
 
 const isHomeworkFilter = (value: unknown): value is 'all' | HomeworkStatus | 'overdue' =>
@@ -218,7 +197,6 @@ export const AppPage = () => {
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
-  const [homeworks, setHomeworks] = useState<Homework[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [unpaidLessonEntries, setUnpaidLessonEntries] = useState<UnpaidLessonEntry[]>([]);
   const [lessonsByRange, setLessonsByRange] = useState<Record<string, Lesson[]>>({});
@@ -251,32 +229,8 @@ export const AppPage = () => {
     storedStudentCardFilters.paymentFilter ?? 'all',
   );
   const [paymentDate, setPaymentDate] = useState(storedStudentCardFilters.paymentDate ?? '');
-  const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
-  const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
-  const [newLessonDraft, setNewLessonDraft] = useState<LessonDraft>({
-    studentId: undefined as number | undefined,
-    studentIds: [] as number[],
-    date: todayISO(resolvedTimeZone),
-    time: '18:00',
-    endTime: resolveLessonEndTime('18:00', teacher.defaultLessonDuration),
-    meetingLink: '',
-    color: DEFAULT_LESSON_COLOR,
-    isRecurring: false,
-    repeatWeekdays: [] as number[],
-    repeatUntil: undefined as string | undefined,
-  });
-  const [newHomeworkDraft, setNewHomeworkDraft] = useState({
-    text: '',
-    deadline: '',
-    status: 'DRAFT' as HomeworkStatus,
-    baseStatus: 'DRAFT' as HomeworkStatus,
-    sendNow: false,
-    remindBefore: true,
-    timeSpentMinutes: '',
-  });
-  const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
   const [monthAnchor, setMonthAnchor] = useState<Date>(() => startOfMonth(toZonedDate(new Date(), resolvedTimeZone)));
   const [monthOffset, setMonthOffset] = useState(0);
@@ -321,10 +275,6 @@ export const AppPage = () => {
 
   const closeDialog = () => setDialogState(null);
 
-  const handleLessonDraftChange = (draft: LessonDraft) => {
-    setNewLessonDraft(draft);
-  };
-
   const showInfoDialog = (title: string, message: string, confirmText?: string) =>
     setDialogState({ type: 'info', title, message, confirmText });
 
@@ -356,8 +306,38 @@ export const AppPage = () => {
     [closeDialog],
   );
 
+  const openRecurringDeleteDialog = useCallback(
+    (options: {
+      title: string;
+      message: string;
+      applyToSeries?: boolean;
+      onConfirm: (applyToSeries: boolean) => void;
+      onCancel?: () => void;
+    }) => {
+      setDialogState({
+        type: 'recurring-delete',
+        title: options.title,
+        message: options.message,
+        applyToSeries: options.applyToSeries ?? false,
+        onConfirm: (applyToSeries) => {
+          closeDialog();
+          options.onConfirm(applyToSeries);
+        },
+        onCancel: () => {
+          closeDialog();
+          options.onCancel?.();
+        },
+      });
+    },
+    [closeDialog],
+  );
+
   const navigateToStudents = useCallback(() => {
     navigate(tabPathById.students);
+  }, [navigate]);
+
+  const navigateToSchedule = useCallback(() => {
+    navigate(tabPathById.schedule);
   }, [navigate]);
 
   const studentsActions = useStudentsActionsInternal({
@@ -375,6 +355,16 @@ export const AppPage = () => {
     refreshPayments,
     clearStudentData,
   });
+
+  const studentsHomework = useStudentsHomeworkInternal({
+    timeZone: resolvedTimeZone,
+    selectedStudentId,
+    loadStudentHomeworks,
+    showInfoDialog,
+    openConfirmDialog,
+    triggerStudentsListReload,
+  });
+  const { homeworks } = studentsHomework;
 
   const buildLessonRange = useCallback(
     (startDate: Date, endDate: Date): LessonRange => {
@@ -422,6 +412,15 @@ export const AppPage = () => {
     const startAt = new Date(lesson.startAt).getTime();
     return startAt >= range.startAt.getTime() && startAt <= range.endAt.getTime();
   }, []);
+
+  const isLessonInCurrentRange = useCallback(
+    (lesson: Lesson) => {
+      const range = lessonRangeRef.current;
+      if (!range) return true;
+      return isLessonInRange(lesson, range);
+    },
+    [isLessonInRange],
+  );
 
   const filterLessonsForCurrentRange = useCallback(
     (items: Lesson[]) => {
@@ -493,6 +492,24 @@ export const AppPage = () => {
     }
   }, [hasAccess]);
 
+  const lessonActions = useLessonActionsInternal({
+    timeZone: resolvedTimeZone,
+    teacherDefaultLessonDuration: teacher.defaultLessonDuration,
+    selectedStudentId,
+    setSelectedStudentId,
+    showInfoDialog,
+    openConfirmDialog,
+    openRecurringDeleteDialog,
+    navigateToSchedule,
+    setDayViewDate,
+    filterLessonsForCurrentRange,
+    updateLessonsForCurrentRange,
+    isLessonInCurrentRange,
+    loadStudentLessons,
+    loadStudentLessonsSummary,
+    loadDashboardUnpaidLessons,
+  });
+
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
   const activeTab = useMemo<TabId>(() => {
@@ -526,19 +543,11 @@ export const AppPage = () => {
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
         setLinks(data.links ?? []);
-        setHomeworks((data.homeworks ?? []).map((homework) => normalizeHomework(homework, resolvedTimeZone)));
+        studentsHomework.replaceHomeworks(data.homeworks ?? []);
         applyLessonsForRange(initialRange, data.lessons ?? []);
 
         const firstStudentId = data.students?.[0]?.id ?? null;
         setSelectedStudentId((prev) => prev ?? firstStudentId);
-        setNewLessonDraft((draft) => ({
-          ...draft,
-          studentId: draft.studentId ?? firstStudentId ?? undefined,
-          endTime: resolveLessonEndTime(
-            draft.time,
-            data.teacher?.defaultLessonDuration ?? teacher.defaultLessonDuration,
-          ),
-        }));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to bootstrap app', error);
@@ -558,14 +567,8 @@ export const AppPage = () => {
     hasAccess,
     resolvedTimeZone,
     scheduleView,
+    studentsHomework.replaceHomeworks,
   ]);
-
-  useEffect(() => {
-    setNewLessonDraft((draft) => ({
-      ...draft,
-      endTime: resolveLessonEndTime(draft.time, teacher.defaultLessonDuration),
-    }));
-  }, [teacher.defaultLessonDuration]);
 
   useEffect(() => {
     const today = toZonedDate(new Date(), resolvedTimeZone);
@@ -574,18 +577,7 @@ export const AppPage = () => {
       return toZonedDate(toUtcDateFromDate(currentIso, resolvedTimeZone), resolvedTimeZone);
     });
     setMonthAnchor(startOfMonth(today));
-    setHomeworks((prev) =>
-      prev.map((homework) =>
-        normalizeHomework({ ...homework, deadline: homework.deadlineAt ?? homework.deadline }, resolvedTimeZone),
-      ),
-    );
   }, [resolvedTimeZone]);
-
-  useEffect(() => {
-    if (selectedStudentId) {
-      setNewLessonDraft((draft) => ({ ...draft, studentId: selectedStudentId }));
-    }
-  }, [selectedStudentId]);
 
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
@@ -681,290 +673,6 @@ export const AppPage = () => {
 
   const handlePaymentDateChange = (nextDate: string) => {
     setPaymentDate(nextDate);
-  };
-
-  const openLessonModal = (dateISO: string, time?: string, existing?: Lesson) => {
-    const startDate = existing ? toZonedDate(existing.startAt, resolvedTimeZone) : undefined;
-    const derivedDay = startDate ? startDate.getDay() : undefined;
-    const recurrenceWeekdays =
-      existing?.recurrenceWeekdays && existing.recurrenceWeekdays.length > 0
-        ? existing.recurrenceWeekdays
-        : derivedDay !== undefined
-          ? [derivedDay]
-          : [];
-
-    const existingStudentIds =
-      existing?.participants && existing.participants.length > 0
-        ? existing.participants.map((p) => p.studentId)
-        : existing?.studentId
-          ? [existing.studentId]
-          : [];
-
-    const nextStartTime = time ?? (startDate ? format(startDate, 'HH:mm') : newLessonDraft.time);
-    const nextDuration = existing?.durationMinutes ?? teacher.defaultLessonDuration;
-
-    setNewLessonDraft((draft) => ({
-      ...draft,
-      date: dateISO,
-      time: nextStartTime,
-      studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
-      studentIds:
-        existingStudentIds.length > 0
-          ? existingStudentIds
-          : draft.studentIds.length > 0
-            ? draft.studentIds
-              : selectedStudentId
-              ? [selectedStudentId]
-              : [],
-      endTime: resolveLessonEndTime(nextStartTime, nextDuration),
-      meetingLink: existing?.meetingLink ?? '',
-      color: existing?.color ?? DEFAULT_LESSON_COLOR,
-      isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
-      repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
-      repeatUntil: existing?.recurrenceUntil
-        ? formatInTimeZone(existing.recurrenceUntil, 'yyyy-MM-dd', { timeZone: resolvedTimeZone })
-        : draft.repeatUntil,
-    }));
-    setEditingLessonId(existing?.id ?? null);
-    setEditingLessonOriginal(existing ?? null);
-    setLessonModalOpen(true);
-    navigate(tabPathById.schedule);
-    setDayViewDate(toZonedDate(toUtcDateFromDate(dateISO, resolvedTimeZone), resolvedTimeZone));
-  };
-
-  const closeLessonModal = () => {
-    setLessonModalOpen(false);
-    setEditingLessonId(null);
-    setEditingLessonOriginal(null);
-    setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-  };
-
-  const performDeleteLesson = async (applyToSeries: boolean) => {
-    if (!editingLessonId) return;
-    const recurrenceGroupId = editingLessonOriginal?.recurrenceGroupId;
-
-    try {
-      await api.deleteLesson(editingLessonId, { applyToSeries });
-      updateLessonsForCurrentRange((prev) => {
-        if (applyToSeries && recurrenceGroupId) {
-          return prev.filter((lesson) => lesson.recurrenceGroupId !== recurrenceGroupId);
-        }
-        return prev.filter((lesson) => lesson.id !== editingLessonId);
-      });
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      closeLessonModal();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
-      showInfoDialog('Ошибка', message);
-      // eslint-disable-next-line no-console
-      console.error('Failed to delete lesson', error);
-    }
-  };
-
-  const requestDeleteLesson = () => {
-    if (!editingLessonId) return;
-    const original = editingLessonOriginal;
-
-    if (original?.isRecurring && original.recurrenceGroupId) {
-      setDialogState({
-        type: 'recurring-delete',
-        title: 'Удалить урок?',
-        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
-        applyToSeries: false,
-        onConfirm: (applyToSeries) => {
-          closeDialog();
-          performDeleteLesson(applyToSeries);
-        },
-        onCancel: closeDialog,
-      });
-      return;
-    }
-
-    setDialogState({
-      type: 'confirm',
-      title: 'Удалить урок?',
-      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
-      confirmText: 'Удалить',
-      cancelText: 'Отмена',
-      onConfirm: () => {
-        closeDialog();
-        performDeleteLesson(false);
-      },
-      onCancel: closeDialog,
-    });
-  };
-
-  const saveLesson = async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
-    if (newLessonDraft.studentIds.length === 0 || !newLessonDraft.date || !newLessonDraft.time) {
-      showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
-      return;
-    }
-    const durationMinutes = diffTimeMinutes(newLessonDraft.time, newLessonDraft.endTime);
-    if (!durationMinutes || durationMinutes <= 0) {
-      showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
-      return;
-    }
-
-    if (newLessonDraft.isRecurring && newLessonDraft.repeatUntil && newLessonDraft.repeatUntil < newLessonDraft.date) {
-      showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
-      return;
-    }
-
-    const startAtDate = toUtcDateFromTimeZone(newLessonDraft.date, newLessonDraft.time, resolvedTimeZone);
-    const startAt = startAtDate.toISOString();
-    const meetingLinkPayload = normalizeMeetingLinkInput(newLessonDraft.meetingLink ?? '');
-    const meetingLink = meetingLinkPayload ? meetingLinkPayload : null;
-
-    try {
-      if (editingLessonId) {
-        const original = editingLessonOriginal;
-        const originalWeekdays = original?.recurrenceWeekdays ?? [];
-        const originalUntil = original?.recurrenceUntil
-          ? formatInTimeZone(original.recurrenceUntil, 'yyyy-MM-dd', { timeZone: resolvedTimeZone })
-          : '';
-        const repeatChanged =
-          (newLessonDraft.repeatUntil ?? '') !== originalUntil ||
-          newLessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
-          newLessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
-
-        if (original?.isRecurring && !repeatChanged && options?.applyToSeriesOverride === undefined) {
-          setDialogState({
-            type: 'confirm',
-            title: 'Изменить только этот урок или всю серию?',
-            message:
-              'Это повторяющийся урок. Вы можете отредактировать только выбранное занятие или сразу всю серию.',
-            confirmText: 'Изменить серию',
-            cancelText: 'Только этот урок',
-            onConfirm: () => {
-              closeDialog();
-              saveLesson({ applyToSeriesOverride: true });
-            },
-            onCancel: () => {
-              closeDialog();
-              saveLesson({ applyToSeriesOverride: false, detachFromSeries: true });
-            },
-          });
-          return;
-        }
-
-        const applyToSeries =
-          options?.applyToSeriesOverride ?? Boolean(original?.isRecurring && (repeatChanged || newLessonDraft.isRecurring));
-        const shouldDetach = options?.detachFromSeries ?? (!applyToSeries && Boolean(original?.isRecurring));
-
-        const data = await api.updateLesson(editingLessonId, {
-          studentIds: newLessonDraft.studentIds,
-          startAt,
-          durationMinutes,
-          color: newLessonDraft.color,
-          meetingLink,
-          applyToSeries,
-          detachFromSeries: shouldDetach,
-          repeatWeekdays: newLessonDraft.isRecurring ? newLessonDraft.repeatWeekdays : undefined,
-          repeatUntil:
-            newLessonDraft.isRecurring && newLessonDraft.repeatUntil
-              ? toUtcEndOfDay(newLessonDraft.repeatUntil, resolvedTimeZone).toISOString()
-              : undefined,
-        });
-
-        if (shouldDetach) {
-          setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-        }
-
-        if (data.lessons && data.lessons.length > 0) {
-          const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
-          updateLessonsForCurrentRange((prev) => {
-            const groupId = data.lessons?.[0]?.recurrenceGroupId;
-            const filtered = groupId
-              ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId && lesson.id !== editingLessonId)
-              : prev.filter((lesson) => lesson.id !== editingLessonId);
-            return [...filtered, ...normalized];
-          });
-        } else if (data.lesson) {
-          const normalizedLesson = normalizeLesson(data.lesson);
-          updateLessonsForCurrentRange((prevLessons) => {
-            const range = lessonRangeRef.current;
-            if (range && !isLessonInRange(normalizedLesson, range)) {
-              return prevLessons.filter((lesson) => lesson.id !== editingLessonId);
-            }
-            const exists = prevLessons.some((lesson) => lesson.id === editingLessonId);
-            if (exists) {
-              return prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizedLesson : lesson));
-            }
-            return [...prevLessons, normalizedLesson];
-          });
-        }
-      } else if (newLessonDraft.isRecurring) {
-        if (newLessonDraft.repeatWeekdays.length === 0) {
-          showInfoDialog('Нужно выбрать дни недели', 'Выберите хотя бы один день недели для повтора');
-          return;
-        }
-        const resolvedRepeatUntil = newLessonDraft.repeatUntil
-          ? toUtcEndOfDay(newLessonDraft.repeatUntil, resolvedTimeZone).toISOString()
-          : toUtcEndOfDay(
-              formatInTimeZone(addYears(new Date(startAt), 1), 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-              resolvedTimeZone,
-            ).toISOString();
-
-        const data = await api.createRecurringLessons({
-          studentIds: newLessonDraft.studentIds,
-          startAt,
-          durationMinutes,
-          color: newLessonDraft.color,
-          meetingLink,
-          repeatWeekdays: newLessonDraft.repeatWeekdays,
-          repeatUntil: resolvedRepeatUntil,
-        });
-
-        const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
-        updateLessonsForCurrentRange((prev) => {
-          const existingKeys = new Set(prev.map((lesson) => `${lesson.id}`));
-          const next = [...prev];
-          normalized.forEach((lesson) => {
-            if (!existingKeys.has(`${lesson.id}`)) {
-              next.push(lesson);
-              existingKeys.add(`${lesson.id}`);
-            }
-          });
-          return next;
-        });
-      } else {
-        const data = await api.createLesson({
-          studentIds: newLessonDraft.studentIds,
-          startAt,
-          durationMinutes,
-          color: newLessonDraft.color,
-          meetingLink,
-        });
-
-        const normalizedLesson = normalizeLesson(data.lesson);
-        updateLessonsForCurrentRange((prev) => {
-          const range = lessonRangeRef.current;
-          if (range && !isLessonInRange(normalizedLesson, range)) {
-            return prev;
-          }
-          return [...prev, normalizedLesson];
-        });
-      }
-
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      setLessonModalOpen(false);
-      setEditingLessonId(null);
-      navigate(tabPathById.schedule);
-      setNewLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Не удалось создать урок';
-      showInfoDialog('Ошибка', message);
-      // eslint-disable-next-line no-console
-      console.error('Failed to create lesson', error);
-    }
-  };
-
-  const startEditLesson = (lesson: Lesson) => {
-    const start = toZonedDate(lesson.startAt, resolvedTimeZone);
-    const time = format(start, 'HH:mm');
-    openLessonModal(format(start, 'yyyy-MM-dd'), time, lesson);
   };
 
   const markLessonCompleted = async (lessonId: number) => {
@@ -1188,239 +896,6 @@ export const AppPage = () => {
     await markPaidWithBalance(lessonId, studentId, false);
   };
 
-  const openCreateLessonForStudent = (studentId?: number) => {
-    const targetDate = newLessonDraft.date || todayISO(resolvedTimeZone);
-    if (studentId) {
-      setSelectedStudentId((prev) => prev ?? studentId);
-      setNewLessonDraft((draft) => ({
-        ...draft,
-        studentId,
-        studentIds: [studentId],
-      }));
-    }
-    openLessonModal(targetDate, newLessonDraft.time);
-  };
-
-  const deleteLessonById = async (lessonId: number) => {
-    try {
-      await api.deleteLesson(lessonId);
-      updateLessonsForCurrentRange((prev) => prev.filter((lesson) => lesson.id !== lessonId));
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to delete lesson', error);
-    }
-  };
-
-  const deleteLessonWithOptions = async (lesson: Lesson, applyToSeries: boolean) => {
-    try {
-      await api.deleteLesson(lesson.id, applyToSeries ? { applyToSeries } : undefined);
-      updateLessonsForCurrentRange((prev) => {
-        if (applyToSeries && lesson.recurrenceGroupId) {
-          return prev.filter((item) => item.recurrenceGroupId !== lesson.recurrenceGroupId);
-        }
-        return prev.filter((item) => item.id !== lesson.id);
-      });
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to delete lesson', error);
-    }
-  };
-
-  const requestDeleteLessonFromList = (lesson: Lesson) => {
-    if (lesson.isRecurring && lesson.recurrenceGroupId) {
-      setDialogState({
-        type: 'recurring-delete',
-        title: 'Удалить урок?',
-        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
-        applyToSeries: false,
-        onConfirm: (applyToSeries) => {
-          closeDialog();
-          void deleteLessonWithOptions(lesson, applyToSeries);
-        },
-        onCancel: closeDialog,
-      });
-      return;
-    }
-
-    setDialogState({
-      type: 'confirm',
-      title: 'Удалить урок?',
-      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
-      confirmText: 'Удалить',
-      cancelText: 'Отмена',
-      onConfirm: () => {
-        closeDialog();
-        void deleteLessonWithOptions(lesson, false);
-      },
-      onCancel: closeDialog,
-    });
-  };
-
-  const sendHomeworkToStudent = async (homeworkId: number) => {
-    try {
-      const result = await api.sendHomework(homeworkId);
-      setHomeworks((prev) =>
-        prev.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework, resolvedTimeZone) : hw)),
-      );
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-      showInfoDialog('Отправлено ученику', 'Задание опубликовано и отправлено ученику.');
-    } catch (error) {
-      setDialogState({
-        type: 'confirm',
-        title: 'Не удалось отправить. Задание опубликовано.',
-        message: 'Повторить отправку?',
-        confirmText: 'Повторить',
-        cancelText: 'Отмена',
-        onConfirm: () => {
-          closeDialog();
-          sendHomeworkToStudent(homeworkId);
-        },
-        onCancel: closeDialog,
-      });
-      // eslint-disable-next-line no-console
-      console.error('Failed to send homework to student', error);
-    }
-  };
-
-  const addHomework = async () => {
-    if (!selectedStudentId || !newHomeworkDraft.text.trim()) return;
-
-    const targetStatus = newHomeworkDraft.sendNow ? 'ASSIGNED' : newHomeworkDraft.status;
-    const parsedTimeSpent = parseTimeSpentMinutes(newHomeworkDraft.timeSpentMinutes);
-
-    try {
-      const data = await api.createHomework({
-        studentId: selectedStudentId,
-        text: newHomeworkDraft.text,
-        deadline: resolveDeadlinePayload(newHomeworkDraft.deadline, resolvedTimeZone),
-        status: targetStatus,
-        timeSpentMinutes: parsedTimeSpent,
-      });
-
-      const normalized = normalizeHomework(data.homework, resolvedTimeZone);
-      setHomeworks([...homeworks, normalized]);
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-
-      if (newHomeworkDraft.sendNow) {
-        await sendHomeworkToStudent(normalized.id);
-      } else {
-        showInfoDialog('Домашнее задание создано', 'Черновик сохранён.');
-      }
-      setNewHomeworkDraft({
-        text: '',
-        deadline: '',
-        status: 'DRAFT',
-        baseStatus: 'DRAFT',
-        sendNow: false,
-        remindBefore: true,
-        timeSpentMinutes: '',
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to add homework', error);
-    }
-  };
-
-  const duplicateHomework = async (homeworkId: number) => {
-    const original = homeworks.find((hw) => hw.id === homeworkId);
-    if (!original) return;
-    try {
-      const data = await api.createHomework({
-        studentId: original.studentId,
-        text: original.text,
-        deadline: resolveDeadlinePayload(original.deadlineAt ?? original.deadline, resolvedTimeZone),
-        status: 'DRAFT',
-        attachments: original.attachments ?? [],
-      });
-      const normalized = normalizeHomework(data.homework, resolvedTimeZone);
-      setHomeworks([...homeworks, normalized]);
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-      showInfoDialog('Черновик создан', 'Копия задания сохранена в черновики.');
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to duplicate homework', error);
-    }
-  };
-
-  const toggleHomeworkDone = async (homeworkId: number) => {
-    try {
-      const data = await api.toggleHomework(homeworkId);
-      setHomeworks(
-        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
-      );
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to toggle homework', error);
-    }
-  };
-
-  const updateHomework = async (homeworkId: number, payload: Partial<Homework>) => {
-    try {
-      const resolvedPayload = { ...payload };
-      if ('deadline' in payload) {
-        resolvedPayload.deadline = payload.deadline
-          ? resolveDeadlinePayload(payload.deadline, resolvedTimeZone)
-          : null;
-      }
-      const data = await api.updateHomework(homeworkId, resolvedPayload);
-      setHomeworks(
-        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(data.homework, resolvedTimeZone) : hw)),
-      );
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to update homework', error);
-    }
-  };
-
-  const deleteHomework = async (homeworkId: number) => {
-    try {
-      await api.deleteHomework(homeworkId);
-      setHomeworks(homeworks.filter((hw) => hw.id !== homeworkId));
-      loadStudentHomeworks();
-      triggerStudentsListReload();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to delete homework', error);
-    }
-  };
-
-  const remindHomework = async (studentId: number) => {
-    try {
-      await api.remindHomework(studentId);
-      showInfoDialog('Напоминание отправлено', `Напоминание отправлено ученику #${studentId}`);
-    } catch (error) {
-      showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
-      // eslint-disable-next-line no-console
-      console.error('Failed to send reminder', error);
-    }
-  };
-
-  const remindHomeworkById = async (homeworkId: number) => {
-    try {
-      const result = await api.remindHomeworkById(homeworkId);
-      setHomeworks(
-        homeworks.map((hw) => (hw.id === homeworkId ? normalizeHomework(result.homework, resolvedTimeZone) : hw)),
-      );
-      showInfoDialog('Напоминание отправлено', 'Мы отправим ученику напоминание.');
-    } catch (error) {
-      showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
-      // eslint-disable-next-line no-console
-      console.error('Failed to send homework reminder', error);
-    }
-  };
 
   const remindLessonPayment = async (lessonId: number, studentId?: number, options?: { force?: boolean }) => {
     try {
@@ -1543,165 +1018,140 @@ export const AppPage = () => {
   return (
     <StudentsDataProvider value={studentsData}>
       <StudentsActionsProvider value={studentsActions}>
-        <TimeZoneProvider timeZone={resolvedTimeZone}>
-          <div className={layoutStyles.page}>
-          <div className={layoutStyles.pageInner}>
-            <Topbar
-              teacher={teacher}
-              activeTab={activeTab}
-              onTabChange={(tab) => navigate(tabPathById[tab])}
-              profilePhotoUrl={sessionUser?.photoUrl ?? null}
-            />
+        <StudentsHomeworkProvider value={studentsHomework}>
+          <LessonActionsProvider value={lessonActions}>
+            <TimeZoneProvider timeZone={resolvedTimeZone}>
+              <div className={layoutStyles.page}>
+                <div className={layoutStyles.pageInner}>
+                  <Topbar
+                    teacher={teacher}
+                    activeTab={activeTab}
+                    onTabChange={(tab) => navigate(tabPathById[tab])}
+                    profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                  />
 
-            <main className={layoutStyles.content}>
-              <AppRoutes
-                resolveLastVisitedPath={resolveLastVisitedPath}
-                dashboard={{
-                  teacher,
-                  lessons,
-                  linkedStudents,
-                  unpaidEntries: unpaidLessonEntries,
-                  onWeekRangeChange: handleDashboardWeekRangeChange,
-                  onAddStudent: () => {
-                    navigate(tabPathById.students);
-                    studentsActions.openCreateStudentModal();
-                  },
-                  onCreateLesson: (date) => {
-                    const lessonDate = date ?? new Date();
-                    const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+                  <main className={layoutStyles.content}>
+                    <AppRoutes
+                      resolveLastVisitedPath={resolveLastVisitedPath}
+                      dashboard={{
+                        teacher,
+                        lessons,
+                        linkedStudents,
+                        unpaidEntries: unpaidLessonEntries,
+                        onWeekRangeChange: handleDashboardWeekRangeChange,
+                        onAddStudent: () => {
+                          navigate(tabPathById.students);
+                          studentsActions.openCreateStudentModal();
+                        },
+                        onCreateLesson: (date) => {
+                          const lessonDate = date ?? new Date();
+                          const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
 
-                    if (date) {
-                      setScheduleView('month');
-                      setDayViewDate(lessonDate);
-                      setMonthAnchor(startOfMonth(lessonDate));
-                      setMonthOffset(0);
-                      setScheduleSelectedMonthDay(lessonIso);
-                      navigate(tabPathById.schedule);
-                    }
+                          if (date) {
+                            setScheduleView('month');
+                            setDayViewDate(lessonDate);
+                            setMonthAnchor(startOfMonth(lessonDate));
+                            setMonthOffset(0);
+                            setScheduleSelectedMonthDay(lessonIso);
+                            navigate(tabPathById.schedule);
+                          }
 
-                    openLessonModal(
-                      lessonIso,
-                      date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
-                    );
-                  },
-                  onOpenSchedule: () => navigate(tabPathById.schedule),
-                  onOpenLesson: (lesson) =>
-                    openLessonModal(
-                      formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                      undefined,
-                      lesson,
-                    ),
-                  onOpenLessonDay: (lesson) => {
-                    const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
-                    const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
-                      timeZone: resolvedTimeZone,
-                    });
-                    setScheduleView('month');
-                    setDayViewDate(lessonDate);
-                    setMonthAnchor(startOfMonth(lessonDate));
-                    setMonthOffset(0);
-                    setScheduleSelectedMonthDay(lessonIso);
-                    navigate(tabPathById.schedule);
-                  },
-                  onCompleteLesson: markLessonCompleted,
-                  onTogglePaid: togglePaid,
-                  onRemindLessonPayment: remindLessonPayment,
-                  onOpenStudent: (studentId) => {
-                    setSelectedStudentId(studentId);
-                    navigate(tabPathById.students);
-                  },
-                }}
-                students={{
-                  hasAccess,
-                  teacher,
-                  lessons,
-                  homeworkFilter: studentHomeworkFilter,
-                  newHomeworkDraft,
-                  onHomeworkFilterChange: setStudentHomeworkFilter,
-                  onRemindHomework: remindHomework,
-                  onRemindHomeworkById: remindHomeworkById,
-                  onSendHomework: sendHomeworkToStudent,
-                  onDuplicateHomework: duplicateHomework,
-                  onDeleteHomework: deleteHomework,
-                  onAddHomework: addHomework,
-                  onHomeworkDraftChange: (draft) =>
-                    setNewHomeworkDraft({
-                      ...draft,
-                      baseStatus: draft.baseStatus ?? draft.status ?? 'DRAFT',
-                    }),
-                  onToggleHomework: toggleHomeworkDone,
-                  onUpdateHomework: updateHomework,
-                  onRemindLessonPayment: remindLessonPayment,
-                  lessonPaymentFilter: studentLessonPaymentFilter,
-                  lessonStatusFilter: studentLessonStatusFilter,
-                  lessonDateRange: studentLessonDateRange,
-                  lessonSortOrder: studentLessonSortOrder,
-                  onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
-                  onLessonStatusFilterChange: setStudentLessonStatusFilter,
-                  onLessonDateRangeChange: setStudentLessonDateRange,
-                  onLessonSortOrderChange: handleLessonSortOrderChange,
-                  paymentFilter,
-                  paymentDate,
-                  onPaymentFilterChange: handlePaymentFilterChange,
-                  onPaymentDateChange: handlePaymentDateChange,
-                  onActiveTabChange: setStudentActiveTab,
-                  onCompleteLesson: markLessonCompleted,
-                  onChangeLessonStatus: updateLessonStatus,
-                  onTogglePaid: togglePaid,
-                  onCreateLesson: openCreateLessonForStudent,
-                  onEditLesson: startEditLesson,
-                  onRequestDeleteLesson: requestDeleteLessonFromList,
-                  studentListReloadKey,
-                }}
-                schedule={{
-                  scheduleView,
-                  onScheduleViewChange: setScheduleView,
-                  dayViewDate,
-                  onDayShift: handleDayShift,
-                  onWeekShift: handleWeekShift,
-                  onMonthShift: handleMonthShift,
-                  dayLabelKey,
-                  weekLabelKey,
-                  monthLabelKey,
-                  lessons,
-                  linkedStudents,
-                  monthAnchor,
-                  monthOffset,
-                  selectedMonthDay: scheduleSelectedMonthDay,
-                  onMonthDaySelect: setScheduleSelectedMonthDay,
-                  onOpenLessonModal: openLessonModal,
-                  onStartEditLesson: startEditLesson,
-                  onTogglePaid: togglePaid,
-                  onDeleteLesson: requestDeleteLessonFromList,
-                  onDayViewDateChange: setDayViewDate,
-                  onGoToToday: handleGoToToday,
-                  autoConfirmLessons: teacher.autoConfirmLessons,
-                }}
-                settings={{ teacher, onTeacherChange: setTeacher }}
-              />
-            </main>
-          </div>
+                          lessonActions.openLessonModal(
+                            lessonIso,
+                            date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                          );
+                        },
+                        onOpenSchedule: () => navigate(tabPathById.schedule),
+                        onOpenLesson: (lesson) =>
+                          lessonActions.openLessonModal(
+                            formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                            undefined,
+                            lesson,
+                          ),
+                        onOpenLessonDay: (lesson) => {
+                          const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+                          const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+                            timeZone: resolvedTimeZone,
+                          });
+                          setScheduleView('month');
+                          setDayViewDate(lessonDate);
+                          setMonthAnchor(startOfMonth(lessonDate));
+                          setMonthOffset(0);
+                          setScheduleSelectedMonthDay(lessonIso);
+                          navigate(tabPathById.schedule);
+                        },
+                        onCompleteLesson: markLessonCompleted,
+                        onTogglePaid: togglePaid,
+                        onRemindLessonPayment: remindLessonPayment,
+                        onOpenStudent: (studentId) => {
+                          setSelectedStudentId(studentId);
+                          navigate(tabPathById.students);
+                        },
+                      }}
+                      students={{
+                        hasAccess,
+                        teacher,
+                        lessons,
+                        homeworkFilter: studentHomeworkFilter,
+                        onHomeworkFilterChange: setStudentHomeworkFilter,
+                        onRemindLessonPayment: remindLessonPayment,
+                        lessonPaymentFilter: studentLessonPaymentFilter,
+                        lessonStatusFilter: studentLessonStatusFilter,
+                        lessonDateRange: studentLessonDateRange,
+                        lessonSortOrder: studentLessonSortOrder,
+                        onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
+                        onLessonStatusFilterChange: setStudentLessonStatusFilter,
+                        onLessonDateRangeChange: setStudentLessonDateRange,
+                        onLessonSortOrderChange: handleLessonSortOrderChange,
+                        paymentFilter,
+                        paymentDate,
+                        onPaymentFilterChange: handlePaymentFilterChange,
+                        onPaymentDateChange: handlePaymentDateChange,
+                        onActiveTabChange: setStudentActiveTab,
+                        onCompleteLesson: markLessonCompleted,
+                        onChangeLessonStatus: updateLessonStatus,
+                        onTogglePaid: togglePaid,
+                        studentListReloadKey,
+                      }}
+                      schedule={{
+                        scheduleView,
+                        onScheduleViewChange: setScheduleView,
+                        dayViewDate,
+                        onDayShift: handleDayShift,
+                        onWeekShift: handleWeekShift,
+                        onMonthShift: handleMonthShift,
+                        dayLabelKey,
+                        weekLabelKey,
+                        monthLabelKey,
+                        lessons,
+                        linkedStudents,
+                        monthAnchor,
+                        monthOffset,
+                        selectedMonthDay: scheduleSelectedMonthDay,
+                        onMonthDaySelect: setScheduleSelectedMonthDay,
+                        onTogglePaid: togglePaid,
+                        onDayViewDateChange: setDayViewDate,
+                        onGoToToday: handleGoToToday,
+                        autoConfirmLessons: teacher.autoConfirmLessons,
+                      }}
+                      settings={{ teacher, onTeacherChange: setTeacher }}
+                    />
+                  </main>
+                </div>
 
-          <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+                <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
 
-          <AppModals
-            lessonModalOpen={lessonModalOpen}
-            onCloseLessonModal={closeLessonModal}
-            editingLessonId={editingLessonId}
-            defaultLessonDuration={teacher.defaultLessonDuration}
-            linkedStudents={linkedStudents}
-            lessonDraft={newLessonDraft}
-            recurrenceLocked={Boolean(editingLessonOriginal?.isRecurring)}
-            onLessonDraftChange={handleLessonDraftChange}
-            onDeleteLesson={editingLessonId ? requestDeleteLesson : undefined}
-            onSubmitLesson={saveLesson}
-            dialogState={dialogState}
-            onCloseDialog={closeDialog}
-            onDialogStateChange={setDialogState}
-          />
-          </div>
-          {showSubscriptionGate ? <SubscriptionGate /> : null}
-        </TimeZoneProvider>
+                <AppModals
+                  linkedStudents={linkedStudents}
+                  dialogState={dialogState}
+                  onCloseDialog={closeDialog}
+                  onDialogStateChange={setDialogState}
+                />
+              </div>
+              {showSubscriptionGate ? <SubscriptionGate /> : null}
+            </TimeZoneProvider>
+          </LessonActionsProvider>
+        </StudentsHomeworkProvider>
       </StudentsActionsProvider>
     </StudentsDataProvider>
   );

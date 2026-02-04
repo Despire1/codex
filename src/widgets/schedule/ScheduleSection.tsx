@@ -29,6 +29,7 @@ import { useIsMobile } from '../../shared/lib/useIsMobile';
 import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import { buildParticipants, getLessonLabel } from './lib/lessonCardDetails';
 import styles from './ScheduleSection.module.css';
+import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
@@ -57,10 +58,7 @@ interface ScheduleSectionProps {
   monthOffset: number;
   selectedMonthDay?: string | null;
   onMonthDaySelect?: (dayIso: string | null) => void;
-  onOpenLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
-  onStartEditLesson: (lesson: Lesson) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onDeleteLesson: (lesson: Lesson) => void;
   onDayViewDateChange: (date: Date) => void;
   onGoToToday: () => void;
   autoConfirmLessons: boolean;
@@ -82,15 +80,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   monthOffset,
   selectedMonthDay,
   onMonthDaySelect,
-  onOpenLessonModal,
-  onStartEditLesson,
   onTogglePaid,
-  onDeleteLesson,
   onDayViewDateChange,
   onGoToToday,
   autoConfirmLessons,
 }) => {
   const timeZone = useTimeZone();
+  const { openLessonModal, startEditLesson, requestDeleteLessonFromList } = useLessonActions();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
@@ -494,7 +490,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           lesson.status === 'CANCELED' ? styles.canceledLesson : ''
         }`}
         style={{ ...layoutStyle, ...buildLessonColorStyle(lesson) }}
-        onClick={() => onStartEditLesson(lesson)}
+        onClick={() => startEditLesson(lesson)}
         onMouseEnter={() => setHoverIndicator(null)}
       >
         {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
@@ -554,7 +550,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
 
     onDayViewDateChange(toZonedDate(toUtcDateFromDate(dayIso, timeZone), timeZone));
-    onOpenLessonModal(dayIso, `${hoursValue}:${minutes}`);
+    openLessonModal(dayIso, `${hoursValue}:${minutes}`);
   };
 
   const renderWeekGrid = () => (
@@ -801,13 +797,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 timeZone={timeZone}
                 style={buildLessonColorStyle(lesson)}
                 isActionsOpen={openLessonMenuId === lesson.id}
-                onEdit={() => onStartEditLesson(lesson)}
+                onEdit={() => startEditLesson(lesson)}
                 onTogglePaid={(studentId) => onTogglePaid(lesson.id, studentId)}
                 onOpenActions={() =>
                   setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
                 }
                 onCloseActions={() => setOpenLessonMenuId(null)}
-                onDelete={() => onDeleteLesson(lesson)}
+                onDelete={() => requestDeleteLessonFromList(lesson)}
                 onReschedule={() => {}}
                 onOpenMeetingLink={handleOpenMeetingLink}
               />
@@ -818,7 +814,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         {effectiveSelectedMonthDay && (
           <button
             className={`${controls.primaryButton} ${styles.panelAction}`}
-            onClick={() => onOpenLessonModal(effectiveSelectedMonthDay)}
+            onClick={() => openLessonModal(effectiveSelectedMonthDay)}
           >
             Создать урок
           </button>
@@ -984,7 +980,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             </div>
             <button
               className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonMobile}`}
-              onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+              onClick={() => openLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
               type="button"
               aria-label="Создать урок"
             >
@@ -1130,7 +1126,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
             )}
             <button
                 className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonComputer}`}
-                onClick={() => onOpenLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
+                onClick={() => openLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
                 type="button"
             >
               <AddOutlinedIcon className={styles.headerActionIcon}/>

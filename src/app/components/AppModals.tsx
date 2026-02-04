@@ -5,10 +5,11 @@ import { Modal } from '../../shared/ui/Modal/Modal';
 import modalStyles from '../../shared/ui/Modal/Modal.module.css';
 import controls from '../../shared/styles/controls.module.css';
 import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
-import { LessonModal, type LessonDraft } from '../../features/modals/LessonModal/LessonModal';
+import { LessonModal } from '../../features/modals/LessonModal/LessonModal';
 import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
 import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
 import { useStudentsActions } from '../../widgets/students/model/useStudentsActions';
+import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 
 export type DialogState =
   | {
@@ -53,32 +54,14 @@ export type DialogState =
   | null;
 
 interface AppModalsProps {
-  lessonModalOpen: boolean;
-  onCloseLessonModal: () => void;
-  editingLessonId: number | null;
-  defaultLessonDuration: number;
   linkedStudents: LinkedStudent[];
-  lessonDraft: LessonDraft;
-  recurrenceLocked: boolean;
-  onLessonDraftChange: (draft: LessonDraft) => void;
-  onDeleteLesson?: () => void;
-  onSubmitLesson: (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => void;
   dialogState: DialogState;
   onCloseDialog: () => void;
   onDialogStateChange: (state: DialogState | ((prev: DialogState) => DialogState)) => void;
 }
 
 export const AppModals: FC<AppModalsProps> = ({
-  lessonModalOpen,
-  onCloseLessonModal,
-  editingLessonId,
-  defaultLessonDuration,
   linkedStudents,
-  lessonDraft,
-  recurrenceLocked,
-  onLessonDraftChange,
-  onDeleteLesson,
-  onSubmitLesson,
   dialogState,
   onCloseDialog,
   onDialogStateChange,
@@ -91,6 +74,17 @@ export const AppModals: FC<AppModalsProps> = ({
     submitStudent,
     closeStudentModal,
   } = useStudentsActions();
+  const {
+    lessonModalOpen,
+    lessonDraft,
+    editingLessonId,
+    recurrenceLocked,
+    defaultLessonDuration,
+    setLessonDraft,
+    saveLesson,
+    closeLessonModal,
+    requestDeleteLesson,
+  } = useLessonActions();
 
   return (
     <>
@@ -105,15 +99,15 @@ export const AppModals: FC<AppModalsProps> = ({
 
       <LessonModal
         open={lessonModalOpen}
-        onClose={onCloseLessonModal}
+        onClose={closeLessonModal}
         editingLessonId={editingLessonId}
         defaultDuration={defaultLessonDuration}
         linkedStudents={linkedStudents}
         draft={lessonDraft}
         recurrenceLocked={recurrenceLocked}
-        onDraftChange={onLessonDraftChange}
-        onDelete={onDeleteLesson}
-        onSubmit={onSubmitLesson}
+        onDraftChange={setLessonDraft}
+        onDelete={editingLessonId ? requestDeleteLesson : undefined}
+        onSubmit={saveLesson}
       />
 
       {dialogState &&

@@ -1,7 +1,6 @@
 import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Homework,
   HomeworkStatus,
   Lesson,
   LessonDateRange,
@@ -18,13 +17,15 @@ import { PaymentsTab } from './components/PaymentsTab';
 import { BalanceTopupModal } from './components/BalanceTopupModal';
 import { StudentHero } from './components/StudentHero';
 import { StudentsSidebar } from './components/StudentsSidebar';
-import { NewHomeworkDraft, SelectedStudent, StudentTabId } from './types';
+import { SelectedStudent, StudentTabId } from './types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useStudentsList } from './model/useStudentsList';
 import { useStudentsFilters } from './model/useStudentsFilters';
 import { useSelectedStudent } from '@/entities/student/model/selectedStudent';
 import { useStudentsData } from './model/useStudentsData';
 import { useStudentsActions } from './model/useStudentsActions';
+import { useStudentsHomework } from './model/useStudentsHomework';
+import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 
 interface StudentsSectionProps {
   hasAccess: boolean;
@@ -32,15 +33,6 @@ interface StudentsSectionProps {
   lessons: Lesson[];
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-  onRemindHomework: (studentId: number) => void;
-  onRemindHomeworkById?: (homeworkId: number) => void;
-  onSendHomework?: (homeworkId: number) => void;
-  onDuplicateHomework?: (homeworkId: number) => void;
-  onDeleteHomework?: (homeworkId: number) => void;
-  onAddHomework: () => void;
-  onHomeworkDraftChange: (draft: NewHomeworkDraft) => void;
-  onToggleHomework: (homeworkId: number) => void;
-  onUpdateHomework?: (homeworkId: number, payload: Partial<Homework>) => void;
   onRemindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -61,10 +53,6 @@ interface StudentsSectionProps {
   onCompleteLesson: (lessonId: number) => void;
   onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
   onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onCreateLesson: (studentId?: number) => void;
-  onEditLesson: (lesson: Lesson) => void;
-  onRequestDeleteLesson: (lesson: Lesson) => void;
-  newHomeworkDraft: NewHomeworkDraft;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onRequestDebtDetails?: () => void;
   studentListReloadKey: number;
@@ -95,15 +83,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   lessons,
   homeworkFilter,
   onHomeworkFilterChange,
-  onRemindHomework,
-  onRemindHomeworkById,
-  onSendHomework,
-  onDuplicateHomework,
-  onDeleteHomework,
-  onAddHomework,
-  onHomeworkDraftChange,
-  onToggleHomework,
-  onUpdateHomework,
   onRemindLessonPayment,
   lessonPaymentFilter,
   lessonStatusFilter,
@@ -120,10 +99,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   onCompleteLesson,
   onChangeLessonStatus,
   onTogglePaid,
-  onCreateLesson,
-  onEditLesson,
-  onRequestDeleteLesson,
-  newHomeworkDraft,
   onActiveTabChange,
   onRequestDebtDetails,
   studentListReloadKey,
@@ -163,6 +138,19 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     adjustBalance,
     topupBalance,
   } = useStudentsActions();
+  const { openCreateLessonForStudent, startEditLesson, requestDeleteLessonFromList } = useLessonActions();
+  const {
+    newHomeworkDraft,
+    setHomeworkDraft,
+    addHomework,
+    sendHomeworkToStudent,
+    duplicateHomework,
+    deleteHomework,
+    toggleHomeworkDone,
+    updateHomework,
+    remindHomework,
+    remindHomeworkById,
+  } = useStudentsHomework();
   const { search: studentSearch, filter: studentFilter, query: studentQuery, setSearch, setFilter } =
     useStudentsFilters();
   const {
@@ -399,14 +387,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     isMobile={isMobile}
                     onHomeworkFilterChange={onHomeworkFilterChange}
                     onLoadMoreHomeworks={loadMoreStudentHomeworks}
-                    onToggleHomework={onToggleHomework}
-                    onUpdateHomework={onUpdateHomework}
-                    onRemindHomework={onRemindHomework}
-                    onRemindHomeworkById={onRemindHomeworkById}
-                    onSendHomework={onSendHomework}
-                    onDeleteHomework={onDeleteHomework}
-                    onAddHomework={onAddHomework}
-                    onHomeworkDraftChange={onHomeworkDraftChange}
+                    onToggleHomework={toggleHomeworkDone}
+                    onUpdateHomework={updateHomework}
+                    onRemindHomework={remindHomework}
+                    onRemindHomeworkById={remindHomeworkById}
+                    onSendHomework={sendHomeworkToStudent}
+                    onDeleteHomework={deleteHomework}
+                    onAddHomework={addHomework}
+                    onHomeworkDraftChange={setHomeworkDraft}
                     newHomeworkDraft={newHomeworkDraft}
                   />
                 ) : */}
@@ -428,11 +416,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onStartEditLessonStatus={handleStartEditLessonStatus}
                     onStopEditLessonStatus={handleStopEditLessonStatus}
                     onLessonStatusChange={handleLessonStatusChange}
-                    onCreateLesson={onCreateLesson}
+                    onCreateLesson={openCreateLessonForStudent}
                     onCompleteLesson={onCompleteLesson}
                     onTogglePaid={onTogglePaid}
-                    onEditLesson={onEditLesson}
-                    onRequestDeleteLesson={onRequestDeleteLesson}
+                    onEditLesson={startEditLesson}
+                    onRequestDeleteLesson={requestDeleteLessonFromList}
                     getLessonStatusLabel={getLessonStatusLabel}
                     autoConfirmLessons={teacher.autoConfirmLessons}
                   />
@@ -448,7 +436,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     paymentRemindersHasMore={paymentRemindersHasMore}
                     onPaymentFilterChange={onPaymentFilterChange}
                     onPaymentDateChange={onPaymentDateChange}
-                    onOpenLesson={onEditLesson}
+                    onOpenLesson={startEditLesson}
                     onOpenReminders={openPaymentReminders}
                     onLoadMoreReminders={loadMorePaymentReminders}
                     paymentsLoading={paymentsLoading}
