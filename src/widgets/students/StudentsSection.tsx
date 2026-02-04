@@ -33,11 +33,6 @@ interface StudentsSectionProps {
   lessons: Lesson[];
   homeworkFilter: 'all' | HomeworkStatus | 'overdue';
   onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-  onRemindLessonPayment: (
-    lessonId: number,
-    studentId?: number,
-    options?: { force?: boolean },
-  ) => Promise<{ status: 'sent' | 'error' }>;
   lessonPaymentFilter: LessonPaymentFilter;
   lessonStatusFilter: LessonStatusFilter;
   lessonDateRange: LessonDateRange;
@@ -50,9 +45,6 @@ interface StudentsSectionProps {
   paymentDate: string;
   onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
   onPaymentDateChange: (date: string) => void;
-  onCompleteLesson: (lessonId: number) => void;
-  onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
-  onTogglePaid: (lessonId: number, studentId?: number) => void;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onRequestDebtDetails?: () => void;
   studentListReloadKey: number;
@@ -83,7 +75,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   lessons,
   homeworkFilter,
   onHomeworkFilterChange,
-  onRemindLessonPayment,
   lessonPaymentFilter,
   lessonStatusFilter,
   lessonDateRange,
@@ -96,9 +87,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   paymentDate,
   onPaymentFilterChange,
   onPaymentDateChange,
-  onCompleteLesson,
-  onChangeLessonStatus,
-  onTogglePaid,
   onActiveTabChange,
   onRequestDebtDetails,
   studentListReloadKey,
@@ -138,7 +126,15 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     adjustBalance,
     topupBalance,
   } = useStudentsActions();
-  const { openCreateLessonForStudent, startEditLesson, requestDeleteLessonFromList } = useLessonActions();
+  const {
+    openCreateLessonForStudent,
+    startEditLesson,
+    requestDeleteLessonFromList,
+    markLessonCompleted,
+    updateLessonStatus,
+    togglePaid,
+    remindLessonPayment,
+  } = useLessonActions();
   const {
     newHomeworkDraft,
     setHomeworkDraft,
@@ -264,7 +260,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   };
 
   const handleLessonStatusChange = (lessonId: number, status: Lesson['status']) => {
-    onChangeLessonStatus(lessonId, status);
+    updateLessonStatus(lessonId, status);
     setEditableLessonStatusId(null);
   };
 
@@ -372,8 +368,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                   onEditStudent={openEditStudentModal}
                   onRequestDeleteStudent={requestDeleteStudent}
                   onRequestDebtDetails={onRequestDebtDetails}
-                  onRemindLessonPayment={onRemindLessonPayment}
-                  onTogglePaid={onTogglePaid}
+                  onRemindLessonPayment={remindLessonPayment}
+                  onTogglePaid={togglePaid}
                 />
 
                 {/*
@@ -417,8 +413,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     onStopEditLessonStatus={handleStopEditLessonStatus}
                     onLessonStatusChange={handleLessonStatusChange}
                     onCreateLesson={openCreateLessonForStudent}
-                    onCompleteLesson={onCompleteLesson}
-                    onTogglePaid={onTogglePaid}
+                    onCompleteLesson={markLessonCompleted}
+                    onTogglePaid={togglePaid}
                     onEditLesson={startEditLesson}
                     onRequestDeleteLesson={requestDeleteLessonFromList}
                     getLessonStatusLabel={getLessonStatusLabel}

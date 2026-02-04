@@ -1,5 +1,4 @@
 import { addDays, addMonths, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -10,7 +9,6 @@ import {
   LessonSortOrder,
   LessonStatusFilter,
   LinkedStudent,
-  PaymentCancelBehavior,
   Student,
   Teacher,
   TeacherStudent,
@@ -43,6 +41,7 @@ import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/studen
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
 import { StudentsHomeworkProvider, useStudentsHomeworkInternal } from '../widgets/students/model/useStudentsHomework';
 import { LessonActionsProvider, useLessonActionsInternal } from '../features/lessons/model/useLessonActions';
+import { ScheduleStateProvider, useScheduleStateInternal } from '../widgets/schedule/model/useScheduleState';
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -231,18 +230,22 @@ export const AppPage = () => {
   const [paymentDate, setPaymentDate] = useState(storedStudentCardFilters.paymentDate ?? '');
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
-  const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('month');
-  const [monthAnchor, setMonthAnchor] = useState<Date>(() => startOfMonth(toZonedDate(new Date(), resolvedTimeZone)));
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [monthLabelKey, setMonthLabelKey] = useState(0);
-  const [weekLabelKey, setWeekLabelKey] = useState(0);
-  const [dayLabelKey, setDayLabelKey] = useState(0);
-  const [dayViewDate, setDayViewDate] = useState<Date>(() => toZonedDate(new Date(), resolvedTimeZone));
-  const [scheduleSelectedMonthDay, setScheduleSelectedMonthDay] = useState<string | null>(null);
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const triggerStudentsListReload = useCallback(() => {
     setStudentListReloadKey((prev) => prev + 1);
   }, []);
+  const scheduleState = useScheduleStateInternal({ timeZone: resolvedTimeZone });
+  const {
+    scheduleView,
+    setScheduleView,
+    dayViewDate,
+    setDayViewDate,
+    monthAnchor,
+    setMonthAnchor,
+    monthOffset,
+    setMonthOffset,
+    setSelectedMonthDay,
+  } = scheduleState;
 
   const studentsData = useStudentsDataInternal({
     hasAccess,
@@ -322,6 +325,64 @@ export const AppPage = () => {
         onConfirm: (applyToSeries) => {
           closeDialog();
           options.onConfirm(applyToSeries);
+        },
+        onCancel: () => {
+          closeDialog();
+          options.onCancel?.();
+        },
+      });
+    },
+    [closeDialog],
+  );
+
+  const openPaymentCancelDialog = useCallback(
+    (options: {
+      title: string;
+      message: string;
+      onRefund: () => void;
+      onWriteOff: () => void;
+      onCancel?: () => void;
+    }) => {
+      setDialogState({
+        type: 'payment-cancel',
+        title: options.title,
+        message: options.message,
+        onRefund: () => {
+          closeDialog();
+          options.onRefund();
+        },
+        onWriteOff: () => {
+          closeDialog();
+          options.onWriteOff();
+        },
+        onCancel: () => {
+          closeDialog();
+          options.onCancel?.();
+        },
+      });
+    },
+    [closeDialog],
+  );
+
+  const openPaymentBalanceDialog = useCallback(
+    (options: {
+      title: string;
+      message: string;
+      onWriteOff: () => void;
+      onSkip: () => void;
+      onCancel?: () => void;
+    }) => {
+      setDialogState({
+        type: 'payment-balance',
+        title: options.title,
+        message: options.message,
+        onWriteOff: () => {
+          closeDialog();
+          options.onWriteOff();
+        },
+        onSkip: () => {
+          closeDialog();
+          options.onSkip();
         },
         onCancel: () => {
           closeDialog();
@@ -497,9 +558,15 @@ export const AppPage = () => {
     teacherDefaultLessonDuration: teacher.defaultLessonDuration,
     selectedStudentId,
     setSelectedStudentId,
+    lessons,
+    links,
+    setLinks,
     showInfoDialog,
+    showToast,
     openConfirmDialog,
     openRecurringDeleteDialog,
+    openPaymentCancelDialog,
+    openPaymentBalanceDialog,
     navigateToSchedule,
     setDayViewDate,
     filterLessonsForCurrentRange,
@@ -507,7 +574,12 @@ export const AppPage = () => {
     isLessonInCurrentRange,
     loadStudentLessons,
     loadStudentLessonsSummary,
+    loadStudentUnpaidLessons,
     loadDashboardUnpaidLessons,
+    refreshPayments,
+    refreshPaymentReminders,
+    triggerStudentsListReload,
+    studentDebtItems,
   });
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
@@ -569,15 +641,6 @@ export const AppPage = () => {
     scheduleView,
     studentsHomework.replaceHomeworks,
   ]);
-
-  useEffect(() => {
-    const today = toZonedDate(new Date(), resolvedTimeZone);
-    setDayViewDate((current) => {
-      const currentIso = format(current, 'yyyy-MM-dd');
-      return toZonedDate(toUtcDateFromDate(currentIso, resolvedTimeZone), resolvedTimeZone);
-    });
-    setMonthAnchor(startOfMonth(today));
-  }, [resolvedTimeZone]);
 
   const handleLessonSortOrderChange = useCallback(
     (order: LessonSortOrder) => {
@@ -675,324 +738,6 @@ export const AppPage = () => {
     setPaymentDate(nextDate);
   };
 
-  const markLessonCompleted = async (lessonId: number) => {
-    try {
-      const data = await api.markLessonCompleted(lessonId);
-      updateLessonsForCurrentRange((prev) =>
-        prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
-      );
-
-      if (data.link) {
-        const previousLink = links.find(
-          (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
-        );
-        const balanceDelta = previousLink ? data.link.balanceLessons - previousLink.balanceLessons : 0;
-        const studentName = data.link.customName || previousLink?.customName || 'ученика';
-
-        setLinks((prev) =>
-          prev.map((link) =>
-            link.studentId === data.link.studentId && link.teacherId === data.link.teacherId ? data.link : link,
-          ),
-        );
-        triggerStudentsListReload();
-
-        if (balanceDelta < 0) {
-          showToast({
-            message: `С баланса ${studentName} списано занятие`,
-            variant: 'success',
-          });
-        }
-      }
-
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    } catch (error) {
-      showToast({
-        message: 'Не удалось отметить занятие проведённым',
-        variant: 'error',
-      });
-      // eslint-disable-next-line no-console
-      console.error('Failed to complete lesson', error);
-    }
-  };
-
-  const updateLessonStatus = async (lessonId: number, status: Lesson['status']) => {
-    try {
-      const data = await api.updateLessonStatus(lessonId, status);
-      updateLessonsForCurrentRange((prev) =>
-        prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)),
-      );
-
-      if (data.links && data.links.length > 0) {
-        const previousLinks = new Map(
-          links.map((link) => [`${link.teacherId}_${link.studentId}`, link]),
-        );
-        const chargedLinks = data.links.filter((link) => {
-          const previous = previousLinks.get(`${link.teacherId}_${link.studentId}`);
-          return previous ? link.balanceLessons < previous.balanceLessons : false;
-        });
-
-        setLinks((prev) => {
-          const map = new Map(prev.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
-          data.links!.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
-          return Array.from(map.values());
-        });
-        triggerStudentsListReload();
-
-        chargedLinks.forEach((link) => {
-          showToast({
-            message: `С баланса ${link.customName} списано занятие`,
-            variant: 'success',
-          });
-        });
-      }
-
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to update lesson status', error);
-    }
-  };
-
-  const applyTogglePaid = async (
-    lessonId: number,
-    studentId?: number,
-    cancelBehavior?: PaymentCancelBehavior,
-    writeOffBalance?: boolean,
-  ) => {
-    try {
-      const payload =
-        cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
-      if (studentId !== undefined) {
-        const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
-        const normalizedLesson = normalizeLesson(data.lesson);
-        updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-
-        if (data.link) {
-          setLinks((prev) => {
-            const exists = prev.some(
-              (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
-            );
-            if (!exists) return [...prev, data.link!];
-            return prev.map((link) =>
-              link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
-            );
-          });
-          triggerStudentsListReload();
-        }
-
-        await refreshPayments(studentId);
-        await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
-        showToast({
-          message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
-          variant: 'success',
-        });
-      } else {
-        const data = await api.togglePaid(lessonId, payload);
-        const normalizedLesson = normalizeLesson(data.lesson);
-        updateLessonsForCurrentRange((prev) => prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)));
-
-        if (data.link) {
-          setLinks((prev) => {
-            const exists = prev.some(
-              (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
-            );
-            if (!exists) return [...prev, data.link!];
-            return prev.map((link) =>
-              link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
-            );
-          });
-          triggerStudentsListReload();
-        }
-
-        const targetStudent = data.lesson.studentId;
-        await refreshPayments(targetStudent);
-        if (targetStudent) {
-          await loadStudentUnpaidLessons({ studentIdOverride: targetStudent, force: true });
-        }
-        showToast({
-          message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
-          variant: 'success',
-        });
-      }
-
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    } catch (error) {
-      showToast({
-        message: 'Не удалось обновить оплату',
-        variant: 'error',
-      });
-    }
-  };
-
-  const resolvePaymentTarget = useCallback(
-    (lessonId: number, studentId?: number) => {
-      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
-      const resolvedStudentId = studentId ?? targetLesson?.studentId;
-      const link = resolvedStudentId ? links.find((item) => item.studentId === resolvedStudentId) : undefined;
-      return { studentId: resolvedStudentId, link };
-    },
-    [lessons, links],
-  );
-
-  const markPaidWithBalance = useCallback(
-    async (lessonId: number, studentId: number | undefined, writeOffBalance: boolean) => {
-      await applyTogglePaid(lessonId, studentId, undefined, writeOffBalance);
-    },
-    [applyTogglePaid],
-  );
-
-  const togglePaid = async (lessonId: number, studentId?: number) => {
-    const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
-    const isCurrentlyPaid =
-      studentId !== undefined
-        ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
-        : targetLesson?.isPaid ?? false;
-
-    if (isCurrentlyPaid) {
-      setDialogState({
-        type: 'payment-cancel',
-        title: 'Отмена оплаты',
-        message: 'Вернуть оплаченный урок на баланс ученика?',
-        onRefund: () => {
-          closeDialog();
-          void applyTogglePaid(lessonId, studentId, 'refund');
-        },
-        onWriteOff: () => {
-          closeDialog();
-          void applyTogglePaid(lessonId, studentId, 'writeoff');
-        },
-        onCancel: closeDialog,
-      });
-      return;
-    }
-
-    const { link } = resolvePaymentTarget(lessonId, studentId);
-    const hasBalance = (link?.balanceLessons ?? 0) > 0;
-
-    if (hasBalance) {
-      setDialogState({
-        type: 'payment-balance',
-        title: 'Отметить оплату',
-        message: 'У ученика есть занятия на балансе. Списать 1 занятие с баланса?',
-        onWriteOff: () => {
-          closeDialog();
-          void markPaidWithBalance(lessonId, studentId, true);
-        },
-        onSkip: () => {
-          closeDialog();
-          void markPaidWithBalance(lessonId, studentId, false);
-        },
-        onCancel: closeDialog,
-      });
-      return;
-    }
-
-    await markPaidWithBalance(lessonId, studentId, false);
-  };
-
-
-  const remindLessonPayment = async (lessonId: number, studentId?: number, options?: { force?: boolean }) => {
-    try {
-      await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
-      showToast({ message: 'Отправлено ✅', variant: 'success' });
-      if (studentId) {
-        await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
-      }
-      if (selectedStudentId) {
-        refreshPaymentReminders(selectedStudentId);
-      }
-      return { status: 'sent' as const };
-    } catch (error) {
-      let code = 'error';
-      if (error instanceof Error) {
-        try {
-          const parsed = JSON.parse(error.message) as { message?: string };
-          code = parsed?.message ?? error.message;
-        } catch {
-          code = error.message;
-        }
-      }
-      if (code === 'recently_sent' && !options?.force) {
-        return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
-          const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
-          const lastReminderLabel = reminderItem?.lastPaymentReminderAt
-            ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
-                locale: ru,
-                timeZone: resolvedTimeZone,
-              })
-            : null;
-          const message = lastReminderLabel
-            ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
-            : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
-          setDialogState({
-            type: 'confirm',
-            title: 'Напоминание уже отправлялось недавно',
-            message,
-            confirmText: 'Отправить',
-            cancelText: 'Отмена',
-            onConfirm: async () => {
-              closeDialog();
-              const result = await remindLessonPayment(lessonId, studentId, { force: true });
-              resolve(result);
-            },
-            onCancel: () => {
-              closeDialog();
-              resolve({ status: 'error' as const });
-            },
-          });
-        });
-      }
-      const message =
-        code === 'student_not_activated'
-          ? 'Ученик не активировал бота — отправка напоминаний невозможна'
-          : 'Не удалось отправить напоминание';
-      showToast({ message, variant: 'error' });
-      // eslint-disable-next-line no-console
-      console.error('Failed to send payment reminder', error);
-      return { status: 'error' as const };
-    }
-  };
-
-  const handleMonthShift = (delta: number) => {
-    setMonthOffset((prev) => {
-      const next = prev + delta;
-      const targetMonth = addMonths(monthAnchor, next);
-      if (scheduleView === 'month') {
-        setDayViewDate((current) => {
-          const day = Math.min(current.getDate(), endOfMonth(targetMonth).getDate());
-          return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), day);
-        });
-      }
-      return next;
-    });
-    setMonthLabelKey((key) => key + 1);
-  };
-
-  const handleWeekShift = (delta: number) => {
-    setDayViewDate((prev) => addDays(prev, delta * 7));
-    setWeekLabelKey((key) => key + 1);
-  };
-
-  const handleDayShift = (delta: number) => {
-    setDayViewDate((prev) => addDays(prev, delta));
-    setDayLabelKey((key) => key + 1);
-  };
-
-  const handleGoToToday = () => {
-    const today = toZonedDate(new Date(), resolvedTimeZone);
-    setDayViewDate(today);
-    setMonthOffset(0);
-    setDayLabelKey((key) => key + 1);
-    setWeekLabelKey((key) => key + 1);
-    setMonthLabelKey((key) => key + 1);
-  };
-
   if (sessionState !== 'authenticated' || !hasTelegramAccess) {
     const fallbackState =
       sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending') ? 'checking' : 'unauthenticated';
@@ -1020,136 +765,115 @@ export const AppPage = () => {
       <StudentsActionsProvider value={studentsActions}>
         <StudentsHomeworkProvider value={studentsHomework}>
           <LessonActionsProvider value={lessonActions}>
-            <TimeZoneProvider timeZone={resolvedTimeZone}>
-              <div className={layoutStyles.page}>
-                <div className={layoutStyles.pageInner}>
-                  <Topbar
-                    teacher={teacher}
-                    activeTab={activeTab}
-                    onTabChange={(tab) => navigate(tabPathById[tab])}
-                    profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                  />
+            <ScheduleStateProvider value={scheduleState}>
+              <TimeZoneProvider timeZone={resolvedTimeZone}>
+                <div className={layoutStyles.page}>
+                  <div className={layoutStyles.pageInner}>
+                    <Topbar
+                      teacher={teacher}
+                      activeTab={activeTab}
+                      onTabChange={(tab) => navigate(tabPathById[tab])}
+                      profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                    />
 
-                  <main className={layoutStyles.content}>
-                    <AppRoutes
-                      resolveLastVisitedPath={resolveLastVisitedPath}
-                      dashboard={{
-                        teacher,
-                        lessons,
-                        linkedStudents,
-                        unpaidEntries: unpaidLessonEntries,
-                        onWeekRangeChange: handleDashboardWeekRangeChange,
-                        onAddStudent: () => {
-                          navigate(tabPathById.students);
-                          studentsActions.openCreateStudentModal();
-                        },
-                        onCreateLesson: (date) => {
-                          const lessonDate = date ?? new Date();
-                          const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+                    <main className={layoutStyles.content}>
+                      <AppRoutes
+                        resolveLastVisitedPath={resolveLastVisitedPath}
+                        dashboard={{
+                          teacher,
+                          lessons,
+                          linkedStudents,
+                          unpaidEntries: unpaidLessonEntries,
+                          onWeekRangeChange: handleDashboardWeekRangeChange,
+                          onAddStudent: () => {
+                            navigate(tabPathById.students);
+                            studentsActions.openCreateStudentModal();
+                          },
+                          onCreateLesson: (date) => {
+                            const lessonDate = date ?? new Date();
+                            const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
 
-                          if (date) {
+                            if (date) {
+                              setScheduleView('month');
+                              setDayViewDate(lessonDate);
+                              setMonthAnchor(startOfMonth(lessonDate));
+                              setMonthOffset(0);
+                              setSelectedMonthDay(lessonIso);
+                              navigate(tabPathById.schedule);
+                            }
+
+                            lessonActions.openLessonModal(
+                              lessonIso,
+                              date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                            );
+                          },
+                          onOpenSchedule: () => navigate(tabPathById.schedule),
+                          onOpenLesson: (lesson) =>
+                            lessonActions.openLessonModal(
+                              formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                              undefined,
+                              lesson,
+                            ),
+                          onOpenLessonDay: (lesson) => {
+                            const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+                            const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+                              timeZone: resolvedTimeZone,
+                            });
                             setScheduleView('month');
                             setDayViewDate(lessonDate);
                             setMonthAnchor(startOfMonth(lessonDate));
                             setMonthOffset(0);
-                            setScheduleSelectedMonthDay(lessonIso);
+                            setSelectedMonthDay(lessonIso);
                             navigate(tabPathById.schedule);
-                          }
+                          },
+                          onOpenStudent: (studentId) => {
+                            setSelectedStudentId(studentId);
+                            navigate(tabPathById.students);
+                          },
+                        }}
+                        students={{
+                          hasAccess,
+                          teacher,
+                          lessons,
+                          homeworkFilter: studentHomeworkFilter,
+                          onHomeworkFilterChange: setStudentHomeworkFilter,
+                          lessonPaymentFilter: studentLessonPaymentFilter,
+                          lessonStatusFilter: studentLessonStatusFilter,
+                          lessonDateRange: studentLessonDateRange,
+                          lessonSortOrder: studentLessonSortOrder,
+                          onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
+                          onLessonStatusFilterChange: setStudentLessonStatusFilter,
+                          onLessonDateRangeChange: setStudentLessonDateRange,
+                          onLessonSortOrderChange: handleLessonSortOrderChange,
+                          paymentFilter,
+                          paymentDate,
+                          onPaymentFilterChange: handlePaymentFilterChange,
+                          onPaymentDateChange: handlePaymentDateChange,
+                          onActiveTabChange: setStudentActiveTab,
+                          studentListReloadKey,
+                        }}
+                        schedule={{
+                          lessons,
+                          linkedStudents,
+                          autoConfirmLessons: teacher.autoConfirmLessons,
+                        }}
+                        settings={{ teacher, onTeacherChange: setTeacher }}
+                      />
+                    </main>
+                  </div>
 
-                          lessonActions.openLessonModal(
-                            lessonIso,
-                            date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
-                          );
-                        },
-                        onOpenSchedule: () => navigate(tabPathById.schedule),
-                        onOpenLesson: (lesson) =>
-                          lessonActions.openLessonModal(
-                            formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                            undefined,
-                            lesson,
-                          ),
-                        onOpenLessonDay: (lesson) => {
-                          const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
-                          const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
-                            timeZone: resolvedTimeZone,
-                          });
-                          setScheduleView('month');
-                          setDayViewDate(lessonDate);
-                          setMonthAnchor(startOfMonth(lessonDate));
-                          setMonthOffset(0);
-                          setScheduleSelectedMonthDay(lessonIso);
-                          navigate(tabPathById.schedule);
-                        },
-                        onCompleteLesson: markLessonCompleted,
-                        onTogglePaid: togglePaid,
-                        onRemindLessonPayment: remindLessonPayment,
-                        onOpenStudent: (studentId) => {
-                          setSelectedStudentId(studentId);
-                          navigate(tabPathById.students);
-                        },
-                      }}
-                      students={{
-                        hasAccess,
-                        teacher,
-                        lessons,
-                        homeworkFilter: studentHomeworkFilter,
-                        onHomeworkFilterChange: setStudentHomeworkFilter,
-                        onRemindLessonPayment: remindLessonPayment,
-                        lessonPaymentFilter: studentLessonPaymentFilter,
-                        lessonStatusFilter: studentLessonStatusFilter,
-                        lessonDateRange: studentLessonDateRange,
-                        lessonSortOrder: studentLessonSortOrder,
-                        onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
-                        onLessonStatusFilterChange: setStudentLessonStatusFilter,
-                        onLessonDateRangeChange: setStudentLessonDateRange,
-                        onLessonSortOrderChange: handleLessonSortOrderChange,
-                        paymentFilter,
-                        paymentDate,
-                        onPaymentFilterChange: handlePaymentFilterChange,
-                        onPaymentDateChange: handlePaymentDateChange,
-                        onActiveTabChange: setStudentActiveTab,
-                        onCompleteLesson: markLessonCompleted,
-                        onChangeLessonStatus: updateLessonStatus,
-                        onTogglePaid: togglePaid,
-                        studentListReloadKey,
-                      }}
-                      schedule={{
-                        scheduleView,
-                        onScheduleViewChange: setScheduleView,
-                        dayViewDate,
-                        onDayShift: handleDayShift,
-                        onWeekShift: handleWeekShift,
-                        onMonthShift: handleMonthShift,
-                        dayLabelKey,
-                        weekLabelKey,
-                        monthLabelKey,
-                        lessons,
-                        linkedStudents,
-                        monthAnchor,
-                        monthOffset,
-                        selectedMonthDay: scheduleSelectedMonthDay,
-                        onMonthDaySelect: setScheduleSelectedMonthDay,
-                        onTogglePaid: togglePaid,
-                        onDayViewDateChange: setDayViewDate,
-                        onGoToToday: handleGoToToday,
-                        autoConfirmLessons: teacher.autoConfirmLessons,
-                      }}
-                      settings={{ teacher, onTeacherChange: setTeacher }}
-                    />
-                  </main>
+                  <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+
+                  <AppModals
+                    linkedStudents={linkedStudents}
+                    dialogState={dialogState}
+                    onCloseDialog={closeDialog}
+                    onDialogStateChange={setDialogState}
+                  />
                 </div>
-
-                <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
-
-                <AppModals
-                  linkedStudents={linkedStudents}
-                  dialogState={dialogState}
-                  onCloseDialog={closeDialog}
-                  onDialogStateChange={setDialogState}
-                />
-              </div>
-              {showSubscriptionGate ? <SubscriptionGate /> : null}
-            </TimeZoneProvider>
+                {showSubscriptionGate ? <SubscriptionGate /> : null}
+              </TimeZoneProvider>
+            </ScheduleStateProvider>
           </LessonActionsProvider>
         </StudentsHomeworkProvider>
       </StudentsActionsProvider>

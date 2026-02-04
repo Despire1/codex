@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { addYears, format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { api } from '../../../shared/api/client';
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
 import { normalizeMeetingLinkInput } from '../../../shared/lib/meetingLink';
@@ -22,8 +23,9 @@ import {
   toUtcDateFromTimeZone,
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
-import { Lesson } from '../../../entities/types';
+import { Lesson, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import { type LessonDraft } from '../../modals/LessonModal/LessonModal';
+import { type ToastOptions } from '../../../shared/lib/toast';
 
 type OpenConfirmDialogOptions = {
   title: string;
@@ -47,9 +49,27 @@ export type LessonActionsConfig = {
   teacherDefaultLessonDuration: number;
   selectedStudentId: number | null;
   setSelectedStudentId: Dispatch<SetStateAction<number | null>>;
+  lessons: Lesson[];
+  links: TeacherStudent[];
+  setLinks: Dispatch<SetStateAction<TeacherStudent[]>>;
   showInfoDialog: (title: string, message: string, confirmText?: string) => void;
+  showToast: (options: ToastOptions) => void;
   openConfirmDialog: (options: OpenConfirmDialogOptions) => void;
   openRecurringDeleteDialog: (options: OpenRecurringDeleteDialogOptions) => void;
+  openPaymentCancelDialog: (options: {
+    title: string;
+    message: string;
+    onRefund: () => void;
+    onWriteOff: () => void;
+    onCancel?: () => void;
+  }) => void;
+  openPaymentBalanceDialog: (options: {
+    title: string;
+    message: string;
+    onWriteOff: () => void;
+    onSkip: () => void;
+    onCancel?: () => void;
+  }) => void;
   navigateToSchedule: () => void;
   setDayViewDate: Dispatch<SetStateAction<Date>>;
   filterLessonsForCurrentRange: (lessons: Lesson[]) => Lesson[];
@@ -57,7 +77,12 @@ export type LessonActionsConfig = {
   isLessonInCurrentRange: (lesson: Lesson) => boolean;
   loadStudentLessons: () => Promise<void>;
   loadStudentLessonsSummary: () => Promise<void>;
+  loadStudentUnpaidLessons: (options?: { studentIdOverride?: number | null; force?: boolean }) => Promise<void>;
   loadDashboardUnpaidLessons: () => Promise<void>;
+  refreshPayments: (studentId: number) => Promise<void>;
+  refreshPaymentReminders: (studentId: number) => Promise<void>;
+  triggerStudentsListReload: () => void;
+  studentDebtItems: StudentDebtItem[];
 };
 
 export type LessonActionsContextValue = {
@@ -74,6 +99,14 @@ export type LessonActionsContextValue = {
   startEditLesson: (lesson: Lesson) => void;
   openCreateLessonForStudent: (studentId?: number) => void;
   requestDeleteLessonFromList: (lesson: Lesson) => void;
+  markLessonCompleted: (lessonId: number) => Promise<void>;
+  updateLessonStatus: (lessonId: number, status: Lesson['status']) => Promise<void>;
+  togglePaid: (lessonId: number, studentId?: number) => Promise<void>;
+  remindLessonPayment: (
+    lessonId: number,
+    studentId?: number,
+    options?: { force?: boolean },
+  ) => Promise<{ status: 'sent' | 'error' }>;
 };
 
 const LessonActionsContext = createContext<LessonActionsContextValue | null>(null);
@@ -114,9 +147,15 @@ export const useLessonActionsInternal = ({
   teacherDefaultLessonDuration,
   selectedStudentId,
   setSelectedStudentId,
+  lessons,
+  links,
+  setLinks,
   showInfoDialog,
+  showToast,
   openConfirmDialog,
   openRecurringDeleteDialog,
+  openPaymentCancelDialog,
+  openPaymentBalanceDialog,
   navigateToSchedule,
   setDayViewDate,
   filterLessonsForCurrentRange,
@@ -124,7 +163,12 @@ export const useLessonActionsInternal = ({
   isLessonInCurrentRange,
   loadStudentLessons,
   loadStudentLessonsSummary,
+  loadStudentUnpaidLessons,
   loadDashboardUnpaidLessons,
+  refreshPayments,
+  refreshPaymentReminders,
+  triggerStudentsListReload,
+  studentDebtItems,
 }: LessonActionsConfig): LessonActionsContextValue => {
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [lessonDraft, setLessonDraft] = useState<LessonDraft>(() =>
@@ -523,6 +567,332 @@ export const useLessonActionsInternal = ({
     [deleteLessonWithOptions, openConfirmDialog, openRecurringDeleteDialog],
   );
 
+  const markLessonCompleted = useCallback(
+    async (lessonId: number) => {
+      try {
+        const data = await api.markLessonCompleted(lessonId);
+        updateLessonsForCurrentRange((prev) =>
+          prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
+        );
+
+        if (data.link) {
+          const previousLink = links.find(
+            (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+          );
+          const balanceDelta = previousLink ? data.link.balanceLessons - previousLink.balanceLessons : 0;
+          const studentName = data.link.customName || previousLink?.customName || 'ученика';
+
+          setLinks((prev) =>
+            prev.map((link) =>
+              link.studentId === data.link.studentId && link.teacherId === data.link.teacherId ? data.link : link,
+            ),
+          );
+          triggerStudentsListReload();
+
+          if (balanceDelta < 0) {
+            showToast({
+              message: `С баланса ${studentName} списано занятие`,
+              variant: 'success',
+            });
+          }
+        }
+
+        await loadStudentLessons();
+        await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
+      } catch (error) {
+        showToast({
+          message: 'Не удалось отметить занятие проведённым',
+          variant: 'error',
+        });
+        // eslint-disable-next-line no-console
+        console.error('Failed to complete lesson', error);
+      }
+    },
+    [
+      links,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      setLinks,
+      showToast,
+      triggerStudentsListReload,
+      updateLessonsForCurrentRange,
+    ],
+  );
+
+  const updateLessonStatus = useCallback(
+    async (lessonId: number, status: Lesson['status']) => {
+      try {
+        const data = await api.updateLessonStatus(lessonId, status);
+        updateLessonsForCurrentRange((prev) =>
+          prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)),
+        );
+
+        if (data.links && data.links.length > 0) {
+          const previousLinks = new Map(
+            links.map((link) => [`${link.teacherId}_${link.studentId}`, link]),
+          );
+          const chargedLinks = data.links.filter((link) => {
+            const previous = previousLinks.get(`${link.teacherId}_${link.studentId}`);
+            return previous ? link.balanceLessons < previous.balanceLessons : false;
+          });
+
+          setLinks((prev) => {
+            const map = new Map(prev.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
+            data.links!.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
+            return Array.from(map.values());
+          });
+          triggerStudentsListReload();
+
+          chargedLinks.forEach((link) => {
+            showToast({
+              message: `С баланса ${link.customName} списано занятие`,
+              variant: 'success',
+            });
+          });
+        }
+
+        await loadStudentLessons();
+        await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to update lesson status', error);
+      }
+    },
+    [
+      links,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      setLinks,
+      showToast,
+      triggerStudentsListReload,
+      updateLessonsForCurrentRange,
+    ],
+  );
+
+  const applyTogglePaid = useCallback(
+    async (
+      lessonId: number,
+      studentId?: number,
+      cancelBehavior?: PaymentCancelBehavior,
+      writeOffBalance?: boolean,
+    ) => {
+      try {
+        const payload = cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
+        if (studentId !== undefined) {
+          const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
+          const normalizedLesson = normalizeLesson(data.lesson);
+          updateLessonsForCurrentRange((prev) =>
+            prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)),
+          );
+
+          if (data.link) {
+            setLinks((prev) => {
+              const exists = prev.some(
+                (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+              );
+              if (!exists) return [...prev, data.link!];
+              return prev.map((link) =>
+                link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
+              );
+            });
+            triggerStudentsListReload();
+          }
+
+          await refreshPayments(studentId);
+          await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
+          showToast({
+            message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
+            variant: 'success',
+          });
+        } else {
+          const data = await api.togglePaid(lessonId, payload);
+          const normalizedLesson = normalizeLesson(data.lesson);
+          updateLessonsForCurrentRange((prev) =>
+            prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)),
+          );
+
+          if (data.link) {
+            setLinks((prev) => {
+              const exists = prev.some(
+                (link) => link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId,
+              );
+              if (!exists) return [...prev, data.link!];
+              return prev.map((link) =>
+                link.studentId === data.link?.studentId && link.teacherId === data.link?.teacherId ? data.link! : link,
+              );
+            });
+            triggerStudentsListReload();
+          }
+
+          const targetStudent = data.lesson.studentId;
+          await refreshPayments(targetStudent);
+          if (targetStudent) {
+            await loadStudentUnpaidLessons({ studentIdOverride: targetStudent, force: true });
+          }
+          showToast({
+            message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
+            variant: 'success',
+          });
+        }
+
+        await loadStudentLessons();
+        await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
+      } catch (error) {
+        showToast({
+          message: 'Не удалось обновить оплату',
+          variant: 'error',
+        });
+      }
+    },
+    [
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      loadStudentUnpaidLessons,
+      refreshPayments,
+      setLinks,
+      showToast,
+      triggerStudentsListReload,
+      updateLessonsForCurrentRange,
+    ],
+  );
+
+  const resolvePaymentTarget = useCallback(
+    (lessonId: number, studentId?: number) => {
+      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
+      const resolvedStudentId = studentId ?? targetLesson?.studentId;
+      const link = resolvedStudentId ? links.find((item) => item.studentId === resolvedStudentId) : undefined;
+      return { studentId: resolvedStudentId, link };
+    },
+    [lessons, links],
+  );
+
+  const markPaidWithBalance = useCallback(
+    async (lessonId: number, studentId: number | undefined, writeOffBalance: boolean) => {
+      await applyTogglePaid(lessonId, studentId, undefined, writeOffBalance);
+    },
+    [applyTogglePaid],
+  );
+
+  const togglePaid = useCallback(
+    async (lessonId: number, studentId?: number) => {
+      const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
+      const isCurrentlyPaid =
+        studentId !== undefined
+          ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
+          : targetLesson?.isPaid ?? false;
+
+      if (isCurrentlyPaid) {
+        openPaymentCancelDialog({
+          title: 'Отмена оплаты',
+          message: 'Вернуть оплаченный урок на баланс ученика?',
+          onRefund: () => {
+            void applyTogglePaid(lessonId, studentId, 'refund');
+          },
+          onWriteOff: () => {
+            void applyTogglePaid(lessonId, studentId, 'writeoff');
+          },
+        });
+        return;
+      }
+
+      const { link } = resolvePaymentTarget(lessonId, studentId);
+      const hasBalance = (link?.balanceLessons ?? 0) > 0;
+
+      if (hasBalance) {
+        openPaymentBalanceDialog({
+          title: 'Отметить оплату',
+          message: 'У ученика есть занятия на балансе. Списать 1 занятие с баланса?',
+          onWriteOff: () => {
+            void markPaidWithBalance(lessonId, studentId, true);
+          },
+          onSkip: () => {
+            void markPaidWithBalance(lessonId, studentId, false);
+          },
+        });
+        return;
+      }
+
+      await markPaidWithBalance(lessonId, studentId, false);
+    },
+    [applyTogglePaid, lessons, markPaidWithBalance, openPaymentBalanceDialog, openPaymentCancelDialog, resolvePaymentTarget],
+  );
+
+  const remindLessonPayment = useCallback(
+    async (lessonId: number, studentId?: number, options?: { force?: boolean }) => {
+      try {
+        await api.remindLessonPayment(lessonId, studentId, Boolean(options?.force));
+        showToast({ message: 'Отправлено ✅', variant: 'success' });
+        if (studentId) {
+          await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
+        }
+        if (selectedStudentId) {
+          refreshPaymentReminders(selectedStudentId);
+        }
+        return { status: 'sent' as const };
+      } catch (error) {
+        let code = 'error';
+        if (error instanceof Error) {
+          try {
+            const parsed = JSON.parse(error.message) as { message?: string };
+            code = parsed?.message ?? error.message;
+          } catch {
+            code = error.message;
+          }
+        }
+        if (code === 'recently_sent' && !options?.force) {
+          return await new Promise<{ status: 'sent' | 'error' }>((resolve) => {
+            const reminderItem = studentDebtItems.find((item) => item.id === lessonId);
+            const lastReminderLabel = reminderItem?.lastPaymentReminderAt
+              ? formatInTimeZone(reminderItem.lastPaymentReminderAt, 'd MMM yyyy, HH:mm', {
+                  locale: ru,
+                  timeZone,
+                })
+              : null;
+            const message = lastReminderLabel
+              ? `Последнее напоминание: ${lastReminderLabel}. Отправить ещё раз?`
+              : 'Напоминание уже отправлялось недавно. Отправить ещё раз?';
+            openConfirmDialog({
+              title: 'Напоминание уже отправлялось недавно',
+              message,
+              confirmText: 'Отправить',
+              cancelText: 'Отмена',
+              onConfirm: async () => {
+                const result = await remindLessonPayment(lessonId, studentId, { force: true });
+                resolve(result);
+              },
+              onCancel: () => {
+                resolve({ status: 'error' as const });
+              },
+            });
+          });
+        }
+        const message =
+          code === 'student_not_activated'
+            ? 'Ученик не активировал бота — отправка напоминаний невозможна'
+            : 'Не удалось отправить напоминание';
+        showToast({ message, variant: 'error' });
+        // eslint-disable-next-line no-console
+        console.error('Failed to send payment reminder', error);
+        return { status: 'error' as const };
+      }
+    },
+    [
+      loadStudentUnpaidLessons,
+      openConfirmDialog,
+      refreshPaymentReminders,
+      selectedStudentId,
+      showToast,
+      studentDebtItems,
+      timeZone,
+    ],
+  );
+
   return useMemo(
     () => ({
       lessonModalOpen,
@@ -538,6 +908,10 @@ export const useLessonActionsInternal = ({
       startEditLesson,
       openCreateLessonForStudent,
       requestDeleteLessonFromList,
+      markLessonCompleted,
+      updateLessonStatus,
+      togglePaid,
+      remindLessonPayment,
     }),
     [
       closeLessonModal,
@@ -553,6 +927,10 @@ export const useLessonActionsInternal = ({
       saveLesson,
       startEditLesson,
       teacherDefaultLessonDuration,
+      markLessonCompleted,
+      remindLessonPayment,
+      togglePaid,
+      updateLessonStatus,
     ],
   );
 };

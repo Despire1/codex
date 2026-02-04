@@ -30,6 +30,7 @@ import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import { buildParticipants, getLessonLabel } from './lib/lessonCardDetails';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
+import { useScheduleState } from './model/useScheduleState';
 
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
@@ -43,50 +44,31 @@ const WEEK_LESSON_INSET = 8;
 const DAY_LESSON_INSET = 12;
 
 interface ScheduleSectionProps {
-  scheduleView: 'day' | 'week' | 'month';
-  onScheduleViewChange: (view: 'day' | 'week' | 'month') => void;
-  dayViewDate: Date;
-  onDayShift: (delta: number) => void;
-  onWeekShift: (delta: number) => void;
-  onMonthShift: (delta: number) => void;
-  dayLabelKey: number;
-  weekLabelKey: number;
-  monthLabelKey: number;
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
-  monthAnchor: Date;
-  monthOffset: number;
-  selectedMonthDay?: string | null;
-  onMonthDaySelect?: (dayIso: string | null) => void;
-  onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onDayViewDateChange: (date: Date) => void;
-  onGoToToday: () => void;
   autoConfirmLessons: boolean;
 }
 
-export const ScheduleSection: FC<ScheduleSectionProps> = ({
-  scheduleView,
-  onScheduleViewChange,
-  dayViewDate,
-  onDayShift,
-  onWeekShift,
-  onMonthShift,
-  dayLabelKey,
-  weekLabelKey,
-  monthLabelKey,
-  lessons,
-  linkedStudents,
-  monthAnchor,
-  monthOffset,
-  selectedMonthDay,
-  onMonthDaySelect,
-  onTogglePaid,
-  onDayViewDateChange,
-  onGoToToday,
-  autoConfirmLessons,
-}) => {
+export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
   const timeZone = useTimeZone();
-  const { openLessonModal, startEditLesson, requestDeleteLessonFromList } = useLessonActions();
+  const { openLessonModal, startEditLesson, requestDeleteLessonFromList, togglePaid } = useLessonActions();
+  const {
+    scheduleView,
+    setScheduleView,
+    dayViewDate,
+    setDayViewDate,
+    monthAnchor,
+    monthOffset,
+    selectedMonthDay,
+    setSelectedMonthDay,
+    dayLabelKey,
+    weekLabelKey,
+    monthLabelKey,
+    shiftDay,
+    shiftWeek,
+    shiftMonth,
+    goToToday,
+  } = useScheduleState();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
@@ -212,11 +194,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       daysInMonth[0];
 
     if (defaultDay) {
-      onDayViewDateChange(defaultDay.date);
+      setDayViewDate(defaultDay.date);
 
       if (!isMobileViewport) {
         setInternalSelectedMonthDay(defaultDay.iso);
-        onMonthDaySelect?.(defaultDay.iso);
+        setSelectedMonthDay(defaultDay.iso);
       }
     }
   }, [
@@ -225,10 +207,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     effectiveSelectedMonthDay,
     isMonthPanelDismissed,
     lessonsByDay,
-    onDayViewDateChange,
+    setDayViewDate,
     isMobileViewport,
     timeZone,
-    onMonthDaySelect,
+    setSelectedMonthDay,
   ]);
 
   useEffect(() => {
@@ -265,9 +247,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const currentIso = format(dayViewDate, 'yyyy-MM-dd');
 
     if (currentIso !== targetIso) {
-      onDayViewDateChange(toZonedDate(toUtcDateFromDate(targetIso, timeZone), timeZone));
+      setDayViewDate(toZonedDate(toUtcDateFromDate(targetIso, timeZone), timeZone));
     }
-  }, [isMobileWeekView, dayViewDate, onDayViewDateChange, timeZone, todayZoned]);
+  }, [isMobileWeekView, dayViewDate, setDayViewDate, timeZone, todayZoned]);
 
   useEffect(() => {
     if (effectiveSelectedMonthDay) {
@@ -435,7 +417,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         className={`${styles.paymentBadge} ${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaid}`}
         onClick={(event) => {
           event.stopPropagation();
-          onTogglePaid(lessonId, participant?.studentId);
+          togglePaid(lessonId, participant?.studentId);
         }}
         title={isPaid ? 'Оплачено' : 'Не оплачено'}
       >
@@ -530,8 +512,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const handleGoToToday = () => {
     setDayPickerOpen(false);
     setInternalSelectedMonthDay(null);
-    onMonthDaySelect?.(null);
-    onGoToToday();
+    setSelectedMonthDay(null);
+    goToToday();
   };
 
   const handleWeekSlotClick = (dayIso: string) => (event: MouseEvent<HTMLDivElement>) => {
@@ -549,7 +531,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       .padStart(2, '0');
     const minutes = (roundedMinutes % 60).toString().padStart(2, '0');
 
-    onDayViewDateChange(toZonedDate(toUtcDateFromDate(dayIso, timeZone), timeZone));
+    setDayViewDate(toZonedDate(toUtcDateFromDate(dayIso, timeZone), timeZone));
     openLessonModal(dayIso, `${hoursValue}:${minutes}`);
   };
 
@@ -748,7 +730,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         if (delta > 120) {
           setInternalSelectedMonthDay(null);
-          onMonthDaySelect?.(null);
+          setSelectedMonthDay(null);
         } else if (delta < -80) {
           setDrawerMode('expanded');
         } else if (drawerModeAtDragStart.current === 'expanded' && delta > 30) {
@@ -798,7 +780,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 style={buildLessonColorStyle(lesson)}
                 isActionsOpen={openLessonMenuId === lesson.id}
                 onEdit={() => startEditLesson(lesson)}
-                onTogglePaid={(studentId) => onTogglePaid(lesson.id, studentId)}
+                onTogglePaid={(studentId) => togglePaid(lesson.id, studentId)}
                 onOpenActions={() =>
                   setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
                 }
@@ -851,8 +833,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   const handleDayClick = () => {
                     setIsMonthPanelDismissed(false);
                     setInternalSelectedMonthDay(day.iso);
-                    onMonthDaySelect?.(day.iso);
-                    onDayViewDateChange(day.date);
+                    setSelectedMonthDay(day.iso);
+                    setDayViewDate(day.date);
 
                     if (isMobileMonthView) {
                       setDrawerMode('expanded');
@@ -889,7 +871,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <div className={`${styles.dayPanel} ${effectiveSelectedMonthDay ? styles.dayPanelOpen : ''}`}>
                 {renderDayDetails(() => {
                   setInternalSelectedMonthDay(null);
-                  onMonthDaySelect?.(null);
+                  setSelectedMonthDay(null);
                   setIsMonthPanelDismissed(true);
                 })}
               </div>
@@ -903,7 +885,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               className={`${styles.dayDrawerScrim} ${effectiveSelectedMonthDay ? styles.scrimVisible : ''}`}
               onClick={() => {
                 setInternalSelectedMonthDay(null);
-                onMonthDaySelect?.(null);
+                setSelectedMonthDay(null);
               }}
             />
             <div
@@ -918,7 +900,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               </div>
               {renderDayDetails(() => {
                 setInternalSelectedMonthDay(null);
-                onMonthDaySelect?.(null);
+                setSelectedMonthDay(null);
               })}
             </div>
           </>
@@ -953,7 +935,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <button
                 type="button"
                 className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('month')}
+                onClick={() => setScheduleView('month')}
                 aria-label="Перейти в вид месяца"
                 aria-pressed={scheduleView === 'month'}
               >
@@ -962,7 +944,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <button
                 type="button"
                 className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('week')}
+                onClick={() => setScheduleView('week')}
                 aria-label="Перейти в вид недели"
                 aria-pressed={scheduleView === 'week'}
               >
@@ -971,7 +953,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               <button
                 type="button"
                 className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-                onClick={() => onScheduleViewChange('day')}
+                onClick={() => setScheduleView('day')}
                 aria-label="Перейти в вид дня"
                 aria-pressed={scheduleView === 'day'}
               >
@@ -994,7 +976,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <div className={styles.monthSwitcher}>
                   <button
                     className={styles.monthNavButton}
-                    onClick={() => onWeekShift(-1)}
+                    onClick={() => shiftWeek(-1)}
                     aria-label="Предыдущая неделя"
                     type="button"
                   >
@@ -1005,7 +987,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </div>
                   <button
                     className={styles.monthNavButton}
-                    onClick={() => onWeekShift(1)}
+                    onClick={() => shiftWeek(1)}
                     aria-label="Следующая неделя"
                     type="button"
                   >
@@ -1026,7 +1008,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                       className={`${styles.weekDayButton} ${
                         isSelected ? styles.weekDayButtonActive : ''
                       } ${isTodayCell ? styles.weekDayButtonToday : ''}`}
-                      onClick={() => onDayViewDateChange(day.date)}
+                      onClick={() => setDayViewDate(day.date)}
                     >
                       <span className={styles.weekDayButtonName}>
                         {weekDayShortLabels[index] ?? format(day.date, 'EE', { locale: ru })}
@@ -1043,7 +1025,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <div className={styles.monthSwitcher}>
                   <button
                     className={styles.monthNavButton}
-                    onClick={() => onDayShift(-1)}
+                    onClick={() => shiftDay(-1)}
                     aria-label="Предыдущий день"
                     type="button"
                   >
@@ -1059,7 +1041,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </button>
                   <button
                     className={styles.monthNavButton}
-                    onClick={() => onDayShift(1)}
+                    onClick={() => shiftDay(1)}
                     aria-label="Следующий день"
                     type="button"
                   >
@@ -1076,8 +1058,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         locale={ru}
                         onSelect={(date) => {
                           if (date) {
-                            onDayViewDateChange(date);
-                            onScheduleViewChange('day');
+                            setDayViewDate(date);
+                            setScheduleView('day');
                           }
                           setDayPickerOpen(false);
                         }}
@@ -1105,7 +1087,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 <div className={styles.monthSwitcher}>
                   <button
                       className={styles.monthNavButton}
-                      onClick={() => onMonthShift(-1)}
+                      onClick={() => shiftMonth(-1)}
                       aria-label="Предыдущий месяц"
                       type="button"
                   >
@@ -1116,7 +1098,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   </div>
                   <button
                       className={styles.monthNavButton}
-                      onClick={() => onMonthShift(1)}
+                      onClick={() => shiftMonth(1)}
                       aria-label="Следующий месяц"
                       type="button"
                   >

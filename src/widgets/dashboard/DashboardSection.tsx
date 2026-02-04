@@ -13,6 +13,7 @@ import { pluralizeRu } from '@/shared/lib/pluralizeRu';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timezoneDates';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
+import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -25,12 +26,6 @@ interface DashboardSectionProps {
   onOpenSchedule: () => void;
   onOpenLesson: (lesson: Lesson) => void;
   onOpenLessonDay: (lesson: Lesson) => void;
-  onCompleteLesson: (lessonId: number) => void;
-  onTogglePaid: (lessonId: number, studentId?: number) => void;
-  onRemindLessonPayment: (
-    lessonId: number,
-    studentId?: number,
-  ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
   onOpenStudent: (studentId: number) => void;
 }
 
@@ -60,12 +55,10 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   onOpenSchedule,
   onOpenLesson,
   onOpenLessonDay,
-  onCompleteLesson,
-  onTogglePaid,
-  onRemindLessonPayment,
   onOpenStudent,
 }) => {
   const timeZone = useTimeZone();
+  const { markLessonCompleted, togglePaid, remindLessonPayment } = useLessonActions();
   const now = new Date();
   const todayZoned = toZonedDate(now, timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
@@ -169,8 +162,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           items={attentionItems}
           isOpen={isAttentionOpen}
           onToggle={() => setIsAttentionOpen((prev) => !prev)}
-          onCompleteLesson={(lessonId) => onCompleteLesson(lessonId)}
-          onTogglePaid={(lessonId, studentId) => onTogglePaid(lessonId, studentId)}
+          onCompleteLesson={(lessonId) => markLessonCompleted(lessonId)}
+          onTogglePaid={(lessonId, studentId) => togglePaid(lessonId, studentId)}
           className={`${styles.card} ${styles.attentionCard} ${styles.attentionArea}`}
         />
       )}
@@ -254,8 +247,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 reminderDelayHours={teacher.paymentReminderDelayHours}
                 globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
                 onOpenStudent={onOpenStudent}
-                onTogglePaid={onTogglePaid}
-                onRemindLessonPayment={onRemindLessonPayment}
+                onTogglePaid={togglePaid}
+                onRemindLessonPayment={remindLessonPayment}
                 maxVisibleEntries={1}
                 showToggle={false}
               />
@@ -274,8 +267,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 reminderDelayHours={teacher.paymentReminderDelayHours}
                 globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
                 onOpenStudent={onOpenStudent}
-                onTogglePaid={onTogglePaid}
-                onRemindLessonPayment={onRemindLessonPayment}
+                onTogglePaid={togglePaid}
+                onRemindLessonPayment={remindLessonPayment}
               />
             </div>
           )}
@@ -307,8 +300,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
             setIsUnpaidOpen(false);
             onOpenStudent(studentId);
           }}
-          onTogglePaid={onTogglePaid}
-          onRemindLessonPayment={onRemindLessonPayment}
+          onTogglePaid={togglePaid}
+          onRemindLessonPayment={remindLessonPayment}
           showAll
           showToggle={false}
           stickyHeader

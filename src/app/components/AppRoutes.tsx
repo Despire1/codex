@@ -31,12 +31,6 @@ interface AppRoutesProps {
     onOpenSchedule: () => void;
     onOpenLesson: (lesson: Lesson) => void;
     onOpenLessonDay: (lesson: Lesson) => void;
-    onCompleteLesson: (lessonId: number) => void;
-    onTogglePaid: (lessonId: number, studentId?: number) => void;
-    onRemindLessonPayment: (
-      lessonId: number,
-      studentId?: number,
-    ) => Promise<{ status: 'sent' | 'error' }> | { status: 'sent' | 'error' };
     onOpenStudent: (studentId: number) => void;
   };
   students: {
@@ -45,11 +39,6 @@ interface AppRoutesProps {
     lessons: Lesson[];
     homeworkFilter: 'all' | HomeworkStatus | 'overdue';
     onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-    onRemindLessonPayment: (
-      lessonId: number,
-      studentId?: number,
-      options?: { force?: boolean },
-    ) => Promise<{ status: 'sent' | 'error' }>;
     lessonPaymentFilter: LessonPaymentFilter;
     lessonStatusFilter: LessonStatusFilter;
     lessonDateRange: LessonDateRange;
@@ -62,31 +51,12 @@ interface AppRoutesProps {
     paymentDate: string;
     onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
     onPaymentDateChange: (date: string) => void;
-    onCompleteLesson: (lessonId: number) => void;
-    onChangeLessonStatus: (lessonId: number, status: Lesson['status']) => void;
-    onTogglePaid: (lessonId: number, studentId?: number) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
     studentListReloadKey: number;
   };
   schedule: {
-    scheduleView: 'day' | 'week' | 'month';
-    onScheduleViewChange: (view: 'day' | 'week' | 'month') => void;
-    dayViewDate: Date;
-    onDayShift: (delta: number) => void;
-    onWeekShift: (delta: number) => void;
-    onMonthShift: (delta: number) => void;
-    dayLabelKey: number;
-    weekLabelKey: number;
-    monthLabelKey: number;
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
-    monthAnchor: Date;
-    monthOffset: number;
-    selectedMonthDay?: string | null;
-    onMonthDaySelect?: (dayIso: string | null) => void;
-    onTogglePaid: (lessonId: number, studentId?: number) => void;
-    onDayViewDateChange: (date: Date) => void;
-    onGoToToday: () => void;
     autoConfirmLessons: boolean;
   };
   settings: {
