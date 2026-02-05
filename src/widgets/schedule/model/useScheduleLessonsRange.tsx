@@ -29,6 +29,8 @@ export type ScheduleLessonsRangeValue = {
   loadLessonsForRange: (range: LessonRange) => Promise<void>;
   applyLessonsForRange: (range: LessonRange, items: Lesson[]) => void;
   updateLessonsForCurrentRange: (updater: (prev: Lesson[]) => Lesson[]) => void;
+  syncLessonsInRanges: (lessons: Lesson[]) => void;
+  removeLessonsFromRanges: (options: { ids?: number[]; recurrenceGroupId?: string | null; startFrom?: Date }) => void;
   isLessonInCurrentRange: (lesson: Lesson) => boolean;
   filterLessonsForCurrentRange: (items: Lesson[]) => Lesson[];
 };
@@ -93,6 +95,18 @@ export const useScheduleLessonsRangeInternal = ({
     return buildLessonRange(monthStart, monthEnd);
   }, [buildLessonRange, monthAnchor, monthOffset]);
 
+  const buildRangeFromKey = useCallback(
+    (key: string): LessonRange | null => {
+      const [startIso, endIso] = key.split('_');
+      if (!startIso || !endIso) return null;
+      const startAt = toUtcDateFromDate(startIso, timeZone);
+      const endAt = toUtcEndOfDay(endIso, timeZone);
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) return null;
+      return { key, startAt, endAt, startIso, endIso };
+    },
+    [timeZone],
+  );
+
   const isLessonInRange = useCallback((lesson: Lesson, range: LessonRange) => {
     const startAt = new Date(lesson.startAt).getTime();
     return startAt >= range.startAt.getTime() && startAt <= range.endAt.getTime();
@@ -134,6 +148,70 @@ export const useScheduleLessonsRangeInternal = ({
     });
   }, []);
 
+  const syncLessonsInRanges = useCallback(
+    (items: Lesson[]) => {
+      if (!items || items.length === 0) return;
+      const normalized = items.map(normalizeLesson);
+      const ids = new Set(normalized.map((lesson) => lesson.id));
+      const currentKey = lessonRangeRef.current?.key ?? null;
+
+      setLessonsByRange((prev) => {
+        const next: Record<string, Lesson[]> = { ...prev };
+        Object.keys(next).forEach((key) => {
+          const range = buildRangeFromKey(key);
+          if (!range) return;
+          const filtered = (next[key] ?? []).filter((lesson) => !ids.has(lesson.id));
+          const additions = normalized.filter((lesson) => isLessonInRange(lesson, range));
+          const merged = [...filtered, ...additions].sort(
+            (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+          );
+          next[key] = merged;
+        });
+        if (currentKey && next[currentKey]) {
+          setLessons(next[currentKey]);
+        }
+        return next;
+      });
+    },
+    [buildRangeFromKey, isLessonInRange],
+  );
+
+  const removeLessonsFromRanges = useCallback(
+    (options: { ids?: number[]; recurrenceGroupId?: string | null; startFrom?: Date }) => {
+      const ids = options.ids ?? [];
+      const recurrenceGroupId = options.recurrenceGroupId ?? null;
+      const startFrom = options.startFrom ?? null;
+      if (ids.length === 0 && !recurrenceGroupId) return;
+      const startFromTime = startFrom ? startFrom.getTime() : null;
+      const idSet = new Set(ids);
+      const currentKey = lessonRangeRef.current?.key ?? null;
+
+      setLessonsByRange((prev) => {
+        const next: Record<string, Lesson[]> = { ...prev };
+        Object.keys(next).forEach((key) => {
+          const items = next[key] ?? [];
+          next[key] = items.filter((lesson) => {
+            if (idSet.has(lesson.id)) return false;
+            if (recurrenceGroupId && lesson.recurrenceGroupId === recurrenceGroupId) {
+              if (!startFromTime) return false;
+              const lessonStart = new Date(lesson.startAt).getTime();
+              if (lessonStart >= startFromTime) {
+                return lesson.status !== 'SCHEDULED';
+              }
+              return true;
+            }
+            return true;
+          });
+        });
+        if (currentKey && next[currentKey]) {
+          setLessons(next[currentKey]);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   const loadLessonsForRange = useCallback(
     async (range: LessonRange) => {
       if (!hasAccess) return;
@@ -172,6 +250,8 @@ export const useScheduleLessonsRangeInternal = ({
       loadLessonsForRange,
       applyLessonsForRange,
       updateLessonsForCurrentRange,
+      syncLessonsInRanges,
+      removeLessonsFromRanges,
       isLessonInCurrentRange,
       filterLessonsForCurrentRange,
     }),
@@ -185,6 +265,8 @@ export const useScheduleLessonsRangeInternal = ({
       isLessonInCurrentRange,
       lessons,
       loadLessonsForRange,
+      removeLessonsFromRanges,
+      syncLessonsInRanges,
       updateLessonsForCurrentRange,
     ],
   );

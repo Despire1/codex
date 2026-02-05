@@ -1,4 +1,4 @@
-import { type FC, type RefObject, useMemo } from 'react';
+import { type FC, useMemo } from 'react';
 import type { Lesson } from '../../entities/types';
 import type { CreatedStudent } from '../../features/onboarding/model/useOnboardingState';
 import styles from './OnboardingHeroCard.module.css';
@@ -8,9 +8,6 @@ interface OnboardingHeroCardProps {
   createdStudent: CreatedStudent | null;
   createdLesson: Lesson | null;
   onPrimaryAction: () => void;
-  onDismiss: () => void;
-  primaryButtonRef?: RefObject<HTMLButtonElement>;
-  highlightPrimary?: boolean;
 }
 
 const resolveStep = (createdStudent: CreatedStudent | null, createdLesson: Lesson | null) => {
@@ -23,9 +20,6 @@ export const OnboardingHeroCard: FC<OnboardingHeroCardProps> = ({
   createdStudent,
   createdLesson,
   onPrimaryAction,
-  onDismiss,
-  primaryButtonRef,
-  highlightPrimary = false,
 }) => {
   const step = resolveStep(createdStudent, createdLesson);
   const studentName = createdStudent?.link.customName || 'учеником';
@@ -57,17 +51,11 @@ export const OnboardingHeroCard: FC<OnboardingHeroCardProps> = ({
         <p className={styles.subtitle}>{subtitle}</p>
         <div className={styles.actions}>
           <button
-            ref={primaryButtonRef}
             type="button"
-            className={`${controls.primaryButton} ${styles.primaryButton} ${
-              highlightPrimary ? styles.primaryButtonHighlight : ''
-            }`}
+            className={`${controls.primaryButton} ${styles.primaryButton}`}
             onClick={onPrimaryAction}
           >
             {primaryLabel}
-          </button>
-          <button type="button" className={controls.secondaryButton} onClick={onDismiss}>
-            Сделаю позже
           </button>
         </div>
       </div>

@@ -14,12 +14,9 @@ import { trackEvent } from '../../shared/lib/analytics';
 import controls from '../../shared/styles/controls.module.css';
 import { OnboardingHeroCard } from './OnboardingHeroCard';
 import { OnboardingStepper } from './OnboardingStepper';
-import { CoachmarkHint } from './CoachmarkHint';
 import { SendReminderSheet } from './SendReminderSheet';
 import { ConnectTelegramSheet } from './ConnectTelegramSheet';
 import styles from './OnboardingEmptyState.module.css';
-
-const COACHMARK_KEY = 'onboarding_coachmark_shown';
 
 type StepSource = 'hero_cta' | 'stepper' | 'quick_action';
 
@@ -51,12 +48,10 @@ export const OnboardingEmptyState: FC<OnboardingEmptyStateProps> = ({ onRefreshS
   const { showToast } = useToast();
   const isMobile = useIsMobile(767);
   const device = isMobile ? 'mobile' : 'desktop';
-  const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [template, setTemplate] = useState<OnboardingReminderTemplate>('TODAY');
   const [isSending, setIsSending] = useState(false);
-  const [showCoachmark, setShowCoachmark] = useState(false);
   const [reminderSource, setReminderSource] = useState<StepSource>('hero_cta');
   const shownRef = useRef(false);
 
@@ -84,19 +79,6 @@ export const OnboardingEmptyState: FC<OnboardingEmptyStateProps> = ({ onRefreshS
       device,
     });
   }, [device, onboarding.isActive, onboarding.teacherId]);
-
-  useEffect(() => {
-    if (step !== 1 || typeof window === 'undefined') return;
-    if (window.sessionStorage.getItem(COACHMARK_KEY)) return;
-    window.sessionStorage.setItem(COACHMARK_KEY, 'true');
-    setShowCoachmark(true);
-  }, [step]);
-
-  useEffect(() => {
-    if (step !== 1 && showCoachmark) {
-      setShowCoachmark(false);
-    }
-  }, [step, showCoachmark]);
 
   const trackStepClick = (nextStep: 1 | 2 | 3, source: StepSource) => {
     trackEvent('onboarding_step_clicked', {
@@ -157,11 +139,6 @@ export const OnboardingEmptyState: FC<OnboardingEmptyStateProps> = ({ onRefreshS
       }
       setReminderOpen(true);
     }
-  };
-
-  const handleDismiss = () => {
-    onboarding.setDismissed(true);
-    trackEvent('onboarding_dismissed', { userId: onboarding.teacherId, device });
   };
 
   const handleQuickAddStudent = () => {
@@ -230,14 +207,6 @@ export const OnboardingEmptyState: FC<OnboardingEmptyStateProps> = ({ onRefreshS
         createdStudent={onboarding.createdStudent}
         createdLesson={onboarding.createdLesson}
         onPrimaryAction={() => handlePrimaryAction('hero_cta')}
-        onDismiss={handleDismiss}
-        primaryButtonRef={primaryButtonRef}
-        highlightPrimary={showCoachmark}
-      />
-      <CoachmarkHint
-        open={showCoachmark}
-        anchorRef={primaryButtonRef}
-        onClose={() => setShowCoachmark(false)}
       />
       <OnboardingStepper
         createdStudent={onboarding.createdStudent}

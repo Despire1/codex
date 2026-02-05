@@ -278,7 +278,6 @@ export const AppPage = () => {
     onStudentCreated: ({ student, link, source }) => {
       if (source.startsWith('onboarding')) {
         onboardingState.setCreatedStudent({ student, link });
-        onboardingState.setDismissed(false);
       }
       dashboardSummary.refresh();
       track('student_create_success', { source: resolveAnalyticsSource(source) });
@@ -316,9 +315,9 @@ export const AppPage = () => {
     buildMonthRange,
     loadLessonsForRange,
     applyLessonsForRange,
-    updateLessonsForCurrentRange,
-    isLessonInCurrentRange,
     filterLessonsForCurrentRange,
+    syncLessonsInRanges,
+    removeLessonsFromRanges,
   } = scheduleLessons;
 
   const activeTab = useMemo<TabId>(() => {
@@ -387,8 +386,8 @@ export const AppPage = () => {
     navigateToSchedule,
     setDayViewDate,
     filterLessonsForCurrentRange,
-    updateLessonsForCurrentRange,
-    isLessonInCurrentRange,
+    syncLessonsInRanges,
+    removeLessonsFromRanges,
     loadStudentLessons,
     loadStudentLessonsSummary,
     loadStudentUnpaidLessons,
@@ -403,7 +402,6 @@ export const AppPage = () => {
     onLessonCreated: ({ lesson, source }) => {
       if (source.startsWith('onboarding')) {
         onboardingState.setCreatedLesson(lesson);
-        onboardingState.setDismissed(false);
       }
       dashboardSummary.refresh();
       track('lesson_create_success', { source: resolveAnalyticsSource(source) });

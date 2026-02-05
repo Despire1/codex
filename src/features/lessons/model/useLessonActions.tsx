@@ -82,8 +82,12 @@ export type LessonActionsConfig = {
   navigateToSchedule: () => void;
   setDayViewDate: Dispatch<SetStateAction<Date>>;
   filterLessonsForCurrentRange: (lessons: Lesson[]) => Lesson[];
-  updateLessonsForCurrentRange: (updater: (prev: Lesson[]) => Lesson[]) => void;
-  isLessonInCurrentRange: (lesson: Lesson) => boolean;
+  syncLessonsInRanges: (lessons: Lesson[]) => void;
+  removeLessonsFromRanges: (options: {
+    ids?: number[];
+    recurrenceGroupId?: string | null;
+    startFrom?: Date;
+  }) => void;
   loadStudentLessons: () => Promise<void>;
   loadStudentLessonsSummary: () => Promise<void>;
   loadStudentUnpaidLessons: (options?: { studentIdOverride?: number | null; force?: boolean }) => Promise<void>;
@@ -180,8 +184,8 @@ export const useLessonActionsInternal = ({
   navigateToSchedule,
   setDayViewDate,
   filterLessonsForCurrentRange,
-  updateLessonsForCurrentRange,
-  isLessonInCurrentRange,
+  syncLessonsInRanges,
+  removeLessonsFromRanges,
   loadStudentLessons,
   loadStudentLessonsSummary,
   loadStudentUnpaidLessons,
@@ -306,12 +310,11 @@ export const useLessonActionsInternal = ({
 
       try {
         await api.deleteLesson(editingLessonId, { applyToSeries });
-        updateLessonsForCurrentRange((prev) => {
-          if (applyToSeries && recurrenceGroupId) {
-            return prev.filter((lesson) => lesson.recurrenceGroupId !== recurrenceGroupId);
-          }
-          return prev.filter((lesson) => lesson.id !== editingLessonId);
-        });
+        if (applyToSeries && recurrenceGroupId) {
+          removeLessonsFromRanges({ recurrenceGroupId });
+        } else if (editingLessonId) {
+          removeLessonsFromRanges({ ids: [editingLessonId] });
+        }
         await loadStudentLessons();
         await loadStudentLessonsSummary();
         closeLessonModal();
@@ -328,8 +331,8 @@ export const useLessonActionsInternal = ({
       editingLessonOriginal?.recurrenceGroupId,
       loadStudentLessons,
       loadStudentLessonsSummary,
+      removeLessonsFromRanges,
       showInfoDialog,
-      updateLessonsForCurrentRange,
     ],
   );
 
@@ -440,26 +443,20 @@ export const useLessonActionsInternal = ({
           }
 
           if (data.lessons && data.lessons.length > 0) {
-            const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
-            updateLessonsForCurrentRange((prev) => {
-              const groupId = data.lessons?.[0]?.recurrenceGroupId;
-              const filtered = groupId
-                ? prev.filter((lesson) => lesson.recurrenceGroupId !== groupId && lesson.id !== editingLessonId)
-                : prev.filter((lesson) => lesson.id !== editingLessonId);
-              return [...filtered, ...normalized];
+            const normalizedLessons = data.lessons.map(normalizeLesson);
+            const groupId = editingLessonOriginal?.recurrenceGroupId ?? normalizedLessons[0]?.recurrenceGroupId ?? null;
+            const idsToRemove =
+              !editingLessonOriginal?.recurrenceGroupId && editingLessonId ? [editingLessonId] : undefined;
+            removeLessonsFromRanges({
+              ids: idsToRemove,
+              recurrenceGroupId: groupId,
+              startFrom: editingLessonOriginal?.recurrenceGroupId ? new Date() : undefined,
             });
+            syncLessonsInRanges(normalizedLessons);
           } else if (data.lesson) {
-            const normalizedLesson = normalizeLesson(data.lesson);
-            updateLessonsForCurrentRange((prevLessons) => {
-              if (!isLessonInCurrentRange(normalizedLesson)) {
-                return prevLessons.filter((lesson) => lesson.id !== editingLessonId);
-              }
-              const exists = prevLessons.some((lesson) => lesson.id === editingLessonId);
-              if (exists) {
-                return prevLessons.map((lesson) => (lesson.id === editingLessonId ? normalizedLesson : lesson));
-              }
-              return [...prevLessons, normalizedLesson];
-            });
+            const baseLesson = lessons.find((lesson) => lesson.id === editingLessonId);
+            const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
+            syncLessonsInRanges([mergedLesson]);
           }
         } else if (lessonDraft.isRecurring) {
           if (lessonDraft.repeatWeekdays.length === 0) {
@@ -483,20 +480,11 @@ export const useLessonActionsInternal = ({
             repeatUntil: resolvedRepeatUntil,
           });
 
-          const normalized = filterLessonsForCurrentRange(data.lessons.map(normalizeLesson));
-          updateLessonsForCurrentRange((prev) => {
-            const existingKeys = new Set(prev.map((lesson) => `${lesson.id}`));
-            const next = [...prev];
-            normalized.forEach((lesson) => {
-              if (!existingKeys.has(`${lesson.id}`)) {
-                next.push(lesson);
-                existingKeys.add(`${lesson.id}`);
-              }
-            });
-            return next;
-          });
-          if (!editingLessonId && normalized.length > 0) {
-            onLessonCreated?.({ lesson: normalized[0], source: lessonModalContext.source });
+          const normalizedLessons = data.lessons.map(normalizeLesson);
+          syncLessonsInRanges(normalizedLessons);
+          const lessonsInRange = filterLessonsForCurrentRange(normalizedLessons);
+          if (!editingLessonId && lessonsInRange.length > 0) {
+            onLessonCreated?.({ lesson: lessonsInRange[0], source: lessonModalContext.source });
             if (isOnboardingSource) {
               showToast({ message: 'Занятие создано. Теперь напоминание 🔔', variant: 'success' });
             }
@@ -511,12 +499,7 @@ export const useLessonActionsInternal = ({
           });
 
           const normalizedLesson = normalizeLesson(data.lesson);
-          updateLessonsForCurrentRange((prev) => {
-            if (!isLessonInCurrentRange(normalizedLesson)) {
-              return prev;
-            }
-            return [...prev, normalizedLesson];
-          });
+          syncLessonsInRanges([normalizedLesson]);
           if (!editingLessonId) {
             onLessonCreated?.({ lesson: normalizedLesson, source: lessonModalContext.source });
             if (isOnboardingSource) {
@@ -547,8 +530,8 @@ export const useLessonActionsInternal = ({
       editingLessonId,
       editingLessonOriginal,
       filterLessonsForCurrentRange,
-      isLessonInCurrentRange,
       lessonDraft,
+      lessons,
       loadStudentLessons,
       loadStudentLessonsSummary,
       navigateToSchedule,
@@ -558,9 +541,10 @@ export const useLessonActionsInternal = ({
       openConfirmDialog,
       showInfoDialog,
       showToast,
+      syncLessonsInRanges,
       lessonModalContext,
       timeZone,
-      updateLessonsForCurrentRange,
+      removeLessonsFromRanges,
     ],
   );
 
@@ -593,12 +577,11 @@ export const useLessonActionsInternal = ({
     async (lesson: Lesson, applyToSeries: boolean) => {
       try {
         await api.deleteLesson(lesson.id, applyToSeries ? { applyToSeries } : undefined);
-        updateLessonsForCurrentRange((prev) => {
-          if (applyToSeries && lesson.recurrenceGroupId) {
-            return prev.filter((item) => item.recurrenceGroupId !== lesson.recurrenceGroupId);
-          }
-          return prev.filter((item) => item.id !== lesson.id);
-        });
+        if (applyToSeries && lesson.recurrenceGroupId) {
+          removeLessonsFromRanges({ recurrenceGroupId: lesson.recurrenceGroupId });
+        } else {
+          removeLessonsFromRanges({ ids: [lesson.id] });
+        }
         await loadStudentLessons();
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
@@ -607,7 +590,7 @@ export const useLessonActionsInternal = ({
         console.error('Failed to delete lesson', error);
       }
     },
-    [loadDashboardUnpaidLessons, loadStudentLessons, loadStudentLessonsSummary, updateLessonsForCurrentRange],
+    [loadDashboardUnpaidLessons, loadStudentLessons, loadStudentLessonsSummary, removeLessonsFromRanges],
   );
 
   const requestDeleteLessonFromList = useCallback(
@@ -641,9 +624,9 @@ export const useLessonActionsInternal = ({
     async (lessonId: number) => {
       try {
         const data = await api.markLessonCompleted(lessonId);
-        updateLessonsForCurrentRange((prev) =>
-          prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson({ ...lesson, ...data.lesson }) : lesson)),
-        );
+        const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
+        const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
+        syncLessonsInRanges([mergedLesson]);
 
         if (data.link) {
           const previousLink = links.find(
@@ -687,7 +670,8 @@ export const useLessonActionsInternal = ({
       setLinks,
       showToast,
       triggerStudentsListReload,
-      updateLessonsForCurrentRange,
+      syncLessonsInRanges,
+      lessons,
     ],
   );
 
@@ -695,9 +679,9 @@ export const useLessonActionsInternal = ({
     async (lessonId: number, status: Lesson['status']) => {
       try {
         const data = await api.updateLessonStatus(lessonId, status);
-        updateLessonsForCurrentRange((prev) =>
-          prev.map((lesson) => (lesson.id === lessonId ? normalizeLesson(data.lesson) : lesson)),
-        );
+        const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
+        const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
+        syncLessonsInRanges([mergedLesson]);
 
         if (data.links && data.links.length > 0) {
           const previousLinks = new Map(
@@ -739,7 +723,8 @@ export const useLessonActionsInternal = ({
       setLinks,
       showToast,
       triggerStudentsListReload,
-      updateLessonsForCurrentRange,
+      syncLessonsInRanges,
+      lessons,
     ],
   );
 
@@ -754,10 +739,9 @@ export const useLessonActionsInternal = ({
         const payload = cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
         if (studentId !== undefined) {
           const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
-          const normalizedLesson = normalizeLesson(data.lesson);
-          updateLessonsForCurrentRange((prev) =>
-            prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)),
-          );
+          const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
+          const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
+          syncLessonsInRanges([mergedLesson]);
 
           if (data.link) {
             setLinks((prev) => {
@@ -780,10 +764,9 @@ export const useLessonActionsInternal = ({
           });
         } else {
           const data = await api.togglePaid(lessonId, payload);
-          const normalizedLesson = normalizeLesson(data.lesson);
-          updateLessonsForCurrentRange((prev) =>
-            prev.map((lesson) => (lesson.id === lessonId ? normalizedLesson : lesson)),
-          );
+          const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
+          const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
+          syncLessonsInRanges([mergedLesson]);
 
           if (data.link) {
             setLinks((prev) => {
@@ -827,8 +810,9 @@ export const useLessonActionsInternal = ({
       refreshPayments,
       setLinks,
       showToast,
+      syncLessonsInRanges,
       triggerStudentsListReload,
-      updateLessonsForCurrentRange,
+      lessons,
     ],
   );
 

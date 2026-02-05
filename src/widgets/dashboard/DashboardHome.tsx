@@ -4,7 +4,6 @@ import type { DashboardSummary } from '../../shared/api/client';
 import { useOnboardingState } from '../../features/onboarding/model/useOnboardingState';
 import { DashboardSection } from './DashboardSection';
 import { OnboardingEmptyState } from '../onboarding/OnboardingEmptyState';
-import { CollapsedOnboardingWidget } from '../onboarding/CollapsedOnboardingWidget';
 import styles from './DashboardHome.module.css';
 
 interface DashboardHomeProps {
@@ -37,9 +36,6 @@ export const DashboardHome: FC<DashboardHomeProps> = ({ dashboardSummary, ...das
   }
 
   if (onboarding.isActive) {
-    if (onboarding.dismissed) {
-      return <CollapsedOnboardingWidget onExpand={() => onboarding.setDismissed(false)} />;
-    }
     return <OnboardingEmptyState onRefreshSummary={dashboardSummary.refresh} />;
   }
 
