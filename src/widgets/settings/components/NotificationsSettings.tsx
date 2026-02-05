@@ -7,13 +7,14 @@ import { StudentNotificationTemplates } from './StudentNotificationTemplates';
 interface NotificationsSettingsProps {
   teacher: Teacher;
   onChange: (patch: Partial<Teacher>) => void;
+  onSaveNow: (patch: Partial<Teacher>) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const lessonReminderOptions = [5, 10, 15, 30, 60, 120];
 const paymentDelayOptions = [2, 6, 12, 24, 48];
 const paymentRepeatOptions = [24, 48, 72];
 const paymentMaxOptions = [1, 2, 3, 5];
-export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange }) => {
+export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange, onSaveNow }) => {
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
   const paymentRemindersDisabled = !teacher.globalPaymentRemindersEnabled;
 
@@ -218,7 +219,7 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
       </div>
 
       <div className={styles.sectionBlock}>
-        <StudentNotificationTemplates teacher={teacher} onChange={onChange} />
+        <StudentNotificationTemplates teacher={teacher} onChange={onChange} onSaveNow={onSaveNow} />
       </div>
     </div>
   );

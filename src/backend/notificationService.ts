@@ -54,7 +54,7 @@ const callTelegram = async <T>(method: string, payload?: Record<string, unknown>
   return data.result;
 };
 
-const sendTelegramMessage = async (chatId: bigint | number, text: string) => {
+export const sendTelegramMessage = async (chatId: bigint | number, text: string) => {
   await callTelegram('sendMessage', {
     chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
     text,

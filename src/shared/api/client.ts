@@ -65,6 +65,34 @@ export type DashboardSummary = {
   teacherId: number;
 };
 
+export type NotificationChannelStatus = {
+  channel: string;
+  configured: boolean;
+  reason?: string;
+};
+
+export type NotificationTestRecipient = {
+  id: number;
+  name: string;
+};
+
+export type NotificationTestSendPayload = {
+  type: 'LESSON_REMINDER' | 'PAYMENT_REMINDER';
+  template_text: string;
+  recipient_mode: 'SELF' | 'STUDENTS';
+  student_ids?: number[];
+  data_source: 'PREVIEW_EXAMPLE_A' | 'PREVIEW_EXAMPLE_B';
+  text_version: 'DRAFT' | 'SAVED';
+};
+
+export type NotificationTestSendResponse = {
+  status: 'ok' | 'partial' | 'error';
+  rendered_text: string;
+  missing_data: string[];
+  results?: Array<{ student_id: number; status: 'ok' | 'error'; error_code?: string }>;
+  channel?: string;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
@@ -137,6 +165,18 @@ export const api = {
   updateSettings: (payload: Partial<SettingsPayload>) =>
     apiFetch<{ settings: SettingsPayload }>('/api/settings', {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  getNotificationChannelStatus: () => apiFetch<NotificationChannelStatus>('/api/notifications/channel-status'),
+  listNotificationTestRecipients: (type: NotificationTestSendPayload['type']) => {
+    const params = new URLSearchParams({ type });
+    return apiFetch<{ students: NotificationTestRecipient[] }>(
+      `/api/notifications/test-recipients?${params.toString()}`,
+    );
+  },
+  sendNotificationTest: (payload: NotificationTestSendPayload) =>
+    apiFetch<NotificationTestSendResponse>('/api/notifications/send-test', {
+      method: 'POST',
       body: JSON.stringify(payload),
     }),
   listSessions: () => apiFetch<{ sessions: SessionSummary[] }>('/api/sessions'),

@@ -107,6 +107,34 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
     [savePendingPatch],
   );
 
+  const saveSettingsNow = useCallback(
+    async (patch: SettingsPatch) => {
+      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const nextPatch = pendingPatchRef.current;
+      pendingPatchRef.current = {};
+      if (Object.keys(nextPatch).length === 0) {
+        return { ok: true } as const;
+      }
+      setSaveStatus('saving');
+      try {
+        const data = await api.updateSettings(nextPatch);
+        applyTeacherPatch(data.settings);
+        setSaveStatus('idle');
+        showToast({ message: 'Сохранено', variant: 'success' });
+        return { ok: true } as const;
+      } catch (error) {
+        setSaveStatus('error');
+        showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
+        return { ok: false, error: 'save_failed' } as const;
+      }
+    },
+    [applyTeacherPatch, showToast],
+  );
+
   useEffect(
     () => () => {
       if (saveTimerRef.current) {
@@ -191,7 +219,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherCh
           />
         );
       case 'notifications':
-        return <NotificationsSettings teacher={teacher} onChange={handleSettingsChange} />;
+        return <NotificationsSettings teacher={teacher} onChange={handleSettingsChange} onSaveNow={saveSettingsNow} />;
       case 'security':
         return <SecuritySettings />;
       default:

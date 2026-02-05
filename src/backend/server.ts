@@ -24,11 +24,15 @@ import {
 import {
   STUDENT_LESSON_TEMPLATE_VARIABLES,
   STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+  STUDENT_LESSON_TEMPLATE_EXAMPLES,
+  STUDENT_PAYMENT_TEMPLATE_EXAMPLES,
 } from '../shared/lib/notificationTemplates';
+import { renderNotificationTemplate } from '../shared/lib/notificationTemplateRender';
 import {
   sendStudentLessonReminder,
   sendStudentLessonReminderManual,
   sendStudentPaymentReminder,
+  sendTelegramMessage as sendNotificationTelegramMessage,
   sendTeacherLessonReminder,
   sendTeacherDailySummary,
   sendTeacherOnboardingNudge,
@@ -107,6 +111,35 @@ const validateStudentTemplate = (value: string, allowedVariables: readonly strin
 
   return value;
 };
+
+type NotificationTestTemplateType = 'LESSON_REMINDER' | 'PAYMENT_REMINDER';
+type NotificationTestRecipientMode = 'SELF' | 'STUDENTS';
+type NotificationTestDataSource = 'PREVIEW_EXAMPLE_A' | 'PREVIEW_EXAMPLE_B';
+type TeacherStudentLink = {
+  studentId: number;
+  customName: string;
+  student: Student | null;
+};
+
+const isNotificationTestType = (value: unknown): value is NotificationTestTemplateType =>
+  value === 'LESSON_REMINDER' || value === 'PAYMENT_REMINDER';
+
+const isNotificationTestRecipientMode = (value: unknown): value is NotificationTestRecipientMode =>
+  value === 'SELF' || value === 'STUDENTS';
+
+const isNotificationTestDataSource = (value: unknown): value is NotificationTestDataSource =>
+  value === 'PREVIEW_EXAMPLE_A' || value === 'PREVIEW_EXAMPLE_B';
+
+const resolveNotificationTestVariables = (type: NotificationTestTemplateType) =>
+  type === 'LESSON_REMINDER' ? STUDENT_LESSON_TEMPLATE_VARIABLES : STUDENT_PAYMENT_TEMPLATE_VARIABLES;
+
+const resolveNotificationTestExamples = (type: NotificationTestTemplateType, source: NotificationTestDataSource) => {
+  const key = source === 'PREVIEW_EXAMPLE_A' ? 'A' : 'B';
+  return type === 'LESSON_REMINDER' ? STUDENT_LESSON_TEMPLATE_EXAMPLES[key] : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[key];
+};
+
+const resolveStudentDisplayName = (link: { customName?: string | null }, student?: Student | null) =>
+  link.customName?.trim() || student?.username?.trim() || 'ученик';
 
 const resolveMeetingLinkValue = (value: any) => {
   if (value === undefined) return undefined;
@@ -599,6 +632,152 @@ const updateSettings = async (user: User, body: any) => {
 
   return {
     settings: { ...pickTeacherSettings(updatedTeacher), receiptEmail: updatedUser.receiptEmail ?? null },
+  };
+};
+
+const getNotificationChannelStatus = () => ({
+  channel: 'telegram',
+  configured: Boolean(TELEGRAM_BOT_TOKEN),
+  reason: TELEGRAM_BOT_TOKEN ? undefined : 'missing_token',
+});
+
+const listNotificationTestRecipients = async (user: User, _type: NotificationTestTemplateType) => {
+  const teacher = await ensureTeacher(user);
+  const links = (await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      isArchived: false,
+      student: {
+        is: {
+          isActivated: true,
+          telegramId: { not: null },
+        },
+      },
+    },
+    include: { student: true },
+    orderBy: { customName: 'asc' },
+  })) as TeacherStudentLink[];
+
+  return {
+    students: links.map((link) => ({
+      id: link.studentId,
+      name: resolveStudentDisplayName(link, link.student),
+    })),
+  };
+};
+
+const sendNotificationTest = async (user: User, body: any) => {
+  const teacher = await ensureTeacher(user);
+  if (!TELEGRAM_BOT_TOKEN) throw new Error('no_channel');
+  const type = body?.type;
+  const recipientMode = body?.recipient_mode;
+  const dataSource = body?.data_source;
+  const templateText = typeof body?.template_text === 'string' ? body.template_text : '';
+
+  if (!isNotificationTestType(type)) throw new Error('invalid_type');
+  if (!isNotificationTestRecipientMode(recipientMode)) throw new Error('invalid_recipient');
+  if (!isNotificationTestDataSource(dataSource)) throw new Error('invalid_data_source');
+  if (!templateText.trim()) throw new Error('empty_text');
+  if (templateText.length > TEMPLATE_MAX_LENGTH) throw new Error('template_too_long');
+
+  const allowedVariables = resolveNotificationTestVariables(type);
+  const exampleValues = resolveNotificationTestExamples(type, dataSource);
+
+  const baseRender = renderNotificationTemplate({
+    template: templateText,
+    values: exampleValues,
+    allowedVariables,
+  });
+
+  if (baseRender.unknownPlaceholders.length > 0) {
+    throw new Error('invalid_template');
+  }
+
+  if (recipientMode === 'SELF') {
+    const result = renderNotificationTemplate({
+      template: templateText,
+      values: exampleValues,
+      allowedVariables,
+    });
+
+    try {
+      await sendNotificationTelegramMessage(teacher.chatId, result.renderedText);
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      const isChatNotFound = message.includes('chat not found');
+      if (isChatNotFound && (LOCAL_AUTH_BYPASS || process.env.NODE_ENV !== 'production')) {
+        return {
+          status: 'ok' as const,
+          rendered_text: result.renderedText,
+          missing_data: result.missingData,
+          channel: 'telegram',
+        };
+      }
+      throw error;
+    }
+
+    return {
+      status: 'ok' as const,
+      rendered_text: result.renderedText,
+      missing_data: result.missingData,
+      channel: 'telegram',
+    };
+  }
+
+  const rawIds = Array.isArray(body?.student_ids) ? (body.student_ids as Array<number | string>) : [];
+  const studentIds: number[] = Array.from(
+    new Set(rawIds.map((value) => Number(value)).filter((value) => Number.isFinite(value))),
+  );
+  if (studentIds.length === 0) throw new Error('student_required');
+  if (studentIds.length > 5) throw new Error('too_many_students');
+
+  const links = (await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: { in: studentIds },
+      isArchived: false,
+    },
+    include: { student: true },
+  })) as TeacherStudentLink[];
+  const linkMap = new Map<number, TeacherStudentLink>(links.map((link) => [link.studentId, link]));
+  const results: Array<{ student_id: number; status: 'ok' | 'error'; error_code?: string }> = [];
+  let renderedText = baseRender.renderedText;
+  let missingData = baseRender.missingData;
+
+  for (const studentId of studentIds) {
+    const link = linkMap.get(studentId);
+    const student = link?.student;
+    if (!link || !student || !student.isActivated || !student.telegramId) {
+      results.push({ student_id: studentId, status: 'error', error_code: 'STUDENT_NOT_ELIGIBLE' });
+      continue;
+    }
+
+    const studentName = resolveStudentDisplayName(link, student);
+    const render = renderNotificationTemplate({
+      template: templateText,
+      values: { ...exampleValues, student_name: studentName },
+      allowedVariables,
+    });
+    renderedText = render.renderedText;
+    missingData = render.missingData;
+
+    try {
+      await sendNotificationTelegramMessage(student.telegramId, render.renderedText);
+      results.push({ student_id: studentId, status: 'ok' });
+    } catch (error) {
+      results.push({ student_id: studentId, status: 'error', error_code: 'SEND_FAILED' });
+    }
+  }
+
+  const okCount = results.filter((item) => item.status === 'ok').length;
+  const status = okCount === 0 ? 'error' : okCount === results.length ? 'ok' : 'partial';
+
+  return {
+    status,
+    rendered_text: renderedText,
+    missing_data: missingData,
+    results: results.length > 1 ? results : undefined,
+    channel: 'telegram',
   };
 };
 
@@ -3675,6 +3854,23 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'PATCH' && pathname === '/api/settings') {
       const body = await readBody(req);
       const data = await updateSettings(requireApiUser(), body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/notifications/channel-status') {
+      return sendJson(res, 200, getNotificationChannelStatus());
+    }
+
+    if (req.method === 'GET' && pathname === '/api/notifications/test-recipients') {
+      const type = url.searchParams.get('type');
+      if (!isNotificationTestType(type)) return badRequest(res, 'invalid_type');
+      const data = await listNotificationTestRecipients(requireApiUser(), type);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/notifications/send-test') {
+      const body = await readBody(req);
+      const data = await sendNotificationTest(requireApiUser(), body);
       return sendJson(res, 200, data);
     }
 

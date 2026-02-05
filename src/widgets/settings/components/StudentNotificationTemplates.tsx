@@ -2,6 +2,8 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Teacher } from '../../../entities/types';
+import { MoreHorizIcon } from '../../../icons/MaterialIcons';
+import { SendTestNotificationModal, useNotificationChannelStatus } from '../../../features/notifications/sendTest';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '../../../shared/lib/toast';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
@@ -11,17 +13,20 @@ import {
   DEFAULT_STUDENT_UPCOMING_LESSON_TEMPLATE,
   STUDENT_LESSON_TEMPLATE_VARIABLES,
   STUDENT_PAYMENT_TEMPLATE_VARIABLES,
+  STUDENT_LESSON_TEMPLATE_EXAMPLES,
+  STUDENT_PAYMENT_TEMPLATE_EXAMPLES,
+  STUDENT_TEMPLATE_MAX_LENGTH,
+  TemplateExampleKey,
 } from '../../../shared/lib/notificationTemplates';
 import styles from './StudentNotificationTemplates.module.css';
 
 interface StudentNotificationTemplatesProps {
   teacher: Teacher;
   onChange: (patch: Partial<Teacher>) => void;
+  onSaveNow: (patch: Partial<Teacher>) => Promise<{ ok: boolean; error?: string }>;
 }
 
 type TemplateId = 'lesson' | 'payment';
-
-type ExampleKey = 'A' | 'B';
 
 type TemplateConfig = {
   id: TemplateId;
@@ -29,11 +34,9 @@ type TemplateConfig = {
   description: string;
   defaultValue: string;
   field: 'studentUpcomingLessonTemplate' | 'studentPaymentDueTemplate';
+  templateType: 'LESSON_REMINDER' | 'PAYMENT_REMINDER';
   allowedVariables: readonly string[];
-  examples: Record<ExampleKey, Record<string, string>>;
 };
-
-const TEMPLATE_MAX_LENGTH = 1000;
 
 type EmojiMartSelection = {
   native?: string;
@@ -59,8 +62,8 @@ const validateTemplate = (value: string, allowedVariables: readonly string[]) =>
   if (!value.trim()) {
     return 'Текст уведомления не может быть пустым';
   }
-  if (value.length > TEMPLATE_MAX_LENGTH) {
-    return `Текст уведомления не должен превышать ${TEMPLATE_MAX_LENGTH} символов`;
+  if (value.length > STUDENT_TEMPLATE_MAX_LENGTH) {
+    return `Текст уведомления не должен превышать ${STUDENT_TEMPLATE_MAX_LENGTH} символов`;
   }
   const allowedSet = new Set(allowedVariables);
   const variables = parseTemplateVariables(value);
@@ -115,23 +118,8 @@ const templateConfigs: TemplateConfig[] = [
     description: 'Сообщение уходит ученику перед предстоящим занятием.',
     defaultValue: DEFAULT_STUDENT_UPCOMING_LESSON_TEMPLATE,
     field: 'studentUpcomingLessonTemplate',
+    templateType: 'LESSON_REMINDER',
     allowedVariables: STUDENT_LESSON_TEMPLATE_VARIABLES,
-    examples: {
-      A: {
-        student_name: 'Ирина',
-        lesson_date: '5 сентября',
-        lesson_time: '18:00',
-        lesson_datetime: '5 сентября 18:00',
-        lesson_link: 'https://meet.google.com/abc-defg-hij',
-      },
-      B: {
-        student_name: 'Мария',
-        lesson_date: '12 октября',
-        lesson_time: '09:30',
-        lesson_datetime: '12 октября 09:30',
-        lesson_link: 'https://meet.google.com/xyz-uvwx-rst',
-      },
-    },
   },
   {
     id: 'payment',
@@ -139,23 +127,8 @@ const templateConfigs: TemplateConfig[] = [
     description: 'Автоматическое или ручное напоминание о неоплаченном занятии.',
     defaultValue: DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
     field: 'studentPaymentDueTemplate',
+    templateType: 'PAYMENT_REMINDER',
     allowedVariables: STUDENT_PAYMENT_TEMPLATE_VARIABLES,
-    examples: {
-      A: {
-        student_name: 'Илья',
-        lesson_date: '7 сентября',
-        lesson_time: '16:00',
-        lesson_datetime: '7 сентября 16:00',
-        lesson_price: '1500',
-      },
-      B: {
-        student_name: 'София',
-        lesson_date: '11 сентября',
-        lesson_time: '10:00',
-        lesson_datetime: '11 сентября 10:00',
-        lesson_price: '900',
-      },
-    },
   },
 ];
 
@@ -166,8 +139,12 @@ const TemplateEditor: FC<{
   error: string | null;
   onSave: () => void;
   onReset: () => void;
-  example: ExampleKey;
-  onExampleChange: (value: ExampleKey) => void;
+  previewExample: Record<string, string>;
+  example: TemplateExampleKey;
+  onExampleChange: (value: TemplateExampleKey) => void;
+  onSendTest: () => void;
+  sendTestDisabled: boolean;
+  sendTestHint: string;
   isMobile: boolean;
 }> = ({
   config,
@@ -176,14 +153,19 @@ const TemplateEditor: FC<{
   error,
   onSave,
   onReset,
+  previewExample,
   example,
   onExampleChange,
+  onSendTest,
+  sendTestDisabled,
+  sendTestHint,
   isMobile,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
   const hasSelectionRef = useRef(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const [isOverflowOpen, setIsOverflowOpen] = useState(false);
   const [popoverTick, setPopoverTick] = useState(0);
 
   useEffect(() => {
@@ -253,6 +235,36 @@ const TemplateEditor: FC<{
           <div className={styles.editorTitle}>{config.label}</div>
           <div className={styles.editorDescription}>{config.description}</div>
         </div>
+        {isMobile && (
+          <AdaptivePopover
+            isOpen={isOverflowOpen}
+            onClose={() => setIsOverflowOpen(false)}
+            trigger={
+              <button
+                type="button"
+                className={`${controls.iconButton} ${styles.overflowButton}`}
+                onClick={() => setIsOverflowOpen((prev) => !prev)}
+                aria-label="Дополнительные действия"
+              >
+                <MoreHorizIcon width={18} height={18} />
+              </button>
+            }
+            side="bottom"
+            align="end"
+            className={styles.overflowPopover}
+          >
+            <button
+              type="button"
+              className={styles.overflowAction}
+              onClick={() => {
+                onReset();
+                setIsOverflowOpen(false);
+              }}
+            >
+              Сбросить по умолчанию
+            </button>
+          </AdaptivePopover>
+        )}
       </div>
 
       <div className={styles.variablePanel}>
@@ -337,7 +349,7 @@ const TemplateEditor: FC<{
           <div className={styles.previewHeader}>
             <div className={styles.previewTitle}>Предпросмотр</div>
             <div className={styles.exampleToggle} data-testid={`student-notification-${config.id}-example-toggle`}>
-              {(['A', 'B'] as ExampleKey[]).map((key) => (
+              {(['A', 'B'] as TemplateExampleKey[]).map((key) => (
                 <button
                   key={key}
                   type="button"
@@ -352,38 +364,69 @@ const TemplateEditor: FC<{
           </div>
           <div className={styles.previewBox} data-testid={`student-notification-${config.id}-preview`}>
             <div className={styles.previewText}>
-              {renderPreview(value, config.examples[example], config.allowedVariables)}
+              {renderPreview(value, previewExample, config.allowedVariables)}
             </div>
           </div>
         </div>
       </div>
 
-      <div className={styles.actionsRow}>
-        <button
-          type="button"
-          className={controls.secondaryButton}
-          onClick={onReset}
-          data-testid={`student-notification-${config.id}-reset`}
-        >
-          Сбросить по умолчанию
-        </button>
-        <button
-          type="button"
-          className={controls.primaryButton}
-          onClick={onSave}
-          data-testid={`student-notification-${config.id}-save`}
-        >
-          Сохранить
-        </button>
-      </div>
+      {!isMobile && (
+        <div className={styles.actionsRow}>
+          <button
+            type="button"
+            className={controls.secondaryButton}
+            onClick={onReset}
+            data-testid={`student-notification-${config.id}-reset`}
+          >
+            Сбросить по умолчанию
+          </button>
+          <button
+            type="button"
+            className={controls.primaryButton}
+            onClick={onSave}
+            data-testid={`student-notification-${config.id}-save`}
+          >
+            Сохранить
+          </button>
+        </div>
+      )}
+
+      {isMobile && (
+        <div className={styles.mobileActions}>
+          <span className={styles.sendTestWrapper} title={sendTestHint}>
+            <button
+              type="button"
+              className={`${controls.secondaryButton} ${styles.mobileActionButton}`}
+              onClick={onSendTest}
+              disabled={sendTestDisabled}
+              data-testid={`student-notification-${config.id}-send-test`}
+            >
+              Тест
+            </button>
+          </span>
+          <button
+            type="button"
+            className={`${controls.primaryButton} ${styles.mobileActionButton}`}
+            onClick={onSave}
+            data-testid={`student-notification-${config.id}-save`}
+          >
+            Сохранить
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
-export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps> = ({ teacher, onChange }) => {
+export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps> = ({
+  teacher,
+  onChange,
+  onSaveNow,
+}) => {
   const { showToast } = useToast();
   const [activeTemplate, setActiveTemplate] = useState<TemplateId>('lesson');
   const isMobile = useIsMobile(720);
+  const channelStatus = useNotificationChannelStatus();
 
   const resolvedValues = useMemo(
     () => ({
@@ -395,7 +438,13 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
 
   const [values, setValues] = useState<Record<TemplateId, string>>(resolvedValues);
   const [errors, setErrors] = useState<Record<TemplateId, string | null>>({ lesson: null, payment: null });
-  const [examples, setExamples] = useState<Record<TemplateId, ExampleKey>>({ lesson: 'A', payment: 'A' });
+  const [examples, setExamples] = useState<Record<TemplateId, TemplateExampleKey>>({ lesson: 'A', payment: 'A' });
+  const [isSendTestOpen, setIsSendTestOpen] = useState(false);
+
+  const sendTestDisabled = channelStatus.status !== 'ready' || !channelStatus.configured;
+  const sendTestHint = sendTestDisabled
+    ? 'Выберите и подключите канал отправки, чтобы отправлять тест.'
+    : 'Отправит тестовое сообщение по текущему шаблону для проверки.';
 
   useEffect(() => {
     setValues(resolvedValues);
@@ -425,33 +474,80 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
     <div className={styles.wrapper}>
       <div className={styles.header}>Тексты уведомлений ученику</div>
       <div className={styles.tabRow}>
-        {templateConfigs.map((config) => (
-          <button
-            key={config.id}
-            type="button"
-            className={`${styles.tabButton} ${activeTemplate === config.id ? styles.tabButtonActive : ''}`}
-            onClick={() => setActiveTemplate(config.id)}
-          >
-            {config.label}
-          </button>
-        ))}
+        <div className={styles.tabButtons}>
+          {templateConfigs.map((config) => (
+            <button
+              key={config.id}
+              type="button"
+              className={`${styles.tabButton} ${activeTemplate === config.id ? styles.tabButtonActive : ''}`}
+              onClick={() => setActiveTemplate(config.id)}
+            >
+              {config.label}
+            </button>
+          ))}
+        </div>
+        {!isMobile && (
+          <span className={`${styles.sendTestWrapper} ${styles.tabAction}`} title={sendTestHint}>
+            <button
+              type="button"
+              className={`${controls.secondaryButton} ${styles.sendTestButton}`}
+              onClick={() => {
+                if (sendTestDisabled) return;
+                setIsSendTestOpen(true);
+              }}
+              disabled={sendTestDisabled}
+              data-testid={`student-notification-${activeTemplate}-send-test`}
+            >
+              Отправить тестовое уведомление
+            </button>
+          </span>
+        )}
       </div>
 
       {templateConfigs
         .filter((config) => config.id === activeTemplate)
         .map((config) => (
+          <div key={config.id}>
           <TemplateEditor
-            key={config.id}
             config={config}
             value={values[config.id]}
             onValueChange={(nextValue) => updateValue(config.id, nextValue)}
             error={errors[config.id]}
             onSave={() => handleSave(config)}
             onReset={() => handleReset(config)}
+            previewExample={
+              config.id === 'lesson'
+                ? STUDENT_LESSON_TEMPLATE_EXAMPLES[examples[config.id]]
+                : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[examples[config.id]]
+            }
             example={examples[config.id]}
             onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
+            onSendTest={() => {
+              if (sendTestDisabled) return;
+              setIsSendTestOpen(true);
+            }}
+            sendTestDisabled={sendTestDisabled}
+            sendTestHint={sendTestHint}
             isMobile={isMobile}
           />
+          <SendTestNotificationModal
+            open={isSendTestOpen}
+            variant={isMobile ? 'sheet' : 'modal'}
+            onClose={() => setIsSendTestOpen(false)}
+            templateType={config.templateType}
+            templateLabel={config.label}
+            templateText={values[config.id]}
+            isDirty={values[config.id] !== resolvedValues[config.id]}
+            allowedVariables={config.allowedVariables}
+            exampleKey={examples[config.id]}
+            onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
+            onSaveNow={onSaveNow}
+            saveField={config.field}
+            examples={
+              config.id === 'lesson' ? STUDENT_LESSON_TEMPLATE_EXAMPLES : STUDENT_PAYMENT_TEMPLATE_EXAMPLES
+            }
+          />
+          </div>
         ))}
     </div>
   );
