@@ -33,3 +33,9 @@
 .priceInput {
   padding-left: 30px;
 }
+
+.sheetModal {
+  max-width: 100%;
+  width: 100%;
+  box-shadow: none;
+}

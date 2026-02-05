@@ -23,6 +23,9 @@ type OpenConfirmDialogOptions = {
   onCancel?: () => void;
 };
 
+export type StudentActionSource = 'default' | 'onboarding_hero' | 'onboarding_stepper' | 'onboarding_quick_action';
+export type ModalVariant = 'modal' | 'sheet';
+
 export type StudentsActionsConfig = {
   students: Student[];
   links: TeacherStudent[];
@@ -37,15 +40,19 @@ export type StudentsActionsConfig = {
   triggerStudentsListReload: () => void;
   refreshPayments: (studentId: number) => Promise<void>;
   clearStudentData: (studentId: number) => void;
+  onStudentCreateStarted?: (source: StudentActionSource) => void;
+  onStudentCreated?: (payload: { student: Student; link: TeacherStudent; source: StudentActionSource }) => void;
+  onStudentCreateError?: (error: unknown, source: StudentActionSource) => void;
 };
 
 export type StudentsActionsContextValue = {
   studentModalOpen: boolean;
+  studentModalVariant: ModalVariant;
   newStudentDraft: StudentDraft;
   isEditingStudent: boolean;
   priceEditState: { id: number | null; value: string };
 
-  openCreateStudentModal: () => void;
+  openCreateStudentModal: (options?: { source?: StudentActionSource; variant?: ModalVariant }) => void;
   openEditStudentModal: () => void;
   closeStudentModal: () => void;
   setStudentDraft: (draft: StudentDraft) => void;
@@ -109,8 +116,13 @@ export const useStudentsActionsInternal = ({
   triggerStudentsListReload,
   refreshPayments,
   clearStudentData,
+  onStudentCreateStarted,
+  onStudentCreated,
+  onStudentCreateError,
 }: StudentsActionsConfig): StudentsActionsContextValue => {
   const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentModalSource, setStudentModalSource] = useState<StudentActionSource>('default');
+  const [studentModalVariant, setStudentModalVariant] = useState<ModalVariant>('modal');
   const [newStudentDraft, setNewStudentDraft] = useState<StudentDraft>(() => createEmptyDraft());
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
@@ -119,11 +131,16 @@ export const useStudentsActionsInternal = ({
     setNewStudentDraft(createEmptyDraft());
   }, []);
 
-  const openCreateStudentModal = useCallback(() => {
-    resetStudentDraft();
-    setEditingStudentId(null);
-    setStudentModalOpen(true);
-  }, [resetStudentDraft]);
+  const openCreateStudentModal = useCallback(
+    (options?: { source?: StudentActionSource; variant?: ModalVariant }) => {
+      resetStudentDraft();
+      setEditingStudentId(null);
+      setStudentModalSource(options?.source ?? 'default');
+      setStudentModalVariant(options?.variant ?? 'modal');
+      setStudentModalOpen(true);
+    },
+    [resetStudentDraft],
+  );
 
   const openEditStudentModal = useCallback(() => {
     if (!selectedStudentId) return;
@@ -136,12 +153,16 @@ export const useStudentsActionsInternal = ({
       pricePerLesson: typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
     });
     setEditingStudentId(selectedStudentId);
+    setStudentModalSource('default');
+    setStudentModalVariant('modal');
     setStudentModalOpen(true);
   }, [links, selectedStudentId, students]);
 
   const closeStudentModal = useCallback(() => {
     setStudentModalOpen(false);
     setEditingStudentId(null);
+    setStudentModalSource('default');
+    setStudentModalVariant('modal');
   }, []);
 
   const setStudentDraft = useCallback((draft: StudentDraft) => {
@@ -163,6 +184,8 @@ export const useStudentsActionsInternal = ({
       return;
     }
 
+    const isOnboardingSource = studentModalSource.startsWith('onboarding');
+    onStudentCreateStarted?.(studentModalSource);
     try {
       const data = await api.addStudent({
         customName: newStudentDraft.customName,
@@ -187,12 +210,19 @@ export const useStudentsActionsInternal = ({
 
       resetStudentDraft();
       setSelectedStudentId(student.id);
-      navigateToStudents();
+      if (!isOnboardingSource) {
+        navigateToStudents();
+      }
       closeStudentModal();
       triggerStudentsListReload();
+      if (isOnboardingSource) {
+        showToast({ message: 'Ученик добавлен. Отлично стартуем ✅', variant: 'success' });
+      }
+      onStudentCreated?.({ student, link, source: studentModalSource });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to add student', error);
+      onStudentCreateError?.(error, studentModalSource);
     }
   }, [
     closeStudentModal,
@@ -200,11 +230,16 @@ export const useStudentsActionsInternal = ({
     newStudentDraft.customName,
     newStudentDraft.pricePerLesson,
     newStudentDraft.username,
+    onStudentCreateError,
+    onStudentCreateStarted,
+    onStudentCreated,
     resetStudentDraft,
     setLinks,
     setSelectedStudentId,
     setStudents,
     showInfoDialog,
+    showToast,
+    studentModalSource,
     triggerStudentsListReload,
   ]);
 
@@ -401,6 +436,7 @@ export const useStudentsActionsInternal = ({
   const contextValue = useMemo(
     () => ({
       studentModalOpen,
+      studentModalVariant,
       newStudentDraft,
       isEditingStudent: Boolean(editingStudentId),
       priceEditState,
@@ -432,6 +468,7 @@ export const useStudentsActionsInternal = ({
       setPriceValue,
       setStudentDraft,
       studentModalOpen,
+      studentModalVariant,
       submitStudent,
       togglePaymentReminders,
       topupBalance,

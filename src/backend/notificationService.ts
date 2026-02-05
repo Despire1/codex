@@ -430,6 +430,66 @@ export const sendStudentLessonReminder = async ({
   }
 };
 
+export const sendStudentLessonReminderManual = async ({
+  studentId,
+  lessonId,
+  text,
+  scheduledFor,
+  dedupeKey,
+}: {
+  studentId: number;
+  lessonId: number;
+  text: string;
+  scheduledFor?: Date;
+  dedupeKey?: string;
+}) => {
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.studentId !== studentId) {
+    return { status: 'skipped' as const, reason: 'lesson_not_found' as const };
+  }
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: lesson.teacherId } });
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!teacher?.studentNotificationsEnabled) {
+    return { status: 'skipped' as const, reason: 'notifications_disabled' as const };
+  }
+  if (!student) {
+    return { status: 'skipped' as const, reason: 'student_not_found' as const };
+  }
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) {
+    return { status: 'skipped' as const, reason: 'student_not_activated' as const };
+  }
+
+  const normalizedText = normalizeNotificationText(text);
+  if (!normalizedText) {
+    return { status: 'skipped' as const, reason: 'empty_text' as const };
+  }
+
+  const log = await createNotificationLog({
+    teacherId: lesson.teacherId,
+    studentId,
+    lessonId,
+    type: 'STUDENT_LESSON_REMINDER',
+    source: 'MANUAL',
+    scheduledFor,
+    dedupeKey,
+  });
+  if (!log) return { status: 'skipped' as const, reason: 'deduped' as const };
+
+  try {
+    await sendTelegramMessage(telegramId, normalizedText);
+    await finalizeNotificationLog(log.id, { status: 'SENT' });
+    return { status: 'sent' as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
+    if (isTelegramUnreachableError(message)) {
+      await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
+    }
+    return { status: 'failed' as const, error: message };
+  }
+};
+
 export const sendTeacherOnboardingNudge = async ({
   teacherId,
   scheduledFor,

@@ -1,31 +1,14 @@
-import { addDays, addMonths, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns';
+import { startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  HomeworkStatus,
-  Lesson,
-  LessonDateRange,
-  LessonPaymentFilter,
-  LessonSortOrder,
-  LessonStatusFilter,
-  LinkedStudent,
-  Student,
-  Teacher,
-  TeacherStudent,
-  UnpaidLessonEntry,
-} from '../entities/types';
+import { LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api } from '../shared/api/client';
-import { normalizeLesson } from '../shared/lib/normalizers';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
-import {
-  formatInTimeZone,
-  resolveTimeZone,
-  toUtcEndOfDay,
-  toUtcDateFromDate,
-  toZonedDate,
-} from '../shared/lib/timezoneDates';
+import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
+import { useIsMobile } from '../shared/lib/useIsMobile';
+import { trackEvent } from '../shared/lib/analytics';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
@@ -42,6 +25,22 @@ import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/
 import { StudentsHomeworkProvider, useStudentsHomeworkInternal } from '../widgets/students/model/useStudentsHomework';
 import { LessonActionsProvider, useLessonActionsInternal } from '../features/lessons/model/useLessonActions';
 import { ScheduleStateProvider, useScheduleStateInternal } from '../widgets/schedule/model/useScheduleState';
+import { DashboardStateProvider, useDashboardStateInternal } from '../widgets/dashboard/model/useDashboardState';
+import { useDashboardSummaryInternal } from '../widgets/dashboard/model/useDashboardSummary';
+import { OnboardingStateProvider, useOnboardingStateInternal } from '../features/onboarding/model/useOnboardingState';
+import {
+  StudentsCardFiltersProvider,
+  useStudentCardFiltersInternal,
+} from '../widgets/students/model/useStudentCardFilters';
+import { useScheduleLessonsLoaderInternal } from '../widgets/schedule/model/useScheduleLessonsLoader';
+import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useScheduleLessonsRange';
+
+const resolveAnalyticsSource = (source: string) => {
+  if (source === 'onboarding_hero') return 'hero_cta';
+  if (source === 'onboarding_stepper') return 'stepper';
+  if (source === 'onboarding_quick_action') return 'quick_action';
+  return source;
+};
 
 const initialTeacher: Teacher = {
   chatId: 111222333,
@@ -70,118 +69,7 @@ const initialTeacher: Teacher = {
 };
 
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
-const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 type TabPath = (typeof tabs)[number]['path'];
-
-type StudentCardFiltersState = {
-  homeworkFilter?: 'all' | HomeworkStatus | 'overdue';
-  lessonPaymentFilter?: LessonPaymentFilter;
-  lessonStatusFilter?: LessonStatusFilter;
-  lessonDateRange?: LessonDateRange;
-  lessonSortOrder?: LessonSortOrder;
-  paymentFilter?: 'all' | 'topup' | 'charges' | 'manual';
-  paymentDate?: string;
-};
-
-const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
-  from: '',
-  to: '',
-  fromTime: '00:00',
-  toTime: '23:59',
-};
-type LessonRange = {
-  key: string;
-  startAt: Date;
-  endAt: Date;
-  startIso: string;
-  endIso: string;
-};
-
-const isHomeworkFilter = (value: unknown): value is 'all' | HomeworkStatus | 'overdue' =>
-  typeof value === 'string' &&
-  (value === 'all' ||
-    value === 'overdue' ||
-    value === 'DRAFT' ||
-    value === 'ASSIGNED' ||
-    value === 'IN_PROGRESS' ||
-    value === 'DONE');
-
-const isLessonPaymentFilter = (value: unknown): value is LessonPaymentFilter =>
-  value === 'all' || value === 'paid' || value === 'unpaid';
-
-const isLessonStatusFilter = (value: unknown): value is LessonStatusFilter =>
-  value === 'all' || value === 'completed' || value === 'not_completed';
-
-const isLessonSortOrder = (value: unknown): value is LessonSortOrder => value === 'asc' || value === 'desc';
-
-const isPaymentFilter = (value: unknown): value is 'all' | 'topup' | 'charges' | 'manual' =>
-  value === 'all' || value === 'topup' || value === 'charges' || value === 'manual';
-
-const parseLessonDateRange = (value: unknown): LessonDateRange | null => {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  if (
-    typeof record.from !== 'string' ||
-    typeof record.to !== 'string' ||
-    typeof record.fromTime !== 'string' ||
-    typeof record.toTime !== 'string'
-  ) {
-    return null;
-  }
-  return {
-    from: record.from,
-    to: record.to,
-    fromTime: record.fromTime,
-    toTime: record.toTime,
-  };
-};
-
-const loadStudentCardFilters = (): StudentCardFiltersState => {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(STUDENT_CARD_FILTERS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const result: StudentCardFiltersState = {};
-    if (isHomeworkFilter(parsed.homeworkFilter)) {
-      result.homeworkFilter = parsed.homeworkFilter;
-    }
-    if (isLessonPaymentFilter(parsed.lessonPaymentFilter)) {
-      result.lessonPaymentFilter = parsed.lessonPaymentFilter;
-    }
-    if (isLessonStatusFilter(parsed.lessonStatusFilter)) {
-      result.lessonStatusFilter = parsed.lessonStatusFilter;
-    }
-    const parsedDateRange = parseLessonDateRange(parsed.lessonDateRange);
-    if (parsedDateRange) {
-      result.lessonDateRange = parsedDateRange;
-    }
-    if (isLessonSortOrder(parsed.lessonSortOrder)) {
-      result.lessonSortOrder = parsed.lessonSortOrder;
-    }
-    if (isPaymentFilter(parsed.paymentFilter)) {
-      result.paymentFilter = parsed.paymentFilter;
-    }
-    if (typeof parsed.paymentDate === 'string') {
-      result.paymentDate = parsed.paymentDate;
-    }
-    return result;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to load student card filters', error);
-    return {};
-  }
-};
-
-const saveStudentCardFilters = (state: StudentCardFiltersState) => {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STUDENT_CARD_FILTERS_KEY, JSON.stringify(state));
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to save student card filters', error);
-  }
-};
 
 export const AppPage = () => {
   const navigate = useNavigate();
@@ -191,46 +79,17 @@ export const AppPage = () => {
   const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
   const hasAccess = sessionState === 'authenticated' && hasTelegramAccess;
-  const storedStudentCardFilters = useMemo(() => loadStudentCardFilters(), []);
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [unpaidLessonEntries, setUnpaidLessonEntries] = useState<UnpaidLessonEntry[]>([]);
-  const [lessonsByRange, setLessonsByRange] = useState<Record<string, Lesson[]>>({});
-  const lessonsByRangeRef = useRef(lessonsByRange);
-  const lessonRangeRef = useRef<LessonRange | null>(null);
-  const lessonRangeRequestId = useRef(0);
   const initialBootstrapDone = useRef(false);
-  const [dashboardWeekRange, setDashboardWeekRange] = useState<{ start: Date; end: Date } | null>(() => {
-    const nowZoned = toZonedDate(new Date(), resolvedTimeZone);
-    const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
-    return { start: weekStart, end: addDays(weekStart, 6) };
-  });
   const [studentListReloadKey, setStudentListReloadKey] = useState(0);
-  const [studentHomeworkFilter, setStudentHomeworkFilter] = useState<'all' | HomeworkStatus | 'overdue'>(
-    storedStudentCardFilters.homeworkFilter ?? 'all',
-  );
-  const [studentLessonPaymentFilter, setStudentLessonPaymentFilter] = useState<LessonPaymentFilter>(
-    storedStudentCardFilters.lessonPaymentFilter ?? 'all',
-  );
-  const [studentLessonStatusFilter, setStudentLessonStatusFilter] = useState<LessonStatusFilter>(
-    storedStudentCardFilters.lessonStatusFilter ?? 'all',
-  );
-  const [studentLessonSortOrder, setStudentLessonSortOrder] = useState<LessonSortOrder>(
-    storedStudentCardFilters.lessonSortOrder ?? 'asc',
-  );
-  const [studentLessonDateRange, setStudentLessonDateRange] = useState<LessonDateRange>(
-    storedStudentCardFilters.lessonDateRange ?? DEFAULT_LESSON_DATE_RANGE,
-  );
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'topup' | 'charges' | 'manual'>(
-    storedStudentCardFilters.paymentFilter ?? 'all',
-  );
-  const [paymentDate, setPaymentDate] = useState(storedStudentCardFilters.paymentDate ?? '');
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
   const [dialogState, setDialogState] = useState<DialogState>(null);
+  const isMobile = useIsMobile(767);
+  const device = isMobile ? 'mobile' : 'desktop';
   const triggerStudentsListReload = useCallback(() => {
     setStudentListReloadKey((prev) => prev + 1);
   }, []);
@@ -247,18 +106,20 @@ export const AppPage = () => {
     setSelectedMonthDay,
   } = scheduleState;
 
+  const studentCardFilters = useStudentCardFiltersInternal();
+
   const studentsData = useStudentsDataInternal({
     hasAccess,
     timeZone: resolvedTimeZone,
     selectedStudentId,
     studentActiveTab,
-    homeworkFilter: studentHomeworkFilter,
-    lessonPaymentFilter: studentLessonPaymentFilter,
-    lessonStatusFilter: studentLessonStatusFilter,
-    lessonDateRange: studentLessonDateRange,
-    lessonSortOrder: studentLessonSortOrder,
-    paymentFilter,
-    paymentDate,
+    homeworkFilter: studentCardFilters.homeworkFilter,
+    lessonPaymentFilter: studentCardFilters.lessonPaymentFilter,
+    lessonStatusFilter: studentCardFilters.lessonStatusFilter,
+    lessonDateRange: studentCardFilters.lessonDateRange,
+    lessonSortOrder: studentCardFilters.lessonSortOrder,
+    paymentFilter: studentCardFilters.paymentFilter,
+    paymentDate: studentCardFilters.paymentDate,
   });
 
   const {
@@ -271,10 +132,6 @@ export const AppPage = () => {
     refreshPaymentReminders,
     clearStudentData,
   } = studentsData;
-
-  useEffect(() => {
-    lessonsByRangeRef.current = lessonsByRange;
-  }, [lessonsByRange]);
 
   const closeDialog = () => setDialogState(null);
 
@@ -415,6 +272,23 @@ export const AppPage = () => {
     triggerStudentsListReload,
     refreshPayments,
     clearStudentData,
+    onStudentCreateStarted: (source) => {
+      track('student_create_started', { source: resolveAnalyticsSource(source) });
+    },
+    onStudentCreated: ({ student, link, source }) => {
+      if (source.startsWith('onboarding')) {
+        onboardingState.setCreatedStudent({ student, link });
+        onboardingState.setDismissed(false);
+      }
+      dashboardSummary.refresh();
+      track('student_create_success', { source: resolveAnalyticsSource(source) });
+    },
+    onStudentCreateError: (error, source) => {
+      track('student_create_error', {
+        source: resolveAnalyticsSource(source),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
   });
 
   const studentsHomework = useStudentsHomeworkInternal({
@@ -427,131 +301,74 @@ export const AppPage = () => {
   });
   const { homeworks } = studentsHomework;
 
-  const buildLessonRange = useCallback(
-    (startDate: Date, endDate: Date): LessonRange => {
-      const startIso = formatInTimeZone(startDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
-      const endIso = formatInTimeZone(endDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
-      const startAt = toUtcDateFromDate(startIso, resolvedTimeZone);
-      const endAt = toUtcEndOfDay(endIso, resolvedTimeZone);
-      return {
-        key: `${startIso}_${endIso}`,
-        startAt,
-        endAt,
-        startIso,
-        endIso,
-      };
+  const scheduleLessons = useScheduleLessonsRangeInternal({
+    hasAccess,
+    timeZone: resolvedTimeZone,
+    monthAnchor,
+    monthOffset,
+  });
+
+  const {
+    lessons,
+    buildLessonRange,
+    buildWeekRange,
+    buildDayRange,
+    buildMonthRange,
+    loadLessonsForRange,
+    applyLessonsForRange,
+    updateLessonsForCurrentRange,
+    isLessonInCurrentRange,
+    filterLessonsForCurrentRange,
+  } = scheduleLessons;
+
+  const activeTab = useMemo<TabId>(() => {
+    const directMatch = tabIdByPath[location.pathname];
+    if (directMatch) return directMatch;
+    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
+    return matchedTab?.id ?? 'dashboard';
+  }, [location.pathname]);
+
+  const dashboardState = useDashboardStateInternal({
+    hasAccess,
+    timeZone: resolvedTimeZone,
+    isActive: activeTab === 'dashboard',
+    buildLessonRange,
+    loadLessonsForRange,
+  });
+
+  const dashboardSummary = useDashboardSummaryInternal({
+    hasAccess,
+    isActive: activeTab === 'dashboard',
+  });
+  const { summary: dashboardSummaryData } = dashboardSummary;
+  const isZeroSummary =
+    dashboardSummaryData?.studentsCount === 0 && dashboardSummaryData?.lessonsCount === 0;
+  const onboardingState = useOnboardingStateInternal({
+    teacherId: dashboardSummaryData?.teacherId ?? null,
+    isZero: Boolean(isZeroSummary),
+  });
+
+  const track = useCallback(
+    (event: string, payload: Record<string, unknown> = {}) => {
+      trackEvent(event, {
+        userId: onboardingState.teacherId,
+        device,
+        ...payload,
+      });
     },
-    [resolvedTimeZone],
+    [device, onboardingState.teacherId],
   );
 
-  const buildWeekRange = useCallback(
-    (date: Date) => {
-      const zoned = toZonedDate(date, resolvedTimeZone);
-      const weekStart = startOfWeek(zoned, { weekStartsOn: 1 });
-      const weekEnd = addDays(weekStart, 6);
-      return buildLessonRange(weekStart, weekEnd);
-    },
-    [buildLessonRange, resolvedTimeZone],
-  );
-
-  const buildDayRange = useCallback(
-    (date: Date) => {
-      const zoned = toZonedDate(date, resolvedTimeZone);
-      return buildLessonRange(zoned, zoned);
-    },
-    [buildLessonRange, resolvedTimeZone],
-  );
-
-  const buildMonthRange = useCallback(() => {
-    const targetMonth = addMonths(monthAnchor, monthOffset);
-    const monthStart = startOfWeek(startOfMonth(targetMonth), { weekStartsOn: 1 });
-    const monthEnd = endOfWeek(endOfMonth(targetMonth), { weekStartsOn: 1 });
-    return buildLessonRange(monthStart, monthEnd);
-  }, [buildLessonRange, monthAnchor, monthOffset]);
-
-  const isLessonInRange = useCallback((lesson: Lesson, range: LessonRange) => {
-    const startAt = new Date(lesson.startAt).getTime();
-    return startAt >= range.startAt.getTime() && startAt <= range.endAt.getTime();
-  }, []);
-
-  const isLessonInCurrentRange = useCallback(
-    (lesson: Lesson) => {
-      const range = lessonRangeRef.current;
-      if (!range) return true;
-      return isLessonInRange(lesson, range);
-    },
-    [isLessonInRange],
-  );
-
-  const filterLessonsForCurrentRange = useCallback(
-    (items: Lesson[]) => {
-      const range = lessonRangeRef.current;
-      if (!range) return items;
-      return items.filter((lesson) => isLessonInRange(lesson, range));
-    },
-    [isLessonInRange],
-  );
-
-  const applyLessonsForRange = useCallback((range: LessonRange, items: Lesson[]) => {
-    const normalized = items.map(normalizeLesson);
-    setLessons(normalized);
-    setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
-    lessonRangeRef.current = range;
-  }, []);
-
-  const updateLessonsForCurrentRange = useCallback((updater: (prev: Lesson[]) => Lesson[]) => {
-    const range = lessonRangeRef.current;
-    setLessons((prev) => {
-      const next = updater(prev);
-      if (range) {
-        setLessonsByRange((cache) => ({ ...cache, [range.key]: next }));
-      }
-      return next;
-    });
-  }, []);
-
-  const loadLessonsForRange = useCallback(
-    async (range: LessonRange) => {
-      if (!hasAccess) return;
-      lessonRangeRef.current = range;
-      const cached = lessonsByRangeRef.current[range.key];
-      if (cached) {
-        setLessons(cached);
-        return;
-      }
-      const requestId = (lessonRangeRequestId.current += 1);
-      try {
-        const data = await api.listLessonsForRange({
-          start: range.startAt.toISOString(),
-          end: range.endAt.toISOString(),
-        });
-        const normalized = (data.lessons ?? []).map(normalizeLesson);
-        setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
-        if (lessonRangeRequestId.current === requestId) {
-          setLessons(normalized);
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load lessons for range', error);
-      }
-    },
-    [hasAccess],
-  );
-
-  const handleDashboardWeekRangeChange = useCallback((start: Date, end: Date) => {
-    setDashboardWeekRange({ start, end });
-  }, []);
-
-  const loadDashboardUnpaidLessons = useCallback(async () => {
-    if (!hasAccess) return;
-    try {
-      const data = await api.listUnpaidLessons();
-      setUnpaidLessonEntries(data.entries ?? []);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to load unpaid lessons', error);
-    }
-  }, [hasAccess]);
+  useScheduleLessonsLoaderInternal({
+    hasAccess,
+    isActive: activeTab === 'schedule',
+    scheduleView,
+    dayViewDate,
+    buildDayRange,
+    buildWeekRange,
+    buildMonthRange,
+    loadLessonsForRange,
+  });
 
   const lessonActions = useLessonActionsInternal({
     timeZone: resolvedTimeZone,
@@ -575,21 +392,31 @@ export const AppPage = () => {
     loadStudentLessons,
     loadStudentLessonsSummary,
     loadStudentUnpaidLessons,
-    loadDashboardUnpaidLessons,
+    loadDashboardUnpaidLessons: dashboardState.loadUnpaidLessons,
     refreshPayments,
     refreshPaymentReminders,
     triggerStudentsListReload,
     studentDebtItems,
+    onLessonCreateStarted: (source) => {
+      track('lesson_create_started', { source: resolveAnalyticsSource(source) });
+    },
+    onLessonCreated: ({ lesson, source }) => {
+      if (source.startsWith('onboarding')) {
+        onboardingState.setCreatedLesson(lesson);
+        onboardingState.setDismissed(false);
+      }
+      dashboardSummary.refresh();
+      track('lesson_create_success', { source: resolveAnalyticsSource(source) });
+    },
+    onLessonCreateError: (error, source) => {
+      track('lesson_create_error', {
+        source: resolveAnalyticsSource(source),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
   });
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
-
-  const activeTab = useMemo<TabId>(() => {
-    const directMatch = tabIdByPath[location.pathname];
-    if (directMatch) return directMatch;
-    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
-    return matchedTab?.id ?? 'dashboard';
-  }, [location.pathname]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -603,8 +430,8 @@ export const AppPage = () => {
               : scheduleView === 'week'
                 ? buildWeekRange(dayViewDate)
                 : buildDayRange(dayViewDate)
-            : activeTab === 'dashboard' && dashboardWeekRange
-              ? buildLessonRange(dashboardWeekRange.start, dashboardWeekRange.end)
+            : activeTab === 'dashboard' && dashboardState.weekRange
+              ? buildLessonRange(dashboardState.weekRange.start, dashboardState.weekRange.end)
               : buildWeekRange(new Date());
         initialBootstrapDone.current = true;
         const data = await api.bootstrap({
@@ -634,7 +461,7 @@ export const AppPage = () => {
     buildLessonRange,
     buildMonthRange,
     buildWeekRange,
-    dashboardWeekRange,
+    dashboardState.weekRange,
     dayViewDate,
     hasAccess,
     resolvedTimeZone,
@@ -642,68 +469,7 @@ export const AppPage = () => {
     studentsHomework.replaceHomeworks,
   ]);
 
-  const handleLessonSortOrderChange = useCallback(
-    (order: LessonSortOrder) => {
-      if (order === studentLessonSortOrder) return;
-      setStudentLessonSortOrder(order);
-    },
-    [studentLessonSortOrder],
-  );
 
-  useEffect(() => {
-    saveStudentCardFilters({
-      homeworkFilter: studentHomeworkFilter,
-      lessonPaymentFilter: studentLessonPaymentFilter,
-      lessonStatusFilter: studentLessonStatusFilter,
-      lessonDateRange: studentLessonDateRange,
-      lessonSortOrder: studentLessonSortOrder,
-      paymentFilter,
-      paymentDate,
-    });
-  }, [
-    paymentDate,
-    paymentFilter,
-    studentHomeworkFilter,
-    studentLessonDateRange,
-    studentLessonPaymentFilter,
-    studentLessonSortOrder,
-    studentLessonStatusFilter,
-  ]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (activeTab === 'dashboard') {
-      if (!dashboardWeekRange) return;
-      loadLessonsForRange(buildLessonRange(dashboardWeekRange.start, dashboardWeekRange.end));
-      return;
-    }
-    if (activeTab === 'schedule') {
-      const range =
-        scheduleView === 'month'
-          ? buildMonthRange()
-          : scheduleView === 'week'
-            ? buildWeekRange(dayViewDate)
-            : buildDayRange(dayViewDate);
-      loadLessonsForRange(range);
-    }
-  }, [
-    activeTab,
-    buildDayRange,
-    buildLessonRange,
-    buildMonthRange,
-    buildWeekRange,
-    dashboardWeekRange,
-    dayViewDate,
-    hasAccess,
-    loadLessonsForRange,
-    scheduleView,
-  ]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (activeTab !== 'dashboard') return;
-    loadDashboardUnpaidLessons();
-  }, [activeTab, hasAccess, loadDashboardUnpaidLessons]);
 
   const resolveLastVisitedPath = useCallback(() => {
     const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;
@@ -730,14 +496,6 @@ export const AppPage = () => {
     [links, students, homeworks],
   );
 
-  const handlePaymentFilterChange = (nextFilter: 'all' | 'topup' | 'charges' | 'manual') => {
-    setPaymentFilter(nextFilter);
-  };
-
-  const handlePaymentDateChange = (nextDate: string) => {
-    setPaymentDate(nextDate);
-  };
-
   if (sessionState !== 'authenticated' || !hasTelegramAccess) {
     const fallbackState =
       sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending') ? 'checking' : 'unauthenticated';
@@ -761,12 +519,15 @@ export const AppPage = () => {
   const showSubscriptionGate = !hasSubscription && !isStudentRole;
 
   return (
-    <StudentsDataProvider value={studentsData}>
-      <StudentsActionsProvider value={studentsActions}>
-        <StudentsHomeworkProvider value={studentsHomework}>
-          <LessonActionsProvider value={lessonActions}>
-            <ScheduleStateProvider value={scheduleState}>
-              <TimeZoneProvider timeZone={resolvedTimeZone}>
+    <StudentsCardFiltersProvider value={studentCardFilters}>
+      <StudentsDataProvider value={studentsData}>
+        <StudentsActionsProvider value={studentsActions}>
+          <StudentsHomeworkProvider value={studentsHomework}>
+            <LessonActionsProvider value={lessonActions}>
+              <DashboardStateProvider value={dashboardState}>
+                <OnboardingStateProvider value={onboardingState}>
+                  <ScheduleStateProvider value={scheduleState}>
+                    <TimeZoneProvider timeZone={resolvedTimeZone}>
                 <div className={layoutStyles.page}>
                   <div className={layoutStyles.pageInner}>
                     <Topbar
@@ -783,8 +544,6 @@ export const AppPage = () => {
                           teacher,
                           lessons,
                           linkedStudents,
-                          unpaidEntries: unpaidLessonEntries,
-                          onWeekRangeChange: handleDashboardWeekRangeChange,
                           onAddStudent: () => {
                             navigate(tabPathById.students);
                             studentsActions.openCreateStudentModal();
@@ -835,20 +594,6 @@ export const AppPage = () => {
                           hasAccess,
                           teacher,
                           lessons,
-                          homeworkFilter: studentHomeworkFilter,
-                          onHomeworkFilterChange: setStudentHomeworkFilter,
-                          lessonPaymentFilter: studentLessonPaymentFilter,
-                          lessonStatusFilter: studentLessonStatusFilter,
-                          lessonDateRange: studentLessonDateRange,
-                          lessonSortOrder: studentLessonSortOrder,
-                          onLessonPaymentFilterChange: setStudentLessonPaymentFilter,
-                          onLessonStatusFilterChange: setStudentLessonStatusFilter,
-                          onLessonDateRangeChange: setStudentLessonDateRange,
-                          onLessonSortOrderChange: handleLessonSortOrderChange,
-                          paymentFilter,
-                          paymentDate,
-                          onPaymentFilterChange: handlePaymentFilterChange,
-                          onPaymentDateChange: handlePaymentDateChange,
                           onActiveTabChange: setStudentActiveTab,
                           studentListReloadKey,
                         }}
@@ -858,6 +603,11 @@ export const AppPage = () => {
                           autoConfirmLessons: teacher.autoConfirmLessons,
                         }}
                         settings={{ teacher, onTeacherChange: setTeacher }}
+                        dashboardSummary={{
+                          summary: dashboardSummaryData,
+                          isLoading: dashboardSummary.isLoading,
+                          refresh: dashboardSummary.refresh,
+                        }}
                       />
                     </main>
                   </div>
@@ -872,11 +622,14 @@ export const AppPage = () => {
                   />
                 </div>
                 {showSubscriptionGate ? <SubscriptionGate /> : null}
-              </TimeZoneProvider>
-            </ScheduleStateProvider>
-          </LessonActionsProvider>
-        </StudentsHomeworkProvider>
-      </StudentsActionsProvider>
-    </StudentsDataProvider>
+                    </TimeZoneProvider>
+                  </ScheduleStateProvider>
+                </OnboardingStateProvider>
+              </DashboardStateProvider>
+            </LessonActionsProvider>
+          </StudentsHomeworkProvider>
+        </StudentsActionsProvider>
+      </StudentsDataProvider>
+    </StudentsCardFiltersProvider>
   );
 };

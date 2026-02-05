@@ -1,0 +1,14 @@
+.loadingGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.loadingCard {
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  padding: 18px;
+  color: var(--color-slate-500);
+  font-size: 14px;
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+}

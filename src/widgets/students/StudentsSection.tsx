@@ -1,14 +1,6 @@
 import { type FC, type UIEvent, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  HomeworkStatus,
-  Lesson,
-  LessonDateRange,
-  LessonPaymentFilter,
-  LessonSortOrder,
-  LessonStatusFilter,
-  Teacher,
-} from '../../entities/types';
+import { Lesson, Teacher } from '../../entities/types';
 import styles from './StudentsSection.module.css';
 // import { HomeworkPanel } from './components/HomeworkPanel';
 import { LessonsTab } from './components/LessonsTab';
@@ -26,25 +18,12 @@ import { useStudentsData } from './model/useStudentsData';
 import { useStudentsActions } from './model/useStudentsActions';
 import { useStudentsHomework } from './model/useStudentsHomework';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
+import { useStudentCardFilters } from './model/useStudentCardFilters';
 
 interface StudentsSectionProps {
   hasAccess: boolean;
   teacher: Teacher;
   lessons: Lesson[];
-  homeworkFilter: 'all' | HomeworkStatus | 'overdue';
-  onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-  lessonPaymentFilter: LessonPaymentFilter;
-  lessonStatusFilter: LessonStatusFilter;
-  lessonDateRange: LessonDateRange;
-  lessonSortOrder: LessonSortOrder;
-  onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
-  onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
-  onLessonDateRangeChange: (range: LessonDateRange) => void;
-  onLessonSortOrderChange: (order: LessonSortOrder) => void;
-  paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
-  paymentDate: string;
-  onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
-  onPaymentDateChange: (date: string) => void;
   onActiveTabChange?: (tab: StudentTabId) => void;
   onRequestDebtDetails?: () => void;
   studentListReloadKey: number;
@@ -73,20 +52,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   hasAccess,
   teacher,
   lessons,
-  homeworkFilter,
-  onHomeworkFilterChange,
-  lessonPaymentFilter,
-  lessonStatusFilter,
-  lessonDateRange,
-  lessonSortOrder,
-  onLessonPaymentFilterChange,
-  onLessonStatusFilterChange,
-  onLessonDateRangeChange,
-  onLessonSortOrderChange,
-  paymentFilter,
-  paymentDate,
-  onPaymentFilterChange,
-  onPaymentDateChange,
   onActiveTabChange,
   onRequestDebtDetails,
   studentListReloadKey,
@@ -135,6 +100,22 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     togglePaid,
     remindLessonPayment,
   } = useLessonActions();
+  const {
+    homeworkFilter,
+    setHomeworkFilter,
+    lessonPaymentFilter,
+    setLessonPaymentFilter,
+    lessonStatusFilter,
+    setLessonStatusFilter,
+    lessonDateRange,
+    setLessonDateRange,
+    lessonSortOrder,
+    setLessonSortOrder,
+    paymentFilter,
+    setPaymentFilter,
+    paymentDate,
+    setPaymentDate,
+  } = useStudentCardFilters();
   const {
     newHomeworkDraft,
     setHomeworkDraft,
@@ -405,10 +386,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     lessonDateRange={lessonDateRange}
                     lessonListLoading={studentLessonLoading}
                     lessonSortOrder={lessonSortOrder}
-                    onLessonPaymentFilterChange={onLessonPaymentFilterChange}
-                    onLessonStatusFilterChange={onLessonStatusFilterChange}
-                    onLessonDateRangeChange={onLessonDateRangeChange}
-                    onLessonSortOrderChange={onLessonSortOrderChange}
+                    onLessonPaymentFilterChange={setLessonPaymentFilter}
+                    onLessonStatusFilterChange={setLessonStatusFilter}
+                    onLessonDateRangeChange={setLessonDateRange}
+                    onLessonSortOrderChange={setLessonSortOrder}
                     onStartEditLessonStatus={handleStartEditLessonStatus}
                     onStopEditLessonStatus={handleStopEditLessonStatus}
                     onLessonStatusChange={handleLessonStatusChange}
@@ -430,8 +411,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                     paymentDate={paymentDate}
                     paymentRemindersCount={paymentRemindersCount}
                     paymentRemindersHasMore={paymentRemindersHasMore}
-                    onPaymentFilterChange={onPaymentFilterChange}
-                    onPaymentDateChange={onPaymentDateChange}
+                    onPaymentFilterChange={setPaymentFilter}
+                    onPaymentDateChange={setPaymentDate}
                     onOpenLesson={startEditLesson}
                     onOpenReminders={openPaymentReminders}
                     onLoadMoreReminders={loadMorePaymentReminders}

@@ -1,0 +1,93 @@
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+  display: grid;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-weight: 700;
+}
+
+.progress {
+  color: var(--color-slate-500);
+  font-size: 13px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+  text-align: left;
+  background: var(--color-slate-50);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.step:hover {
+  border-color: var(--color-slate-200);
+}
+
+.step:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stepActive {
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-50);
+}
+
+.stepDone {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.stepIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--color-slate-200);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--color-slate-600);
+  background: var(--color-white);
+}
+
+.stepDone .stepIcon {
+  color: var(--color-emerald-500);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.stepBody {
+  display: grid;
+  gap: 4px;
+}
+
+.stepTitle {
+  font-weight: 600;
+}
+
+.stepHint {
+  font-size: 12px;
+  color: var(--color-slate-500);
+}

@@ -1,6 +1,6 @@
 import { addDays, format, isSameDay } from 'date-fns';
 import {type FC, useEffect, useMemo, useState} from 'react';
-import { Lesson, LinkedStudent, Teacher, UnpaidLessonEntry } from '@/entities/types';
+import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Badge } from '@/shared/ui/Badge/Badge';
@@ -14,13 +14,12 @@ import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timezoneDates';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
+import { useDashboardState } from './model/useDashboardState';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   teacher: Teacher;
-  unpaidEntries: UnpaidLessonEntry[];
-  onWeekRangeChange?: (start: Date, end: Date) => void;
   onAddStudent: () => void;
   onCreateLesson: (date?: Date) => void;
   onOpenSchedule: () => void;
@@ -48,8 +47,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   lessons,
   linkedStudents,
   teacher,
-  unpaidEntries,
-  onWeekRangeChange,
   onAddStudent,
   onCreateLesson,
   onOpenSchedule,
@@ -59,6 +56,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 }) => {
   const timeZone = useTimeZone();
   const { markLessonCompleted, togglePaid, remindLessonPayment } = useLessonActions();
+  const { unpaidEntries, setWeekRange } = useDashboardState();
   const now = new Date();
   const todayZoned = toZonedDate(now, timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
@@ -194,7 +192,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           timeZone={timeZone}
           onCreateLesson={(date) => onCreateLesson(date)}
           onOpenLessonDay={onOpenLessonDay}
-          onWeekRangeChange={onWeekRangeChange}
+          onWeekRangeChange={setWeekRange}
         />
       )}
 

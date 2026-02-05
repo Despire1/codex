@@ -1,0 +1,20 @@
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+}
+
+.title {
+  font-weight: 700;
+}
+
+.progress {
+  color: var(--color-slate-500);
+  font-size: 13px;
+}

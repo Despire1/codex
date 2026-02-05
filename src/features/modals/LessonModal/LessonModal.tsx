@@ -13,6 +13,8 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import controls from '../../../shared/styles/controls.module.css';
 import modalStyles from '../modal.module.css';
+import sheetStyles from './LessonModal.module.css';
+import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
 import { LessonColor } from '../../../entities/types';
@@ -55,6 +57,7 @@ interface LessonModalProps {
   onClose: () => void;
   onDelete?: () => void;
   onSubmit: () => void;
+  variant?: 'modal' | 'sheet';
 }
 
 const weekdayOptions: { value: number; label: string }[] = [
@@ -78,6 +81,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   onClose,
   onDelete,
   onSubmit,
+  variant = 'modal',
 }) => {
   if (!open) return null;
 
@@ -223,21 +227,23 @@ export const LessonModal: FC<LessonModalProps> = ({
     onDraftChange({ ...draft, meetingLink: normalized });
   };
 
-  return (
-    <div className={modalStyles.modalOverlay} onClick={onClose}>
-      <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
-        <div className={modalStyles.modalHeader}>
-          <div>
-            <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
-            <div className={modalStyles.modalSubtitle}>
-              {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
-            </div>
+  const modalContent = (
+    <div
+      className={`${modalStyles.modal} ${variant === 'sheet' ? sheetStyles.sheetModal : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className={modalStyles.modalHeader}>
+        <div>
+          <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
+          <div className={modalStyles.modalSubtitle}>
+            {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
           </div>
-          <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
-            ×
-          </button>
         </div>
-        <div className={modalStyles.modalBody}>
+        <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
+          ×
+        </button>
+      </div>
+      <div className={modalStyles.modalBody}>
           <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Ученики</span>
@@ -363,7 +369,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           </div>
           {draft.isRecurring && (
             <Box>
-              <div className={`${modalStyles.field}, ${modalStyles.weekdaysRow}`}>
+              <div className={`${modalStyles.field} ${modalStyles.weekdaysRow}`}>
                 <span className={modalStyles.fieldLabel}>Выберите дни недели</span>
                 <div className={modalStyles.weekdayGrid} role="group" aria-label="Дни недели">
                   {weekdayOptions.map((day) => {
@@ -463,6 +469,19 @@ export const LessonModal: FC<LessonModalProps> = ({
           </button>
         </div>
       </div>
+  );
+
+  if (variant === 'sheet') {
+    return (
+      <BottomSheet isOpen={open} onClose={onClose}>
+        {modalContent}
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <div className={modalStyles.modalOverlay} onClick={onClose}>
+      {modalContent}
     </div>
   );
 };

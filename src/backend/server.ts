@@ -27,6 +27,7 @@ import {
 } from '../shared/lib/notificationTemplates';
 import {
   sendStudentLessonReminder,
+  sendStudentLessonReminderManual,
   sendStudentPaymentReminder,
   sendTeacherLessonReminder,
   sendTeacherDailySummary,
@@ -34,6 +35,7 @@ import {
   sendTeacherPaymentReminderNotice,
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
+import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -745,6 +747,9 @@ const normalizeTelegramUsername = (username?: string | null) => {
   return withoutAt.trim().toLowerCase() || null;
 };
 
+const isOnboardingReminderTemplate = (value: unknown): value is OnboardingReminderTemplate =>
+  value === 'TODAY' || value === 'IN_1_HOUR' || value === 'TOMORROW_MORNING';
+
 const findUserByTelegramUsername = async (normalizedUsername: string) => {
   const candidates = await prisma.user.findMany({
     where: { username: { contains: normalizedUsername } },
@@ -1155,6 +1160,78 @@ const listLessonsForRange = async (
   });
 
   return { lessons };
+};
+
+const getDashboardSummary = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  const [studentsCount, lessonsCount] = await Promise.all([
+    prisma.teacherStudent.count({
+      where: { teacherId: teacher.chatId, isArchived: false },
+    }),
+    prisma.lesson.count({
+      where: { teacherId: teacher.chatId },
+    }),
+  ]);
+
+  return {
+    studentsCount,
+    lessonsCount,
+    telegramConnected: Boolean(TELEGRAM_BOT_TOKEN) && teacher.studentNotificationsEnabled,
+    timezone: teacher.timezone ?? null,
+    teacherId: Number(teacher.chatId),
+  };
+};
+
+const sendLessonReminder = async (
+  user: User,
+  payload: {
+    lessonId: number;
+    template: OnboardingReminderTemplate;
+  },
+) => {
+  const teacher = await ensureTeacher(user);
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: payload.lessonId },
+    include: { student: true },
+  });
+  if (!lesson || lesson.teacherId !== teacher.chatId) {
+    throw new Error('Урок не найден');
+  }
+
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: lesson.studentId } },
+  });
+  const studentName = link?.customName?.trim() || lesson.student?.username?.trim() || 'ученик';
+  const text = buildOnboardingReminderMessage({
+    template: payload.template,
+    studentName,
+    lessonStartAt: lesson.startAt,
+    timeZone: teacher.timezone,
+  });
+  const dedupeKey = `manual_lesson_reminder_${lesson.id}_${formatDedupeTimeKey(new Date(), teacher.timezone)}`;
+  const result = await sendStudentLessonReminderManual({
+    studentId: lesson.studentId,
+    lessonId: lesson.id,
+    text,
+    scheduledFor: new Date(),
+    dedupeKey,
+  });
+
+  if (result.status === 'sent') {
+    return { status: 'sent' as const };
+  }
+
+  if (result.status === 'skipped') {
+    if (result.reason === 'student_not_activated') {
+      throw new Error('student_not_activated');
+    }
+    if (result.reason === 'notifications_disabled') {
+      throw new Error('notifications_disabled');
+    }
+    throw new Error('reminder_skipped');
+  }
+
+  throw new Error(result.error ?? 'reminder_failed');
 };
 
 const listUnpaidLessons = async (user: User) => {
@@ -3585,6 +3662,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       });
     }
 
+    if (req.method === 'GET' && pathname === '/api/dashboard/summary') {
+      const data = await getDashboardSummary(requireApiUser());
+      return sendJson(res, 200, data);
+    }
+
     if (req.method === 'GET' && pathname === '/api/settings') {
       const data = await getSettings(requireApiUser());
       return sendJson(res, 200, data);
@@ -3902,6 +3984,16 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         Boolean((body as any)?.writeOffBalance),
       );
       return sendJson(res, 200, { participant: result.participant, lesson: result.lesson, link: result.link });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/reminders/lesson') {
+      const body = await readBody(req);
+      const lessonId = Number((body as any)?.lessonId);
+      const template = (body as any)?.template;
+      if (!Number.isFinite(lessonId)) return badRequest(res, 'invalid_lesson_id');
+      if (!isOnboardingReminderTemplate(template)) return badRequest(res, 'invalid_template');
+      const result = await sendLessonReminder(requireApiUser(), { lessonId, template });
+      return sendJson(res, 200, result);
     }
 
     const remindMatch = pathname.match(/^\/api\/reminders\/homework$/);

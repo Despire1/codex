@@ -1,0 +1,25 @@
+.bubble {
+  position: fixed;
+  width: 260px;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 18px 40px var(--shadow-slate-900-14);
+  z-index: 60;
+}
+
+.message {
+  font-size: 13px;
+  color: var(--color-slate-700);
+  margin-bottom: 10px;
+}
+
+.close {
+  border: none;
+  background: none;
+  color: var(--color-blue-700);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}

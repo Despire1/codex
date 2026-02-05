@@ -1,22 +1,13 @@
 import { type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import {
-  HomeworkStatus,
-  Lesson,
-  LessonDateRange,
-  LessonPaymentFilter,
-  LessonSortOrder,
-  LessonStatusFilter,
-  LinkedStudent,
-  Teacher,
-  UnpaidLessonEntry,
-} from '../../entities/types';
-import { DashboardSection } from '../../widgets/dashboard/DashboardSection';
+import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
+import { DashboardHome } from '../../widgets/dashboard/DashboardHome';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
 import { SettingsSection } from '../../widgets/settings/SettingsSection';
 import { StudentsSection } from '../../widgets/students/StudentsSection';
 import { type StudentTabId } from '../../widgets/students/types';
 import { tabPathById } from '../tabs';
+import type { DashboardSummary } from '../../shared/api/client';
 
 interface AppRoutesProps {
   resolveLastVisitedPath: () => string;
@@ -24,8 +15,6 @@ interface AppRoutesProps {
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
     teacher: Teacher;
-    unpaidEntries: UnpaidLessonEntry[];
-    onWeekRangeChange?: (start: Date, end: Date) => void;
     onAddStudent: () => void;
     onCreateLesson: (date?: Date) => void;
     onOpenSchedule: () => void;
@@ -33,24 +22,15 @@ interface AppRoutesProps {
     onOpenLessonDay: (lesson: Lesson) => void;
     onOpenStudent: (studentId: number) => void;
   };
+  dashboardSummary: {
+    summary: DashboardSummary | null;
+    isLoading: boolean;
+    refresh: () => void;
+  };
   students: {
     hasAccess: boolean;
     teacher: Teacher;
     lessons: Lesson[];
-    homeworkFilter: 'all' | HomeworkStatus | 'overdue';
-    onHomeworkFilterChange: (filter: 'all' | HomeworkStatus | 'overdue') => void;
-    lessonPaymentFilter: LessonPaymentFilter;
-    lessonStatusFilter: LessonStatusFilter;
-    lessonDateRange: LessonDateRange;
-    lessonSortOrder: LessonSortOrder;
-    onLessonPaymentFilterChange: (filter: LessonPaymentFilter) => void;
-    onLessonStatusFilterChange: (filter: LessonStatusFilter) => void;
-    onLessonDateRangeChange: (range: LessonDateRange) => void;
-    onLessonSortOrderChange: (order: LessonSortOrder) => void;
-    paymentFilter: 'all' | 'topup' | 'charges' | 'manual';
-    paymentDate: string;
-    onPaymentFilterChange: (filter: 'all' | 'topup' | 'charges' | 'manual') => void;
-    onPaymentDateChange: (date: string) => void;
     onActiveTabChange?: (tab: StudentTabId) => void;
     studentListReloadKey: number;
   };
@@ -68,6 +48,7 @@ interface AppRoutesProps {
 export const AppRoutes: FC<AppRoutesProps> = ({
   resolveLastVisitedPath,
   dashboard,
+  dashboardSummary,
   students,
   schedule,
   settings,
@@ -75,7 +56,10 @@ export const AppRoutes: FC<AppRoutesProps> = ({
   return (
     <Routes>
       <Route path="/" element={<Navigate to={resolveLastVisitedPath()} replace />} />
-      <Route path={tabPathById.dashboard} element={<DashboardSection {...dashboard} />} />
+      <Route
+        path={tabPathById.dashboard}
+        element={<DashboardHome {...dashboard} dashboardSummary={dashboardSummary} />}
+      />
       <Route path={tabPathById.students} element={<StudentsSection {...students} />} />
       <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
       <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />

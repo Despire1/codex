@@ -2,6 +2,7 @@ import { type FC } from 'react';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './StudentModal.module.css';
 import modalStyles from '../modal.module.css';
+import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 
 interface StudentModalProps {
   open: boolean;
@@ -10,6 +11,7 @@ interface StudentModalProps {
   isEditing: boolean;
   onDraftChange: (draft: { customName: string; username: string; pricePerLesson: string }) => void;
   onSubmit: () => void;
+  variant?: 'modal' | 'sheet';
 }
 
 export const StudentModal: FC<StudentModalProps> = ({
@@ -19,12 +21,15 @@ export const StudentModal: FC<StudentModalProps> = ({
   isEditing,
   onDraftChange,
   onSubmit,
+  variant = 'modal',
 }) => {
   if (!open) return null;
 
-  return (
-    <div className={modalStyles.modalOverlay} onClick={onClose}>
-      <div className={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
+  const modalContent = (
+    <div
+      className={`${modalStyles.modal} ${variant === 'sheet' ? styles.sheetModal : ''}`}
+      onClick={(e) => e.stopPropagation()}
+    >
         <div className={modalStyles.modalHeader}>
           <div>
             <div className={modalStyles.modalLabel}>
@@ -105,6 +110,19 @@ export const StudentModal: FC<StudentModalProps> = ({
           </button>
         </div>
       </div>
+  );
+
+  if (variant === 'sheet') {
+    return (
+      <BottomSheet isOpen={open} onClose={onClose}>
+        {modalContent}
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <div className={modalStyles.modalOverlay} onClick={onClose}>
+      {modalContent}
     </div>
   );
 };

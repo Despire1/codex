@@ -68,6 +68,7 @@ export const AppModals: FC<AppModalsProps> = ({
 }) => {
   const {
     studentModalOpen,
+    studentModalVariant,
     newStudentDraft,
     isEditingStudent,
     setStudentDraft,
@@ -76,6 +77,7 @@ export const AppModals: FC<AppModalsProps> = ({
   } = useStudentsActions();
   const {
     lessonModalOpen,
+    lessonModalVariant,
     lessonDraft,
     editingLessonId,
     recurrenceLocked,
@@ -90,6 +92,7 @@ export const AppModals: FC<AppModalsProps> = ({
     <>
       <StudentModal
         open={studentModalOpen}
+        variant={studentModalVariant}
         onClose={closeStudentModal}
         draft={newStudentDraft}
         isEditing={isEditingStudent}
@@ -99,6 +102,7 @@ export const AppModals: FC<AppModalsProps> = ({
 
       <LessonModal
         open={lessonModalOpen}
+        variant={lessonModalVariant}
         onClose={closeLessonModal}
         editingLessonId={editingLessonId}
         defaultDuration={defaultLessonDuration}

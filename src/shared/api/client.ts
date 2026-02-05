@@ -17,6 +17,7 @@ import {
   TeacherStudent,
   UnpaidLessonEntry,
 } from '../../entities/types';
+import { type OnboardingReminderTemplate } from '../lib/onboardingReminder';
 
 type SettingsPayload = Pick<
   Teacher,
@@ -54,6 +55,14 @@ export type SessionUser = {
   subscriptionEndAt?: string | null;
   role?: string;
   photoUrl?: string | null;
+};
+
+export type DashboardSummary = {
+  studentsCount: number;
+  lessonsCount: number;
+  telegramConnected: boolean;
+  timezone: string | null;
+  teacherId: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -115,6 +124,7 @@ export const api = {
       lessons: Lesson[];
     }>(path);
   },
+  getDashboardSummary: () => apiFetch<DashboardSummary>('/api/dashboard/summary'),
   listLessonsForRange: (payload: { start: string; end: string }) => {
     const search = new URLSearchParams({
       start: payload.start,
@@ -281,6 +291,11 @@ export const api = {
     apiFetch<{ status: string; studentId: number; teacherId: number }>('/api/reminders/homework', {
       method: 'POST',
       body: JSON.stringify({ studentId }),
+    }),
+  sendLessonReminder: (payload: { lessonId: number; template: OnboardingReminderTemplate }) =>
+    apiFetch<{ status: 'sent' }>('/api/reminders/lesson', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
   searchStudents: (params: { query?: string; filter?: 'all' | 'pendingHomework' | 'noReminder' }) => {
     const query = new URLSearchParams();

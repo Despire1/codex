@@ -44,6 +44,15 @@ type OpenRecurringDeleteDialogOptions = {
   onCancel?: () => void;
 };
 
+export type LessonActionSource = 'default' | 'onboarding_hero' | 'onboarding_stepper' | 'onboarding_quick_action';
+export type ModalVariant = 'modal' | 'sheet';
+
+type LessonModalContext = {
+  source: LessonActionSource;
+  variant: ModalVariant;
+  skipNavigation: boolean;
+};
+
 export type LessonActionsConfig = {
   timeZone: string;
   teacherDefaultLessonDuration: number;
@@ -83,21 +92,33 @@ export type LessonActionsConfig = {
   refreshPaymentReminders: (studentId: number) => Promise<void>;
   triggerStudentsListReload: () => void;
   studentDebtItems: StudentDebtItem[];
+  onLessonCreateStarted?: (source: LessonActionSource) => void;
+  onLessonCreated?: (payload: { lesson: Lesson; source: LessonActionSource }) => void;
+  onLessonCreateError?: (error: unknown, source: LessonActionSource) => void;
 };
 
 export type LessonActionsContextValue = {
   lessonModalOpen: boolean;
+  lessonModalVariant: ModalVariant;
   lessonDraft: LessonDraft;
   editingLessonId: number | null;
   recurrenceLocked: boolean;
   defaultLessonDuration: number;
-  openLessonModal: (dateISO: string, time?: string, existing?: Lesson) => void;
+  openLessonModal: (
+    dateISO: string,
+    time?: string,
+    existing?: Lesson,
+    options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+  ) => void;
   closeLessonModal: () => void;
   setLessonDraft: (draft: LessonDraft) => void;
   saveLesson: (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => void;
   requestDeleteLesson: () => void;
   startEditLesson: (lesson: Lesson) => void;
-  openCreateLessonForStudent: (studentId?: number) => void;
+  openCreateLessonForStudent: (
+    studentId?: number,
+    options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+  ) => void;
   requestDeleteLessonFromList: (lesson: Lesson) => void;
   markLessonCompleted: (lessonId: number) => Promise<void>;
   updateLessonStatus: (lessonId: number, status: Lesson['status']) => Promise<void>;
@@ -169,6 +190,9 @@ export const useLessonActionsInternal = ({
   refreshPaymentReminders,
   triggerStudentsListReload,
   studentDebtItems,
+  onLessonCreateStarted,
+  onLessonCreated,
+  onLessonCreateError,
 }: LessonActionsConfig): LessonActionsContextValue => {
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
   const [lessonDraft, setLessonDraft] = useState<LessonDraft>(() =>
@@ -176,6 +200,11 @@ export const useLessonActionsInternal = ({
   );
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
+  const [lessonModalContext, setLessonModalContext] = useState<LessonModalContext>({
+    source: 'default',
+    variant: 'modal',
+    skipNavigation: false,
+  });
 
   useEffect(() => {
     setLessonDraft((draft) => ({
@@ -191,7 +220,18 @@ export const useLessonActionsInternal = ({
   }, [selectedStudentId]);
 
   const openLessonModal = useCallback(
-    (dateISO: string, time?: string, existing?: Lesson) => {
+    (
+      dateISO: string,
+      time?: string,
+      existing?: Lesson,
+      options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+    ) => {
+      const nextContext: LessonModalContext = {
+        source: options?.source ?? 'default',
+        variant: options?.variant ?? 'modal',
+        skipNavigation: options?.skipNavigation ?? false,
+      };
+      setLessonModalContext(nextContext);
       const startDate = existing ? toZonedDate(existing.startAt, timeZone) : undefined;
       const derivedDay = startDate ? startDate.getDay() : undefined;
       const recurrenceWeekdays =
@@ -239,7 +279,9 @@ export const useLessonActionsInternal = ({
       setEditingLessonId(existing?.id ?? null);
       setEditingLessonOriginal(existing ?? null);
       setLessonModalOpen(true);
-      navigateToSchedule();
+      if (!nextContext.skipNavigation) {
+        navigateToSchedule();
+      }
       setDayViewDate(toZonedDate(toUtcDateFromDate(dateISO, timeZone), timeZone));
     },
     [navigateToSchedule, selectedStudentId, setDayViewDate, teacherDefaultLessonDuration, timeZone],
@@ -249,6 +291,7 @@ export const useLessonActionsInternal = ({
     setLessonModalOpen(false);
     setEditingLessonId(null);
     setEditingLessonOriginal(null);
+    setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false });
     setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   }, []);
 
@@ -338,6 +381,11 @@ export const useLessonActionsInternal = ({
       const startAt = startAtDate.toISOString();
       const meetingLinkPayload = normalizeMeetingLinkInput(lessonDraft.meetingLink ?? '');
       const meetingLink = meetingLinkPayload ? meetingLinkPayload : null;
+
+      const isOnboardingSource = lessonModalContext.source.startsWith('onboarding');
+      if (!editingLessonId) {
+        onLessonCreateStarted?.(lessonModalContext.source);
+      }
 
       try {
         if (editingLessonId) {
@@ -447,6 +495,12 @@ export const useLessonActionsInternal = ({
             });
             return next;
           });
+          if (!editingLessonId && normalized.length > 0) {
+            onLessonCreated?.({ lesson: normalized[0], source: lessonModalContext.source });
+            if (isOnboardingSource) {
+              showToast({ message: 'Занятие создано. Теперь напоминание 🔔', variant: 'success' });
+            }
+          }
         } else {
           const data = await api.createLesson({
             studentIds: lessonDraft.studentIds,
@@ -463,19 +517,30 @@ export const useLessonActionsInternal = ({
             }
             return [...prev, normalizedLesson];
           });
+          if (!editingLessonId) {
+            onLessonCreated?.({ lesson: normalizedLesson, source: lessonModalContext.source });
+            if (isOnboardingSource) {
+              showToast({ message: 'Занятие создано. Теперь напоминание 🔔', variant: 'success' });
+            }
+          }
         }
 
         await loadStudentLessons();
         await loadStudentLessonsSummary();
         setLessonModalOpen(false);
         setEditingLessonId(null);
-        navigateToSchedule();
+        if (!lessonModalContext.skipNavigation) {
+          navigateToSchedule();
+        }
         setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось создать урок';
         showInfoDialog('Ошибка', message);
         // eslint-disable-next-line no-console
         console.error('Failed to create lesson', error);
+        if (!editingLessonId) {
+          onLessonCreateError?.(error, lessonModalContext.source);
+        }
       }
     },
     [
@@ -487,8 +552,13 @@ export const useLessonActionsInternal = ({
       loadStudentLessons,
       loadStudentLessonsSummary,
       navigateToSchedule,
+      onLessonCreateError,
+      onLessonCreateStarted,
+      onLessonCreated,
       openConfirmDialog,
       showInfoDialog,
+      showToast,
+      lessonModalContext,
       timeZone,
       updateLessonsForCurrentRange,
     ],
@@ -504,7 +574,7 @@ export const useLessonActionsInternal = ({
   );
 
   const openCreateLessonForStudent = useCallback(
-    (studentId?: number) => {
+    (studentId?: number, options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean }) => {
       const targetDate = lessonDraft.date || todayISO(timeZone);
       if (studentId) {
         setSelectedStudentId((prev) => prev ?? studentId);
@@ -514,7 +584,7 @@ export const useLessonActionsInternal = ({
           studentIds: [studentId],
         }));
       }
-      openLessonModal(targetDate, lessonDraft.time);
+      openLessonModal(targetDate, lessonDraft.time, undefined, options);
     },
     [lessonDraft.date, lessonDraft.time, openLessonModal, setSelectedStudentId, timeZone],
   );
@@ -896,6 +966,7 @@ export const useLessonActionsInternal = ({
   return useMemo(
     () => ({
       lessonModalOpen,
+      lessonModalVariant: lessonModalContext.variant,
       lessonDraft,
       editingLessonId,
       recurrenceLocked: Boolean(editingLessonOriginal?.isRecurring),
@@ -919,6 +990,7 @@ export const useLessonActionsInternal = ({
       editingLessonOriginal?.isRecurring,
       handleLessonDraftChange,
       lessonDraft,
+      lessonModalContext.variant,
       lessonModalOpen,
       openCreateLessonForStudent,
       openLessonModal,

@@ -1,0 +1,107 @@
+.card {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fef9f0 0%, #eef5ff 60%, #f2fbff 100%);
+  border: 1px solid var(--color-slate-200);
+  box-shadow: 0 18px 40px var(--shadow-slate-900-08);
+  overflow: hidden;
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
+}
+
+.illustration {
+  position: absolute;
+  inset: -60px auto auto -40px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(37, 99, 235, 0.16), transparent 70%);
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.stepBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-blue-700);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.title {
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--color-slate-600);
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.primaryButton {
+  min-width: 220px;
+}
+
+.primaryButtonHighlight {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2), 0 14px 30px var(--shadow-blue-600-18);
+  animation: coachmarkPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes coachmarkPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.22), 0 14px 30px var(--shadow-blue-600-18);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0), 0 14px 30px var(--shadow-blue-600-18);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0), 0 14px 30px var(--shadow-blue-600-18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButtonHighlight {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .card {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+}
