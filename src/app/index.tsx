@@ -5,6 +5,7 @@ import { App } from './App';
 import { AppProviders } from './providers';
 import { store } from './providers/StoreProvider/config/store';
 import './styles/global.css';
+import './styles/safe-area.css';
 
 const container = document.getElementById('root');
 

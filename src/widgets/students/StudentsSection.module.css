@@ -2612,7 +2612,7 @@
     border-left: none;
     border-top: 1px solid var(--color-slate-200);
     box-shadow: 0 -10px 36px var(--shadow-slate-900-18);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: 0;
   }
 
   .drawerOpen {

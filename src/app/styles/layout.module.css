@@ -1,5 +1,5 @@
 .page {
-  height: 100vh;
+  height: var(--app-vh, 100vh);
   background: linear-gradient(180deg, var(--color-sky-50) 0%, var(--color-sky-80) 100%);
   color: var(--color-slate-900);
   display: flex;

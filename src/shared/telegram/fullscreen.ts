@@ -1,20 +1,5 @@
-type TelegramWebApp = {
-  ready: () => void;
-  expand: () => void;
-  requestFullscreen?: () => void;
-  onEvent?: (event: string, handler: (payload?: unknown) => void) => void;
-  isFullscreen?: boolean;
-  platform?: string;
-};
-
-type TelegramWindow = Window & {
-  Telegram?: {
-    WebApp?: TelegramWebApp;
-  };
-  analytics?: {
-    track?: (event: string, payload?: Record<string, unknown>) => void;
-  };
-};
+import { isDesktopPlatform, isMobilePlatform } from './platform';
+import { type TelegramWindow } from './types';
 
 const isDev = import.meta.env.DEV;
 
@@ -72,12 +57,12 @@ const warnDev = (message: string, payload?: unknown) => {
   }
 };
 
-const isDesktopPlatform = (platform?: string) => {
-  if (!platform) {
-    return false;
+const setBodyFlag = (className: string, enabled: boolean) => {
+  if (typeof document === 'undefined') {
+    return;
   }
 
-  return ['tdesktop', 'macos', 'windows', 'linux'].includes(platform);
+  document.body.classList.toggle(className, enabled);
 };
 
 export const initTelegramFullscreen = () => {
@@ -87,17 +72,29 @@ export const initTelegramFullscreen = () => {
     return;
   }
 
+  const isMobile = isMobilePlatform(tg.platform);
+  const isDesktop = isDesktopPlatform(tg.platform);
+
   tg.ready();
   tg.expand();
+  if (isMobile && typeof tg.disableVerticalSwipes === 'function') {
+    try {
+      tg.disableVerticalSwipes();
+    } catch (error) {
+      warnDev('Telegram disableVerticalSwipes failed', { error });
+    }
+  }
 
   const handleFullscreenChanged = () => {
     const isFullscreen = Boolean(tg.isFullscreen);
+    setBodyFlag('tg-fullscreen', isFullscreen);
     trackEvent('tg_fullscreen_changed', { isFullscreen });
     logDev('Telegram fullscreen state changed', { isFullscreen });
   };
 
   const handleFullscreenFailed = (reason?: unknown) => {
     const normalizedReason = normalizeReason(reason);
+    setBodyFlag('tg-fullscreen', false);
     trackEvent('tg_fullscreen_failed', { reason: normalizedReason });
     warnDev('Telegram fullscreen request failed', { reason: normalizedReason });
     tg.expand();
@@ -108,11 +105,21 @@ export const initTelegramFullscreen = () => {
     tg.onEvent('fullscreenFailed', handleFullscreenFailed);
   }
 
-  if (typeof tg.requestFullscreen === 'function' && isDesktopPlatform(tg.platform)) {
+  setBodyFlag('tg-fullscreen', Boolean(tg.isFullscreen));
+
+  if ((isMobile || isDesktop) && typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
     try {
       tg.requestFullscreen();
     } catch (error) {
       handleFullscreenFailed(error);
     }
   }
+
+  return () => {
+    if (typeof tg.offEvent === 'function') {
+      tg.offEvent('fullscreenChanged', handleFullscreenChanged);
+      tg.offEvent('fullscreenFailed', handleFullscreenFailed);
+    }
+    setBodyFlag('tg-fullscreen', false);
+  };
 };

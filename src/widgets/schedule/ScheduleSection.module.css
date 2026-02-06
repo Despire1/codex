@@ -630,7 +630,7 @@
   z-index: 30;
   overflow: hidden;
   display: none;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  padding-bottom: 4px;
   max-height: 80vh;
   will-change: transform, height;
   contain: layout paint;

@@ -382,6 +382,11 @@ const AppPageContent = () => {
   const onboardingState = useOnboardingStateInternal({
     teacherId: dashboardSummaryData?.teacherId ?? null,
     isZero: Boolean(isZeroSummary),
+    students,
+    links,
+    lessons,
+    studentsCount: dashboardSummaryData?.studentsCount ?? null,
+    lessonsCount: dashboardSummaryData?.lessonsCount ?? null,
   });
 
   const track = useCallback(
@@ -541,11 +546,13 @@ const AppPageContent = () => {
 
   if (isStudentRole) {
     return (
-      <div className={layoutStyles.page}>
-        <div className={layoutStyles.pageInner}>
-          <main className={layoutStyles.content}>
-            <StudentRoleNotice />
-          </main>
+      <div id="app" className={`${layoutStyles.page} app-content`}>
+        <div className="app-surface">
+          <div className={layoutStyles.pageInner}>
+            <main className={layoutStyles.content}>
+              <StudentRoleNotice />
+            </main>
+          </div>
         </div>
       </div>
     );
@@ -563,8 +570,9 @@ const AppPageContent = () => {
                 <OnboardingStateProvider value={onboardingState}>
                   <ScheduleStateProvider value={scheduleState}>
                     <TimeZoneProvider timeZone={resolvedTimeZone}>
-                <div className={layoutStyles.page}>
-                  <div className={layoutStyles.pageInner}>
+                <div id="app" className={`${layoutStyles.page} app-content`}>
+                  <div className="app-surface">
+                    <div className={layoutStyles.pageInner}>
                     <Topbar
                       teacher={teacher}
                       activeTab={activeTab}
@@ -645,9 +653,10 @@ const AppPageContent = () => {
                         }}
                       />
                     </main>
-                  </div>
+                    </div>
 
-                  <Tabbar activeTab={activeTab} onTabChange={(tab) => guardedNavigate(tabPathById[tab])} />
+                    <Tabbar activeTab={activeTab} onTabChange={(tab) => guardedNavigate(tabPathById[tab])} />
+                  </div>
 
                   <AppModals
                     linkedStudents={linkedStudents}

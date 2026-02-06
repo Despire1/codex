@@ -133,6 +133,21 @@ const sendWebAppMessage = async (chatId: number, messageId?: number) => {
   });
 };
 
+const ensureChatMenuButton = async () => {
+  try {
+    await callTelegram('setChatMenuButton', {
+      menu_button: {
+        type: 'web_app',
+        text: 'Открыть',
+        web_app: { url: TELEGRAM_WEBAPP_URL },
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[telegram-bot] setChatMenuButton failed: ${message}`);
+  }
+};
+
 const sendSupportMessage = async (chatId: number) => {
   await callTelegram('sendMessage', {
     chat_id: chatId,
@@ -1029,6 +1044,7 @@ const clearWebhook = async () => {
 const startPolling = async () => {
   ensureEnv();
   await clearWebhook();
+  await ensureChatMenuButton();
   let offset = 0;
 
   // eslint-disable-next-line no-constant-condition

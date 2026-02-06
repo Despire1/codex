@@ -10,7 +10,7 @@ export const SessionFallback: FC<SessionFallbackProps> = ({ state }) => {
 
   if (state === 'checking') {
     return (
-      <div className={styles.container}>
+      <div id="app" className={`${styles.container} app-content`}>
         <div className={styles.card}>
           <h1>Подключаемся…</h1>
           <p>{isLocalAuthBypass ? 'Проверяем локальный доступ.' : 'Проверяем доступ через Telegram.'}</p>
@@ -20,7 +20,7 @@ export const SessionFallback: FC<SessionFallbackProps> = ({ state }) => {
   }
 
   return (
-    <div className={styles.container}>
+    <div id="app" className={`${styles.container} app-content`}>
       <div className={styles.card}>
         {isLocalAuthBypass ? (
           <>
