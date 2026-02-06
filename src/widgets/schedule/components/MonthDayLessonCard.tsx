@@ -5,11 +5,7 @@ import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopo
 import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
-import {
-  buildParticipants,
-  getLessonLabel,
-  resolveLessonPaid,
-} from '../lib/lessonCardDetails';
+import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../entities/lesson/lib/lessonDetails';
 import styles from './MonthDayLessonCard.module.css';
 
 interface MonthDayLessonCardProps {
@@ -24,6 +20,8 @@ interface MonthDayLessonCardProps {
   onCloseActions: () => void;
   onDelete: () => void;
   onReschedule: () => void;
+  onCancel: () => void;
+  onRestore: () => void;
   onOpenMeetingLink: (event: MouseEvent<HTMLButtonElement>, meetingLink: string) => void;
 }
 
@@ -39,6 +37,8 @@ export const MonthDayLessonCard = ({
   onCloseActions,
   onDelete,
   onReschedule,
+  onCancel,
+  onRestore,
   onOpenMeetingLink,
 }: MonthDayLessonCardProps) => {
   const participants = buildParticipants(lesson, linkedStudentsById);
@@ -86,28 +86,56 @@ export const MonthDayLessonCard = ({
                 }
               >
                 <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lesson.id}`}>
-                  <button
-                    type="button"
-                    className={styles.actionItem}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onReschedule();
-                      onCloseActions();
-                    }}
-                  >
-                    Перенести занятие
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.actionItem}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onEdit();
-                      onCloseActions();
-                    }}
-                  >
-                    Редактировать
-                  </button>
+                  {!isCanceled && (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.actionItem}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onReschedule();
+                          onCloseActions();
+                        }}
+                      >
+                        Перенести занятие
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionItem}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit();
+                          onCloseActions();
+                        }}
+                      >
+                        Редактировать
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionItem}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onCancel();
+                          onCloseActions();
+                        }}
+                      >
+                        Отменить
+                      </button>
+                    </>
+                  )}
+                  {isCanceled && (
+                    <button
+                      type="button"
+                      className={styles.actionItem}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRestore();
+                        onCloseActions();
+                      }}
+                    >
+                      Восстановить
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.actionItem} ${styles.actionDanger}`}
@@ -122,16 +150,19 @@ export const MonthDayLessonCard = ({
                 </div>
               </AdaptivePopover>
             </div>
-            {lesson.meetingLink && (
+            {(lesson.meetingLink || isCanceled) && (
               <div className={styles.metaRow}>
-                <button
-                  type="button"
-                  className={styles.linkBadge}
-                  onClick={(event) => onOpenMeetingLink(event, lesson.meetingLink as string)}
-                >
-                  <MeetingLinkIcon className={styles.linkIcon} />
-                  Ссылка
-                </button>
+                {lesson.meetingLink && (
+                  <button
+                    type="button"
+                    className={styles.linkBadge}
+                    onClick={(event) => onOpenMeetingLink(event, lesson.meetingLink as string)}
+                  >
+                    <MeetingLinkIcon className={styles.linkIcon} />
+                    Ссылка
+                  </button>
+                )}
+                {isCanceled && <span className={`${styles.linkBadge} ${styles.canceledBadge}`}>Отменено</span>}
               </div>
             )}
             <div className={styles.divider} />

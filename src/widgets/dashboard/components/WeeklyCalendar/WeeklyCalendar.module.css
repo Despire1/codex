@@ -82,6 +82,8 @@
   border-radius: 14px;
   padding: 12px 10px;
   min-height: 140px;
+  display: flex;
+  flex-direction: column;
 }
 
 .dayCardInteractive {
@@ -112,29 +114,27 @@
 
 .lessonList {
   display: grid;
-  gap: 8px;
+  gap: var(--lesson-row-gap, 8px);
+  min-height: var(--lesson-list-min-height, 0);
+  grid-auto-rows: var(--lesson-row-height, auto);
+  align-content: start;
 }
 
-.lesson {
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  background: var(--lesson-bg, var(--color-slate-100));
-  border: 1px solid var(--lesson-border, var(--color-slate-200));
-  color: var(--lesson-text, var(--color-slate-600));
-  text-align: center;
-  cursor: pointer;
-}
-
-.lessonTime {
+.moreButton {
+  border: 1px dashed var(--color-slate-300);
+  background: var(--color-slate-50);
+  border-radius: 999px;
+  padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
+  color: var(--color-slate-600);
+  cursor: pointer;
+  justify-self: center;
 }
 
-.lessonStudent {
-  font-size: 10px;
-  font-weight: 500;
+.moreButton:hover {
+  border-color: var(--color-slate-400);
+  background: var(--color-slate-100);
 }
 
 .emptyState {

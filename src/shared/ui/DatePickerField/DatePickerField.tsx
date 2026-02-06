@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type Ref, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
@@ -17,6 +17,7 @@ interface DatePickerFieldProps {
   className?: string;
   allowClear?: boolean;
   disabled?: boolean;
+  buttonRef?: Ref<HTMLButtonElement>;
 }
 
 export const DatePickerField = ({
@@ -28,6 +29,7 @@ export const DatePickerField = ({
   className,
   allowClear = false,
   disabled = false,
+  buttonRef,
 }: DatePickerFieldProps) => {
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
@@ -144,6 +146,16 @@ export const DatePickerField = ({
     )
     : null;
 
+  const setControlRef = (node: HTMLButtonElement | null) => {
+    controlRef.current = node;
+    if (!buttonRef) return;
+    if (typeof buttonRef === 'function') {
+      buttonRef(node);
+    } else {
+      buttonRef.current = node;
+    }
+  };
+
   return (
     <div className={`${styles.field} ${className ?? ''}`} ref={ref}>
       {label && <span className={styles.label}>{label}</span>}
@@ -154,7 +166,7 @@ export const DatePickerField = ({
           onClick={() => !disabled && setOpen((prev) => !prev)}
           aria-label={label ? `${label}. ${displayValue}` : displayValue}
           disabled={disabled}
-          ref={controlRef}
+          ref={setControlRef}
         >
           <span className={styles.value}>{displayValue}</span>
           <span aria-hidden className={styles.icon}>

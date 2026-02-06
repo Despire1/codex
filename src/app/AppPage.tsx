@@ -601,12 +601,13 @@ const AppPageContent = () => {
                               setMonthAnchor(startOfMonth(lessonDate));
                               setMonthOffset(0);
                               setSelectedMonthDay(lessonIso);
-                              guardedNavigate(tabPathById.schedule);
                             }
 
                             lessonActions.openLessonModal(
                               lessonIso,
                               date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+                              undefined,
+                              { skipNavigation: true },
                             );
                           },
                           onOpenSchedule: () => guardedNavigate(tabPathById.schedule),
@@ -615,6 +616,7 @@ const AppPageContent = () => {
                               formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
                               undefined,
                               lesson,
+                              { skipNavigation: true },
                             ),
                           onOpenLessonDay: (lesson) => {
                             const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);

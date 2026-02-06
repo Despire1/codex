@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { addYears, format } from 'date-fns';
+import { addMinutes, addYears, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { api } from '../../../shared/api/client';
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
@@ -24,6 +24,7 @@ import {
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
 import { Lesson, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
+import type { LessonCancelRefundMode, LessonModalFocus, LessonSeriesScope, RescheduleDraft } from './types';
 import { type LessonDraft } from '../../modals/LessonModal/LessonModal';
 import { type ToastOptions } from '../../../shared/lib/toast';
 
@@ -51,6 +52,7 @@ type LessonModalContext = {
   source: LessonActionSource;
   variant: ModalVariant;
   skipNavigation: boolean;
+  focus: LessonModalFocus;
 };
 
 export type LessonActionsConfig = {
@@ -104,19 +106,27 @@ export type LessonActionsConfig = {
 export type LessonActionsContextValue = {
   lessonModalOpen: boolean;
   lessonModalVariant: ModalVariant;
+  lessonModalFocus: LessonModalFocus;
   lessonDraft: LessonDraft;
   editingLessonId: number | null;
   recurrenceLocked: boolean;
   defaultLessonDuration: number;
+  rescheduleModalOpen: boolean;
+  rescheduleDraft: RescheduleDraft;
+  rescheduleLesson: Lesson | null;
   openLessonModal: (
     dateISO: string,
     time?: string,
     existing?: Lesson,
-    options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+    options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean; focus?: LessonModalFocus },
   ) => void;
+  openRescheduleModal: (lesson: Lesson, options?: { skipNavigation?: boolean }) => void;
   closeLessonModal: () => void;
+  closeRescheduleModal: () => void;
   setLessonDraft: (draft: LessonDraft) => void;
+  setRescheduleDraft: (draft: RescheduleDraft) => void;
   saveLesson: (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => void;
+  saveRescheduleLesson: () => void;
   requestDeleteLesson: () => void;
   startEditLesson: (lesson: Lesson) => void;
   openCreateLessonForStudent: (
@@ -132,6 +142,23 @@ export type LessonActionsContextValue = {
     studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
+  shiftLessonTime: (lesson: Lesson, minutes: number, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => Promise<void>;
+  cancelLesson: (
+    lesson: Lesson,
+    scope: LessonSeriesScope,
+    refundMode?: LessonCancelRefundMode,
+    options?: { skipToast?: boolean },
+  ) => Promise<void>;
+  restoreLesson: (lesson: Lesson, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => Promise<void>;
+  rescheduleScopePending: {
+    lesson: Lesson;
+    startAt: string;
+    durationMinutes: number;
+    previousStartAt: string;
+    previousDuration: number;
+  } | null;
+  confirmRescheduleScope: (scope: LessonSeriesScope) => void;
+  cancelRescheduleScope: () => void;
 };
 
 const LessonActionsContext = createContext<LessonActionsContextValue | null>(null);
@@ -204,10 +231,25 @@ export const useLessonActionsInternal = ({
   );
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleLesson, setRescheduleLesson] = useState<Lesson | null>(null);
+  const [rescheduleDraft, setRescheduleDraft] = useState<RescheduleDraft>({
+    date: '',
+    time: '',
+    endTime: '',
+  });
+  const [rescheduleScopePending, setRescheduleScopePending] = useState<{
+    lesson: Lesson;
+    startAt: string;
+    durationMinutes: number;
+    previousStartAt: string;
+    previousDuration: number;
+  } | null>(null);
   const [lessonModalContext, setLessonModalContext] = useState<LessonModalContext>({
     source: 'default',
     variant: 'modal',
     skipNavigation: false,
+    focus: 'full',
   });
 
   useEffect(() => {
@@ -228,12 +270,13 @@ export const useLessonActionsInternal = ({
       dateISO: string,
       time?: string,
       existing?: Lesson,
-      options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+      options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean; focus?: LessonModalFocus },
     ) => {
       const nextContext: LessonModalContext = {
         source: options?.source ?? 'default',
         variant: options?.variant ?? 'modal',
         skipNavigation: options?.skipNavigation ?? false,
+        focus: options?.focus ?? 'full',
       };
       setLessonModalContext(nextContext);
       const startDate = existing ? toZonedDate(existing.startAt, timeZone) : undefined;
@@ -291,17 +334,107 @@ export const useLessonActionsInternal = ({
     [navigateToSchedule, selectedStudentId, setDayViewDate, teacherDefaultLessonDuration, timeZone],
   );
 
+  const openRescheduleModal = useCallback(
+    (lesson: Lesson, options?: { skipNavigation?: boolean }) => {
+      const start = toZonedDate(lesson.startAt, timeZone);
+      const time = format(start, 'HH:mm');
+      const endTime = format(addMinutes(start, lesson.durationMinutes), 'HH:mm');
+      setRescheduleLesson(lesson);
+      setRescheduleDraft({
+        date: format(start, 'yyyy-MM-dd'),
+        time,
+        endTime,
+      });
+      setRescheduleModalOpen(true);
+      if (!options?.skipNavigation) {
+        navigateToSchedule();
+      }
+      setDayViewDate(toZonedDate(toUtcDateFromDate(format(start, 'yyyy-MM-dd'), timeZone), timeZone));
+    },
+    [navigateToSchedule, setDayViewDate, timeZone],
+  );
+
+  const closeRescheduleModal = useCallback(() => {
+    setRescheduleModalOpen(false);
+    setRescheduleLesson(null);
+    setRescheduleDraft({ date: '', time: '', endTime: '' });
+    setRescheduleScopePending(null);
+  }, []);
+
   const closeLessonModal = useCallback(() => {
     setLessonModalOpen(false);
     setEditingLessonId(null);
     setEditingLessonOriginal(null);
-    setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false });
+    setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false, focus: 'full' });
     setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
   }, []);
 
   const handleLessonDraftChange = useCallback((draft: LessonDraft) => {
     setLessonDraft(draft);
   }, []);
+
+  const applyLessonUpdateResult = useCallback(
+    (data: { lesson?: Lesson; lessons?: Lesson[] }, baseLesson?: Lesson | null) => {
+      if (data.lessons && data.lessons.length > 0) {
+        const normalizedLessons = data.lessons.map(normalizeLesson);
+        const groupId = baseLesson?.recurrenceGroupId ?? normalizedLessons[0]?.recurrenceGroupId ?? null;
+        const idsToRemove = !baseLesson?.recurrenceGroupId && baseLesson?.id ? [baseLesson.id] : undefined;
+        removeLessonsFromRanges({
+          ids: idsToRemove,
+          recurrenceGroupId: groupId,
+          startFrom: baseLesson?.recurrenceGroupId ? new Date() : undefined,
+        });
+        syncLessonsInRanges(normalizedLessons);
+        return normalizedLessons;
+      }
+
+      if (data.lesson) {
+        const normalizedLesson = normalizeLesson(data.lesson);
+        const base = lessons.find((lesson) => lesson.id === normalizedLesson.id) ?? baseLesson ?? null;
+        const mergedLesson = base ? { ...base, ...normalizedLesson } : normalizedLesson;
+        syncLessonsInRanges([mergedLesson]);
+        return [mergedLesson];
+      }
+
+      return [];
+    },
+    [lessons, removeLessonsFromRanges, syncLessonsInRanges],
+  );
+
+  const applyLinksUpdate = useCallback(
+    (nextLinks?: TeacherStudent[] | null) => {
+      if (!nextLinks || nextLinks.length === 0) return;
+      setLinks((prev) => {
+        const map = new Map(prev.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
+        nextLinks.forEach((link) => map.set(`${link.teacherId}_${link.studentId}`, link));
+        return Array.from(map.values());
+      });
+      triggerStudentsListReload();
+    },
+    [setLinks, triggerStudentsListReload],
+  );
+
+  const updateLessonTiming = useCallback(
+    async (lesson: Lesson, startAt: string, durationMinutes: number, scope: LessonSeriesScope) => {
+      const applyToSeries = scope === 'SERIES';
+      const data = await api.updateLesson(lesson.id, {
+        startAt,
+        durationMinutes,
+        applyToSeries,
+        detachFromSeries: !applyToSeries && Boolean(lesson.isRecurring),
+      });
+      applyLessonUpdateResult(data, lesson);
+      await loadStudentLessons();
+      await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
+    },
+    [
+      applyLessonUpdateResult,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+    ],
+  );
 
   const performDeleteLesson = useCallback(
     async (applyToSeries: boolean) => {
@@ -402,7 +535,13 @@ export const useLessonActionsInternal = ({
             lessonDraft.repeatWeekdays.length !== originalWeekdays.length ||
             lessonDraft.repeatWeekdays.some((day) => !originalWeekdays.includes(day));
 
-          if (original?.isRecurring && !repeatChanged && options?.applyToSeriesOverride === undefined) {
+          const timeChanged = Boolean(
+            original &&
+              (new Date(original.startAt).getTime() !== new Date(startAt).getTime() ||
+                original.durationMinutes !== durationMinutes),
+          );
+
+          if (original?.isRecurring && !repeatChanged && timeChanged && options?.applyToSeriesOverride === undefined) {
             openConfirmDialog({
               title: 'Изменить только этот урок или всю серию?',
               message:
@@ -442,21 +581,27 @@ export const useLessonActionsInternal = ({
             setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
           }
 
-          if (data.lessons && data.lessons.length > 0) {
-            const normalizedLessons = data.lessons.map(normalizeLesson);
-            const groupId = editingLessonOriginal?.recurrenceGroupId ?? normalizedLessons[0]?.recurrenceGroupId ?? null;
-            const idsToRemove =
-              !editingLessonOriginal?.recurrenceGroupId && editingLessonId ? [editingLessonId] : undefined;
-            removeLessonsFromRanges({
-              ids: idsToRemove,
-              recurrenceGroupId: groupId,
-              startFrom: editingLessonOriginal?.recurrenceGroupId ? new Date() : undefined,
+          applyLessonUpdateResult(data, editingLessonOriginal);
+
+          if (
+            timeChanged &&
+            (lessonModalContext.focus === 'focus_date' || lessonModalContext.focus === 'focus_time') &&
+            original
+          ) {
+            const message = lessonModalContext.focus === 'focus_date' ? 'Урок перенесён' : 'Время изменено';
+            const undoScope: LessonSeriesScope = applyToSeries ? 'SERIES' : 'SINGLE';
+            const undoStartAt = original.startAt;
+            const undoDuration = original.durationMinutes;
+            showToast({
+              message,
+              variant: 'success',
+              actionLabel: 'Отменить',
+              onAction: () => {
+                void updateLessonTiming(original, undoStartAt, undoDuration, undoScope).catch(() => {
+                  showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+                });
+              },
             });
-            syncLessonsInRanges(normalizedLessons);
-          } else if (data.lesson) {
-            const baseLesson = lessons.find((lesson) => lesson.id === editingLessonId);
-            const mergedLesson = baseLesson ? { ...baseLesson, ...data.lesson } : data.lesson;
-            syncLessonsInRanges([mergedLesson]);
           }
         } else if (lessonDraft.isRecurring) {
           if (lessonDraft.repeatWeekdays.length === 0) {
@@ -529,6 +674,7 @@ export const useLessonActionsInternal = ({
     [
       editingLessonId,
       editingLessonOriginal,
+      applyLessonUpdateResult,
       filterLessonsForCurrentRange,
       lessonDraft,
       lessons,
@@ -542,11 +688,81 @@ export const useLessonActionsInternal = ({
       showInfoDialog,
       showToast,
       syncLessonsInRanges,
+      updateLessonTiming,
       lessonModalContext,
       timeZone,
       removeLessonsFromRanges,
     ],
   );
+
+  const saveRescheduleLesson = useCallback(async () => {
+    if (!rescheduleLesson) return;
+    if (!rescheduleDraft.date || !rescheduleDraft.time) {
+      showInfoDialog('Проверьте дату и время', 'Укажите дату и время урока');
+      return;
+    }
+    const durationMinutes = diffTimeMinutes(rescheduleDraft.time, rescheduleDraft.endTime);
+    if (!durationMinutes || durationMinutes <= 0) {
+      showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
+      return;
+    }
+
+    const startAtDate = toUtcDateFromTimeZone(rescheduleDraft.date, rescheduleDraft.time, timeZone);
+    const startAt = startAtDate.toISOString();
+    const timeChanged =
+      startAt !== rescheduleLesson.startAt || durationMinutes !== rescheduleLesson.durationMinutes;
+
+    if (!timeChanged) {
+      closeRescheduleModal();
+      return;
+    }
+
+    if (rescheduleLesson.isRecurring && rescheduleLesson.recurrenceGroupId) {
+      setRescheduleScopePending({
+        lesson: rescheduleLesson,
+        startAt,
+        durationMinutes,
+        previousStartAt: rescheduleLesson.startAt,
+        previousDuration: rescheduleLesson.durationMinutes,
+      });
+      setRescheduleModalOpen(false);
+      return;
+    }
+
+    try {
+      await updateLessonTiming(rescheduleLesson, startAt, durationMinutes, 'SINGLE');
+      showToast({
+        message: 'Урок перенесён',
+        variant: 'success',
+        actionLabel: 'Отменить',
+        onAction: () => {
+          void updateLessonTiming(
+            rescheduleLesson,
+            rescheduleLesson.startAt,
+            rescheduleLesson.durationMinutes,
+            'SINGLE',
+          ).catch(() => {
+            showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+          });
+        },
+      });
+      closeRescheduleModal();
+    } catch (error) {
+      showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+      // eslint-disable-next-line no-console
+      console.error('Failed to reschedule lesson', error);
+    }
+  }, [
+    closeRescheduleModal,
+    rescheduleDraft.date,
+    rescheduleDraft.endTime,
+    rescheduleDraft.time,
+    rescheduleLesson,
+    showInfoDialog,
+    showToast,
+    timeZone,
+    updateLessonTiming,
+  ]);
 
   const startEditLesson = useCallback(
     (lesson: Lesson) => {
@@ -727,6 +943,155 @@ export const useLessonActionsInternal = ({
       lessons,
     ],
   );
+
+  const shiftLessonTime = useCallback(
+    async (lesson: Lesson, minutes: number, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => {
+      const previousStartAt = lesson.startAt;
+      const nextStartAt = addMinutes(new Date(lesson.startAt), minutes).toISOString();
+      try {
+        await updateLessonTiming(lesson, nextStartAt, lesson.durationMinutes, scope);
+
+        if (!options?.skipToast) {
+          showToast({
+            message: 'Время изменено',
+            variant: 'success',
+            actionLabel: 'Отменить',
+            onAction: () => {
+              void updateLessonTiming(lesson, previousStartAt, lesson.durationMinutes, scope).catch(() => {
+                showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+              });
+            },
+          });
+        }
+      } catch (error) {
+        showToast({ message: 'Не удалось изменить время', variant: 'error' });
+        // eslint-disable-next-line no-console
+        console.error('Failed to shift lesson time', error);
+      }
+    },
+    [showToast, updateLessonTiming],
+  );
+
+  const updateLessonStatusScoped = useCallback(
+    async (lesson: Lesson, scope: LessonSeriesScope, status: Lesson['status']) => {
+      const targets =
+        scope === 'SERIES' && lesson.recurrenceGroupId
+          ? lessons.filter((item) => item.recurrenceGroupId === lesson.recurrenceGroupId)
+          : [lesson];
+
+      const results = await Promise.all(
+        targets.map(async (target) => {
+          const data = await api.updateLessonStatus(target.id, status);
+          return { data, target };
+        }),
+      );
+
+      results.forEach(({ data, target }) => {
+        applyLessonUpdateResult({ lesson: data.lesson }, target);
+        applyLinksUpdate(data.links);
+      });
+
+      await loadStudentLessons();
+      await loadStudentLessonsSummary();
+      await loadDashboardUnpaidLessons();
+    },
+    [
+      applyLessonUpdateResult,
+      applyLinksUpdate,
+      lessons,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+    ],
+  );
+
+  const restoreLesson = useCallback(
+    async (lesson: Lesson, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => {
+      try {
+        await updateLessonStatusScoped(lesson, scope, 'SCHEDULED');
+
+        if (!options?.skipToast) {
+          showToast({ message: 'Урок восстановлен', variant: 'success' });
+        }
+      } catch (error) {
+        showToast({ message: 'Не удалось восстановить урок', variant: 'error' });
+        // eslint-disable-next-line no-console
+        console.error('Failed to restore lesson', error);
+      }
+    },
+    [showToast, updateLessonStatusScoped],
+  );
+
+  const cancelLesson = useCallback(
+    async (
+      lesson: Lesson,
+      scope: LessonSeriesScope,
+      refundMode?: LessonCancelRefundMode,
+      options?: { skipToast?: boolean },
+    ) => {
+      try {
+        await updateLessonStatusScoped(lesson, scope, 'CANCELED');
+
+        if (!options?.skipToast) {
+          showToast({
+            message: 'Урок отменён',
+            variant: 'success',
+            actionLabel: 'Вернуть',
+            onAction: () => {
+              void restoreLesson(lesson, scope, { skipToast: true }).catch(() => {
+                showToast({ message: 'Не удалось вернуть урок', variant: 'error' });
+              });
+            },
+          });
+        }
+      } catch (error) {
+        showToast({ message: 'Не удалось отменить урок', variant: 'error' });
+        // eslint-disable-next-line no-console
+        console.error('Failed to cancel lesson', error);
+      }
+    },
+    [restoreLesson, showToast, updateLessonStatusScoped],
+  );
+
+  const confirmRescheduleScope = useCallback(
+    (scope: LessonSeriesScope) => {
+      if (!rescheduleScopePending) return;
+      const payload = rescheduleScopePending;
+      setRescheduleScopePending(null);
+      void updateLessonTiming(payload.lesson, payload.startAt, payload.durationMinutes, scope)
+        .then(() => {
+          showToast({
+            message: 'Урок перенесён',
+            variant: 'success',
+            actionLabel: 'Отменить',
+            onAction: () => {
+              void updateLessonTiming(
+                payload.lesson,
+                payload.previousStartAt,
+                payload.previousDuration,
+                scope,
+              ).catch(() => {
+                showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+              });
+            },
+          });
+          closeRescheduleModal();
+        })
+        .catch((error) => {
+          showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+          // eslint-disable-next-line no-console
+          console.error('Failed to reschedule lesson', error);
+          setRescheduleModalOpen(true);
+        });
+    },
+    [closeRescheduleModal, rescheduleScopePending, showToast, updateLessonTiming],
+  );
+
+  const cancelRescheduleScope = useCallback(() => {
+    if (!rescheduleScopePending) return;
+    setRescheduleScopePending(null);
+    setRescheduleModalOpen(true);
+  }, [rescheduleScopePending]);
 
   const applyTogglePaid = useCallback(
     async (
@@ -951,14 +1316,22 @@ export const useLessonActionsInternal = ({
     () => ({
       lessonModalOpen,
       lessonModalVariant: lessonModalContext.variant,
+      lessonModalFocus: lessonModalContext.focus,
       lessonDraft,
       editingLessonId,
       recurrenceLocked: Boolean(editingLessonOriginal?.isRecurring),
       defaultLessonDuration: teacherDefaultLessonDuration,
+      rescheduleModalOpen,
+      rescheduleDraft,
+      rescheduleLesson,
       openLessonModal,
+      openRescheduleModal,
       closeLessonModal,
+      closeRescheduleModal,
       setLessonDraft: handleLessonDraftChange,
+      setRescheduleDraft,
       saveLesson,
+      saveRescheduleLesson,
       requestDeleteLesson,
       startEditLesson,
       openCreateLessonForStudent,
@@ -967,26 +1340,45 @@ export const useLessonActionsInternal = ({
       updateLessonStatus,
       togglePaid,
       remindLessonPayment,
+      shiftLessonTime,
+      cancelLesson,
+      restoreLesson,
+      rescheduleScopePending,
+      confirmRescheduleScope,
+      cancelRescheduleScope,
     }),
     [
       closeLessonModal,
+      closeRescheduleModal,
       editingLessonId,
       editingLessonOriginal?.isRecurring,
       handleLessonDraftChange,
       lessonDraft,
+      lessonModalContext.focus,
       lessonModalContext.variant,
       lessonModalOpen,
+      openRescheduleModal,
       openCreateLessonForStudent,
       openLessonModal,
       requestDeleteLesson,
       requestDeleteLessonFromList,
       saveLesson,
+      saveRescheduleLesson,
       startEditLesson,
       teacherDefaultLessonDuration,
+      rescheduleDraft,
+      rescheduleLesson,
+      rescheduleModalOpen,
       markLessonCompleted,
       remindLessonPayment,
       togglePaid,
       updateLessonStatus,
+      shiftLessonTime,
+      cancelLesson,
+      restoreLesson,
+      rescheduleScopePending,
+      confirmRescheduleScope,
+      cancelRescheduleScope,
     ],
   );
 };

@@ -1,5 +1,6 @@
-import { type FC, useMemo } from 'react';
+import { type FC, useEffect, useMemo, useRef } from 'react';
 import { LinkedStudent } from '../../../entities/types';
+import type { LessonModalFocus } from '../../lessons/model/types';
 import {
   Autocomplete,
   Accordion,
@@ -58,6 +59,7 @@ interface LessonModalProps {
   onDelete?: () => void;
   onSubmit: () => void;
   variant?: 'modal' | 'sheet';
+  focusTarget?: LessonModalFocus;
 }
 
 const weekdayOptions: { value: number; label: string }[] = [
@@ -82,11 +84,14 @@ export const LessonModal: FC<LessonModalProps> = ({
   onDelete,
   onSubmit,
   variant = 'modal',
+  focusTarget = 'full',
 }) => {
   if (!open) return null;
 
   const timeZone = useTimeZone();
   const isEditing = Boolean(editingLessonId);
+  const dateButtonRef = useRef<HTMLButtonElement>(null);
+  const startTimeRef = useRef<HTMLInputElement>(null);
   const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
   const startAt = useMemo(
     () => toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone),
@@ -171,6 +176,17 @@ export const LessonModal: FC<LessonModalProps> = ({
     },
   } as const;
   const isSubmitDisabled = Boolean(meetingLinkError);
+
+  useEffect(() => {
+    if (!open) return;
+    if (focusTarget === 'focus_date') {
+      dateButtonRef.current?.focus();
+      return;
+    }
+    if (focusTarget === 'focus_time') {
+      startTimeRef.current?.focus();
+    }
+  }, [focusTarget, open]);
 
   const handleOpenMeetingLink = () => {
     if (!normalizedMeetingLink || meetingLinkError) return;
@@ -275,6 +291,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               value={draft.date}
               onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
               className={modalStyles.field}
+              buttonRef={dateButtonRef}
             />
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Начало</span>
@@ -285,6 +302,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                 onBlur={handleStartTimeBlur}
                 fullWidth
                 sx={textFieldSx}
+                inputRef={startTimeRef}
                 inputProps={{ step: 60 }}
               />
             </div>

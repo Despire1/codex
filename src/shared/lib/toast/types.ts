@@ -9,6 +9,8 @@ export interface ToastOptions {
   durationMs?: number;
   backgroundColor?: string;
   textColor?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 export interface ToastController {

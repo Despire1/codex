@@ -1,4 +1,4 @@
-import { Lesson, LessonParticipant, LinkedStudent } from '../../../entities/types';
+import type { Lesson, LessonParticipant, LinkedStudent } from '../../types';
 
 export type LessonParticipantLike = Partial<LessonParticipant> & {
   studentId: number;
@@ -26,8 +26,8 @@ export const resolveLessonPrice = (lesson: Lesson, participants: LessonParticipa
 };
 
 export const resolveLessonPaid = (lesson: Lesson, participants: LessonParticipantLike[]) => {
-  if (participants.length === 0) return !!lesson.isPaid;
-  return participants.every((participant) => participant?.isPaid);
+  if (participants.length === 0) return Boolean(lesson.isPaid);
+  return participants.every((participant) => Boolean(participant?.isPaid));
 };
 
 export const getParticipantName = (
@@ -52,3 +52,5 @@ export const getLessonLabel = (
     .filter((name) => name);
   return names.length > 0 ? names.join(', ') : 'Урок';
 };
+
+export const isLessonInSeries = (lesson: Lesson) => Boolean(lesson.isRecurring && lesson.recurrenceGroupId);

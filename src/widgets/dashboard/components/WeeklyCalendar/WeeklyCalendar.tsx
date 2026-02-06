@@ -1,9 +1,27 @@
 import { addDays, addWeeks, endOfDay, format, isSameDay, isWithinInterval, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { type CSSProperties, type FC, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type FC,
+  type KeyboardEvent,
+  type MouseEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Lesson, LinkedStudent } from '@/entities/types';
-import { getLessonColorTheme } from '@/shared/lib/lessonColors';
-import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
+import { LessonChip } from '@/entities/lesson/ui/LessonChip/LessonChip';
+import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
+import { useLessonActions } from '@/features/lessons/model/useLessonActions';
+import type { LessonCancelRefundMode, LessonSeriesScope, LessonModalFocus } from '@/features/lessons/model/types';
+import { LessonPopover } from '@/features/lessons/ui/LessonPopover/LessonPopover';
+import { LessonCancelDialog } from '@/features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import { LessonRestoreDialog } from '@/features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
+import { SeriesScopeDialog } from '@/features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { AnchoredPopover } from '@/shared/ui/AnchoredPopover/AnchoredPopover';
+import { toZonedDate } from '@/shared/lib/timezoneDates';
+import { DayOverflowPopover } from './DayOverflowPopover';
 import styles from './WeeklyCalendar.module.css';
 
 interface WeeklyCalendarProps {
@@ -16,19 +34,15 @@ interface WeeklyCalendarProps {
   className?: string;
 }
 
-const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+type PendingScopeAction =
+  | { type: 'cancel'; lesson: Lesson; refundMode?: LessonCancelRefundMode }
+  | { type: 'restore'; lesson: Lesson };
 
-const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
-  if (lesson.participants && lesson.participants.length > 1) {
-    const names = lesson.participants
-      .map((participant) =>
-        linkedStudents.find((student) => student.id === participant.studentId)?.link.customName,
-      )
-      .filter(Boolean);
-    return names.length > 0 ? names.join(', ') : 'Группа';
-  }
-  return linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик';
-};
+const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+const SINGLE_CLICK_DELAY = 200;
+const LESSON_ROW_HEIGHT = 44;
+const LESSON_ROW_GAP = 8;
+const MAX_VISIBLE_LESSONS = 10;
 
 export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   lessons,
@@ -40,6 +54,19 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   className,
 }) => {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [lessonPopover, setLessonPopover] = useState<{ lessonId: number; anchorEl: HTMLElement } | null>(null);
+  const [overflowPopover, setOverflowPopover] = useState<{ dayKey: string; anchorEl: HTMLElement } | null>(null);
+  const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
+  const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
+  const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
+  const clickTimerRef = useRef<number | null>(null);
+
+  const linkedStudentsById = useMemo(
+    () => new Map(linkedStudents.map((student) => [student.id, student])),
+    [linkedStudents],
+  );
+
+  const { openLessonModal, openRescheduleModal, cancelLesson, restoreLesson } = useLessonActions();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const baseWeekStart = useMemo(() => startOfWeek(todayZoned, { weekStartsOn: 1 }), [todayZoned]);
   const weekStart = useMemo(() => addWeeks(baseWeekStart, weekOffset), [baseWeekStart, weekOffset]);
@@ -56,6 +83,26 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
     onWeekRangeChange?.(weekStart, weekEnd);
   }, [onWeekRangeChange, weekEnd, weekStart]);
 
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) {
+        window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!lessonPopover) return;
+    const exists = lessons.some((lesson) => lesson.id === lessonPopover.lessonId);
+    if (!exists) setLessonPopover(null);
+  }, [lessons, lessonPopover]);
+
+  useEffect(() => {
+    setLessonPopover(null);
+    setOverflowPopover(null);
+  }, [weekStart]);
+
   const weekLabel = useMemo(() => {
     const startLabel = format(weekStart, 'd', { locale: ru });
     const endLabel = format(weekEnd, 'd MMMM yyyy', { locale: ru });
@@ -65,7 +112,6 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   const lessonsByDay = useMemo(() => {
     const map = new Map<string, Lesson[]>();
     lessons.forEach((lesson) => {
-      if (lesson.status === 'CANCELED') return;
       const lessonDate = toZonedDate(lesson.startAt, timeZone);
       if (!isWithinInterval(lessonDate, weekInterval)) return;
       const key = format(lessonDate, 'yyyy-MM-dd');
@@ -80,6 +126,131 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
 
     return map;
   }, [lessons, timeZone, weekInterval]);
+
+  const weekDayKeys = useMemo(
+    () => dayLabels.map((_, index) => format(addDays(weekStart, index), 'yyyy-MM-dd')),
+    [weekStart],
+  );
+
+  const maxCount = useMemo(
+    () => Math.max(0, ...weekDayKeys.map((key) => (lessonsByDay.get(key) ?? []).length)),
+    [lessonsByDay, weekDayKeys],
+  );
+  const visibleCapacity = Math.min(maxCount, MAX_VISIBLE_LESSONS);
+  const listMinHeight =
+    visibleCapacity > 0 ? visibleCapacity * LESSON_ROW_HEIGHT + (visibleCapacity - 1) * LESSON_ROW_GAP : 0;
+
+  const activeLesson = useMemo(() => {
+    if (!lessonPopover) return null;
+    return lessons.find((lesson) => lesson.id === lessonPopover.lessonId) ?? null;
+  }, [lessonPopover, lessons]);
+
+  const overflowLessons = useMemo(() => {
+    if (!overflowPopover) return [];
+    const dayLessons = lessonsByDay.get(overflowPopover.dayKey) ?? [];
+    return dayLessons.slice(visibleCapacity);
+  }, [lessonsByDay, overflowPopover, visibleCapacity]);
+
+  const openLessonEditModal = (lesson: Lesson, focus: LessonModalFocus) => {
+    const start = toZonedDate(lesson.startAt, timeZone);
+    openLessonModal(format(start, 'yyyy-MM-dd'), format(start, 'HH:mm'), lesson, {
+      focus,
+      skipNavigation: true,
+    });
+  };
+
+  const openRescheduleLessonModal = (lesson: Lesson) => {
+    openRescheduleModal(lesson, { skipNavigation: true });
+  };
+
+  const openLessonPopoverForLesson = (lesson: Lesson, anchorEl: HTMLElement) => {
+    setOverflowPopover(null);
+    setLessonPopover({ lessonId: lesson.id, anchorEl });
+  };
+
+  const closeLessonPopover = () => setLessonPopover(null);
+
+  const handleLessonClick = (lesson: Lesson) => (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+    }
+    const anchorEl = event.currentTarget;
+    clickTimerRef.current = window.setTimeout(() => {
+      clickTimerRef.current = null;
+      openLessonPopoverForLesson(lesson, anchorEl);
+    }, SINGLE_CLICK_DELAY);
+  };
+
+  const handleLessonDoubleClick = (lesson: Lesson) => (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+    closeLessonPopover();
+    setOverflowPopover(null);
+    openLessonEditModal(lesson, 'full');
+  };
+
+  const handleLessonKeyDown = (lesson: Lesson) => (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      openLessonPopoverForLesson(lesson, event.currentTarget);
+    }
+  };
+
+  const handleCancelLesson = (lesson: Lesson) => {
+    closeLessonPopover();
+    setCancelDialogLesson(lesson);
+  };
+
+  const handleRestoreLesson = (lesson: Lesson) => {
+    closeLessonPopover();
+    setRestoreDialogLesson(lesson);
+  };
+
+  const handleConfirmCancel = (refundMode?: LessonCancelRefundMode) => {
+    if (!cancelDialogLesson) return;
+    const target = cancelDialogLesson;
+    setCancelDialogLesson(null);
+    if (isLessonInSeries(target)) {
+      setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+      return;
+    }
+    void cancelLesson(target, 'SINGLE', refundMode);
+  };
+
+  const handleConfirmRestore = () => {
+    if (!restoreDialogLesson) return;
+    const target = restoreDialogLesson;
+    setRestoreDialogLesson(null);
+    if (isLessonInSeries(target)) {
+      setScopeDialog({ type: 'restore', lesson: target });
+      return;
+    }
+    void restoreLesson(target, 'SINGLE');
+  };
+
+  const handleScopeConfirm = (scope: LessonSeriesScope) => {
+    if (!scopeDialog) return;
+    const payload = scopeDialog;
+    setScopeDialog(null);
+    if (payload.type === 'cancel') {
+      void cancelLesson(payload.lesson, scope, payload.refundMode);
+      return;
+    }
+    if (payload.type === 'restore') {
+      void restoreLesson(payload.lesson, scope);
+    }
+  };
+
+  const dayCardStyle = {
+    '--lesson-row-height': `${LESSON_ROW_HEIGHT}px`,
+    '--lesson-row-gap': `${LESSON_ROW_GAP}px`,
+    '--lesson-list-min-height': `${listMinHeight}px`,
+  } as CSSProperties;
 
   return (
     <section className={[styles.root, className].filter(Boolean).join(' ')}>
@@ -111,7 +282,7 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
             <svg viewBox="0 0 320 512" aria-hidden="true" focusable="false">
               <path
                 fill="currentColor"
-                d="M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z"
+                d="M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z"
               />
             </svg>
           </button>
@@ -124,6 +295,8 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
           const dayNumber = format(date, 'd');
           const dayKey = format(date, 'yyyy-MM-dd');
           const dayLessons = lessonsByDay.get(dayKey) ?? [];
+          const visibleLessons = dayLessons.slice(0, visibleCapacity);
+          const hiddenCount = dayLessons.length - visibleLessons.length;
           const isActive = isSameDay(date, todayZoned);
           const isEmpty = dayLessons.length === 0;
 
@@ -149,6 +322,7 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
                     onCreateLesson(date);
                   }
                 }}
+                style={dayCardStyle}
               >
                 <div className={[styles.dayNumber, isActive ? styles.dayNumberActive : ''].filter(Boolean).join(' ')}>
                   {dayNumber}
@@ -159,31 +333,30 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
                   </div>
                 ) : (
                   <div className={styles.lessonList}>
-                    {dayLessons.map((lesson) => {
-                      const theme = getLessonColorTheme(lesson.color);
-                      const lessonStyle = {
-                        '--lesson-bg': theme.background,
-                        '--lesson-border': theme.border,
-                        '--lesson-text': theme.hoverBackground,
-                      } as CSSProperties;
-                      return (
-                        <button
-                          key={lesson.id}
-                          type="button"
-                          className={styles.lesson}
-                          style={lessonStyle}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onOpenLessonDay(lesson);
-                          }}
-                        >
-                          <div className={styles.lessonTime}>
-                            {formatInTimeZone(lesson.startAt, 'HH:mm', { timeZone })}
-                          </div>
-                          <div className={styles.lessonStudent}>{getStudentLabel(lesson, linkedStudents)}</div>
-                        </button>
-                      );
-                    })}
+                    {visibleLessons.map((lesson) => (
+                      <LessonChip
+                        key={lesson.id}
+                        lesson={lesson}
+                        linkedStudentsById={linkedStudentsById}
+                        timeZone={timeZone}
+                        onClick={handleLessonClick(lesson)}
+                        onDoubleClick={handleLessonDoubleClick(lesson)}
+                        onKeyDown={handleLessonKeyDown(lesson)}
+                      />
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        className={styles.moreButton}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setLessonPopover(null);
+                          setOverflowPopover({ dayKey, anchorEl: event.currentTarget });
+                        }}
+                      >
+                        Ещё {hiddenCount}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -191,6 +364,72 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
           );
         })}
       </div>
+
+      <AnchoredPopover
+        isOpen={Boolean(activeLesson && lessonPopover)}
+        anchorEl={lessonPopover?.anchorEl ?? null}
+        onClose={closeLessonPopover}
+        side="right"
+        align="start"
+      >
+        {activeLesson && (
+          <LessonPopover
+            lesson={activeLesson}
+            linkedStudentsById={linkedStudentsById}
+            timeZone={timeZone}
+            onReschedule={() => {
+              closeLessonPopover();
+              openRescheduleLessonModal(activeLesson);
+            }}
+            onEditFull={() => {
+              closeLessonPopover();
+              openLessonEditModal(activeLesson, 'full');
+            }}
+            onCancel={() => handleCancelLesson(activeLesson)}
+            onRestore={() => handleRestoreLesson(activeLesson)}
+          />
+        )}
+      </AnchoredPopover>
+
+      <DayOverflowPopover
+        isOpen={Boolean(overflowPopover)}
+        anchorEl={overflowPopover?.anchorEl ?? null}
+        lessons={overflowLessons}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setOverflowPopover(null)}
+        onSelectLesson={(lesson) => {
+          const anchor = overflowPopover?.anchorEl;
+          setOverflowPopover(null);
+          if (anchor) {
+            openLessonPopoverForLesson(lesson, anchor);
+          }
+        }}
+      />
+
+      <LessonCancelDialog
+        open={Boolean(cancelDialogLesson)}
+        lesson={cancelDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setCancelDialogLesson(null)}
+        onConfirm={handleConfirmCancel}
+      />
+
+      <LessonRestoreDialog
+        open={Boolean(restoreDialogLesson)}
+        lesson={restoreDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setRestoreDialogLesson(null)}
+        onConfirm={handleConfirmRestore}
+      />
+
+      <SeriesScopeDialog
+        open={Boolean(scopeDialog)}
+        onClose={() => setScopeDialog(null)}
+        onConfirm={handleScopeConfirm}
+      />
     </section>
   );
 };

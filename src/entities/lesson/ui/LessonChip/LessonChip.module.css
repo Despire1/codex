@@ -1,0 +1,87 @@
+.chip {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--lesson-border, var(--color-slate-200));
+  background: var(--lesson-bg, var(--color-slate-100));
+  color: var(--lesson-text, var(--color-slate-700));
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
+  box-shadow: 0 2px 6px var(--lesson-shadow, rgba(15, 23, 42, 0.08));
+}
+
+.chip:hover {
+  background: var(--lesson-hover-bg, var(--lesson-bg, var(--color-slate-100)));
+  border-color: var(--lesson-hover-border, var(--lesson-border, var(--color-slate-200)));
+  color: var(--lesson-hover-text, var(--lesson-text, var(--color-slate-700)));
+  box-shadow: 0 10px 18px var(--lesson-hover-shadow, rgba(15, 23, 42, 0.16));
+  transform: translateY(-1px);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-indigo-400);
+  outline-offset: 2px;
+}
+
+.canceled {
+  opacity: 0.6;
+}
+
+.canceled:hover {
+  transform: none;
+  box-shadow: 0 4px 12px var(--lesson-shadow, rgba(15, 23, 42, 0.08));
+  color: var(--lesson-text, var(--color-slate-700));
+}
+
+.time {
+  font-size: 11px;
+  font-weight: 700;
+  width: 100%;
+}
+
+.name {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+}
+
+.nameRow .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.badge {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--color-slate-600);
+}

@@ -35,7 +35,6 @@
   border-style: dashed;
   background: var(--color-slate-50);
   color: var(--color-slate-400);
-  opacity: 0.7;
 }
 
 .content {
@@ -115,6 +114,19 @@
   border-color: var(--color-blue-600);
   background: var(--color-blue-600);
   color: var(--color-white) !important;
+}
+
+.canceledBadge {
+  border-color: var(--color-slate-200);
+  background: var(--color-slate-100);
+  color: var(--color-slate-500) !important;
+  cursor: default;
+}
+
+.canceledBadge:hover {
+  border-color: var(--color-slate-200);
+  background: var(--color-slate-100);
+  color: var(--color-slate-500) !important;
 }
 
 .linkIcon {

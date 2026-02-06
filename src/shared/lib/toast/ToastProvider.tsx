@@ -6,11 +6,16 @@ import { ToastController, ToastOptions, ToastVariant } from './types';
 
 const ToastContext = createContext<ToastController | null>(null);
 
-interface ToastState extends Required<Omit<ToastOptions, 'icon' | 'durationMs' | 'variant'>> {
+interface ToastState {
   id: number;
-  icon?: ReactNode;
+  message: string;
   variant: ToastVariant;
+  icon?: ReactNode;
   durationMs: number;
+  backgroundColor: string;
+  textColor: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 const DEFAULT_DURATION_MS = 2000;
@@ -42,6 +47,8 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
       durationMs: options.durationMs ?? DEFAULT_DURATION_MS,
       backgroundColor: options.backgroundColor ?? defaults.backgroundColor,
       textColor: options.textColor ?? defaults.textColor,
+      actionLabel: options.actionLabel,
+      onAction: options.onAction,
     });
     setIsVisible(true);
   }, []);
@@ -73,6 +80,14 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
             backgroundColor={toast.backgroundColor}
             textColor={toast.textColor}
             visible={isVisible}
+            actionLabel={toast.actionLabel}
+            onAction={() => {
+              if (toast.onAction) {
+                toast.onAction();
+              }
+              setIsVisible(false);
+              setTimeout(() => setToast(null), TRANSITION_DURATION_MS);
+            }}
           />,
           document.body,
         )}

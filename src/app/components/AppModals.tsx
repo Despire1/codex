@@ -6,8 +6,10 @@ import modalStyles from '../../shared/ui/Modal/Modal.module.css';
 import controls from '../../shared/styles/controls.module.css';
 import { StudentModal } from '../../features/modals/StudentModal/StudentModal';
 import { LessonModal } from '../../features/modals/LessonModal/LessonModal';
+import { RescheduleLessonModal } from '../../features/modals/RescheduleLessonModal/RescheduleLessonModal';
 import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/PaymentCancelModal';
 import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
+import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
 import { useStudentsActions } from '../../widgets/students/model/useStudentsActions';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 
@@ -78,6 +80,7 @@ export const AppModals: FC<AppModalsProps> = ({
   const {
     lessonModalOpen,
     lessonModalVariant,
+    lessonModalFocus,
     lessonDraft,
     editingLessonId,
     recurrenceLocked,
@@ -86,6 +89,15 @@ export const AppModals: FC<AppModalsProps> = ({
     saveLesson,
     closeLessonModal,
     requestDeleteLesson,
+    rescheduleModalOpen,
+    rescheduleDraft,
+    rescheduleLesson,
+    setRescheduleDraft,
+    saveRescheduleLesson,
+    closeRescheduleModal,
+    rescheduleScopePending,
+    confirmRescheduleScope,
+    cancelRescheduleScope,
   } = useLessonActions();
 
   return (
@@ -103,6 +115,7 @@ export const AppModals: FC<AppModalsProps> = ({
       <LessonModal
         open={lessonModalOpen}
         variant={lessonModalVariant}
+        focusTarget={lessonModalFocus}
         onClose={closeLessonModal}
         editingLessonId={editingLessonId}
         defaultDuration={defaultLessonDuration}
@@ -112,6 +125,15 @@ export const AppModals: FC<AppModalsProps> = ({
         onDraftChange={setLessonDraft}
         onDelete={editingLessonId ? requestDeleteLesson : undefined}
         onSubmit={saveLesson}
+      />
+
+      <RescheduleLessonModal
+        open={rescheduleModalOpen}
+        lesson={rescheduleLesson}
+        draft={rescheduleDraft}
+        onDraftChange={setRescheduleDraft}
+        onClose={closeRescheduleModal}
+        onSubmit={saveRescheduleLesson}
       />
 
       {dialogState &&
@@ -191,6 +213,12 @@ export const AppModals: FC<AppModalsProps> = ({
           onSkip={dialogState.onSkip}
         />
       )}
+
+      <SeriesScopeDialog
+        open={Boolean(rescheduleScopePending)}
+        onClose={cancelRescheduleScope}
+        onConfirm={confirmRescheduleScope}
+      />
     </>
   );
 };

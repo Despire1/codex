@@ -260,6 +260,19 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+  cancelLesson: (
+    id: number,
+    payload: { scope: 'SINGLE' | 'SERIES'; refundMode?: 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID' },
+  ) =>
+    apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  restoreLesson: (id: number, payload: { scope: 'SINGLE' | 'SERIES' }) =>
+    apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}/restore`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   deleteLesson: (id: number, payload?: { applyToSeries?: boolean }) =>
     apiFetch<{ deletedIds?: number[] }>(`/api/lessons/${id}`, { method: 'DELETE', body: JSON.stringify(payload ?? {}) }),
   markLessonCompleted: (lessonId: number) =>

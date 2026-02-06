@@ -9,9 +9,20 @@ interface ToastProps {
   backgroundColor?: string;
   textColor?: string;
   visible: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export const Toast = ({ message, variant, icon, backgroundColor, textColor, visible }: ToastProps) => {
+export const Toast = ({
+  message,
+  variant,
+  icon,
+  backgroundColor,
+  textColor,
+  visible,
+  actionLabel,
+  onAction,
+}: ToastProps) => {
   return (
     <div className={styles.container} role="status" aria-live="polite">
       <div
@@ -20,6 +31,11 @@ export const Toast = ({ message, variant, icon, backgroundColor, textColor, visi
       >
         {icon && <span className={styles.icon}>{icon}</span>}
         <span className={styles.message}>{message}</span>
+        {actionLabel && onAction && (
+          <button type="button" className={styles.action} onClick={onAction}>
+            {actionLabel}
+          </button>
+        )}
       </div>
     </div>
   );

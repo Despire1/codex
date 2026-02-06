@@ -27,10 +27,13 @@ import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import controls from '../../shared/styles/controls.module.css';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
 import { MonthDayLessonCard } from './components/MonthDayLessonCard';
-import { buildParticipants, getLessonLabel } from './lib/lessonCardDetails';
+import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../entities/lesson/lib/lessonDetails';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useScheduleState } from './model/useScheduleState';
+import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { LessonCancelDialog } from '../../features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import type { LessonCancelRefundMode, LessonSeriesScope } from '../../features/lessons/model/types';
 
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
@@ -51,7 +54,15 @@ interface ScheduleSectionProps {
 
 export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
   const timeZone = useTimeZone();
-  const { openLessonModal, startEditLesson, requestDeleteLessonFromList, togglePaid } = useLessonActions();
+  const {
+    openLessonModal,
+    openRescheduleModal,
+    startEditLesson,
+    requestDeleteLessonFromList,
+    togglePaid,
+    cancelLesson,
+    restoreLesson,
+  } = useLessonActions();
   const {
     scheduleView,
     setScheduleView,
@@ -80,11 +91,51 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
   const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
+  const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
+  const [scopeDialog, setScopeDialog] = useState<
+    | { type: 'restore'; lesson: Lesson }
+    | { type: 'cancel'; lesson: Lesson; refundMode?: LessonCancelRefundMode }
+    | null
+  >(null);
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
   const drawerDragRafRef = useRef<number | null>(null);
   const mobileWeekKeyRef = useRef<string | null>(null);
+
+  const handleCancelLesson = (lesson: Lesson) => {
+    setCancelDialogLesson(lesson);
+  };
+
+  const handleConfirmCancel = (refundMode?: LessonCancelRefundMode) => {
+    if (!cancelDialogLesson) return;
+    const target = cancelDialogLesson;
+    setCancelDialogLesson(null);
+    if (isLessonInSeries(target)) {
+      setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+      return;
+    }
+    void cancelLesson(target, 'SINGLE', refundMode);
+  };
+
+  const handleRestoreLesson = (lesson: Lesson) => {
+    if (isLessonInSeries(lesson)) {
+      setScopeDialog({ type: 'restore', lesson });
+      return;
+    }
+    void restoreLesson(lesson, 'SINGLE');
+  };
+
+  const handleConfirmScope = (scope: LessonSeriesScope) => {
+    if (!scopeDialog) return;
+    const payload = scopeDialog;
+    setScopeDialog(null);
+    if (payload.type === 'cancel') {
+      void cancelLesson(payload.lesson, scope, payload.refundMode);
+      return;
+    }
+    void restoreLesson(payload.lesson, scope);
+  };
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -786,7 +837,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                 }
                 onCloseActions={() => setOpenLessonMenuId(null)}
                 onDelete={() => requestDeleteLessonFromList(lesson)}
-                onReschedule={() => {}}
+                onReschedule={() => openRescheduleModal(lesson, { skipNavigation: true })}
+                onCancel={() => handleCancelLesson(lesson)}
+                onRestore={() => handleRestoreLesson(lesson)}
                 onOpenMeetingLink={handleOpenMeetingLink}
               />
             );
@@ -905,6 +958,19 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
             </div>
           </>
         )}
+        <LessonCancelDialog
+          open={Boolean(cancelDialogLesson)}
+          lesson={cancelDialogLesson}
+          linkedStudentsById={linkedStudentsById}
+          timeZone={timeZone}
+          onClose={() => setCancelDialogLesson(null)}
+          onConfirm={handleConfirmCancel}
+        />
+        <SeriesScopeDialog
+          open={Boolean(scopeDialog)}
+          onClose={() => setScopeDialog(null)}
+          onConfirm={handleConfirmScope}
+        />
       </div>
     );
   };
