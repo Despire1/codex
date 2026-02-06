@@ -34,6 +34,7 @@ import {
 } from '../widgets/students/model/useStudentCardFilters';
 import { useScheduleLessonsLoaderInternal } from '../widgets/schedule/model/useScheduleLessonsLoader';
 import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useScheduleLessonsRange';
+import { UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
 
 const resolveAnalyticsSource = (source: string) => {
   if (source === 'onboarding_hero') return 'hero_cta';
@@ -71,10 +72,11 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 type TabPath = (typeof tabs)[number]['path'];
 
-export const AppPage = () => {
+const AppPageContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+  const { getActiveEntry, clearEntry } = useUnsavedChanges();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
   const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
@@ -250,13 +252,48 @@ export const AppPage = () => {
     [closeDialog],
   );
 
+  const guardedNavigate = useCallback(
+    (to: string) => {
+      const active = getActiveEntry();
+      if (!active || !active.entry.isDirty) {
+        navigate(to);
+        return;
+      }
+
+      openConfirmDialog({
+        title: 'Несохранённые изменения',
+        message: active.entry.message ?? 'Вы изменили тексты уведомлений. Сохранить перед выходом?',
+        confirmText: 'Сохранить',
+        cancelText: 'Выйти без сохранения',
+        onConfirm: () => {
+          active.entry
+            .onSave()
+            .then((ok) => {
+              if (!ok) return;
+              clearEntry(active.key);
+              navigate(to);
+            })
+            .catch(() => {
+              showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
+            });
+        },
+        onCancel: () => {
+          active.entry.onDiscard?.();
+          clearEntry(active.key);
+          navigate(to);
+        },
+      });
+    },
+    [clearEntry, getActiveEntry, navigate, openConfirmDialog, showToast],
+  );
+
   const navigateToStudents = useCallback(() => {
-    navigate(tabPathById.students);
-  }, [navigate]);
+    guardedNavigate(tabPathById.students);
+  }, [guardedNavigate]);
 
   const navigateToSchedule = useCallback(() => {
-    navigate(tabPathById.schedule);
-  }, [navigate]);
+    guardedNavigate(tabPathById.schedule);
+  }, [guardedNavigate]);
 
   const studentsActions = useStudentsActionsInternal({
     students,
@@ -531,7 +568,7 @@ export const AppPage = () => {
                     <Topbar
                       teacher={teacher}
                       activeTab={activeTab}
-                      onTabChange={(tab) => navigate(tabPathById[tab])}
+                      onTabChange={(tab) => guardedNavigate(tabPathById[tab])}
                       profilePhotoUrl={sessionUser?.photoUrl ?? null}
                     />
 
@@ -543,7 +580,7 @@ export const AppPage = () => {
                           lessons,
                           linkedStudents,
                           onAddStudent: () => {
-                            navigate(tabPathById.students);
+                            guardedNavigate(tabPathById.students);
                             studentsActions.openCreateStudentModal();
                           },
                           onCreateLesson: (date) => {
@@ -556,7 +593,7 @@ export const AppPage = () => {
                               setMonthAnchor(startOfMonth(lessonDate));
                               setMonthOffset(0);
                               setSelectedMonthDay(lessonIso);
-                              navigate(tabPathById.schedule);
+                              guardedNavigate(tabPathById.schedule);
                             }
 
                             lessonActions.openLessonModal(
@@ -564,7 +601,7 @@ export const AppPage = () => {
                               date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
                             );
                           },
-                          onOpenSchedule: () => navigate(tabPathById.schedule),
+                          onOpenSchedule: () => guardedNavigate(tabPathById.schedule),
                           onOpenLesson: (lesson) =>
                             lessonActions.openLessonModal(
                               formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
@@ -581,11 +618,11 @@ export const AppPage = () => {
                             setMonthAnchor(startOfMonth(lessonDate));
                             setMonthOffset(0);
                             setSelectedMonthDay(lessonIso);
-                            navigate(tabPathById.schedule);
+                            guardedNavigate(tabPathById.schedule);
                           },
                           onOpenStudent: (studentId) => {
                             setSelectedStudentId(studentId);
-                            navigate(tabPathById.students);
+                            guardedNavigate(tabPathById.students);
                           },
                         }}
                         students={{
@@ -600,7 +637,7 @@ export const AppPage = () => {
                           linkedStudents,
                           autoConfirmLessons: teacher.autoConfirmLessons,
                         }}
-                        settings={{ teacher, onTeacherChange: setTeacher }}
+                        settings={{ teacher, onTeacherChange: setTeacher, onNavigate: guardedNavigate }}
                         dashboardSummary={{
                           summary: dashboardSummaryData,
                           isLoading: dashboardSummary.isLoading,
@@ -610,7 +647,7 @@ export const AppPage = () => {
                     </main>
                   </div>
 
-                  <Tabbar activeTab={activeTab} onTabChange={(tab) => navigate(tabPathById[tab])} />
+                  <Tabbar activeTab={activeTab} onTabChange={(tab) => guardedNavigate(tabPathById[tab])} />
 
                   <AppModals
                     linkedStudents={linkedStudents}
@@ -631,3 +668,9 @@ export const AppPage = () => {
     </StudentsCardFiltersProvider>
   );
 };
+
+export const AppPage = () => (
+  <UnsavedChangesProvider>
+    <AppPageContent />
+  </UnsavedChangesProvider>
+);

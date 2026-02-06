@@ -42,6 +42,7 @@ interface AppRoutesProps {
   settings: {
     teacher: Teacher;
     onTeacherChange: (teacher: Teacher) => void;
+    onNavigate?: (to: string) => void;
   };
 }
 

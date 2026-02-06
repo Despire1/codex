@@ -17,6 +17,7 @@ import styles from './SettingsSection.module.css';
 interface SettingsSectionProps {
   teacher: Teacher;
   onTeacherChange: (teacher: Teacher) => void;
+  onNavigate?: (to: string) => void;
 }
 
 type SettingsPatch = Partial<
@@ -47,8 +48,8 @@ type SettingsPatch = Partial<
 const isSettingsTab = (value: string | null): value is SettingsTabId =>
   SETTINGS_TABS.some((tab) => tab.id === value);
 
-export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherChange }) => {
-  const navigate = useNavigate();
+export const SettingsSection: FC<SettingsSectionProps> = ({ teacher, onTeacherChange, onNavigate }) => {
+  const navigate = onNavigate ?? useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
   const isMobile = useIsMobile(720);

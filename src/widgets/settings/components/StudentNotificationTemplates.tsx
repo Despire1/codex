@@ -7,6 +7,7 @@ import { SendTestNotificationModal, useNotificationChannelStatus } from '../../.
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '../../../shared/lib/toast';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
+import { useUnsavedChanges } from '../../../shared/lib/unsavedChanges';
 import controls from '../../../shared/styles/controls.module.css';
 import {
   DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
@@ -139,6 +140,7 @@ const TemplateEditor: FC<{
   error: string | null;
   onSave: () => void;
   onReset: () => void;
+  isDirty: boolean;
   previewExample: Record<string, string>;
   example: TemplateExampleKey;
   onExampleChange: (value: TemplateExampleKey) => void;
@@ -153,6 +155,7 @@ const TemplateEditor: FC<{
   error,
   onSave,
   onReset,
+  isDirty,
   previewExample,
   example,
   onExampleChange,
@@ -382,8 +385,9 @@ const TemplateEditor: FC<{
           </button>
           <button
             type="button"
-            className={controls.primaryButton}
+            className={`${controls.primaryButton} ${styles.saveButton}`}
             onClick={onSave}
+            disabled={!isDirty}
             data-testid={`student-notification-${config.id}-save`}
           >
             Сохранить
@@ -406,8 +410,9 @@ const TemplateEditor: FC<{
           </span>
           <button
             type="button"
-            className={`${controls.primaryButton} ${styles.mobileActionButton}`}
+            className={`${controls.primaryButton} ${styles.mobileActionButton} ${styles.saveButton}`}
             onClick={onSave}
+            disabled={!isDirty}
             data-testid={`student-notification-${config.id}-save`}
           >
             Сохранить
@@ -424,6 +429,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
   onSaveNow,
 }) => {
   const { showToast } = useToast();
+  const { setEntry, clearEntry } = useUnsavedChanges();
   const [activeTemplate, setActiveTemplate] = useState<TemplateId>('lesson');
   const isMobile = useIsMobile(720);
   const channelStatus = useNotificationChannelStatus();
@@ -440,6 +446,14 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
   const [errors, setErrors] = useState<Record<TemplateId, string | null>>({ lesson: null, payment: null });
   const [examples, setExamples] = useState<Record<TemplateId, TemplateExampleKey>>({ lesson: 'A', payment: 'A' });
   const [isSendTestOpen, setIsSendTestOpen] = useState(false);
+  const dirtyById = useMemo(
+    () => ({
+      lesson: values.lesson !== resolvedValues.lesson,
+      payment: values.payment !== resolvedValues.payment,
+    }),
+    [resolvedValues.lesson, resolvedValues.payment, values.lesson, values.payment],
+  );
+  const hasUnsavedChanges = dirtyById.lesson || dirtyById.payment;
 
   const sendTestDisabled = channelStatus.status !== 'ready' || !channelStatus.configured;
   const sendTestHint = sendTestDisabled
@@ -449,6 +463,47 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
   useEffect(() => {
     setValues(resolvedValues);
   }, [resolvedValues]);
+
+  const saveDirtyTemplates = useCallback(async () => {
+    const patch: Partial<Teacher> = {};
+    let hasValidationError = false;
+
+    templateConfigs.forEach((config) => {
+      if (!dirtyById[config.id]) return;
+      const nextValue = values[config.id];
+      const validationError = validateTemplate(nextValue, config.allowedVariables);
+      if (validationError) {
+        hasValidationError = true;
+        setErrors((prev) => ({ ...prev, [config.id]: validationError }));
+        return;
+      }
+      patch[config.field] = nextValue;
+    });
+
+    if (hasValidationError) {
+      showToast({ message: 'Исправьте ошибки перед сохранением', variant: 'error' });
+      return false;
+    }
+
+    if (Object.keys(patch).length === 0) return true;
+    const result = await onSaveNow(patch);
+    return result.ok;
+  }, [dirtyById, onSaveNow, setErrors, showToast, values]);
+
+  const discardDirtyTemplates = useCallback(() => {
+    setValues(resolvedValues);
+    setErrors({ lesson: null, payment: null });
+  }, [resolvedValues]);
+
+  useEffect(() => {
+    setEntry('student-notification-templates', {
+      isDirty: hasUnsavedChanges,
+      onSave: saveDirtyTemplates,
+      onDiscard: discardDirtyTemplates,
+      message: 'Вы изменили тексты уведомлений. Сохранить перед выходом?',
+    });
+    return () => clearEntry('student-notification-templates');
+  }, [clearEntry, discardDirtyTemplates, hasUnsavedChanges, saveDirtyTemplates, setEntry]);
 
   const updateValue = (id: TemplateId, nextValue: string) => {
     setValues((prev) => ({ ...prev, [id]: nextValue }));
@@ -515,6 +570,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
             error={errors[config.id]}
             onSave={() => handleSave(config)}
             onReset={() => handleReset(config)}
+            isDirty={dirtyById[config.id]}
             previewExample={
               config.id === 'lesson'
                 ? STUDENT_LESSON_TEMPLATE_EXAMPLES[examples[config.id]]

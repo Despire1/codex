@@ -466,30 +466,28 @@ export const SendTestNotificationModal: FC<SendTestNotificationModalProps> = ({
         ) : (
           <div className={styles.form}>
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>Получатель</div>
-              <div className={styles.radioGroup}>
-                <label className={styles.radioRow}>
-                  <input
-                    type="radio"
-                    checked={recipientMode === 'SELF'}
-                    onChange={() => handleRecipientChange('SELF')}
-                    disabled={isSending}
-                    className={styles.optionInput}
-                  />
-                  <span className={styles.radioIndicator} aria-hidden />
-                  <span>Отправить себе</span>
-                </label>
-                <label className={styles.radioRow}>
-                  <input
-                    type="radio"
-                    checked={recipientMode === 'STUDENTS'}
-                    onChange={() => handleRecipientChange('STUDENTS')}
-                    disabled={isSending}
-                    className={styles.optionInput}
-                  />
-                  <span className={styles.radioIndicator} aria-hidden />
-                  <span>Отправить ученику</span>
-                </label>
+              <div className={styles.sectionTitle}>Кому отправить</div>
+              <div className={styles.segmented} role="tablist" aria-label="Выбор получателя">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={recipientMode === 'SELF'}
+                  className={`${styles.segmentButton} ${recipientMode === 'SELF' ? styles.segmentButtonActive : ''}`}
+                  onClick={() => handleRecipientChange('SELF')}
+                  disabled={isSending}
+                >
+                  Себе
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={recipientMode === 'STUDENTS'}
+                  className={`${styles.segmentButton} ${recipientMode === 'STUDENTS' ? styles.segmentButtonActive : ''}`}
+                  onClick={() => handleRecipientChange('STUDENTS')}
+                  disabled={isSending}
+                >
+                  Ученику
+                </button>
               </div>
             </div>
 
