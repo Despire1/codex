@@ -41,9 +41,3 @@
 .tabLabel {
   display: none;
 }
-
-@media (min-width: 760px) {
-  .tabbar {
-    display: none;
-  }
-}

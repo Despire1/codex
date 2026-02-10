@@ -8,10 +8,13 @@ import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
 import { useIsMobile } from '../shared/lib/useIsMobile';
+import { useIsDesktop } from '../shared/lib/useIsDesktop';
 import { trackEvent } from '../shared/lib/analytics';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
+import { Sidebar } from '../widgets/layout/Sidebar';
+import { type SidebarNavItem } from '../widgets/layout/model/navigation';
 import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
 import { AppModals, DialogState } from './components/AppModals';
@@ -72,6 +75,13 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 type TabPath = (typeof tabs)[number]['path'];
 
+const desktopTitleByTab: Record<TabId, string> = {
+  dashboard: 'Обзор',
+  students: 'Ученики',
+  schedule: 'Расписание',
+  settings: 'Настройки',
+};
+
 const AppPageContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,6 +101,7 @@ const AppPageContent = () => {
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
   const [dialogState, setDialogState] = useState<DialogState>(null);
   const isMobile = useIsMobile(767);
+  const isDesktop = useIsDesktop();
   const device = isMobile ? 'mobile' : 'desktop';
   const triggerStudentsListReload = useCallback(() => {
     setStudentListReloadKey((prev) => prev + 1);
@@ -364,6 +375,18 @@ const AppPageContent = () => {
     return matchedTab?.id ?? 'dashboard';
   }, [location.pathname]);
 
+  const desktopTopbarTitle = desktopTitleByTab[activeTab];
+  const desktopDateLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat('ru-RU', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date()),
+    [],
+  );
+
   const dashboardState = useDashboardStateInternal({
     hasAccess,
     timeZone: resolvedTimeZone,
@@ -457,6 +480,64 @@ const AppPageContent = () => {
   });
 
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
+
+  const openCreateLesson = useCallback(
+    (date?: Date) => {
+      const lessonDate = date ?? new Date();
+      const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+
+      if (date) {
+        setScheduleView('month');
+        setDayViewDate(lessonDate);
+        setMonthAnchor(startOfMonth(lessonDate));
+        setMonthOffset(0);
+        setSelectedMonthDay(lessonIso);
+      }
+
+      lessonActions.openLessonModal(
+        lessonIso,
+        date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+        undefined,
+        { skipNavigation: true },
+      );
+    },
+    [
+      lessonActions,
+      resolvedTimeZone,
+      setDayViewDate,
+      setMonthAnchor,
+      setMonthOffset,
+      setScheduleView,
+      setSelectedMonthDay,
+    ],
+  );
+
+  const onSidebarNavigate = useCallback(
+    (item: SidebarNavItem) => {
+      track('nav_click', { item: item.id, placement: 'sidebar' });
+      guardedNavigate(item.href);
+    },
+    [guardedNavigate, track],
+  );
+
+  const onTabbarNavigate = useCallback(
+    (tab: TabId) => {
+      track('nav_click', { item: tab, placement: 'top_tabs' });
+      guardedNavigate(tabPathById[tab]);
+    },
+    [guardedNavigate, track],
+  );
+
+  const onSidebarToggle = useCallback(
+    (collapsed: boolean) => {
+      track('sidebar_toggle', { collapsed });
+    },
+    [track],
+  );
+
+  const onOpenNotifications = useCallback(() => {
+    guardedNavigate('/settings/notifications');
+  }, [guardedNavigate]);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -572,92 +653,91 @@ const AppPageContent = () => {
                     <TimeZoneProvider timeZone={resolvedTimeZone}>
                 <div id="app" className={`${layoutStyles.page} app-content`}>
                   <div className="app-surface">
-                    <div className={layoutStyles.pageInner}>
-                    <Topbar
-                      teacher={teacher}
-                      activeTab={activeTab}
-                      onTabChange={(tab) => guardedNavigate(tabPathById[tab])}
-                      profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                    />
+                    <div
+                      className={`${layoutStyles.pageInner} ${isDesktop ? layoutStyles.pageInnerDesktop : ''}`}
+                    >
+                      {isDesktop ? (
+                        <Sidebar
+                          pathname={location.pathname}
+                          onNavigate={onSidebarNavigate}
+                          onToggleCollapsed={onSidebarToggle}
+                        />
+                      ) : null}
 
-                    <main className={layoutStyles.content}>
-                      <AppRoutes
-                        resolveLastVisitedPath={resolveLastVisitedPath}
-                        dashboard={{
-                          teacher,
-                          lessons,
-                          linkedStudents,
-                          onAddStudent: () => {
-                            guardedNavigate(tabPathById.students);
-                            studentsActions.openCreateStudentModal();
-                          },
-                          onCreateLesson: (date) => {
-                            const lessonDate = date ?? new Date();
-                            const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+                      <div className={layoutStyles.mainColumn}>
+                        {isDesktop ? (
+                          <Topbar
+                            teacher={teacher}
+                            title={desktopTopbarTitle}
+                            subtitle={desktopDateLabel}
+                            showCreateLesson={activeTab === 'dashboard'}
+                            onOpenNotifications={onOpenNotifications}
+                            onCreateLesson={() => openCreateLesson()}
+                            profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                          />
+                        ) : null}
 
-                            if (date) {
-                              setScheduleView('month');
-                              setDayViewDate(lessonDate);
-                              setMonthAnchor(startOfMonth(lessonDate));
-                              setMonthOffset(0);
-                              setSelectedMonthDay(lessonIso);
-                            }
+                        <main className={layoutStyles.content}>
+                          <AppRoutes
+                            resolveLastVisitedPath={resolveLastVisitedPath}
+                            dashboard={{
+                              teacher,
+                              lessons,
+                              linkedStudents,
+                              onAddStudent: () => {
+                                guardedNavigate(tabPathById.students);
+                                studentsActions.openCreateStudentModal();
+                              },
+                              onCreateLesson: openCreateLesson,
+                              onOpenSchedule: () => guardedNavigate(tabPathById.schedule),
+                              onOpenLesson: (lesson) =>
+                                lessonActions.openLessonModal(
+                                  formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+                                  undefined,
+                                  lesson,
+                                  { skipNavigation: true },
+                                ),
+                              onOpenLessonDay: (lesson) => {
+                                const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+                                const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+                                  timeZone: resolvedTimeZone,
+                                });
+                                setScheduleView('month');
+                                setDayViewDate(lessonDate);
+                                setMonthAnchor(startOfMonth(lessonDate));
+                                setMonthOffset(0);
+                                setSelectedMonthDay(lessonIso);
+                                guardedNavigate(tabPathById.schedule);
+                              },
+                              onOpenStudent: (studentId) => {
+                                setSelectedStudentId(studentId);
+                                guardedNavigate(tabPathById.students);
+                              },
+                            }}
+                            students={{
+                              hasAccess,
+                              teacher,
+                              lessons,
+                              onActiveTabChange: setStudentActiveTab,
+                              studentListReloadKey,
+                            }}
+                            schedule={{
+                              lessons,
+                              linkedStudents,
+                              autoConfirmLessons: teacher.autoConfirmLessons,
+                            }}
+                            settings={{ teacher, onTeacherChange: setTeacher, onNavigate: guardedNavigate }}
+                            dashboardSummary={{
+                              summary: dashboardSummaryData,
+                              isLoading: dashboardSummary.isLoading,
+                              refresh: dashboardSummary.refresh,
+                            }}
+                          />
+                        </main>
 
-                            lessonActions.openLessonModal(
-                              lessonIso,
-                              date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
-                              undefined,
-                              { skipNavigation: true },
-                            );
-                          },
-                          onOpenSchedule: () => guardedNavigate(tabPathById.schedule),
-                          onOpenLesson: (lesson) =>
-                            lessonActions.openLessonModal(
-                              formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                              undefined,
-                              lesson,
-                              { skipNavigation: true },
-                            ),
-                          onOpenLessonDay: (lesson) => {
-                            const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
-                            const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
-                              timeZone: resolvedTimeZone,
-                            });
-                            setScheduleView('month');
-                            setDayViewDate(lessonDate);
-                            setMonthAnchor(startOfMonth(lessonDate));
-                            setMonthOffset(0);
-                            setSelectedMonthDay(lessonIso);
-                            guardedNavigate(tabPathById.schedule);
-                          },
-                          onOpenStudent: (studentId) => {
-                            setSelectedStudentId(studentId);
-                            guardedNavigate(tabPathById.students);
-                          },
-                        }}
-                        students={{
-                          hasAccess,
-                          teacher,
-                          lessons,
-                          onActiveTabChange: setStudentActiveTab,
-                          studentListReloadKey,
-                        }}
-                        schedule={{
-                          lessons,
-                          linkedStudents,
-                          autoConfirmLessons: teacher.autoConfirmLessons,
-                        }}
-                        settings={{ teacher, onTeacherChange: setTeacher, onNavigate: guardedNavigate }}
-                        dashboardSummary={{
-                          summary: dashboardSummaryData,
-                          isLoading: dashboardSummary.isLoading,
-                          refresh: dashboardSummary.refresh,
-                        }}
-                      />
-                    </main>
+                        {!isDesktop ? <Tabbar activeTab={activeTab} onTabChange={onTabbarNavigate} /> : null}
+                      </div>
                     </div>
-
-                    <Tabbar activeTab={activeTab} onTabChange={(tab) => guardedNavigate(tabPathById[tab])} />
                   </div>
 
                   <AppModals

@@ -13,6 +13,7 @@ export const Tabbar: FC<TabbarProps> = ({ activeTab, onTabChange }) => {
       {tabs.map((tab) => (
         <button
           key={tab.id}
+          type="button"
           className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
           onClick={() => onTabChange(tab.id)}
           aria-label={tab.label}

@@ -1,109 +1,194 @@
 .topbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  min-height: 64px;
   background: var(--color-white);
   border: 1px solid var(--color-slate-200);
-  border-radius: 16px;
-  box-shadow: 0 12px 30px rgba(56, 130, 246, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 12px 28px var(--shadow-slate-900-06);
   position: sticky;
   top: 0;
   z-index: 10;
-  flex-wrap: wrap;
 }
 
-.topbarGreeting {
+.left {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.actionsCreateVisible {
+  --create-slot-width: 176px;
+  --actions-gap: 10px;
+  --bell-shift: 0px;
+}
+
+.actionsCreateHidden {
+  --create-slot-width: 176px;
+  --actions-gap: 10px;
+  --bell-shift: calc(var(--create-slot-width) + var(--actions-gap));
 }
 
 .title {
-  margin: 2px 0 0;
-  font-size: 22px;
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.separator {
+  color: var(--color-slate-300);
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .subtitle {
+  margin: 0;
   font-size: 14px;
+  font-weight: 500;
   color: var(--color-slate-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.topbarNav {
-  flex: 1;
-  display: none;
-  justify-content: center;
-  min-width: 240px;
-}
-
-.topbarProfile {
-  display: flex;
+.actions {
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+  contain: layout paint;
+}
+
+.iconButton {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transform: translate3d(var(--bell-shift, 0px), 0, 0);
+  transition: transform 0.22s ease, background-color 0.2s ease;
+  will-change: transform;
+}
+
+.iconButton:hover {
+  background: var(--color-slate-50);
+}
+
+.notificationDot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-red-500);
+}
+
+.createButton {
+  min-height: 40px;
+  white-space: nowrap;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-slate-900);
+  color: var(--color-white);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  cursor: pointer;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: right center;
+  transition: transform 0.22s ease, opacity 0.22s ease, background-color 0.2s ease;
+  will-change: transform, opacity;
+}
+
+.topbar .createButton {
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+}
+
+.topbar .createButton svg {
+  fill: currentColor;
+}
+
+.createButton:hover {
+  background: var(--color-slate-800);
+}
+
+.createButtonSlot {
+  display: inline-flex;
   justify-content: flex-end;
-  min-width: 44px;
+  width: var(--create-slot-width);
+  flex: 0 0 var(--create-slot-width);
+  overflow: hidden;
+}
+
+.createButtonSlotVisible {
+  pointer-events: auto;
+}
+
+.createButtonSlotHidden {
+  pointer-events: none;
+}
+
+.createButtonVisible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.createButtonHidden {
+  opacity: 0;
+  transform: translate3d(12px, 0, 0) scale(0.94);
+  pointer-events: none;
+}
+
+.profile {
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
 }
 
 .teacherName {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--color-slate-900);
+  color: var(--color-slate-700);
   white-space: nowrap;
 }
 
-.topNav {
-  display: inline-flex;
-  background: var(--color-slate-50);
-  border: 1px solid var(--color-slate-200);
-  border-radius: 12px;
-  padding: 4px;
-  gap: 6px;
-}
+@media (max-width: 1199px) {
+  .title {
+    font-size: 28px;
+  }
 
-.topNavButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  border-radius: 10px;
-  color: var(--color-slate-900);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.topNavButton:hover {
-  background: var(--color-indigo-50);
-}
-
-.topNavActive {
-  background: var(--color-blue-600);
-  color: var(--color-white);
-  cursor: pointer;
-  border-color: var(--color-blue-600);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
-}
-
-.topNavActive:hover {
-  background: var(--color-blue-600);
-}
-
-.tabIcon {
-  display: inline-flex;
-  width: 18px;
-  height: 18px;
-}
-
-@media (max-width: 859px) {
-  .topbar {
+  .teacherName {
     display: none;
   }
 }
 
-@media (min-width: 860px) {
-  .topbarNav {
-    display: flex;
+@media (max-width: 1099px) {
+  .subtitle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton,
+  .createButton {
+    transition: none;
   }
 }
