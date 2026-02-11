@@ -4,9 +4,12 @@ import {
   addYears,
   endOfMonth,
   format,
+  isAfter,
+  isBefore,
   isSameDay,
   isSameMonth,
   isWithinInterval,
+  startOfDay,
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
@@ -36,6 +39,7 @@ type ClassNames = {
   day_range_start: string;
   day_range_end: string;
   day_outside: string;
+  day_disabled: string;
   day_today: string;
 };
 
@@ -51,6 +55,9 @@ type DayPickerProps = {
   classNames?: Partial<ClassNames>;
   numberOfMonths?: number;
   defaultMonth?: Date;
+  minDate?: Date;
+  maxDate?: Date;
+  disabled?: (date: Date) => boolean;
 } | {
   mode: 'range';
   selected?: DateRange;
@@ -61,6 +68,9 @@ type DayPickerProps = {
   classNames?: Partial<ClassNames>;
   numberOfMonths?: number;
   defaultMonth?: Date;
+  minDate?: Date;
+  maxDate?: Date;
+  disabled?: (date: Date) => boolean;
 };
 
 const mergeClassName = (base: string, override?: string) => `${base}${override ? ` ${override}` : ''}`;
@@ -75,6 +85,9 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   classNames,
   numberOfMonths = 1,
   defaultMonth,
+  minDate,
+  maxDate,
+  disabled,
 }) => {
   const timeZone = useTimeZone();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
@@ -92,6 +105,8 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   const [month, setMonth] = useState<Date>(() => initialMonth);
   const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
   const [yearPage, setYearPage] = useState(0);
+  const minBoundary = useMemo(() => (minDate ? startOfDay(minDate) : undefined), [minDate]);
+  const maxBoundary = useMemo(() => (maxDate ? startOfDay(maxDate) : undefined), [maxDate]);
 
   useEffect(() => {
     if (isRangeMode && selectedRange?.from && !isSameMonth(selectedRange.from, month)) {
@@ -152,20 +167,22 @@ export const DayPicker: React.FC<DayPickerProps> = ({
 
   const handleSelect = (date: Date) => {
     if (isRangeMode) {
+      const onRangeSelect = onSelect as ((range?: DateRange) => void) | undefined;
       const current = selectedRange ?? {};
       const hasCompleteRange = Boolean(current.from && current.to);
 
       if (!current.from || hasCompleteRange) {
-        onSelect?.({ from: date, to: undefined });
+        onRangeSelect?.({ from: date, to: undefined });
       } else if (current.from && !current.to) {
         if (date < current.from) {
-          onSelect?.({ from: date, to: undefined });
+          onRangeSelect?.({ from: date, to: undefined });
         } else {
-          onSelect?.({ from: current.from, to: date });
+          onRangeSelect?.({ from: current.from, to: date });
         }
       }
     } else {
-      onSelect?.(date);
+      const onSingleSelect = onSelect as ((nextDate?: Date) => void) | undefined;
+      onSingleSelect?.(date);
     }
 
     setMonth(date);
@@ -288,6 +305,10 @@ export const DayPicker: React.FC<DayPickerProps> = ({
 
               <div className={mergeClassName(styles.grid, classNames?.grid)}>
                 {days.map(({ date, outside }) => {
+                  const isDisabled =
+                    (minBoundary ? isBefore(date, minBoundary) : false) ||
+                    (maxBoundary ? isAfter(date, maxBoundary) : false) ||
+                    Boolean(disabled?.(date));
                   const isSelected = !isRangeMode && selectedDate ? isSameDay(selectedDate, date) : false;
                   const isRangeStart = Boolean(selectedRange?.from && isSameDay(selectedRange.from, date));
                   const isRangeEnd = Boolean(selectedRange?.to && isSameDay(selectedRange.to, date));
@@ -300,6 +321,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                   const today = isSameDay(date, todayZoned);
                   const classes = [styles.dayButton, classNames?.day];
                   if (outside) classes.push(styles.dayOutside, classNames?.day_outside);
+                  if (isDisabled) classes.push(styles.dayDisabled, classNames?.day_disabled);
                   if (isSelected) classes.push(styles.daySelected, classNames?.day_selected);
                   if (isRangeMode && isInRange) classes.push(styles.dayRange, classNames?.day_range);
                   if (isRangeMode && isRangeStart) classes.push(styles.dayRangeStart, classNames?.day_range_start);
@@ -312,6 +334,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                       type="button"
                       className={classes.filter(Boolean).join(' ')}
                       onClick={() => handleSelect(date)}
+                      disabled={isDisabled}
                     >
                       {format(date, 'd')}
                     </button>

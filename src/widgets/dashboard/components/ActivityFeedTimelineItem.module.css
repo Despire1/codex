@@ -1,0 +1,77 @@
+.root {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: stretch;
+}
+
+.track {
+  position: relative;
+  align-self: stretch;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 3px solid var(--color-slate-400, #94a3b8);
+  background: var(--color-white);
+  margin-top: 4px;
+}
+
+.dotSuccess {
+  border-color: var(--color-emerald-600, #059669);
+}
+
+.dotFailed {
+  border-color: var(--color-rose-600, #e11d48);
+}
+
+.dotInfo {
+  border-color: var(--color-blue-600, #2563eb);
+}
+
+.line {
+  position: absolute;
+  top: 18px;
+  left: 6px;
+  width: 2px;
+  bottom: -16px;
+  background: var(--color-slate-200);
+}
+
+.rootLast .line {
+  display: none;
+}
+
+.content {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 24px;
+}
+
+.time {
+  color: var(--color-slate-400);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.message {
+  color: var(--color-slate-700);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.message strong {
+  color: var(--color-slate-900);
+  font-weight: 700;
+}
+
+.details {
+  color: var(--color-slate-500);
+  font-size: 13px;
+  line-height: 1.35;
+}

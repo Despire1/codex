@@ -1,0 +1,105 @@
+.trigger {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.iconWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filterCounter {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-blue-600);
+  color: var(--color-white);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.filterPopover {
+  width: min(540px, calc(100vw - 24px));
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 14px;
+  overflow: visible;
+}
+
+.filtersPanel {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.categoryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.categoryButton {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-600);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.categoryButton.categoryButtonActive {
+  background: var(--color-slate-900);
+  color: var(--color-white);
+  border-color: var(--color-slate-900);
+}
+
+.controlsRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.controlItem {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-slate-500);
+}
+
+.studentControl {
+  width: 100%;
+}
+
+.dateRangeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.panelActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .dateRangeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .filterPopover {
+    width: min(520px, calc(100vw - 20px));
+  }
+}

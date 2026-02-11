@@ -26,6 +26,7 @@ declare module '@prisma/client' {
     notifyTeacherOnAutoPaymentReminder: boolean;
     notifyTeacherOnManualPaymentReminder: boolean;
     payments: Payment[];
+    activityEvents: ActivityEvent[];
     createdAt: Date;
   };
 
@@ -39,6 +40,7 @@ declare module '@prisma/client' {
     paymentRemindersEnabled: boolean;
     payments: Payment[];
     paymentEvents: PaymentEvent[];
+    activityEvents: ActivityEvent[];
     createdAt: Date;
   };
 
@@ -66,6 +68,7 @@ declare module '@prisma/client' {
     takenByStudentId: number | null;
     studentId: number;
     teacherId: bigint;
+    activityEvents: ActivityEvent[];
     createdAt: Date;
     updatedAt: Date;
     lastReminderAt: Date | null;
@@ -87,6 +90,7 @@ declare module '@prisma/client' {
     lastPaymentReminderAt: Date | null;
     paymentReminderCount: number;
     lastPaymentReminderSource: string | null;
+    activityEvents: ActivityEvent[];
     createdAt: Date;
   };
 
@@ -151,6 +155,24 @@ declare module '@prisma/client' {
     errorText: string | null;
     dedupeKey: string | null;
     createdAt: Date;
+  };
+
+  export type ActivityEvent = {
+    id: number;
+    teacherId: bigint;
+    studentId: number | null;
+    lessonId: number | null;
+    homeworkId: number | null;
+    category: string;
+    action: string;
+    status: string;
+    source: string;
+    title: string;
+    details: string | null;
+    payload: string | null;
+    occurredAt: Date;
+    createdAt: Date;
+    dedupeKey: string | null;
   };
 
   export type Session = {
@@ -235,6 +257,12 @@ declare module '@prisma/client' {
       create(args: any): PrismaPromise<TransferToken>;
       findFirst(args: any): PrismaPromise<TransferToken | null>;
       updateMany(args: any): PrismaPromise<any>;
+    };
+    activityEvent: {
+      findUnique(args: any): PrismaPromise<ActivityEvent | null>;
+      findMany(args?: any): PrismaPromise<ActivityEvent[]>;
+      create(args: any): PrismaPromise<ActivityEvent>;
+      createMany(args: any): PrismaPromise<any>;
     };
     $transaction<T>(promises: PrismaPromise<T>[]): PrismaPromise<T[]>;
   }

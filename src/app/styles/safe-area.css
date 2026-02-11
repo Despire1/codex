@@ -22,7 +22,7 @@ body {
 }
 
 #app {
-  min-height: var(--app-vh);
+  min-height: min(var(--app-vh), 100vh);
 }
 
 .app-content {
@@ -30,7 +30,7 @@ body {
   background: var(--app-safe-top-bg);
   padding-top: calc(var(--app-safe-top) + var(--app-safe-top-extra) + var(--app-safe-top-boost));
   padding-right: var(--app-safe-right);
-  padding-bottom: var(--app-safe-bottom);
+  padding-bottom: min(var(--app-safe-bottom), 48px);
   padding-left: var(--app-safe-left);
 }
 

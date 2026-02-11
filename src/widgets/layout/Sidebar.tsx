@@ -4,7 +4,7 @@ import { sidebarNavItems, type SidebarNavItem } from './model/navigation';
 import styles from './Sidebar.module.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'tb_sidebar_collapsed';
-const HOVER_EXPAND_DELAY_MS = 2000;
+const HOVER_EXPAND_DELAY_MS = 1500;
 const HOVER_COLLAPSE_DELAY_MS = 1000;
 
 interface SidebarProps {
@@ -141,12 +141,17 @@ export const Sidebar: FC<SidebarProps> = ({
     const active = isItemActive(item, pathname);
     const hasBadgeCount = typeof item.badgeCount === 'number';
     const hasBadge = hasBadgeCount || item.hasUnreadDot;
+    const navLinkClassName = `${styles.navLink} ${active ? styles.navLinkActive : ''}`;
+    const navMetaClassName = `${styles.navMeta} ${isCollapsed ? styles.navMetaHidden : ''}`;
+    const navCollapsedIndicatorClassName = `${styles.navCollapsedIndicator} ${
+      isCollapsed && hasBadge ? styles.navCollapsedIndicatorVisible : ''
+    }`;
 
     return (
       <a
         key={item.id}
         href={item.href}
-        className={`${styles.navLink} ${active ? styles.navLinkActive : ''}`}
+        className={navLinkClassName}
         onClick={(event) => onItemClick(event, item)}
         aria-current={active ? 'page' : undefined}
         title={isCollapsed ? item.label : undefined}
@@ -155,9 +160,13 @@ export const Sidebar: FC<SidebarProps> = ({
           <item.icon width={20} height={20} />
         </span>
         <span className={styles.navLabel}>{item.label}</span>
-        {!isCollapsed && hasBadgeCount && <span className={styles.navBadge}>{item.badgeCount}</span>}
-        {!isCollapsed && !hasBadgeCount && item.hasUnreadDot && <span className={styles.navDot} aria-hidden />}
-        {isCollapsed && hasBadge && <span className={styles.navCollapsedIndicator} aria-hidden />}
+        {hasBadge ? (
+          <span className={navMetaClassName} aria-hidden={isCollapsed}>
+            {hasBadgeCount ? <span className={styles.navBadge}>{item.badgeCount}</span> : null}
+            {!hasBadgeCount && item.hasUnreadDot ? <span className={styles.navDot} aria-hidden /> : null}
+          </span>
+        ) : null}
+        {hasBadge ? <span className={navCollapsedIndicatorClassName} aria-hidden /> : null}
       </a>
     );
   };

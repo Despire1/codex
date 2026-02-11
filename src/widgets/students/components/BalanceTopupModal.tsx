@@ -3,6 +3,7 @@ import { formatInTimeZone, toUtcDateFromTimeZone } from '../../../shared/lib/tim
 import { PaymentEventType, Student, TeacherStudent } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { NumberInput } from '../../../shared/ui/NumberInput/NumberInput';
+import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import styles from '../StudentsSection.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
@@ -183,6 +184,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
               onChange={handleLessonChange}
               step={1}
               ariaLabel="Изменить баланс занятий"
+              disallowZero
             />
           </label>
           <label className={styles.modalField}>
@@ -209,15 +211,14 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
               placeholder="Комментарий"
             />
           </label>
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Дата и время</span>
-            <input
-              className={styles.modalInput}
-              type="datetime-local"
-              value={dateTime}
-              onChange={(event) => setDateTime(event.target.value)}
-            />
-          </label>
+          <DatePickerField
+            className={styles.modalField}
+            label="Дата и время"
+            value={dateTime}
+            onChange={(nextValue) => setDateTime(nextValue ?? defaultDateTime(timeZone))}
+            mode="datetime"
+            minuteStep={5}
+          />
           {errorMessage && <div className={styles.modalError}>{errorMessage}</div>}
         </div>
         <div className={`${styles.modalFooter} ${isMobile ? styles.modalFooterSticky : ''}`}>

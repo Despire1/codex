@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
 import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
@@ -40,6 +41,7 @@ import {
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
 import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
+import { listActivityFeedForTeacher, logActivityEvent } from './activityFeedService';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -79,7 +81,7 @@ const NOTIFICATION_TICK_MS = 60_000;
 const ONBOARDING_NUDGE_TICK_MS = 15 * 60_000;
 const ONBOARDING_NUDGE_DELAY_MS = 24 * 60 * 60 * 1000;
 const ONBOARDING_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 30);
+const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 0);
 const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
 const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
 let isLessonAutomationRunning = false;
@@ -138,8 +140,63 @@ const resolveNotificationTestExamples = (type: NotificationTestTemplateType, sou
   return type === 'LESSON_REMINDER' ? STUDENT_LESSON_TEMPLATE_EXAMPLES[key] : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[key];
 };
 
-const resolveStudentDisplayName = (link: { customName?: string | null }, student?: Student | null) =>
-  link.customName?.trim() || student?.username?.trim() || 'ученик';
+const resolveStudentDisplayName = (
+  link: { customName?: string | null },
+  student?: Student | null,
+  options?: { preferCustomOnly?: boolean },
+) => {
+  const customName = link.customName?.trim() ?? '';
+  if (customName) return customName;
+  if (options?.preferCustomOnly) return 'ученик';
+  return student?.username?.trim() || 'ученик';
+};
+
+const LESSON_WEEKDAY_LABELS_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'] as const;
+
+const uniqueStrings = (values: string[]) => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
+
+const resolveWeekdayLabels = (weekdays: number[]) =>
+  uniqueStrings(
+    weekdays
+      .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+      .map((day) => LESSON_WEEKDAY_LABELS_RU[day] ?? ''),
+  );
+
+const resolveLessonParticipantNames = (
+  studentIds: number[],
+  links: Array<{ studentId: number; customName?: string | null; student?: Student | null }>,
+) => {
+  const linkByStudentId = new Map<number, { studentId: number; customName?: string | null; student?: Student | null }>(
+    links.map((link) => [link.studentId, link]),
+  );
+  return uniqueStrings(
+    studentIds.map((studentId) => {
+      const link = linkByStudentId.get(studentId);
+      if (!link) return '';
+      return resolveStudentDisplayName(link, link.student ?? null, { preferCustomOnly: true });
+    }),
+  );
+};
+
+const resolveLessonParticipantNamesFromParticipants = (
+  participants: Array<{ studentId: number; student?: Student | null }>,
+  links?: Array<{ studentId: number; customName?: string | null; student?: Student | null }>,
+) => {
+  const linksByStudentId = new Map<number, { studentId: number; customName?: string | null; student?: Student | null }>(
+    (links ?? []).map((link) => [link.studentId, link]),
+  );
+  return uniqueStrings(
+    participants.map((participant) => {
+      const link = linksByStudentId.get(participant.studentId);
+      if (link) {
+        return resolveStudentDisplayName(link, link.student ?? participant.student ?? null, {
+          preferCustomOnly: true,
+        });
+      }
+      return '';
+    }),
+  );
+};
 
 const resolveMeetingLinkValue = (value: any) => {
   if (value === undefined) return undefined;
@@ -156,6 +213,15 @@ const resolveMeetingLinkValue = (value: any) => {
     throw new Error('Некорректная ссылка');
   }
   return normalized;
+};
+
+const safeLogActivityEvent = async (payload: Parameters<typeof logActivityEvent>[0]) => {
+  try {
+    await logActivityEvent(payload);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to log activity event', error);
+  }
 };
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
@@ -630,6 +696,29 @@ const updateSettings = async (user: User, body: any) => {
       })
     : user;
 
+  const changedTeacherKeys = Object.keys(data).filter((key) => (teacher as any)[key] !== (updatedTeacher as any)[key]);
+  const changedUserKeys = Object.keys(userData).filter((key) => (user as any)[key] !== (updatedUser as any)[key]);
+  if (changedTeacherKeys.length > 0 || changedUserKeys.length > 0) {
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      category: 'SETTINGS',
+      action: 'UPDATE_SETTINGS',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Обновлены настройки',
+      details: [
+        changedTeacherKeys.length > 0 ? `Teacher: ${changedTeacherKeys.join(', ')}` : null,
+        changedUserKeys.length > 0 ? `Profile: ${changedUserKeys.join(', ')}` : null,
+      ]
+        .filter(Boolean)
+        .join('; '),
+      payload: {
+        changedTeacherKeys,
+        changedUserKeys,
+      },
+    });
+  }
+
   return {
     settings: { ...pickTeacherSettings(updatedTeacher), receiptEmail: updatedUser.receiptEmail ?? null },
   };
@@ -891,6 +980,30 @@ const resolvePageParams = (url: URL) => {
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
   const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
   return { limit, offset };
+};
+
+const parseActivityCategories = (value?: string | null) => {
+  if (!value) return undefined;
+  const categories = value
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean)
+    .filter(
+      (item): item is 'LESSON' | 'STUDENT' | 'HOMEWORK' | 'SETTINGS' | 'PAYMENT' | 'NOTIFICATION' =>
+        item === 'LESSON' ||
+        item === 'STUDENT' ||
+        item === 'HOMEWORK' ||
+        item === 'SETTINGS' ||
+        item === 'PAYMENT' ||
+        item === 'NOTIFICATION',
+    );
+  return categories.length > 0 ? categories : undefined;
+};
+
+const parseQueryDate = (value?: string | null) => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
 const isHomeworkDone = (homework: any) => normalizeTeacherStatus(homework.status) === 'DONE' || homework.isDone;
@@ -1211,6 +1324,21 @@ const listStudentPaymentReminders = async (
   };
 };
 
+const listActivityFeed = async (
+  user: User,
+  filters: {
+    limit?: number;
+    cursor?: string | null;
+    categories?: ('LESSON' | 'STUDENT' | 'HOMEWORK' | 'SETTINGS' | 'PAYMENT' | 'NOTIFICATION')[];
+    studentId?: number | null;
+    from?: Date;
+    to?: Date;
+  },
+) => {
+  const teacher = await ensureTeacher(user);
+  return listActivityFeedForTeacher(teacher.chatId, filters);
+};
+
 const listStudentLessons = async (
   user: User,
   studentId: number,
@@ -1439,7 +1567,7 @@ const listUnpaidLessons = async (user: User) => {
   });
 
   const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
-  const linkMap = new Map(links.map((link) => [link.studentId, link]));
+  const linkMap = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
 
   const entries = lessons.flatMap((lesson) => {
     const buildEntry = (studentId: number, price: number, student?: Student | null) => {
@@ -1524,6 +1652,16 @@ const addStudent = async (user: User, body: any) => {
         where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
         data: { isArchived: false, customName, pricePerLesson: normalizedPrice },
       });
+      await safeLogActivityEvent({
+        teacherId: teacher.chatId,
+        studentId: student.id,
+        category: 'STUDENT',
+        action: 'RESTORE',
+        status: 'SUCCESS',
+        source: 'USER',
+        title: `Ученик восстановлен: ${customName.trim()}`,
+        details: 'Ссылка преподавателя с учеником восстановлена из архива.',
+      });
       return { student, link: restoredLink };
     }
     return { student, link: existingLink };
@@ -1538,6 +1676,16 @@ const addStudent = async (user: User, body: any) => {
       balanceLessons: 0,
       pricePerLesson: normalizedPrice,
     },
+  });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: student.id,
+    category: 'STUDENT',
+    action: 'CREATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Добавлен ученик: ${customName.trim()}`,
+    details: normalizedUsername ? `username: @${normalizedUsername}` : null,
   });
   return { student, link };
 };
@@ -1585,6 +1733,17 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
     }),
   ]);
 
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId,
+    category: 'STUDENT',
+    action: 'UPDATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Обновлён ученик: ${customName.trim()}`,
+    details: `username: @${normalizedUsername}; pricePerLesson: ${Math.round(numericPrice)}`,
+  });
+
   return { student, link: updatedLink };
 };
 
@@ -1595,10 +1754,20 @@ const archiveStudentLink = async (user: User, studentId: number) => {
   });
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
-  return prisma.teacherStudent.update({
+  const updatedLink = await prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { isArchived: true },
   });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId,
+    category: 'STUDENT',
+    action: 'ARCHIVE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Ученик отправлен в архив: ${link.customName}`,
+  });
+  return updatedLink;
 };
 
 const toggleAutoReminder = async (user: User, studentId: number, value: boolean) => {
@@ -1607,10 +1776,21 @@ const toggleAutoReminder = async (user: User, studentId: number, value: boolean)
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
   if (!link || link.isArchived) throw new Error('Student link not found');
-  return prisma.teacherStudent.update({
+  const updatedLink = await prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
     data: { autoRemindHomework: value },
   });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId,
+    category: 'STUDENT',
+    action: 'TOGGLE_HOMEWORK_REMINDER',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Авто-напоминания по ДЗ ${value ? 'включены' : 'выключены'}`,
+    details: `Ученик: ${link.customName}`,
+  });
+  return updatedLink;
 };
 
 const updateStudentPaymentReminders = async (user: User, studentId: number, enabled: boolean) => {
@@ -1622,6 +1802,16 @@ const updateStudentPaymentReminders = async (user: User, studentId: number, enab
   const student = await prisma.student.update({
     where: { id: studentId },
     data: { paymentRemindersEnabled: enabled },
+  });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId,
+    category: 'STUDENT',
+    action: 'TOGGLE_PAYMENT_REMINDER',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Напоминания об оплате ${enabled ? 'включены' : 'выключены'}`,
+    details: `Ученик: ${link.customName}`,
   });
   return { student };
 };
@@ -1635,11 +1825,22 @@ const updatePricePerLesson = async (user: User, studentId: number, value: number
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  return prisma.teacherStudent.update({
+  const nextPrice = Math.round(value);
+  const updatedLink = await prisma.teacherStudent.update({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    data: { pricePerLesson: Math.round(value) },
+    data: { pricePerLesson: nextPrice },
   });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId,
+    category: 'STUDENT',
+    action: 'UPDATE_PRICE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: `Изменена цена занятия: ${nextPrice} ₽`,
+    details: `Ученик: ${link.customName}`,
+  });
+  return updatedLink;
 };
 
 const adjustBalance = async (
@@ -1834,7 +2035,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
   const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
 
   return prisma.$transaction(async (tx) => {
-    const updatedLinks: any[] = [];
+    const nextLinksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
     const participantPriceMap = new Map<number, number>();
     const existingPayments = await tx.payment.findMany({ where: { lessonId: lesson.id } });
     const paymentTeacherStudentIds = new Set(existingPayments.map((payment) => payment.teacherStudentId));
@@ -1876,7 +2077,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
         where: { id: link.id },
         data: { balanceLessons: nextBalance },
       });
-      updatedLinks.push(savedLink);
+      nextLinksByStudentId.set(savedLink.studentId, savedLink);
 
       if (!paymentTeacherStudentIds.has(link.id)) {
         await tx.payment.create({
@@ -1940,7 +2141,7 @@ const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
       include: { participants: { include: { student: true } } },
     });
 
-    return { lesson: updatedLesson, links: updatedLinks };
+    return { lesson: updatedLesson, links: Array.from(nextLinksByStudentId.values()) };
   });
 };
 
@@ -1966,7 +2167,7 @@ const createHomework = async (user: User, body: any) => {
   const parsedTimeSpent = parseTimeSpentMinutes(timeSpentMinutes);
   const completedAt = normalizedStatus === 'DONE' ? new Date() : null;
 
-  return prisma.homework.create({
+  const homework = await prisma.homework.create({
     data: {
       studentId: Number(studentId),
       teacherId: teacher.chatId,
@@ -1979,6 +2180,18 @@ const createHomework = async (user: User, body: any) => {
       completedAt,
     },
   });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: Number(studentId),
+    homeworkId: homework.id,
+    category: 'HOMEWORK',
+    action: 'CREATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Создано домашнее задание',
+    details: homework.text.slice(0, 140),
+  });
+  return homework;
 };
 
 const toggleHomework = async (user: User, homeworkId: number) => {
@@ -1989,7 +2202,7 @@ const toggleHomework = async (user: User, homeworkId: number) => {
   const nextIsDone = !homework.isDone;
   const nextStatus = nextIsDone ? 'DONE' : 'ASSIGNED';
 
-  return prisma.homework.update({
+  const updated = await prisma.homework.update({
     where: { id: homeworkId },
     data: {
       isDone: nextIsDone,
@@ -1997,6 +2210,17 @@ const toggleHomework = async (user: User, homeworkId: number) => {
       completedAt: nextIsDone ? new Date() : null,
     },
   });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: homework.studentId,
+    homeworkId,
+    category: 'HOMEWORK',
+    action: 'TOGGLE_DONE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: nextIsDone ? 'Домашка отмечена выполненной' : 'Домашка возвращена в активные',
+  });
+  return updated;
 };
 
 const updateHomework = async (user: User, homeworkId: number, body: any) => {
@@ -2027,7 +2251,19 @@ const updateHomework = async (user: User, homeworkId: number, body: any) => {
     }
   }
 
-  return prisma.homework.update({ where: { id: homeworkId }, data: payload });
+  const updatedHomework = await prisma.homework.update({ where: { id: homeworkId }, data: payload });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: homework.studentId,
+    homeworkId,
+    category: 'HOMEWORK',
+    action: 'UPDATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Обновлено домашнее задание',
+    details: Object.keys(payload).length > 0 ? `Поля: ${Object.keys(payload).join(', ')}` : null,
+  });
+  return updatedHomework;
 };
 
 const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
@@ -2058,7 +2294,7 @@ const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
     throw error;
   }
 
-  return prisma.homework.update({
+  const updatedHomework = await prisma.homework.update({
     where: { id: homeworkId },
     data: {
       status: 'IN_PROGRESS',
@@ -2067,6 +2303,18 @@ const takeHomeworkInWork = async (homeworkId: number, req: IncomingMessage) => {
       takenByStudentId: requesterStudentId,
     },
   });
+  await safeLogActivityEvent({
+    teacherId: homework.teacherId,
+    studentId: requesterStudentId,
+    homeworkId,
+    category: 'HOMEWORK',
+    action: 'TAKE_IN_WORK',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Ученик взял домашку в работу',
+    details: `studentId: ${requesterStudentId}`,
+  });
+  return updatedHomework;
 };
 
 const deleteHomework = async (user: User, homeworkId: number) => {
@@ -2075,6 +2323,18 @@ const deleteHomework = async (user: User, homeworkId: number) => {
   if (!homework || homework.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
 
   await prisma.homework.delete({ where: { id: homeworkId } });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: homework.studentId,
+    homeworkId: null,
+    category: 'HOMEWORK',
+    action: 'DELETE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Удалено домашнее задание',
+    details: homework.text.slice(0, 140),
+    payload: { deletedHomeworkId: homeworkId },
+  });
   return { id: homeworkId };
 };
 
@@ -2117,9 +2377,11 @@ const createLesson = async (user: User, body: any) => {
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
+    include: { student: true },
   });
   const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
+  const participantNames = resolveLessonParticipantNames(studentIds, links);
 
   const lesson = await prisma.lesson.create({
     data: {
@@ -2193,8 +2455,44 @@ const createLesson = async (user: User, body: any) => {
       },
     });
 
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: updated.studentId,
+      lessonId: updated.id,
+      category: 'LESSON',
+      action: 'CREATE',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Создано и оплачено занятие',
+      payload: {
+        lessonStartAt: updated.startAt.toISOString(),
+        durationMinutes: updated.durationMinutes,
+        studentIds,
+        studentNames: participantNames,
+        isPaidAtCreation: true,
+      },
+    });
+
     return updated;
   }
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: lesson.studentId,
+    lessonId: lesson.id,
+    category: 'LESSON',
+    action: 'CREATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Создано занятие',
+    payload: {
+      lessonStartAt: lesson.startAt.toISOString(),
+      durationMinutes: lesson.durationMinutes,
+      studentIds,
+      studentNames: participantNames,
+      isPaidAtCreation: false,
+    },
+  });
 
   return lesson;
 };
@@ -2234,10 +2532,12 @@ const createRecurringLessons = async (user: User, body: any) => {
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
+    include: { student: true },
   });
 
   const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
+  const participantNames = resolveLessonParticipantNames(studentIds, links);
 
   const maxEndDate = addYears(seriesStart, 1);
   const requestedEndDate = repeatUntil ? new Date(repeatUntil) : null;
@@ -2365,6 +2665,27 @@ const createRecurringLessons = async (user: User, body: any) => {
     }
   }
 
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: studentIds[0] ?? null,
+    category: 'LESSON',
+    action: 'CREATE_RECURRING',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Создана серия занятий',
+    payload: {
+      recurrenceGroupId,
+      lessonStartAt: seriesStart.toISOString(),
+      createdCount: created.length,
+      repeatWeekdays: weekdays,
+      repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
+      repeatUntil: endDate.toISOString(),
+      studentIds,
+      studentNames: participantNames,
+      isPaidAtCreation: markPaid,
+    },
+  });
+
   return created;
 };
 
@@ -2399,7 +2720,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     durationMinutes !== undefined && durationMinutes !== null ? Number(durationMinutes) : existing.durationMinutes;
   if (!Number.isFinite(nextDuration) || nextDuration <= 0) throw new Error('Длительность должна быть больше нуля');
 
-  const links = await prisma.teacherStudent.findMany({
+  const activeLinks = await prisma.teacherStudent.findMany({
     where: {
       teacherId: teacher.chatId,
       studentId: { in: ids },
@@ -2407,13 +2728,26 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     },
   });
 
-  if (links.length !== ids.length) {
+  if (activeLinks.length !== ids.length) {
     throw new Error('Некоторые ученики не найдены у текущего преподавателя');
   }
+
+  const previousParticipantIds = existing.participants.map((participant: any) => participant.studentId);
+  const allParticipantIds = Array.from(new Set([...ids, ...previousParticipantIds]));
+  const allLinks = await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: { in: allParticipantIds },
+    },
+    include: { student: true },
+  });
 
   const students = await prisma.student.findMany({
     where: { id: { in: ids } },
   });
+
+  const nextParticipantNames = resolveLessonParticipantNames(ids, allLinks as any);
+  const previousParticipantNames = resolveLessonParticipantNames(previousParticipantIds, allLinks as any);
 
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   const existingLesson = existing as any;
@@ -2431,7 +2765,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       where: { lessonId },
     });
 
-    return prisma.lesson.update({
+    const detachedLesson = await prisma.lesson.update({
       where: { id: lessonId },
       data: {
         studentId: ids[0],
@@ -2460,6 +2794,25 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         },
       },
     });
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: detachedLesson.studentId,
+      lessonId: detachedLesson.id,
+      category: 'LESSON',
+      action: 'DETACH_FROM_SERIES',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Занятие отделено от серии',
+      payload: {
+        lessonStartAt: detachedLesson.startAt.toISOString(),
+        previousLessonStartAt: new Date(existingLesson.startAt).toISOString(),
+        durationMinutes: detachedLesson.durationMinutes,
+        studentIds: ids,
+        studentNames: nextParticipantNames,
+        previousStudentNames: previousParticipantNames,
+      },
+    });
+    return detachedLesson;
   }
 
   if (!existingLesson.isRecurring && weekdays.length > 0 && repeatWeekdays) {
@@ -2528,6 +2881,29 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     if (seriesLessons.length === 0) {
       throw new Error('Не найдено дат для создания повторяющихся уроков');
     }
+
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: ids[0] ?? null,
+      lessonId: null,
+      category: 'LESSON',
+      action: 'CONVERT_TO_SERIES',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Одиночное занятие преобразовано в серию',
+      payload: {
+        convertedFromLessonId: lessonId,
+        recurrenceGroupId,
+        lessonStartAt: seriesStart.toISOString(),
+        createdCount: seriesLessons.length,
+        repeatWeekdays: weekdays,
+        repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
+        repeatUntil: recurrenceEnd.toISOString(),
+        studentIds: ids,
+        studentNames: nextParticipantNames,
+        previousStudentNames: previousParticipantNames,
+      },
+    });
 
     return { lessons: seriesLessons };
   }
@@ -2609,6 +2985,28 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       throw new Error('Не найдено дат для обновления серии');
     }
 
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: ids[0] ?? null,
+      lessonId,
+      category: 'LESSON',
+      action: 'UPDATE_SERIES',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Серия занятий обновлена',
+      payload: {
+        recurrenceGroupId: existingLesson.recurrenceGroupId,
+        lessonStartAt: targetStart.toISOString(),
+        updatedCount: seriesLessons.length,
+        repeatWeekdays: weekdays,
+        repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
+        repeatUntil: recurrenceEnd.toISOString(),
+        studentIds: ids,
+        studentNames: nextParticipantNames,
+        previousStudentNames: previousParticipantNames,
+      },
+    });
+
     return { lessons: seriesLessons };
   }
 
@@ -2635,7 +3033,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     updatePayload.meetingLink = requestedMeetingLink;
   }
 
-  return prisma.lesson.update({
+  const updatedLesson = await prisma.lesson.update({
     where: { id: lessonId },
     data: updatePayload,
     include: {
@@ -2646,21 +3044,117 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       },
     },
   });
+
+  const nextStudentIds = updatedLesson.participants.map((participant: any) => participant.studentId);
+  const nextStudentNames = resolveLessonParticipantNames(nextStudentIds, allLinks as any);
+  const previousStudentIdsSorted = [...previousParticipantIds].sort((left, right) => left - right);
+  const nextStudentIdsSorted = [...nextStudentIds].sort((left, right) => left - right);
+  const participantsChanged =
+    previousStudentIdsSorted.length !== nextStudentIdsSorted.length ||
+    previousStudentIdsSorted.some((studentId, index) => studentId !== nextStudentIdsSorted[index]);
+
+  const changedFields: string[] = [];
+  if (existingLesson.startAt.getTime() !== updatedLesson.startAt.getTime()) changedFields.push('date_time');
+  if (existingLesson.durationMinutes !== updatedLesson.durationMinutes) changedFields.push('duration');
+  if (participantsChanged) changedFields.push('participants');
+  if ((existingLesson.meetingLink ?? null) !== (updatedLesson.meetingLink ?? null)) changedFields.push('meeting_link');
+  if (existingLesson.color !== updatedLesson.color) changedFields.push('color');
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: updatedLesson.studentId,
+    lessonId: updatedLesson.id,
+    category: 'LESSON',
+    action: 'UPDATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Занятие обновлено',
+    payload: {
+      lessonStartAt: updatedLesson.startAt.toISOString(),
+      previousLessonStartAt: existingLesson.startAt.toISOString(),
+      durationMinutes: updatedLesson.durationMinutes,
+      previousDurationMinutes: existingLesson.durationMinutes,
+      studentIds: nextStudentIds,
+      studentNames: nextStudentNames,
+      previousStudentNames: previousParticipantNames,
+      changedFields,
+    },
+  });
+  return updatedLesson;
 };
 
 const deleteLesson = async (user: User, lessonId: number, applyToSeries?: boolean) => {
   const teacher = await ensureTeacher(user);
-  const lesson = (await prisma.lesson.findUnique({ where: { id: lessonId } })) as any;
+  const lesson = (await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: {
+      participants: {
+        include: { student: true },
+      },
+    },
+  })) as any;
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  const lessonStudentIds: number[] = Array.from(
+    new Set<number>(
+      lesson.participants && lesson.participants.length > 0
+        ? lesson.participants.map((participant: any) => Number(participant.studentId))
+        : [Number(lesson.studentId)],
+    ),
+  ).filter((studentId) => Number.isFinite(studentId));
+  const lessonLinks = await prisma.teacherStudent.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      studentId: { in: lessonStudentIds },
+    },
+    include: { student: true },
+  });
+  const lessonStudentNames = resolveLessonParticipantNames(lessonStudentIds, lessonLinks as any);
 
   if (applyToSeries && lesson.isRecurring && lesson.recurrenceGroupId) {
     const deleted = await (prisma.lesson as any).deleteMany({
       where: { teacherId: teacher.chatId, recurrenceGroupId: lesson.recurrenceGroupId },
     });
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: lesson.studentId,
+      lessonId: null,
+      category: 'LESSON',
+      action: 'DELETE_SERIES',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Серия занятий удалена',
+      payload: {
+        recurrenceGroupId: lesson.recurrenceGroupId,
+        deletedFromLessonId: lessonId,
+        deletedCount: deleted?.count ?? 0,
+        lessonStartAt: new Date(lesson.startAt).toISOString(),
+        studentIds: lessonStudentIds,
+        studentNames: lessonStudentNames,
+        repeatWeekdays: parseWeekdays(lesson.recurrenceWeekdays),
+        repeatWeekdayLabels: resolveWeekdayLabels(parseWeekdays(lesson.recurrenceWeekdays)),
+      },
+    });
     return { deletedIds: [], deletedCount: deleted?.count ?? 0 };
   }
 
   await (prisma.lesson as any).delete({ where: { id: lessonId } });
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: lesson.studentId,
+    lessonId: null,
+    category: 'LESSON',
+    action: 'DELETE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Занятие удалено',
+    payload: {
+      deletedLessonId: lessonId,
+      lessonStartAt: new Date(lesson.startAt).toISOString(),
+      studentIds: lessonStudentIds,
+      studentNames: lessonStudentNames,
+    },
+  });
   return { deletedIds: [lessonId], deletedCount: 1 };
 };
 
@@ -2668,6 +3162,24 @@ const markLessonCompleted = async (user: User, lessonId: number) => {
   const teacher = await ensureTeacher(user);
   const { lesson, links } = await settleLessonPayments(lessonId, teacher.chatId);
   const primaryLink = links.find((link: any) => link.studentId === lesson.studentId) ?? null;
+  const participantIds = lesson.participants.map((participant: any) => participant.studentId);
+  const participantNames = resolveLessonParticipantNamesFromParticipants(lesson.participants as any, links as any);
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: lesson.studentId,
+    lessonId: lesson.id,
+    category: 'LESSON',
+    action: 'MARK_COMPLETED',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Занятие отмечено проведённым',
+    payload: {
+      lessonStartAt: lesson.startAt.toISOString(),
+      isPaid: lesson.isPaid,
+      studentIds: participantIds,
+      studentNames: participantNames,
+    },
+  });
   return { lesson, link: primaryLink };
 };
 
@@ -2869,9 +3381,28 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
   });
 
   if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+  const lessonParticipantIds = lesson.participants.map((participant: any) => participant.studentId);
 
   if (normalizedStatus === 'COMPLETED') {
-    return settleLessonPayments(lessonId, teacher.chatId);
+    const result = await settleLessonPayments(lessonId, teacher.chatId);
+    const participantIds = result.lesson.participants.map((participant: any) => participant.studentId);
+    const participantNames = resolveLessonParticipantNamesFromParticipants(result.lesson.participants as any, result.links as any);
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: result.lesson.studentId,
+      lessonId: result.lesson.id,
+      category: 'LESSON',
+      action: 'STATUS_COMPLETED',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Статус занятия: проведён',
+      payload: {
+        lessonStartAt: result.lesson.startAt.toISOString(),
+        studentIds: participantIds,
+        studentNames: participantNames,
+      },
+    });
+    return result;
   }
   if (normalizedStatus === 'CANCELED') {
     const result = await prisma.$transaction(async (tx) => {
@@ -2882,10 +3413,10 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
         where: { lessonId, type: 'ADJUSTMENT', reason: 'LESSON_CANCELED' },
       });
       const adjustedStudentIds = new Set(existingAdjustments.map((event: any) => event.studentId));
-      const autoChargeStudentIds = Array.from(new Set(autoChargeEvents.map((event: any) => event.studentId)));
-      const links = autoChargeStudentIds.length
+      const links = lessonParticipantIds.length
         ? await tx.teacherStudent.findMany({
-            where: { teacherId: teacher.chatId, studentId: { in: autoChargeStudentIds }, isArchived: false },
+            where: { teacherId: teacher.chatId, studentId: { in: lessonParticipantIds }, isArchived: false },
+            include: { student: true },
           })
         : [];
       const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
@@ -2926,9 +3457,9 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
         where: { id: lessonId },
         data: {
           status: normalizedStatus,
-          isPaid: normalizedStatus === 'COMPLETED' ? participantsPaid : false,
-          paymentStatus: normalizedStatus === 'COMPLETED' ? (participantsPaid ? 'PAID' : 'UNPAID') : 'UNPAID',
-          paidSource: normalizedStatus === 'COMPLETED' && participantsPaid ? 'MANUAL' : 'NONE',
+          isPaid: false,
+          paymentStatus: 'UNPAID',
+          paidSource: 'NONE',
         },
         include: { participants: { include: { student: true } } },
       });
@@ -2936,6 +3467,24 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
       return { lesson: updatedLesson, links };
     });
 
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: result.lesson.studentId,
+      lessonId: result.lesson.id,
+      category: 'LESSON',
+      action: 'STATUS_CANCELED',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Статус занятия: отменён',
+      payload: {
+        lessonStartAt: result.lesson.startAt.toISOString(),
+        studentIds: result.lesson.participants.map((participant: any) => participant.studentId),
+        studentNames: resolveLessonParticipantNamesFromParticipants(
+          result.lesson.participants as any,
+          result.links as any,
+        ),
+      },
+    });
     return result;
   }
 
@@ -2943,6 +3492,29 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
     where: { id: lessonId },
     data: { status: normalizedStatus, isPaid: false, paymentStatus: 'UNPAID', paidSource: 'NONE' },
     include: { participants: { include: { student: true } } },
+  });
+  const updatedLessonParticipantIds = updatedLesson.participants.map((participant: any) => participant.studentId);
+  const updatedLessonLinks = updatedLessonParticipantIds.length
+    ? await prisma.teacherStudent.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: updatedLessonParticipantIds }, isArchived: false },
+        include: { student: true },
+      })
+    : [];
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: updatedLesson.studentId,
+    lessonId: updatedLesson.id,
+    category: 'LESSON',
+    action: 'STATUS_SCHEDULED',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Статус занятия: запланирован',
+    payload: {
+      lessonStartAt: updatedLesson.startAt.toISOString(),
+      studentIds: updatedLessonParticipantIds,
+      studentNames: resolveLessonParticipantNames(updatedLessonParticipantIds, updatedLessonLinks as any),
+    },
   });
 
   return { lesson: updatedLesson, links: [] as any[] };
@@ -3030,7 +3602,7 @@ const remindLessonPayment = async (
   if (teacher.notifyTeacherOnManualPaymentReminder) {
     await sendTeacherPaymentReminderNotice({
       teacherId: teacher.chatId,
-      studentId: lesson.studentId,
+      studentId: resolvedStudentId,
       lessonId,
       source: 'MANUAL',
     });
@@ -3053,6 +3625,18 @@ const sendHomeworkToStudent = async (user: User, homeworkId: number) => {
     data: { status: nextStatus, isDone: nextStatus === 'DONE' ? true : homework.isDone },
   });
 
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: homework.studentId,
+    homeworkId,
+    category: 'HOMEWORK',
+    action: 'SEND',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Домашка отправлена ученику',
+    details: `Статус: ${nextStatus}`,
+  });
+
   return { status: 'queued', homework: updated };
 };
 
@@ -3064,6 +3648,17 @@ const remindHomeworkById = async (user: User, homeworkId: number) => {
   const result = await prisma.homework.update({
     where: { id: homeworkId },
     data: { lastReminderAt: new Date(), status: homework.status === 'DRAFT' ? 'ASSIGNED' : homework.status },
+  });
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: homework.studentId,
+    homeworkId,
+    category: 'HOMEWORK',
+    action: 'REMIND',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Отправлено напоминание по домашке',
   });
 
   return { status: 'queued', homework: result };
@@ -3108,6 +3703,7 @@ const runLessonAutomationTick = async () => {
     if (teacher.autoConfirmLessons) {
       const scheduledLessons = await prisma.lesson.findMany({
         where: { teacherId: teacher.chatId, status: 'SCHEDULED', startAt: { lt: now } },
+        include: { participants: { include: { student: true } } },
       });
 
       const dueLessons = scheduledLessons.filter((lesson) => {
@@ -3117,9 +3713,32 @@ const runLessonAutomationTick = async () => {
 
       for (const lesson of dueLessons) {
         try {
-          await prisma.lesson.update({
+          const updatedLesson = await prisma.lesson.update({
             where: { id: lesson.id },
             data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
+            include: { participants: { include: { student: true } } },
+          });
+          const participantIds = updatedLesson.participants.map((participant: any) => participant.studentId);
+          const participantLinks = participantIds.length
+            ? await prisma.teacherStudent.findMany({
+                where: { teacherId: teacher.chatId, studentId: { in: participantIds }, isArchived: false },
+                include: { student: true },
+              })
+            : [];
+          await safeLogActivityEvent({
+            teacherId: teacher.chatId,
+            studentId: updatedLesson.studentId,
+            lessonId: updatedLesson.id,
+            category: 'LESSON',
+            action: 'AUTO_COMPLETE',
+            status: 'SUCCESS',
+            source: 'AUTO',
+            title: 'Занятие автоматически отмечено проведённым',
+            payload: {
+              lessonStartAt: updatedLesson.startAt.toISOString(),
+              studentIds: participantIds,
+              studentNames: resolveLessonParticipantNames(participantIds, participantLinks as any),
+            },
           });
         } catch (error) {
           // eslint-disable-next-line no-console
@@ -3423,14 +4042,16 @@ const cleanupTransferTokens = async () => {
 };
 
 const resolveNotificationLogRetentionDays = () => {
-  const normalized = Number.isFinite(NOTIFICATION_LOG_RETENTION_DAYS)
-    ? NOTIFICATION_LOG_RETENTION_DAYS
-    : MAX_NOTIFICATION_LOG_RETENTION_DAYS;
+  if (!Number.isFinite(NOTIFICATION_LOG_RETENTION_DAYS) || NOTIFICATION_LOG_RETENTION_DAYS <= 0) {
+    return null;
+  }
+  const normalized = NOTIFICATION_LOG_RETENTION_DAYS;
   return Math.min(Math.max(normalized, MIN_NOTIFICATION_LOG_RETENTION_DAYS), MAX_NOTIFICATION_LOG_RETENTION_DAYS);
 };
 
 const cleanupNotificationLogs = async () => {
   const retentionDays = resolveNotificationLogRetentionDays();
+  if (!retentionDays) return;
   const cutoff = addDays(new Date(), -retentionDays);
   await prisma.notificationLog.deleteMany({
     where: {
@@ -3899,6 +4520,29 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           ? data.entries.filter((entry) => entry.studentId === requestedStudentId)
           : data.entries;
       return sendJson(res, 200, { entries: filteredEntries });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/activity-feed') {
+      if (role === 'STUDENT') {
+        return sendJson(res, 403, { message: 'forbidden' });
+      }
+      const limit = Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE);
+      const cursor = url.searchParams.get('cursor');
+      const categories = parseActivityCategories(url.searchParams.get('categories'));
+      const studentIdParam = url.searchParams.get('studentId');
+      const studentIdRaw = studentIdParam === null ? Number.NaN : Number(studentIdParam);
+      const studentId = Number.isFinite(studentIdRaw) && studentIdRaw > 0 ? studentIdRaw : null;
+      const from = parseQueryDate(url.searchParams.get('from'));
+      const to = parseQueryDate(url.searchParams.get('to'));
+      const data = await listActivityFeed(requireApiUser(), {
+        limit,
+        cursor,
+        categories,
+        studentId,
+        from,
+        to,
+      });
+      return sendJson(res, 200, data);
     }
 
     if (req.method === 'GET' && pathname === '/api/lessons') {

@@ -907,7 +907,7 @@
 .balanceRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  min-width: 0;
 }
 
 .summaryLabel {
@@ -1013,22 +1013,70 @@
   color: #188542;
 }
 
-.balanceButton {
+.balanceTrigger {
   border: none;
   background: transparent;
   padding: 0;
   cursor: pointer;
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.balanceLabel {
+  transition: color 0.2s ease;
+}
+
+.balanceValue {
+  display: inline-flex;
+  align-items: baseline;
   gap: 6px;
   font-weight: 800;
   font-size: 16px;
   color: var(--color-blue-700);
+  transition: color 0.2s ease;
 }
 
-.balanceButton:hover {
-  text-decoration: underline;
+.balanceValueNumber {
+  --balance-underline-color: var(--color-slate-600);
+  position: relative;
+  display: inline-block;
+  line-height: 1.15;
+}
+
+.balanceValueNumber::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--balance-underline-color) 0 2.6px,
+    transparent 3.1px 4.2px
+  );
+  pointer-events: none;
+}
+
+.balanceTrigger:hover .balanceLabel {
+  color: var(--color-gray-500);
+}
+
+.balanceTrigger:hover .balanceValue {
   color: #1e40af;
+}
+
+.balanceTrigger:hover .balanceValueNumber {
+  --balance-underline-color: var(--color-slate-700);
+}
+
+.balanceTrigger:focus-visible {
+  outline: none;
+}
+
+.balanceTrigger:focus-visible .balanceValueNumber {
+  --balance-underline-color: var(--color-blue-600);
 }
 
 .summaryDivider {
@@ -2181,8 +2229,9 @@
 .modalInput:focus,
 .modalTextarea:focus,
 .modalSelect:focus {
-  outline: 2px solid var(--primary-weak);
+  outline: none;
   border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-weak);
 }
 
 .inputLabel {

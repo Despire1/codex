@@ -178,6 +178,26 @@ export const StudentHero: FC<StudentHeroProps> = ({
     );
   };
 
+  const renderBalanceTrigger = () => {
+    const balanceValue = selectedStudent.link.balanceLessons;
+
+    return (
+      <button
+        type="button"
+        className={styles.balanceTrigger}
+        onClick={onOpenBalanceTopup}
+        title="Нажмите, чтобы изменить баланс"
+        aria-label={`Изменить баланс. Текущий баланс: ${balanceValue}`}
+      >
+        <span className={`${styles.summaryLabel} ${styles.balanceLabel}`}>Баланс:</span>
+        <span className={styles.balanceValue}>
+          <span className={styles.balanceValueNumber}>{balanceValue}</span>
+          {balanceValue < 0 && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
+        </span>
+      </button>
+    );
+  };
+
   useEffect(() => {
     if (shouldAutoCloseDebt && previousDebtTotal.current > 0 && studentDebtTotal === 0) {
       setIsDebtPopoverOpen(false);
@@ -384,19 +404,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
         {!isMobile && (
           <div className={styles.summaryDesktopLine}>
             <div className={styles.balanceRow}>
-              <span className={styles.summaryLabel}>Баланс:</span>
-              <button
-                type="button"
-                className={styles.balanceButton}
-                onClick={onOpenBalanceTopup}
-                title="Нажмите, чтобы пополнить баланс"
-                aria-label="Нажмите, чтобы пополнить баланс"
-              >
-                {selectedStudent.link.balanceLessons}
-                {selectedStudent.link.balanceLessons < 0 && (
-                  <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-                )}
-              </button>
+              {renderBalanceTrigger()}
             </div>
             <span className={styles.summaryDivider}>|</span>
             <div className={styles.priceInline}>
@@ -470,19 +478,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
           <div className={styles.summaryMobileStack}>
             <div className={styles.summaryMobileRow}>
               <div className={styles.balanceRow}>
-                <span className={styles.summaryLabel}>Баланс:</span>
-                <button
-                  type="button"
-                  className={styles.balanceButton}
-                  onClick={onOpenBalanceTopup}
-                  title="Нажмите, чтобы пополнить баланс"
-                  aria-label="Нажмите, чтобы пополнить баланс"
-                >
-                  {selectedStudent.link.balanceLessons}
-                  {selectedStudent.link.balanceLessons < 0 && (
-                    <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>
-                  )}
-                </button>
+                {renderBalanceTrigger()}
               </div>
               <div className={styles.priceInline}>
                 <span className={styles.summaryLabel}>Цена:</span>

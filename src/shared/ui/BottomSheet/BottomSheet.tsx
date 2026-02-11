@@ -7,12 +7,19 @@ interface BottomSheetProps {
   onClose: () => void;
   children: ReactNode;
   className?: string;
+  contentScrollable?: boolean;
 }
 
 const ANIMATION_DURATION = 250;
 const CLOSE_THRESHOLD = 80;
 
-export const BottomSheet = ({ isOpen, onClose, children, className = '' }: BottomSheetProps) => {
+export const BottomSheet = ({
+  isOpen,
+  onClose,
+  children,
+  className = '',
+  contentScrollable = true,
+}: BottomSheetProps) => {
   const [isVisible, setIsVisible] = useState(isOpen);
   const [isPresented, setIsPresented] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -109,7 +116,7 @@ export const BottomSheet = ({ isOpen, onClose, children, className = '' }: Botto
           >
             <div className={styles.handle} />
           </div>
-          <div className={styles.content}>{children}</div>
+          <div className={`${styles.content} ${!contentScrollable ? styles.contentNoScroll : ''}`}>{children}</div>
         </div>
       </div>
     </>,

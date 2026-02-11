@@ -1,11 +1,15 @@
 import { addDays, format, isSameDay } from 'date-fns';
-import {type FC, useEffect, useMemo, useState} from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
 import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
+import { Modal } from '@/shared/ui/Modal/Modal';
 import { Badge } from '@/shared/ui/Badge/Badge';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
+import { ActivityFeedCard } from './components/ActivityFeedCard';
+import { ActivityFeedFullscreen } from './components/ActivityFeedFullscreen';
+import { ActivityFeedFiltersControl } from './components/ActivityFeedFiltersControl';
 import styles from './DashboardSection.module.css';
 import { WeeklyCalendar } from './components/WeeklyCalendar/WeeklyCalendar';
 import { getLessonColorVars } from '@/shared/lib/lessonColors';
@@ -15,6 +19,7 @@ import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timez
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useDashboardState } from './model/useDashboardState';
+import { DashboardActivityFilters, useDashboardActivityFeed } from './model/useDashboardActivityFeed';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -57,12 +62,38 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   const timeZone = useTimeZone();
   const { markLessonCompleted, togglePaid, remindLessonPayment } = useLessonActions();
   const { unpaidEntries, setWeekRange } = useDashboardState();
+  const {
+    items: activityItems,
+    loading: activityLoading,
+    loadingMore: activityLoadingMore,
+    hasMore: activityHasMore,
+    filters: activityFilters,
+    setFilters: setActivityFilters,
+    loadMore: loadMoreActivity,
+    refresh: refreshActivity,
+  } = useDashboardActivityFeed(timeZone);
   const now = new Date();
   const todayZoned = toZonedDate(now, timeZone);
+  const hasSyncedActivityForLessonsRef = useRef(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const isDashboardMobile = useIsMobile(1023);
   const showWeeklyCalendar = !isDashboardMobile;
+  const lessonsActivitySignature = useMemo(
+    () =>
+      lessons
+        .map((lesson) => {
+          const participantsSignature = (lesson.participants ?? [])
+            .map((participant) => `${participant.studentId}:${participant.isPaid ? 1 : 0}`)
+            .sort()
+            .join(',');
+          return `${lesson.id}:${lesson.status}:${lesson.startAt}:${lesson.durationMinutes}:${lesson.isPaid ? 1 : 0}:${participantsSignature}`;
+        })
+        .sort()
+        .join('|'),
+    [lessons],
+  );
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     return lessons.flatMap((lesson) => {
@@ -138,12 +169,68 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       studentCount: studentIds.size,
     };
   }, [unpaidEntries]);
+  const hasUnpaidLessons = unpaidSummary.lessonCount > 0;
+  const shouldPlaceActivityInUnpaidArea = !isDashboardMobile && !hasUnpaidLessons;
+  const activityAreaClassName = shouldPlaceActivityInUnpaidArea ? styles.unpaidArea : styles.activityArea;
+
+  const activityStudents = useMemo(() => {
+    const map = new Map<number, string>();
+    linkedStudents.forEach((student) => {
+      const name = student.link.customName?.trim() || student.username?.trim() || `Ученик #${student.id}`;
+      map.set(student.id, name);
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  }, [linkedStudents]);
+
+  const handleRemindLessonPayment = useCallback(
+    async (lessonId: number, studentId?: number) => {
+      const result = await remindLessonPayment(lessonId, studentId);
+      void refreshActivity();
+      return result;
+    },
+    [refreshActivity, remindLessonPayment],
+  );
+
+  const handleApplyActivityFilters = useCallback(
+    (next: DashboardActivityFilters) => {
+      setActivityFilters(next);
+    },
+    [setActivityFilters],
+  );
+
+  const activityFiltersCount = useMemo(() => {
+    let count = 0;
+    if (activityFilters.categories.length > 0) count += 1;
+    if (activityFilters.studentId !== null) count += 1;
+    if (activityFilters.from) count += 1;
+    if (activityFilters.to) count += 1;
+    return count;
+  }, [activityFilters.categories.length, activityFilters.from, activityFilters.studentId, activityFilters.to]);
+
+  const handleResetActivityFilters = useCallback(() => {
+    setActivityFilters({
+      categories: [],
+      studentId: null,
+      from: '',
+      to: '',
+    });
+  }, [setActivityFilters]);
 
   useEffect(() => {
     if (attentionItems.length === 0) {
       setIsAttentionOpen(false);
     }
   }, [attentionItems.length]);
+
+  useEffect(() => {
+    if (!hasSyncedActivityForLessonsRef.current) {
+      hasSyncedActivityForLessonsRef.current = true;
+      return;
+    }
+    void refreshActivity();
+  }, [lessonsActivitySignature, refreshActivity]);
 
   return (
     <section
@@ -236,7 +323,17 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         )}
       </div>
 
-      {unpaidSummary.lessonCount > 0 && (
+      <div className={`${styles.card} ${styles.activityCardShell} ${activityAreaClassName}`}>
+        <ActivityFeedCard
+          items={activityItems}
+          loading={activityLoading}
+          activeFiltersCount={activityFiltersCount}
+          onResetFilters={handleResetActivityFilters}
+          onOpen={() => setIsActivityOpen(true)}
+        />
+      </div>
+
+      {hasUnpaidLessons && (
         <div className={`${styles.unpaidCardWrapper} ${styles.unpaidArea}`}>
           {isDashboardMobile ? (
             <div className={`${styles.card} ${styles.unpaidCard}`}>
@@ -246,7 +343,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
                 onOpenStudent={onOpenStudent}
                 onTogglePaid={togglePaid}
-                onRemindLessonPayment={remindLessonPayment}
+                onRemindLessonPayment={handleRemindLessonPayment}
                 maxVisibleEntries={1}
                 showToggle={false}
               />
@@ -266,7 +363,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
                 onOpenStudent={onOpenStudent}
                 onTogglePaid={togglePaid}
-                onRemindLessonPayment={remindLessonPayment}
+                onRemindLessonPayment={handleRemindLessonPayment}
               />
             </div>
           )}
@@ -285,10 +382,35 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         </div>
       </div>
 
+      {!isDashboardMobile && (
+        <Modal
+          open={isActivityOpen}
+          onClose={() => setIsActivityOpen(false)}
+          title="Лента активности"
+          titleActions={
+            <ActivityFeedFiltersControl
+              filters={activityFilters}
+              students={activityStudents}
+              onApplyFilters={handleApplyActivityFilters}
+              popoverAlign="start"
+            />
+          }
+        >
+          <ActivityFeedFullscreen
+            items={activityItems}
+            loading={activityLoading}
+            loadingMore={activityLoadingMore}
+            hasMore={activityHasMore}
+            onLoadMore={loadMoreActivity}
+          />
+        </Modal>
+      )}
+
       <BottomSheet
         isOpen={isDashboardMobile && isUnpaidOpen}
         onClose={() => setIsUnpaidOpen(false)}
         className={styles.unpaidBottomSheet}
+        contentScrollable={false}
       >
         <UnpaidLessonsPopoverContent
           entries={unpaidEntries}
@@ -299,10 +421,36 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
             onOpenStudent(studentId);
           }}
           onTogglePaid={togglePaid}
-          onRemindLessonPayment={remindLessonPayment}
+          onRemindLessonPayment={handleRemindLessonPayment}
           showAll
           showToggle={false}
           stickyHeader
+          fitContainer
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isDashboardMobile && isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+        className={styles.activityBottomSheet}
+        contentScrollable={false}
+      >
+        <ActivityFeedFullscreen
+          items={activityItems}
+          loading={activityLoading}
+          loadingMore={activityLoadingMore}
+          hasMore={activityHasMore}
+          onLoadMore={loadMoreActivity}
+          headerTitle="Лента активности"
+          headerAction={
+            <ActivityFeedFiltersControl
+              filters={activityFilters}
+              students={activityStudents}
+              onApplyFilters={handleApplyActivityFilters}
+              popoverAlign="end"
+            />
+          }
+          fitContainer
         />
       </BottomSheet>
     </section>

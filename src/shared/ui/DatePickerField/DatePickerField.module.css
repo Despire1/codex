@@ -40,8 +40,9 @@
 }
 
 .control:focus-visible {
-  outline: 2px solid var(--primary-weak);
+  outline: none;
   border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-weak);
 }
 
 .value {
@@ -82,15 +83,56 @@
   overflow: hidden;
 }
 
-.popoverBottom {
-  top: calc(100% + 6px);
+.popoverDatetime {
+  max-width: min(460px, calc(100vw - 24px));
 }
 
-.popoverTop {
-  bottom: calc(100% + 6px);
+.pickerContent {
+  display: flex;
+  flex-direction: column;
 }
 
-.popoverRight {
-  left: auto;
-  right: 0;
+.timePanel {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-slate-50);
+}
+
+.timePanelLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.timeControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.timeField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.timeSelect {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--color-white);
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.timeSelect:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-weak);
 }

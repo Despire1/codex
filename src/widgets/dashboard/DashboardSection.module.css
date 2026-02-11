@@ -10,6 +10,7 @@
     'today'
     'upcoming'
     'unpaid'
+    'activity'
     'actions';
 }
 
@@ -18,6 +19,7 @@
     'today'
     'upcoming'
     'unpaid'
+    'activity'
     'actions';
 }
 
@@ -26,6 +28,7 @@
     'calendar'
     'upcoming'
     'unpaid'
+    'activity'
     'actions';
 }
 
@@ -34,6 +37,7 @@
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
     grid-template-areas:
       'attention today'
+      'upcoming activity'
       'upcoming unpaid'
       'upcoming actions';
   }
@@ -42,16 +46,17 @@
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
     grid-template-areas:
       'upcoming today'
+      'upcoming activity'
       'upcoming unpaid'
       'upcoming actions';
   }
 
   .gridWithCalendar {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
-      'calendar calendar'
-      'upcoming unpaid'
-      'actions actions';
+      'calendar calendar calendar'
+      'upcoming unpaid activity'
+      'actions actions actions';
   }
 }
 
@@ -61,6 +66,7 @@
   border-radius: 18px;
   padding: 14px;
   box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+  min-height: 0;
 }
 
 .cardHeader {
@@ -189,6 +195,11 @@
   max-height: 80vh;
 }
 
+.activityBottomSheet {
+  height: 85vh;
+  max-height: 85vh;
+}
+
 .actionsRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -211,6 +222,15 @@
 
 .upcomingArea {
   grid-area: upcoming;
+}
+
+.activityCardShell {
+  display: flex;
+  min-height: 0;
+}
+
+.activityArea {
+  grid-area: activity;
 }
 
 .unpaidArea {

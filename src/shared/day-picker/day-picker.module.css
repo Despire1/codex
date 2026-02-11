@@ -112,6 +112,23 @@
   box-shadow: 0 4px 12px var(--shadow-primary-16);
 }
 
+.dayDisabled,
+.dayButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--color-slate-50);
+  color: var(--color-slate-400);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.dayButton:disabled:hover {
+  background: var(--color-slate-50);
+  color: var(--color-slate-400);
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .dayOutside {
   color: var(--color-slate-300);
   background: var(--color-slate-50);

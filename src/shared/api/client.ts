@@ -1,4 +1,6 @@
 import {
+  ActivityCategory,
+  ActivityFeedListResponse,
   Homework,
   HomeworkAttachment,
   HomeworkStatus,
@@ -161,6 +163,26 @@ export const api = {
     return apiFetch<{ lessons: Lesson[] }>(`/api/lessons?${search.toString()}`);
   },
   listUnpaidLessons: () => apiFetch<{ entries: UnpaidLessonEntry[] }>('/api/lessons/unpaid'),
+  listActivityFeed: (params?: {
+    limit?: number;
+    cursor?: string | null;
+    categories?: ActivityCategory[];
+    studentId?: number;
+    from?: string;
+    to?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.cursor) query.set('cursor', params.cursor);
+    if (params?.categories && params.categories.length > 0) {
+      query.set('categories', params.categories.join(','));
+    }
+    if (typeof params?.studentId === 'number') query.set('studentId', String(params.studentId));
+    if (params?.from) query.set('from', params.from);
+    if (params?.to) query.set('to', params.to);
+    const suffix = query.toString();
+    return apiFetch<ActivityFeedListResponse>(`/api/activity-feed${suffix ? `?${suffix}` : ''}`);
+  },
   getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
   updateSettings: (payload: Partial<SettingsPayload>) =>
     apiFetch<{ settings: SettingsPayload }>('/api/settings', {

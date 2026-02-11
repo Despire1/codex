@@ -2,7 +2,6 @@ import { type FC, useEffect, useMemo, useRef } from 'react';
 import { LinkedStudent } from '../../../entities/types';
 import type { LessonModalFocus } from '../../lessons/model/types';
 import {
-  Autocomplete,
   Accordion,
   AccordionDetails,
   AccordionSummary,
@@ -17,6 +16,7 @@ import modalStyles from '../modal.module.css';
 import sheetStyles from './LessonModal.module.css';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
+import { StudentSelect } from '../../../shared/ui/StudentSelect';
 import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
 import { LessonColor } from '../../../entities/types';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
@@ -176,6 +176,14 @@ export const LessonModal: FC<LessonModalProps> = ({
     },
   } as const;
   const isSubmitDisabled = Boolean(meetingLinkError);
+  const studentSelectOptions = useMemo(
+    () =>
+      linkedStudents.map((student) => ({
+        id: student.id,
+        name: student.link.customName,
+      })),
+    [linkedStudents],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -263,25 +271,18 @@ export const LessonModal: FC<LessonModalProps> = ({
           <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Ученики</span>
-              <Autocomplete
-                multiple
-                id="students-autocomplete"
-                options={linkedStudents}
-                getOptionLabel={(option) => option.link.customName}
-                value={linkedStudents.filter((s) => draft.studentIds.includes(s.id))}
-                onChange={(_, newValue) => {
-                  const ids = (Array.isArray(newValue) ? newValue : []).map((student) => student.id);
-                  onDraftChange({ ...draft, studentIds: ids, studentId: ids[0] });
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder="Выберите учеников"
-                    variant="outlined"
-                    sx={textFieldSx}
-                  />
-                )}
-                disableCloseOnSelect
+              <StudentSelect
+                mode="multiple"
+                options={studentSelectOptions}
+                value={draft.studentIds}
+                onChange={(nextStudentIds) =>
+                  onDraftChange({
+                    ...draft,
+                    studentIds: nextStudentIds,
+                    studentId: nextStudentIds[0],
+                  })
+                }
+                placeholder="Выберите учеников"
               />
             </div>
           </div>

@@ -14,6 +14,7 @@ interface AnchoredPopoverProps {
   align?: PopoverAlign;
   offset?: number;
   className?: string;
+  preventCloseOnOtherPopoverClick?: boolean;
 }
 
 const DEFAULT_OFFSET = 8;
@@ -45,6 +46,7 @@ export const AnchoredPopover = ({
   align = 'start',
   offset = DEFAULT_OFFSET,
   className = '',
+  preventCloseOnOtherPopoverClick = false,
 }: AnchoredPopoverProps) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -159,6 +161,13 @@ export const AnchoredPopover = ({
       const target = event.target as Node;
       if (popoverRef.current?.contains(target)) return;
       if (anchorEl?.contains(target)) return;
+      if (
+        preventCloseOnOtherPopoverClick &&
+        target instanceof Element &&
+        target.closest('[data-anchored-popover-root="true"]')
+      ) {
+        return;
+      }
       onClose();
     };
 
@@ -179,13 +188,14 @@ export const AnchoredPopover = ({
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
-  }, [anchorEl, isOpen, onClose]);
+  }, [anchorEl, isOpen, onClose, preventCloseOnOtherPopoverClick]);
 
   if (!isOpen || !anchorEl) return null;
 
   return createPortal(
     <div
       ref={popoverRef}
+      data-anchored-popover-root="true"
       className={`${styles.popover} ${className}`.trim()}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >

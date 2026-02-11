@@ -65,3 +65,8 @@
   flex-direction: column;
   gap: 16px;
 }
+
+.contentNoScroll {
+  overflow: hidden;
+  min-height: 0;
+}

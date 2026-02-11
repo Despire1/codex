@@ -1,7 +1,7 @@
 .popover {
   box-shadow: 0 12px 24px var(--shadow-slate-900-16);
   position: fixed;
-  z-index: 50;
+  z-index: 1200;
   overflow: hidden;
   border-radius: 14px;
 }

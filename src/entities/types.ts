@@ -197,3 +197,30 @@ export interface StudentListItem {
     totalHomeworkCount: number;
   };
 }
+
+export type ActivityCategory = 'LESSON' | 'STUDENT' | 'HOMEWORK' | 'SETTINGS' | 'PAYMENT' | 'NOTIFICATION';
+export type ActivityStatus = 'SUCCESS' | 'FAILED';
+export type ActivitySource = 'USER' | 'SYSTEM' | 'AUTO' | 'LEGACY';
+export type ActivityRecordSource = 'ACTIVITY_EVENT' | 'PAYMENT_EVENT' | 'NOTIFICATION_LOG';
+
+export interface ActivityFeedItem {
+  id: string;
+  sourceRecord: ActivityRecordSource;
+  category: ActivityCategory;
+  action: string;
+  status: ActivityStatus;
+  source: ActivitySource;
+  title: string;
+  details?: string | null;
+  occurredAt: string;
+  studentId?: number | null;
+  studentName?: string | null;
+  lessonId?: number | null;
+  homeworkId?: number | null;
+  payload?: Record<string, unknown> | null;
+}
+
+export interface ActivityFeedListResponse {
+  items: ActivityFeedItem[];
+  nextCursor: string | null;
+}

@@ -35,6 +35,7 @@ model Teacher {
   homeworks             Homework[]
   lessons               Lesson[]
   notificationLogs      NotificationLog[]
+  activityEvents        ActivityEvent[]
   createdAt             DateTime        @default(now())
   authUser              TeacherAuth?
 }
@@ -54,6 +55,7 @@ model Student {
   lessonParticipations LessonParticipant[]
   paymentEvents        PaymentEvent[]
   notificationLogs     NotificationLog[]
+  activityEvents       ActivityEvent[]
   createdAt            DateTime             @default(now())
 }
 
@@ -90,6 +92,7 @@ model Homework {
   student   Student  @relation("HomeworkStudent", fields: [studentId], references: [id])
   teacher   Teacher  @relation(fields: [teacherId], references: [chatId])
   takenByStudent Student? @relation("HomeworkTakenBy", fields: [takenByStudentId], references: [id])
+  activityEvents ActivityEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   lastReminderAt DateTime?
@@ -123,6 +126,7 @@ model Lesson {
   payments            Payment[]
   paymentEvents       PaymentEvent[]
   notificationLogs    NotificationLog[]
+  activityEvents      ActivityEvent[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
@@ -244,6 +248,33 @@ model NotificationLog {
   @@index([studentId, createdAt])
   @@index([lessonId, createdAt])
   @@index([type])
+}
+
+model ActivityEvent {
+  id         Int      @id @default(autoincrement())
+  teacherId  BigInt
+  studentId  Int?
+  lessonId   Int?
+  homeworkId Int?
+  category   String
+  action     String
+  status     String
+  source     String
+  title      String
+  details    String?
+  payload    String?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  dedupeKey  String?  @unique
+
+  teacher  Teacher  @relation(fields: [teacherId], references: [chatId])
+  student  Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lesson   Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  homework Homework? @relation(fields: [homeworkId], references: [id], onDelete: SetNull)
+
+  @@index([teacherId, occurredAt])
+  @@index([teacherId, category, occurredAt])
+  @@index([teacherId, studentId, occurredAt])
 }
 
 enum LessonPaymentStatus {

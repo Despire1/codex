@@ -194,7 +194,7 @@ export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
         </div>
         <div className={styles.lessonTimeFields}>
           <label className={styles.lessonTimeField}>
-            <span>С</span>
+            <span>С какого...</span>
             <input
               type="time"
               value={lessonDateRange.fromTime}
@@ -203,7 +203,7 @@ export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
             />
           </label>
           <label className={styles.lessonTimeField}>
-            <span>По</span>
+            <span>По какое...</span>
             <input
               type="time"
               value={lessonDateRange.toTime}

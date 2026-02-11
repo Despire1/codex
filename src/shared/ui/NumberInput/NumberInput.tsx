@@ -1,4 +1,4 @@
-import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './NumberInput.module.css';
 
 interface NumberInputProps {
@@ -11,6 +11,7 @@ interface NumberInputProps {
   disabled?: boolean;
   placeholder?: string;
   ariaLabel?: string;
+  disallowZero?: boolean;
 }
 
 const formatValue = (value: number) => (Number.isFinite(value) ? String(value) : '');
@@ -48,17 +49,53 @@ export const NumberInput = ({
   disabled = false,
   placeholder,
   ariaLabel,
+  disallowZero = false,
 }: NumberInputProps) => {
   const [draft, setDraft] = useState(formatValue(value));
+  const lastNonZeroValueRef = useRef(value !== 0 ? value : Math.abs(step) || 1);
 
   const clampedValue = useMemo(() => clampValue(value, min, max), [value, min, max]);
+  const normalizedStep = useMemo(() => Math.max(Math.abs(step), 1), [step]);
 
   useEffect(() => {
+    if (clampedValue !== 0) {
+      lastNonZeroValueRef.current = clampedValue;
+    }
     setDraft(formatValue(clampedValue));
   }, [clampedValue]);
 
-  const commitValue = (nextValue: number) => {
-    const clamped = clampValue(nextValue, min, max);
+  const resolveNonZeroFallback = (direction?: number) => {
+    const candidates: number[] = [];
+    if (lastNonZeroValueRef.current !== 0) candidates.push(lastNonZeroValueRef.current);
+    if (clampedValue !== 0) candidates.push(clampedValue);
+    if (direction) {
+      candidates.push(direction > 0 ? normalizedStep : -normalizedStep);
+    }
+    candidates.push(normalizedStep, -normalizedStep);
+
+    for (const candidate of candidates) {
+      const normalized = clampValue(candidate, min, max);
+      if (normalized !== 0) return normalized;
+    }
+
+    return 0;
+  };
+
+  const commitValue = (nextValue: number, direction?: number) => {
+    let clamped = clampValue(nextValue, min, max);
+
+    if (disallowZero && clamped === 0) {
+      clamped = resolveNonZeroFallback(direction);
+      if (clamped === 0) {
+        setDraft(formatValue(clampedValue));
+        return;
+      }
+    }
+
+    if (clamped !== 0) {
+      lastNonZeroValueRef.current = clamped;
+    }
+
     onChange(clamped);
     setDraft(formatValue(clamped));
   };
@@ -68,7 +105,12 @@ export const NumberInput = ({
     setDraft(nextDraft);
     const parsed = parseNumericInput(nextDraft);
     if (parsed !== null) {
-      onChange(clampValue(parsed, min, max));
+      const nextValue = clampValue(parsed, min, max);
+      if (disallowZero && nextValue === 0) return;
+      if (nextValue !== 0) {
+        lastNonZeroValueRef.current = nextValue;
+      }
+      onChange(nextValue);
     }
   };
 
@@ -78,12 +120,34 @@ export const NumberInput = ({
       setDraft(formatValue(clampedValue));
       return;
     }
-    commitValue(parsed);
+
+    const nextValue = clampValue(parsed, min, max);
+    if (disallowZero && nextValue === 0) {
+      const fallback = resolveNonZeroFallback();
+      if (fallback === 0) {
+        setDraft(formatValue(clampedValue));
+        return;
+      }
+      commitValue(fallback);
+      return;
+    }
+
+    commitValue(nextValue);
   };
 
   const handleStep = (direction: number) => {
-    const base = parseNumericInput(draft) ?? clampedValue ?? 0;
-    commitValue(base + direction * step);
+    const stepDirection = direction >= 0 ? 1 : -1;
+    const parsedDraft = parseNumericInput(draft);
+    const fallbackBase = disallowZero ? resolveNonZeroFallback(stepDirection) : 0;
+    const baseValue = parsedDraft ?? clampedValue ?? fallbackBase;
+    const safeBase = disallowZero && baseValue === 0 ? fallbackBase : baseValue;
+    let nextValue = safeBase + stepDirection * normalizedStep;
+
+    if (disallowZero && nextValue === 0) {
+      nextValue += stepDirection * normalizedStep;
+    }
+
+    commitValue(nextValue, stepDirection);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {

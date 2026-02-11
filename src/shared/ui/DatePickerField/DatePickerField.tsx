@@ -1,126 +1,168 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { type CSSProperties, type Ref, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { ChangeEvent, type MutableRefObject, type Ref, useMemo, useRef, useState } from 'react';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker } from '../../day-picker';
 import styles from './DatePickerField.module.css';
 import { useTimeZone } from '../../lib/timezoneContext';
-import { toUtcDateFromDate, toZonedDate } from '../../lib/timezoneDates';
+import { formatInTimeZone, toUtcDateFromDate, toUtcDateFromTimeZone, toZonedDate } from '../../lib/timezoneDates';
+import { AnchoredPopover } from '../AnchoredPopover/AnchoredPopover';
 
 interface DatePickerFieldProps {
   label?: string;
   value?: string;
   onChange: (value?: string) => void;
   min?: string;
+  max?: string;
   placeholder?: string;
   className?: string;
   allowClear?: boolean;
   disabled?: boolean;
   buttonRef?: Ref<HTMLButtonElement>;
+  mode?: 'date' | 'datetime';
+  minuteStep?: number;
 }
+
+const DATE_VALUE_FORMAT = 'yyyy-MM-dd';
+
+const pad = (value: number) => value.toString().padStart(2, '0');
+
+const parseTimeParts = (value: string) => {
+  const [hoursPart, minutesPart] = value.split(':');
+  const hours = Number(hoursPart);
+  const minutes = Number(minutesPart);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return { hours, minutes };
+};
+
+const formatTimeParts = (hours: number, minutes: number) => `${pad(hours)}:${pad(minutes)}`;
+
+const normalizeTimeToStep = (value: string, step: number) => {
+  const parsed = parseTimeParts(value);
+  if (!parsed) return '00:00';
+
+  const nextMinutes = Math.floor(parsed.minutes / step) * step;
+  return formatTimeParts(parsed.hours, nextMinutes);
+};
 
 export const DatePickerField = ({
   label,
   value,
   onChange,
   min,
-  placeholder = 'Выберите дату',
+  max,
+  placeholder,
   className,
   allowClear = false,
   disabled = false,
   buttonRef,
+  mode = 'date',
+  minuteStep = 5,
 }: DatePickerFieldProps) => {
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
 
-  const parseDate = (input?: string) => {
+  const normalizedMinuteStep = useMemo(() => {
+    const parsed = Math.trunc(minuteStep);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 5;
+    return Math.min(parsed, 59);
+  }, [minuteStep]);
+
+  const parseDate = (input?: string | null) => {
     if (!input) return null;
     const parsed = toUtcDateFromDate(input, timeZone);
     return Number.isNaN(parsed.getTime()) ? null : toZonedDate(parsed, timeZone);
   };
-  const selectedDate = useMemo(() => parseDate(value), [value, timeZone]);
-  const minDate = useMemo(() => parseDate(min), [min, timeZone]);
+
+  const parseDateTime = (input?: string | null) => {
+    if (!input) return null;
+    const [datePart, rawTimePart] = input.split('T');
+    if (!datePart) return null;
+    const timeValue = rawTimePart ? rawTimePart.slice(0, 5) : '00:00';
+    if (!parseTimeParts(timeValue)) return null;
+    const parsed = toUtcDateFromTimeZone(datePart, timeValue, timeZone);
+    return Number.isNaN(parsed.getTime()) ? null : toZonedDate(parsed, timeZone);
+  };
+
+  const parseBoundary = (input?: string) => {
+    if (!input) return null;
+    if (mode === 'datetime' && input.includes('T')) {
+      return parseDateTime(input);
+    }
+    return parseDate(input);
+  };
+
+  const selectedDate = useMemo(
+    () => (mode === 'datetime' ? parseDateTime(value) : parseDate(value)),
+    [mode, value, timeZone, normalizedMinuteStep],
+  );
+  const minDate = useMemo(() => parseBoundary(min), [min, mode, timeZone, normalizedMinuteStep]);
+  const maxDate = useMemo(() => parseBoundary(max), [max, mode, timeZone, normalizedMinuteStep]);
   const today = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const initialMonth = useMemo(() => {
     if (selectedDate) return selectedDate;
     if (minDate && minDate > today) return minDate;
+    if (maxDate && maxDate < today) return maxDate;
     return today;
-  }, [minDate, selectedDate, today]);
-  const displayValue = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : placeholder;
+  }, [maxDate, minDate, selectedDate, today]);
 
-  useEffect(() => {
-    if (!open) return undefined;
+  const minDay = useMemo(
+    () => (minDate ? new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate()) : null),
+    [minDate],
+  );
+  const maxDay = useMemo(
+    () => (maxDate ? new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate()) : null),
+    [maxDate],
+  );
 
-    const handleOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (ref.current?.contains(target)) return;
-      if (popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
+  const resolvedPlaceholder = placeholder ?? (mode === 'datetime' ? 'Выберите дату и время' : 'Выберите дату');
+  const displayValue = selectedDate
+    ? mode === 'datetime'
+      ? format(selectedDate, 'dd.MM.yyyy HH:mm')
+      : format(selectedDate, 'dd.MM.yyyy')
+    : resolvedPlaceholder;
 
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [open]);
+  const selectedTime = useMemo(() => {
+    if (mode !== 'datetime') return null;
+    if (selectedDate) {
+      return normalizeTimeToStep(format(selectedDate, 'HH:mm'), normalizedMinuteStep);
+    }
+    return normalizeTimeToStep(formatInTimeZone(new Date(), 'HH:mm', { timeZone }), normalizedMinuteStep);
+  }, [mode, normalizedMinuteStep, selectedDate, timeZone]);
 
-  useLayoutEffect(() => {
-    if (!open) return undefined;
+  const [selectedHour, selectedMinute] = (selectedTime ?? '00:00').split(':');
 
-    const updatePlacement = () => {
-      if (!controlRef.current || !popoverRef.current) return;
+  const minuteOptions = useMemo(() => {
+    const options: string[] = [];
+    for (let minute = 0; minute < 60; minute += normalizedMinuteStep) {
+      options.push(pad(minute));
+    }
+    return options.length > 0 ? options : ['00'];
+  }, [normalizedMinuteStep]);
 
-      const controlRect = controlRef.current.getBoundingClientRect();
-      const popoverRect = popoverRef.current.getBoundingClientRect();
+  const isDateDisabled = (date: Date) => {
+    const dayValue = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    return (minDay ? dayValue < minDay.getTime() : false) || (maxDay ? dayValue > maxDay.getTime() : false);
+  };
 
-      const spaceBelow = window.innerHeight - controlRect.bottom;
-      const spaceAbove = controlRect.top;
-      const fitsBelow = spaceBelow >= popoverRect.height;
-      const fitsAbove = spaceAbove >= popoverRect.height;
-
-      const vertical: 'top' | 'bottom' = !fitsBelow && fitsAbove ? 'top' : 'bottom';
-
-      const spaceRight = window.innerWidth - controlRect.left;
-      const fitsRight = spaceRight >= popoverRect.width;
-      const align: 'left' | 'right' = fitsRight ? 'left' : 'right';
-
-      const gap = 6;
-      const viewportPadding = 12;
-      const top =
-        vertical === 'bottom' ? controlRect.bottom + gap : controlRect.top - popoverRect.height - gap;
-      const left = align === 'left' ? controlRect.left : controlRect.right - popoverRect.width;
-      const clampedLeft = Math.min(
-        window.innerWidth - popoverRect.width - viewportPadding,
-        Math.max(viewportPadding, left),
-      );
-      const clampedTop = Math.min(
-        window.innerHeight - popoverRect.height - viewportPadding,
-        Math.max(viewportPadding, top),
-      );
-
-      setPopoverStyle((prev) =>
-        prev.top === clampedTop && prev.left === clampedLeft ? prev : { top: clampedTop, left: clampedLeft },
-      );
-
-    };
-
-    updatePlacement();
-    window.addEventListener('resize', updatePlacement);
-    window.addEventListener('scroll', updatePlacement, true);
-
-    return () => {
-      window.removeEventListener('resize', updatePlacement);
-      window.removeEventListener('scroll', updatePlacement, true);
-    };
-  }, [open]);
+  const emitDateTimeValue = (nextHours: string, nextMinutes: string) => {
+    if (mode !== 'datetime') return;
+    const baseDate = selectedDate ?? initialMonth;
+    onChange(`${format(baseDate, DATE_VALUE_FORMAT)}T${nextHours}:${nextMinutes}`);
+  };
 
   const handleSelect = (date?: Date) => {
     if (!date) return;
-    if (minDate && date < minDate) return;
-    onChange(format(date, 'yyyy-MM-dd'));
+    if (isDateDisabled(date)) return;
+
+    if (mode === 'datetime') {
+      onChange(`${format(date, DATE_VALUE_FORMAT)}T${selectedTime ?? '00:00'}`);
+      return;
+    }
+
+    onChange(format(date, DATE_VALUE_FORMAT));
     setOpen(false);
   };
 
@@ -130,21 +172,13 @@ export const DatePickerField = ({
     setOpen(false);
   };
 
-  const portalTarget = typeof document === 'undefined' ? null : document.body;
-  const popover = open && !disabled && portalTarget
-    ? createPortal(
-      <div className={styles.popover} ref={popoverRef} style={popoverStyle}>
-        <DayPicker
-          selected={selectedDate ?? undefined}
-          onSelect={handleSelect}
-          weekStartsOn={1}
-          locale={ru}
-          defaultMonth={initialMonth}
-        />
-      </div>,
-      portalTarget,
-    )
-    : null;
+  const handleHourChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    emitDateTimeValue(event.target.value, selectedMinute);
+  };
+
+  const handleMinuteChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    emitDateTimeValue(selectedHour, event.target.value);
+  };
 
   const setControlRef = (node: HTMLButtonElement | null) => {
     controlRef.current = node;
@@ -152,12 +186,12 @@ export const DatePickerField = ({
     if (typeof buttonRef === 'function') {
       buttonRef(node);
     } else {
-      buttonRef.current = node;
+      (buttonRef as MutableRefObject<HTMLButtonElement | null>).current = node;
     }
   };
 
   return (
-    <div className={`${styles.field} ${className ?? ''}`} ref={ref}>
+    <div className={`${styles.field} ${className ?? ''}`}>
       {label && <span className={styles.label}>{label}</span>}
       <div className={styles.controlRow}>
         <button
@@ -174,12 +208,72 @@ export const DatePickerField = ({
           </span>
         </button>
         {allowClear && value && !disabled && (
-          <button type="button" className={styles.clear} onClick={handleClear} aria-label="Очистить дату">
+          <button
+            type="button"
+            className={styles.clear}
+            onClick={handleClear}
+            aria-label={mode === 'datetime' ? 'Очистить дату и время' : 'Очистить дату'}
+          >
             ×
           </button>
         )}
       </div>
-      {popover}
+      <AnchoredPopover
+        isOpen={open && !disabled}
+        anchorEl={controlRef.current}
+        onClose={() => setOpen(false)}
+        side="bottom"
+        align="start"
+        className={`${styles.popover} ${mode === 'datetime' ? styles.popoverDatetime : ''}`}
+      >
+        <div className={styles.pickerContent}>
+          <DayPicker
+            selected={selectedDate ?? undefined}
+            onSelect={handleSelect}
+            weekStartsOn={1}
+            locale={ru}
+            defaultMonth={initialMonth}
+            disabled={isDateDisabled}
+          />
+          {mode === 'datetime' && (
+            <div className={styles.timePanel}>
+              <span className={styles.timePanelLabel}>Время</span>
+              <div className={styles.timeControls}>
+                <label className={styles.timeField}>
+                  <span>Часы</span>
+                  <select
+                    className={styles.timeSelect}
+                    value={selectedHour}
+                    onChange={handleHourChange}
+                    aria-label="Выбор часа"
+                  >
+                    {Array.from({ length: 24 }, (_, hour) => pad(hour)).map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.timeField}>
+                  <span>Минуты</span>
+                  <select
+                    className={styles.timeSelect}
+                    value={selectedMinute}
+                    onChange={handleMinuteChange}
+                    aria-label="Выбор минут"
+                  >
+                    {minuteOptions.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      </AnchoredPopover>
     </div>
   );
 };

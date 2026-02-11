@@ -1,6 +1,11 @@
 .sidebar {
-  width: 256px;
-  flex: 0 0 256px;
+  --sidebar-expanded-width: 256px;
+  --sidebar-collapsed-width: 64px;
+  --sidebar-motion-duration: 0.28s;
+  --sidebar-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  width: var(--sidebar-expanded-width);
+  flex: 0 0 var(--sidebar-expanded-width);
+  min-width: var(--sidebar-collapsed-width);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -10,12 +15,17 @@
   box-shadow: 0 14px 30px var(--shadow-slate-900-06);
   overflow: hidden;
   contain: layout paint;
-  will-change: auto;
+  transition:
+    width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    flex-basis var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  will-change: width, flex-basis;
 }
 
 .collapsed {
-  width: 64px;
-  flex-basis: 64px;
+  width: var(--sidebar-collapsed-width);
+  flex-basis: var(--sidebar-collapsed-width);
 }
 
 .brand {
@@ -25,6 +35,10 @@
   min-height: 72px;
   padding: 10px;
   border-bottom: 1px solid var(--color-slate-100);
+  overflow: hidden;
+  transition:
+    padding var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    gap var(--sidebar-motion-duration) var(--sidebar-motion-ease);
 }
 
 .brandLogo {
@@ -47,7 +61,9 @@
   white-space: nowrap;
   opacity: 1;
   transform: translate3d(0, 0, 0);
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition:
+    transform var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    opacity var(--sidebar-motion-duration) var(--sidebar-motion-ease);
   will-change: transform, opacity;
 }
 
@@ -77,6 +93,15 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 0 10px 8px;
+  max-height: 24px;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  overflow: hidden;
+  transition:
+    max-height var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    padding-bottom var(--sidebar-motion-duration) var(--sidebar-motion-ease);
 }
 
 .navLink {
@@ -90,6 +115,7 @@
   border-radius: 12px;
   color: var(--color-slate-700);
   text-decoration: none;
+  overflow: hidden;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -147,12 +173,36 @@
   font-weight: 600;
   opacity: 1;
   transform: translate3d(0, 0, 0);
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition:
+    transform var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    opacity var(--sidebar-motion-duration) var(--sidebar-motion-ease);
   will-change: transform, opacity;
 }
 
-.navBadge {
+.navMeta {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 84px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    max-width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  will-change: max-width, opacity, transform;
+}
+
+.navMetaHidden {
+  max-width: 0;
+  opacity: 0;
+  transform: translate3d(-6px, 0, 0);
+  pointer-events: none;
+}
+
+.navBadge {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
@@ -164,6 +214,8 @@
   justify-content: center;
   background: var(--color-slate-100);
   color: var(--color-slate-600);
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.18s ease, opacity 0.18s ease;
 }
 
 .navLinkActive .navBadge {
@@ -184,11 +236,21 @@
   position: absolute;
   right: 10px;
   top: 10px;
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.navCollapsedIndicatorVisible {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .footer {
   border-top: 1px solid var(--color-slate-100);
   padding: 10px;
+  transition: padding var(--sidebar-motion-duration) var(--sidebar-motion-ease);
 }
 
 .toggleButton {
@@ -204,7 +266,11 @@
   gap: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    gap var(--sidebar-motion-duration) var(--sidebar-motion-ease);
 }
 
 .toggleButton:hover {
@@ -217,13 +283,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 18px;
 }
 
 .toggleLabel {
   white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
   opacity: 1;
   transform: translate3d(0, 0, 0);
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  transition:
+    max-width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    transform var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    opacity var(--sidebar-motion-duration) var(--sidebar-motion-ease);
   will-change: transform, opacity;
 }
 
@@ -233,14 +305,18 @@
   gap: 0;
 }
 
-.collapsed .sectionTitle,
-.collapsed .navBadge {
-  display: none;
+.collapsed .sectionTitle {
+  max-height: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  transform: translate3d(-8px, 0, 0);
+  pointer-events: none;
 }
 
 .collapsed .brandText,
 .collapsed .navLabel,
 .collapsed .toggleLabel {
+  max-width: 0;
   opacity: 0;
   transform: translate3d(-8px, 0, 0);
   pointer-events: none;
@@ -251,10 +327,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .brand,
+  .sectionTitle,
   .brandText,
   .navLabel,
+  .navMeta,
+  .navBadge,
+  .navCollapsedIndicator,
   .toggleLabel,
-  .toggleButton {
+  .toggleButton,
+  .footer {
     transition: none;
   }
 }

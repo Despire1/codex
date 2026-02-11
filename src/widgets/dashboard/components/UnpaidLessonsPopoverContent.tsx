@@ -23,6 +23,7 @@ interface UnpaidLessonsPopoverContentProps {
   showToggle?: boolean;
   showAll?: boolean;
   stickyHeader?: boolean;
+  fitContainer?: boolean;
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -38,6 +39,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   showToggle = true,
   showAll = false,
   stickyHeader = false,
+  fitContainer = false,
 }) => {
   const timeZone = useTimeZone();
   const now = new Date();
@@ -110,10 +112,10 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
       ? sortedEntries
       : sortedEntries.slice(0, maxVisibleEntries);
   const canToggle = !showAll && showToggle && sortedEntries.length > maxVisibleEntries;
-  const isScrollable = (showAll || isExpanded) && sortedEntries.length > 4;
+  const isScrollable = showAll || (isExpanded && sortedEntries.length > 4);
 
   return (
-      <div className={styles.root}>
+      <div className={`${styles.root} ${fitContainer ? styles.rootFill : ''}`.trim()}>
         <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
           <div className={styles.title}>Неоплаченные ({entries.length})</div>
         </div>
@@ -122,7 +124,11 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
             <div className={styles.empty}>Нет неоплаченных занятий</div>
         ) : (
             <>
-              <div className={`${styles.list} ${isScrollable ? styles.listScrollable : ''}`}>
+              <div
+                className={`${styles.list} ${isScrollable ? styles.listScrollable : ''} ${
+                  fitContainer ? styles.listFill : ''
+                }`.trim()}
+              >
                 {visibleEntries.map((entry) => {
                   const entryKey = `${entry.lessonId}-${entry.studentId}`;
                   const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;

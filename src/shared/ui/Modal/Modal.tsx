@@ -3,12 +3,14 @@ import styles from './Modal.module.css';
 
 interface ModalProps {
   open: boolean;
-  title?: string;
+  title?: ReactNode;
+  titleActions?: ReactNode;
+  headerActions?: ReactNode;
   onClose: () => void;
   children: ReactNode;
 }
 
-export const Modal = ({ open, title, onClose, children }: ModalProps) => {
+export const Modal = ({ open, title, titleActions, headerActions, onClose, children }: ModalProps) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -24,10 +26,16 @@ export const Modal = ({ open, title, onClose, children }: ModalProps) => {
     <div className={styles.backdrop} onClick={onClose}>
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
-          {title ? <h3 className={styles.title}>{title}</h3> : <span />}
-          <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
-            ×
-          </button>
+          <div className={styles.titleRow}>
+            {title ? <h3 className={styles.title}>{title}</h3> : <span />}
+            {titleActions ? <div className={styles.titleActions}>{titleActions}</div> : null}
+          </div>
+          <div className={styles.headerActions}>
+            {headerActions}
+            <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
+              ×
+            </button>
+          </div>
         </div>
         <div className={styles.body}>{children}</div>
       </div>
