@@ -21,6 +21,13 @@ export const EventNoteIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const AnalyticsIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M19 3H5c-1.1 0-2 .9-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5a2 2 0 0 0-2-2zm0 16H5V5h14v14z" />
+    <path d="m7 14 2.5-2.5 2.1 2.1L17 8.2l1.4 1.4-6.8 6.8-2.1-2.1L8.4 15.4 7 14z" />
+  </svg>
+);
+
 export const SettingsIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .11-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.007 7.007 0 0 0-1.63-.94l-.36-2.54A.488.488 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.37 2.54c-.6.23-1.16.53-1.68.89l-2.4-.96a.5.5 0 0 0-.6.22L2.14 7.84a.5.5 0 0 0 .11.64l2.03 1.58c-.05.3-.08.65-.08.94 0 .32.03.64.08.94L2.25 13.52a.5.5 0 0 0-.11.64l1.92 3.32c.14.24.43.34.7.23l2.39-.96c.51.36 1.07.66 1.67.89l.37 2.54c.05.25.25.42.5.42h4c.25 0 .45-.17.49-.42l.37-2.54c.6-.23 1.16-.53 1.68-.89l2.39.96c.26.11.56.01.7-.23l1.92-3.32a.5.5 0 0 0-.11-.64l-2.03-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" />

@@ -1,6 +1,7 @@
 import { type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
+import { AnalyticsSection } from '../../widgets/analytics/AnalyticsSection';
 import { DashboardHome } from '../../widgets/dashboard/DashboardHome';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
 import { SettingsSection } from '../../widgets/settings/SettingsSection';
@@ -63,6 +64,7 @@ export const AppRoutes: FC<AppRoutesProps> = ({
       />
       <Route path={tabPathById.students} element={<StudentsSection {...students} />} />
       <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
+      <Route path={tabPathById.analytics} element={<AnalyticsSection />} />
       <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />
       <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
     </Routes>

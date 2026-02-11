@@ -19,6 +19,7 @@ const sectionByTab: Record<TabId, SidebarNavSection> = {
   dashboard: 'primary',
   students: 'primary',
   schedule: 'primary',
+  analytics: 'primary',
   settings: 'settings',
 };
 
@@ -26,6 +27,7 @@ const matchByTab: Record<TabId, SidebarNavMatch> = {
   dashboard: 'exact',
   students: 'exact',
   schedule: 'exact',
+  analytics: 'exact',
   settings: 'prefix',
 };
 

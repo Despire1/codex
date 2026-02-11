@@ -4,7 +4,7 @@ import { sidebarNavItems, type SidebarNavItem } from './model/navigation';
 import styles from './Sidebar.module.css';
 
 const SIDEBAR_COLLAPSED_KEY = 'tb_sidebar_collapsed';
-const HOVER_EXPAND_DELAY_MS = 1500;
+const HOVER_EXPAND_DELAY_MS = 1000;
 const HOVER_COLLAPSE_DELAY_MS = 1000;
 
 interface SidebarProps {
@@ -55,6 +55,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const expandTimerRef = useRef<number | null>(null);
   const collapseTimerRef = useRef<number | null>(null);
   const isCollapsed = manualCollapsed && !hoverExpanded;
+  const isHoverPreview = manualCollapsed && hoverExpanded;
   const primaryItems = useMemo(() => items.filter((item) => item.section === 'primary'), [items]);
   const settingsItems = useMemo(() => items.filter((item) => item.section === 'settings'), [items]);
 
@@ -172,47 +173,57 @@ export const Sidebar: FC<SidebarProps> = ({
   };
 
   return (
-    <aside
-      className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}
-      aria-label="Навигация по разделам"
-      onMouseEnter={onMouseEnterSidebar}
-      onMouseLeave={onMouseLeaveSidebar}
+    <div
+      className={`${styles.sidebarSlot} ${manualCollapsed ? styles.sidebarSlotCollapsed : ''} ${
+        isHoverPreview ? styles.sidebarSlotPreview : ''
+      }`}
     >
-      <div className={styles.brand}>
-        <span className={styles.brandLogo} aria-hidden>
-          <DashboardIcon width={20} height={20} />
-        </span>
-        <span className={styles.brandText}>TeacherBot</span>
-      </div>
-
-      <div className={styles.navScroll}>
-        <nav className={styles.navSection} aria-label="Основная навигация">
-          {primaryItems.map(renderItem)}
-        </nav>
-
-        {settingsItems.length > 0 ? (
-          <>
-            <div className={styles.sectionDivider} />
-            <nav className={styles.navSection} aria-label="Настройки">
-              {settingsItems.map(renderItem)}
-            </nav>
-          </>
-        ) : null}
-      </div>
-
-      <div className={styles.footer}>
-        <button
-          type="button"
-          className={styles.toggleButton}
-          onClick={onToggle}
-          aria-label={manualCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
-        >
-          <span className={styles.toggleIcon} aria-hidden>
-            {manualCollapsed ? <ChevronRightIcon width={18} height={18} /> : <ChevronLeftIcon width={18} height={18} />}
+      <aside
+        className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}
+        aria-label="Навигация по разделам"
+        onMouseEnter={onMouseEnterSidebar}
+        onMouseLeave={onMouseLeaveSidebar}
+      >
+        <div className={styles.brand}>
+          <span className={styles.brandLogo} aria-hidden>
+            <DashboardIcon width={20} height={20} />
           </span>
-          <span className={styles.toggleLabel}>{manualCollapsed ? 'Развернуть' : 'Свернуть'}</span>
-        </button>
-      </div>
-    </aside>
+          <span className={styles.brandText}>TeacherBot</span>
+        </div>
+
+        <div className={styles.navScroll}>
+          <nav className={styles.navSection} aria-label="Основная навигация">
+            {primaryItems.map(renderItem)}
+          </nav>
+
+          {settingsItems.length > 0 ? (
+            <>
+              <div className={styles.sectionDivider} />
+              <nav className={styles.navSection} aria-label="Настройки">
+                {settingsItems.map(renderItem)}
+              </nav>
+            </>
+          ) : null}
+        </div>
+
+        <div className={styles.footer}>
+          <button
+            type="button"
+            className={styles.toggleButton}
+            onClick={onToggle}
+            aria-label={manualCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+          >
+            <span className={styles.toggleIcon} aria-hidden>
+              {manualCollapsed ? (
+                <ChevronRightIcon width={18} height={18} />
+              ) : (
+                <ChevronLeftIcon width={18} height={18} />
+              )}
+            </span>
+            <span className={styles.toggleLabel}>{manualCollapsed ? 'Развернуть' : 'Свернуть'}</span>
+          </button>
+        </div>
+      </aside>
+    </div>
   );
 };

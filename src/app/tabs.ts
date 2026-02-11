@@ -1,9 +1,10 @@
-import { DashboardIcon, EventNoteIcon, PeopleIcon, SettingsIcon } from '../icons/MaterialIcons';
+import { AnalyticsIcon, DashboardIcon, EventNoteIcon, PeopleIcon, SettingsIcon } from '../icons/MaterialIcons';
 
 export const tabs = [
   { id: 'dashboard', label: 'Главная', icon: DashboardIcon, path: '/dashboard' },
   { id: 'students', label: 'Ученики', icon: PeopleIcon, path: '/students' },
   { id: 'schedule', label: 'Расписание', icon: EventNoteIcon, path: '/schedule' },
+  { id: 'analytics', label: 'Аналитика', icon: AnalyticsIcon, path: '/analytics' },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon, path: '/settings' },
 ] as const;
 

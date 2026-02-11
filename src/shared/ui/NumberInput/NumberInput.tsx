@@ -106,7 +106,12 @@ export const NumberInput = ({
     const parsed = parseNumericInput(nextDraft);
     if (parsed !== null) {
       const nextValue = clampValue(parsed, min, max);
-      if (disallowZero && nextValue === 0) return;
+      if (disallowZero && nextValue === 0) {
+        if (clampedValue === 0) {
+          onChange(0);
+        }
+        return;
+      }
       if (nextValue !== 0) {
         lastNonZeroValueRef.current = nextValue;
       }
@@ -123,6 +128,10 @@ export const NumberInput = ({
 
     const nextValue = clampValue(parsed, min, max);
     if (disallowZero && nextValue === 0) {
+      if (clampedValue === 0) {
+        setDraft(formatValue(clampedValue));
+        return;
+      }
       const fallback = resolveNonZeroFallback();
       if (fallback === 0) {
         setDraft(formatValue(clampedValue));
@@ -138,10 +147,11 @@ export const NumberInput = ({
   const handleStep = (direction: number) => {
     const stepDirection = direction >= 0 ? 1 : -1;
     const parsedDraft = parseNumericInput(draft);
-    const fallbackBase = disallowZero ? resolveNonZeroFallback(stepDirection) : 0;
-    const baseValue = parsedDraft ?? clampedValue ?? fallbackBase;
-    const safeBase = disallowZero && baseValue === 0 ? fallbackBase : baseValue;
-    let nextValue = safeBase + stepDirection * normalizedStep;
+    const baseValue = parsedDraft ?? clampedValue;
+    let nextValue =
+      disallowZero && baseValue === 0
+        ? stepDirection * normalizedStep
+        : baseValue + stepDirection * normalizedStep;
 
     if (disallowZero && nextValue === 0) {
       nextValue += stepDirection * normalizedStep;

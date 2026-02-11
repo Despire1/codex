@@ -1,4 +1,4 @@
-.sidebar {
+.sidebarSlot {
   --sidebar-expanded-width: 256px;
   --sidebar-collapsed-width: 64px;
   --sidebar-motion-duration: 0.28s;
@@ -6,6 +6,31 @@
   width: var(--sidebar-expanded-width);
   flex: 0 0 var(--sidebar-expanded-width);
   min-width: var(--sidebar-collapsed-width);
+  min-height: 0;
+  display: flex;
+  position: relative;
+  transition:
+    width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    flex-basis var(--sidebar-motion-duration) var(--sidebar-motion-ease);
+}
+
+.sidebarSlotCollapsed {
+  width: var(--sidebar-collapsed-width);
+  flex-basis: var(--sidebar-collapsed-width);
+}
+
+.sidebarSlotPreview {
+  overflow: visible;
+  z-index: 20;
+}
+
+.sidebar {
+  --sidebar-motion-duration: 0.28s;
+  --sidebar-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  width: var(--sidebar-expanded-width);
+  flex: 0 0 var(--sidebar-expanded-width);
+  min-width: var(--sidebar-collapsed-width);
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -21,6 +46,15 @@
     border-color 0.2s ease,
     box-shadow 0.2s ease;
   will-change: width, flex-basis;
+}
+
+.sidebarSlotPreview .sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-expanded-width);
+  flex-basis: var(--sidebar-expanded-width);
 }
 
 .collapsed {
@@ -327,6 +361,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sidebarSlot,
   .sidebar,
   .brand,
   .sectionTitle,

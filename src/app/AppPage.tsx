@@ -79,6 +79,7 @@ const desktopTitleByTab: Record<TabId, string> = {
   dashboard: 'Обзор',
   students: 'Ученики',
   schedule: 'Расписание',
+  analytics: 'Аналитика',
   settings: 'Настройки',
 };
 

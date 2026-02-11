@@ -32,7 +32,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
   onSubmit,
 }) => {
   const timeZone = useTimeZone();
-  const [lessonCount, setLessonCount] = useState(1);
+  const [lessonCount, setLessonCount] = useState(0);
   const [operationType, setOperationType] = useState<BalanceOperationType>('TOP_UP');
   const [comment, setComment] = useState('');
   const [dateTime, setDateTime] = useState(() => defaultDateTime(timeZone));
@@ -47,7 +47,7 @@ export const BalanceTopupModal: FC<BalanceTopupModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setLessonCount(1);
+    setLessonCount(0);
     setOperationType('TOP_UP');
     setComment('');
     setDateTime(defaultDateTime(timeZone));
