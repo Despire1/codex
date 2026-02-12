@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { memo, type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
 import { AnalyticsSection } from '../../widgets/analytics/AnalyticsSection';
@@ -47,7 +47,7 @@ interface AppRoutesProps {
   };
 }
 
-export const AppRoutes: FC<AppRoutesProps> = ({
+const AppRoutesComponent: FC<AppRoutesProps> = ({
   resolveLastVisitedPath,
   dashboard,
   dashboardSummary,
@@ -70,3 +70,7 @@ export const AppRoutes: FC<AppRoutesProps> = ({
     </Routes>
   );
 };
+
+AppRoutesComponent.displayName = 'AppRoutes';
+
+export const AppRoutes = memo(AppRoutesComponent);

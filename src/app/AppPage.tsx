@@ -1,7 +1,7 @@
 import { startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LinkedStudent, Student, Teacher, TeacherStudent } from '../entities/types';
+import { Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api } from '../shared/api/client';
 import { useToast } from '../shared/lib/toast';
@@ -17,7 +17,7 @@ import { Sidebar } from '../widgets/layout/Sidebar';
 import { type SidebarNavItem } from '../widgets/layout/model/navigation';
 import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
-import { AppModals, DialogState } from './components/AppModals';
+import { AppModals } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
@@ -38,6 +38,8 @@ import {
 import { useScheduleLessonsLoaderInternal } from '../widgets/schedule/model/useScheduleLessonsLoader';
 import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useScheduleLessonsRange';
 import { UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
+import { useAppDialogs } from './model/useAppDialogs';
+import { useLinkedStudents } from './model/useLinkedStudents';
 
 const resolveAnalyticsSource = (source: string) => {
   if (source === 'onboarding_hero') return 'hero_cta';
@@ -100,10 +102,19 @@ const AppPageContent = () => {
   const [studentListReloadKey, setStudentListReloadKey] = useState(0);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
-  const [dialogState, setDialogState] = useState<DialogState>(null);
   const isMobile = useIsMobile(767);
   const isDesktop = useIsDesktop();
   const device = isMobile ? 'mobile' : 'desktop';
+  const {
+    dialogState,
+    setDialogState,
+    closeDialog,
+    showInfoDialog,
+    openConfirmDialog,
+    openRecurringDeleteDialog,
+    openPaymentCancelDialog,
+    openPaymentBalanceDialog,
+  } = useAppDialogs();
   const triggerStudentsListReload = useCallback(() => {
     setStudentListReloadKey((prev) => prev + 1);
   }, []);
@@ -147,123 +158,6 @@ const AppPageContent = () => {
     clearStudentData,
   } = studentsData;
 
-  const closeDialog = () => setDialogState(null);
-
-  const showInfoDialog = (title: string, message: string, confirmText?: string) =>
-    setDialogState({ type: 'info', title, message, confirmText });
-
-  const openConfirmDialog = useCallback(
-    (options: {
-      title: string;
-      message: string;
-      confirmText?: string;
-      cancelText?: string;
-      onConfirm: () => void;
-      onCancel?: () => void;
-    }) => {
-      setDialogState({
-        type: 'confirm',
-        title: options.title,
-        message: options.message,
-        confirmText: options.confirmText,
-        cancelText: options.cancelText,
-        onConfirm: () => {
-          closeDialog();
-          options.onConfirm();
-        },
-        onCancel: () => {
-          closeDialog();
-          options.onCancel?.();
-        },
-      });
-    },
-    [closeDialog],
-  );
-
-  const openRecurringDeleteDialog = useCallback(
-    (options: {
-      title: string;
-      message: string;
-      applyToSeries?: boolean;
-      onConfirm: (applyToSeries: boolean) => void;
-      onCancel?: () => void;
-    }) => {
-      setDialogState({
-        type: 'recurring-delete',
-        title: options.title,
-        message: options.message,
-        applyToSeries: options.applyToSeries ?? false,
-        onConfirm: (applyToSeries) => {
-          closeDialog();
-          options.onConfirm(applyToSeries);
-        },
-        onCancel: () => {
-          closeDialog();
-          options.onCancel?.();
-        },
-      });
-    },
-    [closeDialog],
-  );
-
-  const openPaymentCancelDialog = useCallback(
-    (options: {
-      title: string;
-      message: string;
-      onRefund: () => void;
-      onWriteOff: () => void;
-      onCancel?: () => void;
-    }) => {
-      setDialogState({
-        type: 'payment-cancel',
-        title: options.title,
-        message: options.message,
-        onRefund: () => {
-          closeDialog();
-          options.onRefund();
-        },
-        onWriteOff: () => {
-          closeDialog();
-          options.onWriteOff();
-        },
-        onCancel: () => {
-          closeDialog();
-          options.onCancel?.();
-        },
-      });
-    },
-    [closeDialog],
-  );
-
-  const openPaymentBalanceDialog = useCallback(
-    (options: {
-      title: string;
-      message: string;
-      onWriteOff: () => void;
-      onSkip: () => void;
-      onCancel?: () => void;
-    }) => {
-      setDialogState({
-        type: 'payment-balance',
-        title: options.title,
-        message: options.message,
-        onWriteOff: () => {
-          closeDialog();
-          options.onWriteOff();
-        },
-        onSkip: () => {
-          closeDialog();
-          options.onSkip();
-        },
-        onCancel: () => {
-          closeDialog();
-          options.onCancel?.();
-        },
-      });
-    },
-    [closeDialog],
-  );
-
   const guardedNavigate = useCallback(
     (to: string) => {
       const active = getActiveEntry();
@@ -306,38 +200,6 @@ const AppPageContent = () => {
   const navigateToSchedule = useCallback(() => {
     guardedNavigate(tabPathById.schedule);
   }, [guardedNavigate]);
-
-  const studentsActions = useStudentsActionsInternal({
-    students,
-    links,
-    setStudents,
-    setLinks,
-    selectedStudentId,
-    setSelectedStudentId,
-    showToast,
-    showInfoDialog,
-    openConfirmDialog,
-    navigateToStudents,
-    triggerStudentsListReload,
-    refreshPayments,
-    clearStudentData,
-    onStudentCreateStarted: (source) => {
-      track('student_create_started', { source: resolveAnalyticsSource(source) });
-    },
-    onStudentCreated: ({ student, link, source }) => {
-      if (source.startsWith('onboarding')) {
-        onboardingState.setCreatedStudent({ student, link });
-      }
-      dashboardSummary.refresh();
-      track('student_create_success', { source: resolveAnalyticsSource(source) });
-    },
-    onStudentCreateError: (error, source) => {
-      track('student_create_error', {
-        source: resolveAnalyticsSource(source),
-        error: error instanceof Error ? error.message : String(error),
-      });
-    },
-  });
 
   const studentsHomework = useStudentsHomeworkInternal({
     timeZone: resolvedTimeZone,
@@ -424,6 +286,38 @@ const AppPageContent = () => {
     [device, onboardingState.teacherId],
   );
 
+  const studentsActions = useStudentsActionsInternal({
+    students,
+    links,
+    setStudents,
+    setLinks,
+    selectedStudentId,
+    setSelectedStudentId,
+    showToast,
+    showInfoDialog,
+    openConfirmDialog,
+    navigateToStudents,
+    triggerStudentsListReload,
+    refreshPayments,
+    clearStudentData,
+    onStudentCreateStarted: (source) => {
+      track('student_create_started', { source: resolveAnalyticsSource(source) });
+    },
+    onStudentCreated: ({ student, link, source }) => {
+      if (source.startsWith('onboarding')) {
+        onboardingState.setCreatedStudent({ student, link });
+      }
+      dashboardSummary.refresh();
+      track('student_create_success', { source: resolveAnalyticsSource(source) });
+    },
+    onStudentCreateError: (error, source) => {
+      track('student_create_error', {
+        source: resolveAnalyticsSource(source),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  });
+
   useScheduleLessonsLoaderInternal({
     hasAccess,
     isActive: activeTab === 'schedule',
@@ -480,6 +374,8 @@ const AppPageContent = () => {
     },
   });
 
+  const { openCreateStudentModal } = studentsActions;
+  const { openLessonModal } = lessonActions;
   const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
 
   const openCreateLesson = useCallback(
@@ -495,7 +391,7 @@ const AppPageContent = () => {
         setSelectedMonthDay(lessonIso);
       }
 
-      lessonActions.openLessonModal(
+      openLessonModal(
         lessonIso,
         date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
         undefined,
@@ -503,7 +399,7 @@ const AppPageContent = () => {
       );
     },
     [
-      lessonActions,
+      openLessonModal,
       resolvedTimeZone,
       setDayViewDate,
       setMonthAnchor,
@@ -586,7 +482,6 @@ const AppPageContent = () => {
     dashboardState.weekRange,
     dayViewDate,
     hasAccess,
-    resolvedTimeZone,
     scheduleView,
     studentsHomework.replaceHomeworks,
   ]);
@@ -608,14 +503,118 @@ const AppPageContent = () => {
     }
   }, [knownPaths, location.pathname]);
 
-  const linkedStudents: LinkedStudent[] = useMemo(
-    () =>
-      links.map((link) => ({
-        ...students.find((s) => s.id === link.studentId)!,
-        link,
-        homeworks: homeworks.filter((hw) => hw.studentId === link.studentId),
-      })),
-    [links, students, homeworks],
+  const linkedStudents = useLinkedStudents({ students, links, homeworks });
+
+  const onTopbarCreateLesson = useCallback(() => {
+    openCreateLesson();
+  }, [openCreateLesson]);
+
+  const onDashboardAddStudent = useCallback(() => {
+    guardedNavigate(tabPathById.students);
+    openCreateStudentModal();
+  }, [guardedNavigate, openCreateStudentModal]);
+
+  const onDashboardOpenSchedule = useCallback(() => {
+    guardedNavigate(tabPathById.schedule);
+  }, [guardedNavigate]);
+
+  const onDashboardOpenLesson = useCallback(
+    (lesson: Lesson) => {
+      openLessonModal(
+        formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
+        undefined,
+        lesson,
+        { skipNavigation: true },
+      );
+    },
+    [openLessonModal, resolvedTimeZone],
+  );
+
+  const onDashboardOpenLessonDay = useCallback(
+    (lesson: Lesson) => {
+      const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
+      const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
+        timeZone: resolvedTimeZone,
+      });
+      setScheduleView('month');
+      setDayViewDate(lessonDate);
+      setMonthAnchor(startOfMonth(lessonDate));
+      setMonthOffset(0);
+      setSelectedMonthDay(lessonIso);
+      guardedNavigate(tabPathById.schedule);
+    },
+    [guardedNavigate, resolvedTimeZone, setDayViewDate, setMonthAnchor, setMonthOffset, setScheduleView, setSelectedMonthDay],
+  );
+
+  const onDashboardOpenStudent = useCallback(
+    (studentId: number) => {
+      setSelectedStudentId(studentId);
+      guardedNavigate(tabPathById.students);
+    },
+    [guardedNavigate, setSelectedStudentId],
+  );
+
+  const dashboardRouteProps = useMemo(
+    () => ({
+      teacher,
+      lessons,
+      linkedStudents,
+      onAddStudent: onDashboardAddStudent,
+      onCreateLesson: openCreateLesson,
+      onOpenSchedule: onDashboardOpenSchedule,
+      onOpenLesson: onDashboardOpenLesson,
+      onOpenLessonDay: onDashboardOpenLessonDay,
+      onOpenStudent: onDashboardOpenStudent,
+    }),
+    [
+      linkedStudents,
+      lessons,
+      onDashboardAddStudent,
+      onDashboardOpenLesson,
+      onDashboardOpenLessonDay,
+      onDashboardOpenSchedule,
+      onDashboardOpenStudent,
+      openCreateLesson,
+      teacher,
+    ],
+  );
+
+  const studentsRouteProps = useMemo(
+    () => ({
+      hasAccess,
+      teacher,
+      lessons,
+      onActiveTabChange: setStudentActiveTab,
+      studentListReloadKey,
+    }),
+    [hasAccess, lessons, setStudentActiveTab, studentListReloadKey, teacher],
+  );
+
+  const scheduleRouteProps = useMemo(
+    () => ({
+      lessons,
+      linkedStudents,
+      autoConfirmLessons: teacher.autoConfirmLessons,
+    }),
+    [lessons, linkedStudents, teacher.autoConfirmLessons],
+  );
+
+  const settingsRouteProps = useMemo(
+    () => ({
+      teacher,
+      onTeacherChange: setTeacher,
+      onNavigate: guardedNavigate,
+    }),
+    [guardedNavigate, teacher],
+  );
+
+  const dashboardSummaryRouteProps = useMemo(
+    () => ({
+      summary: dashboardSummaryData,
+      isLoading: dashboardSummary.isLoading,
+      refresh: dashboardSummary.refresh,
+    }),
+    [dashboardSummary.isLoading, dashboardSummary.refresh, dashboardSummaryData],
   );
 
   if (sessionState !== 'authenticated' || !hasTelegramAccess) {
@@ -673,7 +672,7 @@ const AppPageContent = () => {
                             subtitle={desktopDateLabel}
                             showCreateLesson={activeTab === 'dashboard'}
                             onOpenNotifications={onOpenNotifications}
-                            onCreateLesson={() => openCreateLesson()}
+                            onCreateLesson={onTopbarCreateLesson}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
                           />
                         ) : null}
@@ -681,58 +680,11 @@ const AppPageContent = () => {
                         <main className={layoutStyles.content}>
                           <AppRoutes
                             resolveLastVisitedPath={resolveLastVisitedPath}
-                            dashboard={{
-                              teacher,
-                              lessons,
-                              linkedStudents,
-                              onAddStudent: () => {
-                                guardedNavigate(tabPathById.students);
-                                studentsActions.openCreateStudentModal();
-                              },
-                              onCreateLesson: openCreateLesson,
-                              onOpenSchedule: () => guardedNavigate(tabPathById.schedule),
-                              onOpenLesson: (lesson) =>
-                                lessonActions.openLessonModal(
-                                  formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone }),
-                                  undefined,
-                                  lesson,
-                                  { skipNavigation: true },
-                                ),
-                              onOpenLessonDay: (lesson) => {
-                                const lessonDate = toZonedDate(lesson.startAt, resolvedTimeZone);
-                                const lessonIso = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', {
-                                  timeZone: resolvedTimeZone,
-                                });
-                                setScheduleView('month');
-                                setDayViewDate(lessonDate);
-                                setMonthAnchor(startOfMonth(lessonDate));
-                                setMonthOffset(0);
-                                setSelectedMonthDay(lessonIso);
-                                guardedNavigate(tabPathById.schedule);
-                              },
-                              onOpenStudent: (studentId) => {
-                                setSelectedStudentId(studentId);
-                                guardedNavigate(tabPathById.students);
-                              },
-                            }}
-                            students={{
-                              hasAccess,
-                              teacher,
-                              lessons,
-                              onActiveTabChange: setStudentActiveTab,
-                              studentListReloadKey,
-                            }}
-                            schedule={{
-                              lessons,
-                              linkedStudents,
-                              autoConfirmLessons: teacher.autoConfirmLessons,
-                            }}
-                            settings={{ teacher, onTeacherChange: setTeacher, onNavigate: guardedNavigate }}
-                            dashboardSummary={{
-                              summary: dashboardSummaryData,
-                              isLoading: dashboardSummary.isLoading,
-                              refresh: dashboardSummary.refresh,
-                            }}
+                            dashboard={dashboardRouteProps}
+                            students={studentsRouteProps}
+                            schedule={scheduleRouteProps}
+                            settings={settingsRouteProps}
+                            dashboardSummary={dashboardSummaryRouteProps}
                           />
                         </main>
 
