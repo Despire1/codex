@@ -50,7 +50,7 @@ const resetInsets = (root: HTMLElement) => {
 };
 
 export const initTelegramLayoutInsetsMobileOnly = (root: HTMLElement = document.documentElement) => {
-  const tg = (window as TelegramWindow).Telegram?.WebApp;
+  const tg = (window as unknown as TelegramWindow).Telegram?.WebApp;
   if (!tg) {
     return () => undefined;
   }

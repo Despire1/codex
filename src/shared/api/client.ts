@@ -2,8 +2,12 @@ import {
   ActivityCategory,
   ActivityFeedListResponse,
   Homework,
+  HomeworkAssignment,
   HomeworkAttachment,
+  HomeworkBlock,
+  HomeworkSubmission,
   HomeworkStatus,
+  HomeworkTemplate,
   Lesson,
   LessonPaymentFilter,
   LessonSortOrder,
@@ -42,6 +46,14 @@ type SettingsPayload = Pick<
   | 'paymentReminderMaxCount'
   | 'notifyTeacherOnAutoPaymentReminder'
   | 'notifyTeacherOnManualPaymentReminder'
+  | 'homeworkNotifyOnAssign'
+  | 'homeworkReminder24hEnabled'
+  | 'homeworkReminderMorningEnabled'
+  | 'homeworkReminderMorningTime'
+  | 'homeworkReminder3hEnabled'
+  | 'homeworkOverdueRemindersEnabled'
+  | 'homeworkOverdueReminderTime'
+  | 'homeworkOverdueReminderMaxCount'
 >;
 
 export type SessionSummary = {
@@ -95,15 +107,46 @@ export type NotificationTestSendResponse = {
   channel?: string;
 };
 
+export type StudentContextLink = {
+  teacherId: number;
+  studentId: number;
+  teacherName: string;
+  teacherUsername?: string | null;
+  studentName: string;
+  studentUsername?: string | null;
+};
+
+export type StudentContextResponse = {
+  contexts: StudentContextLink[];
+  activeTeacherId: number | null;
+  activeStudentId: number | null;
+};
+
+export type HomeworkAssignmentBucket = 'all' | 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
+
+export type HomeworkAssignmentsSummary = {
+  totalCount: number;
+  draftCount: number;
+  sentCount: number;
+  reviewCount: number;
+  reviewedCount: number;
+  overdueCount: number;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
-  const roleHeader =
-    typeof window !== 'undefined' ? window.localStorage.getItem('userRole') ?? undefined : undefined;
+  const roleHeader = typeof window !== 'undefined' ? window.localStorage.getItem('userRole') ?? undefined : undefined;
+  const activeTeacherHeader =
+    typeof window !== 'undefined' ? window.localStorage.getItem('student_active_teacher_id') ?? undefined : undefined;
+  const activeStudentHeader =
+    typeof window !== 'undefined' ? window.localStorage.getItem('student_active_student_id') ?? undefined : undefined;
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
       ...(roleHeader ? { 'X-User-Role': roleHeader } : {}),
+      ...(activeTeacherHeader ? { 'X-Teacher-Id': activeTeacherHeader } : {}),
+      ...(activeStudentHeader ? { 'X-Student-Id': activeStudentHeader } : {}),
       ...(options?.headers ?? {}),
     },
     cache: 'no-store',
@@ -437,6 +480,179 @@ export const api = {
   },
   listStudentUnpaidLessons: (studentId: number) =>
     apiFetch<StudentDebtSummary>(`/api/students/${studentId}/unpaid-lessons`),
+  getStudentContext: () => apiFetch<StudentContextResponse>('/api/v2/student/context'),
+  listHomeworkTemplatesV2: (params?: { query?: string; includeArchived?: boolean }) => {
+    const search = new URLSearchParams();
+    if (params?.query) search.set('query', params.query);
+    if (params?.includeArchived) search.set('includeArchived', '1');
+    const suffix = search.toString();
+    return apiFetch<{ items: HomeworkTemplate[] }>(`/api/v2/homework/templates${suffix ? `?${suffix}` : ''}`);
+  },
+  createHomeworkTemplateV2: (payload: {
+    title: string;
+    tags?: string[];
+    subject?: string | null;
+    level?: string | null;
+    blocks: HomeworkBlock[];
+  }) =>
+    apiFetch<{ template: HomeworkTemplate }>('/api/v2/homework/templates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateHomeworkTemplateV2: (
+    templateId: number,
+    payload: Partial<Pick<HomeworkTemplate, 'title' | 'subject' | 'level' | 'isArchived'>> & {
+      tags?: string[];
+      blocks?: HomeworkBlock[];
+    },
+  ) =>
+    apiFetch<{ template: HomeworkTemplate }>(`/api/v2/homework/templates/${templateId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  listHomeworkAssignmentsV2: (params?: {
+    studentId?: number;
+    lessonId?: number;
+    status?: string;
+    bucket?: HomeworkAssignmentBucket;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const search = new URLSearchParams();
+    if (typeof params?.studentId === 'number') search.set('studentId', String(params.studentId));
+    if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
+    if (params?.status) search.set('status', params.status);
+    if (params?.bucket) search.set('bucket', params.bucket);
+    if (typeof params?.limit === 'number') search.set('limit', String(params.limit));
+    if (typeof params?.offset === 'number') search.set('offset', String(params.offset));
+    const suffix = search.toString();
+    return apiFetch<{ items: HomeworkAssignment[]; total: number; nextOffset: number | null }>(
+      `/api/v2/homework/assignments${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+  getHomeworkAssignmentsSummaryV2: (params?: { studentId?: number; lessonId?: number }) => {
+    const search = new URLSearchParams();
+    if (typeof params?.studentId === 'number') search.set('studentId', String(params.studentId));
+    if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
+    const suffix = search.toString();
+    return apiFetch<HomeworkAssignmentsSummary>(
+      `/api/v2/homework/assignments/summary${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+  createHomeworkAssignmentV2: (payload: {
+    studentId: number;
+    lessonId?: number | null;
+    templateId?: number | null;
+    title?: string;
+    status?: HomeworkAssignment['status'];
+    sendMode?: HomeworkAssignment['sendMode'];
+    deadlineAt?: string | null;
+    contentSnapshot?: HomeworkBlock[];
+    legacyHomeworkId?: number | null;
+  }) =>
+    apiFetch<{ assignment: HomeworkAssignment }>('/api/v2/homework/assignments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateHomeworkAssignmentV2: (
+    assignmentId: number,
+    payload: Partial<{
+      title: string;
+      status: HomeworkAssignment['status'];
+      sendMode: HomeworkAssignment['sendMode'];
+      deadlineAt: string | null;
+      sentAt: string | null;
+      contentSnapshot: HomeworkBlock[];
+      teacherComment: string | null;
+      autoScore: number | null;
+      manualScore: number | null;
+      finalScore: number | null;
+    }>,
+  ) =>
+    apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  listHomeworkSubmissionsV2: (assignmentId: number) =>
+    apiFetch<{ items: HomeworkSubmission[] }>(`/api/v2/homework/assignments/${assignmentId}/submissions`),
+  createHomeworkSubmissionV2: (
+    assignmentId: number,
+    payload: {
+      answerText?: string | null;
+      attachments?: HomeworkAttachment[];
+      voice?: HomeworkAttachment[];
+      testAnswers?: Record<string, unknown> | null;
+      submit?: boolean;
+    },
+  ) =>
+    apiFetch<{ submission: HomeworkSubmission; assignment: HomeworkAssignment }>(
+      `/api/v2/homework/assignments/${assignmentId}/submissions`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  reviewHomeworkAssignmentV2: (
+    assignmentId: number,
+    payload: {
+      action: 'REVIEWED' | 'RETURNED';
+      submissionId?: number;
+      autoScore?: number | null;
+      manualScore?: number | null;
+      finalScore?: number | null;
+      teacherComment?: string | null;
+    },
+  ) =>
+    apiFetch<{ assignment: HomeworkAssignment; submission: HomeworkSubmission | null }>(
+      `/api/v2/homework/assignments/${assignmentId}/review`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  listStudentHomeworkAssignmentsV2: (params?: {
+    filter?: 'active' | 'overdue' | 'submitted' | 'reviewed';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const search = new URLSearchParams();
+    if (params?.filter) search.set('filter', params.filter);
+    if (typeof params?.limit === 'number') search.set('limit', String(params.limit));
+    if (typeof params?.offset === 'number') search.set('offset', String(params.offset));
+    const suffix = search.toString();
+    return apiFetch<{ items: HomeworkAssignment[]; total: number; nextOffset: number | null }>(
+      `/api/v2/student/homework/assignments${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+  getStudentHomeworkAssignmentDetailV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment; submissions: HomeworkSubmission[] }>(
+      `/api/v2/student/homework/assignments/${assignmentId}`,
+    ),
+  getStudentHomeworkSummaryV2: () =>
+    apiFetch<{
+      activeCount: number;
+      overdueCount: number;
+      submittedCount: number;
+      reviewedCount: number;
+      dueTodayCount: number;
+    }>('/api/v2/student/homework/summary'),
+  updateStudentPreferencesV2: (payload: { timezone?: string | null }) =>
+    apiFetch<{ student: Student }>('/api/v2/student/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  createFilePresignV2: (payload: { fileName: string; contentType: string; size: number; scope?: string }) =>
+    apiFetch<{
+      uploadUrl: string;
+      method: 'PUT';
+      headers: Record<string, string>;
+      fileUrl: string;
+      objectKey: string;
+      expiresInSeconds: number;
+    }>('/api/v2/files/presign-upload', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export type ApiClient = typeof api;

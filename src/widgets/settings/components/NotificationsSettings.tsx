@@ -14,9 +14,11 @@ const lessonReminderOptions = [5, 10, 15, 30, 60, 120];
 const paymentDelayOptions = [2, 6, 12, 24, 48];
 const paymentRepeatOptions = [24, 48, 72];
 const paymentMaxOptions = [1, 2, 3, 5];
+const homeworkOverdueMaxOptions = [1, 2, 3, 5];
 export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange, onSaveNow }) => {
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
   const paymentRemindersDisabled = !teacher.globalPaymentRemindersEnabled;
+  const homeworkRemindersDisabled = !teacher.homeworkNotifyOnAssign;
 
   return (
     <div className={styles.moduleStack}>
@@ -215,6 +217,126 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
             />
             <span className={controls.slider} />
           </label>
+        </div>
+      </div>
+
+      <div className={`${styles.sectionBlock} ${studentSectionDisabled ? styles.disabledSection : ''}`}>
+        <div className={styles.rowHeader}>
+          <div>
+            <div className={styles.label}>Домашка: уведомлять при выдаче</div>
+            <div className={styles.helperText}>
+              Когда домашка выдана ученику, отправляется уведомление в Telegram.
+            </div>
+          </div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.homeworkNotifyOnAssign}
+              onChange={(event) => onChange({ homeworkNotifyOnAssign: event.target.checked })}
+              disabled={studentSectionDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Напоминание за 24 часа</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.homeworkReminder24hEnabled}
+              onChange={(event) => onChange({ homeworkReminder24hEnabled: event.target.checked })}
+              disabled={studentSectionDisabled || homeworkRemindersDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Утром в день дедлайна</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.homeworkReminderMorningEnabled}
+              onChange={(event) => onChange({ homeworkReminderMorningEnabled: event.target.checked })}
+              disabled={studentSectionDisabled || homeworkRemindersDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Время утреннего напоминания</div>
+          <input
+            className={controls.input}
+            type="time"
+            value={teacher.homeworkReminderMorningTime}
+            onChange={(event) => onChange({ homeworkReminderMorningTime: event.target.value })}
+            disabled={
+              studentSectionDisabled || homeworkRemindersDisabled || !teacher.homeworkReminderMorningEnabled
+            }
+          />
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Напоминание за 3 часа</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.homeworkReminder3hEnabled}
+              onChange={(event) => onChange({ homeworkReminder3hEnabled: event.target.checked })}
+              disabled={studentSectionDisabled || homeworkRemindersDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Просрочено: напоминать ежедневно</div>
+          <label className={controls.switch}>
+            <input
+              type="checkbox"
+              checked={teacher.homeworkOverdueRemindersEnabled}
+              onChange={(event) => onChange({ homeworkOverdueRemindersEnabled: event.target.checked })}
+              disabled={studentSectionDisabled || homeworkRemindersDisabled}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Время overdue-напоминания</div>
+          <input
+            className={controls.input}
+            type="time"
+            value={teacher.homeworkOverdueReminderTime}
+            onChange={(event) => onChange({ homeworkOverdueReminderTime: event.target.value })}
+            disabled={
+              studentSectionDisabled ||
+              homeworkRemindersDisabled ||
+              !teacher.homeworkOverdueRemindersEnabled
+            }
+          />
+        </div>
+
+        <div className={styles.inlineField}>
+          <div className={styles.inlineLabel}>Максимум overdue-напоминаний</div>
+          <select
+            className={controls.input}
+            value={teacher.homeworkOverdueReminderMaxCount}
+            onChange={(event) => onChange({ homeworkOverdueReminderMaxCount: Number(event.target.value) })}
+            disabled={
+              studentSectionDisabled ||
+              homeworkRemindersDisabled ||
+              !teacher.homeworkOverdueRemindersEnabled
+            }
+          >
+            {homeworkOverdueMaxOptions.map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

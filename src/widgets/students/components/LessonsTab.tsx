@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
@@ -84,7 +84,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   useEffect(() => {
     if (!datePickerOpen) return undefined;
 
-    const handleOutside = (event: MouseEvent) => {
+    const handleOutside = (event: globalThis.MouseEvent) => {
       if (!datePickerRef.current) return;
       if (!datePickerRef.current.contains(event.target as Node)) {
         setDatePickerOpen(false);
@@ -180,7 +180,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     [autoConfirmLessons],
   );
 
-  const handleOpenMeetingLink = useCallback((event: MouseEvent<HTMLButtonElement>, meetingLink: string) => {
+  const handleOpenMeetingLink = useCallback((event: ReactMouseEvent<HTMLButtonElement>, meetingLink: string) => {
     event.stopPropagation();
     window.open(meetingLink, '_blank', 'noopener,noreferrer');
   }, []);

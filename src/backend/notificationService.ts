@@ -1,6 +1,5 @@
 import { addDays, addMinutes, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Prisma } from '@prisma/client';
 import prisma from './prismaClient';
 import { resolveStudentTelegramId } from './studentContacts';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
@@ -256,7 +255,7 @@ const createNotificationLog = async (payload: {
   channel?: 'TELEGRAM' | null;
   scheduledFor?: Date | null;
   dedupeKey?: string | null;
-}) => {
+  }) => {
   try {
     const teacherExists = await prisma.teacher.findUnique({
       where: { chatId: payload.teacherId },
@@ -278,13 +277,12 @@ const createNotificationLog = async (payload: {
       },
     });
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      ((error.code === 'P2002' &&
-        Array.isArray(error.meta?.target) &&
-        error.meta?.target.includes('dedupeKey')) ||
-        error.code === 'P2003')
-    ) {
+    const prismaError = error as { code?: string; meta?: { target?: unknown } } | null;
+    const uniqueTarget = prismaError?.meta?.target;
+    const isDedupeConflict =
+      prismaError?.code === 'P2002' && Array.isArray(uniqueTarget) && uniqueTarget.includes('dedupeKey');
+    const isForeignKeyConflict = prismaError?.code === 'P2003';
+    if (isDedupeConflict || isForeignKeyConflict) {
       return null;
     }
     throw error;

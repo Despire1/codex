@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
+import path from 'node:path';
 import { URL } from 'node:url';
 import { addDays, addYears } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -554,6 +556,14 @@ const pickTeacherSettings = (teacher: any) => ({
   paymentReminderMaxCount: teacher.paymentReminderMaxCount,
   notifyTeacherOnAutoPaymentReminder: teacher.notifyTeacherOnAutoPaymentReminder,
   notifyTeacherOnManualPaymentReminder: teacher.notifyTeacherOnManualPaymentReminder,
+  homeworkNotifyOnAssign: teacher.homeworkNotifyOnAssign,
+  homeworkReminder24hEnabled: teacher.homeworkReminder24hEnabled,
+  homeworkReminderMorningEnabled: teacher.homeworkReminderMorningEnabled,
+  homeworkReminderMorningTime: teacher.homeworkReminderMorningTime,
+  homeworkReminder3hEnabled: teacher.homeworkReminder3hEnabled,
+  homeworkOverdueRemindersEnabled: teacher.homeworkOverdueRemindersEnabled,
+  homeworkOverdueReminderTime: teacher.homeworkOverdueReminderTime,
+  homeworkOverdueReminderMaxCount: teacher.homeworkOverdueReminderMaxCount,
 });
 
 const getSettings = async (user: User) => {
@@ -664,6 +674,41 @@ const updateSettings = async (user: User, body: any) => {
 
   if (typeof body.notifyTeacherOnManualPaymentReminder === 'boolean') {
     data.notifyTeacherOnManualPaymentReminder = body.notifyTeacherOnManualPaymentReminder;
+  }
+
+  if (typeof body.homeworkNotifyOnAssign === 'boolean') {
+    data.homeworkNotifyOnAssign = body.homeworkNotifyOnAssign;
+  }
+
+  if (typeof body.homeworkReminder24hEnabled === 'boolean') {
+    data.homeworkReminder24hEnabled = body.homeworkReminder24hEnabled;
+  }
+
+  if (typeof body.homeworkReminderMorningEnabled === 'boolean') {
+    data.homeworkReminderMorningEnabled = body.homeworkReminderMorningEnabled;
+  }
+
+  if (typeof body.homeworkReminderMorningTime === 'string' && isValidTimeString(body.homeworkReminderMorningTime)) {
+    data.homeworkReminderMorningTime = body.homeworkReminderMorningTime;
+  }
+
+  if (typeof body.homeworkReminder3hEnabled === 'boolean') {
+    data.homeworkReminder3hEnabled = body.homeworkReminder3hEnabled;
+  }
+
+  if (typeof body.homeworkOverdueRemindersEnabled === 'boolean') {
+    data.homeworkOverdueRemindersEnabled = body.homeworkOverdueRemindersEnabled;
+  }
+
+  if (typeof body.homeworkOverdueReminderTime === 'string' && isValidTimeString(body.homeworkOverdueReminderTime)) {
+    data.homeworkOverdueReminderTime = body.homeworkOverdueReminderTime;
+  }
+
+  if (body.homeworkOverdueReminderMaxCount !== undefined) {
+    const numeric = Number(body.homeworkOverdueReminderMaxCount);
+    if (Number.isFinite(numeric)) {
+      data.homeworkOverdueReminderMaxCount = clampNumber(Math.round(numeric), 1, 10);
+    }
   }
 
   if (typeof body.receiptEmail === 'string') {
@@ -1969,6 +2014,18 @@ const getRequestedStudentId = (req: IncomingMessage): number | null => {
   return Number.isFinite(requesterStudentId) ? requesterStudentId : null;
 };
 
+const getRequestedTeacherId = (req: IncomingMessage): number | null => {
+  const teacherIdHeader = req.headers['x-teacher-id'];
+  const requesterTeacherId = typeof teacherIdHeader === 'string' ? Number(teacherIdHeader) : NaN;
+  return Number.isFinite(requesterTeacherId) ? requesterTeacherId : null;
+};
+
+const parseOptionalNumberQueryParam = (value: string | null): number | null => {
+  if (value === null || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const filterHomeworksForRole = (homeworks: any[], role: RequestRole, studentId?: number | null) => {
   if (role !== 'STUDENT') return homeworks;
 
@@ -2013,6 +2070,584 @@ const resolveProfileLessonPrice = (link: any) => normalizeLessonPriceValue(link?
 
 const createPaymentEvent = async (tx: any, payload: any) => {
   return tx.paymentEvent.create({ data: payload });
+};
+
+type HomeworkV2NotificationKind =
+  | 'ASSIGNED'
+  | 'REVIEWED'
+  | 'RETURNED'
+  | 'REMINDER_24H'
+  | 'REMINDER_MORNING'
+  | 'REMINDER_3H'
+  | 'OVERDUE';
+
+type StudentAccessLink = {
+  teacherId: bigint;
+  studentId: number;
+  customName: string;
+  teacher?: { chatId: bigint; name?: string | null; username?: string | null; timezone?: string | null } | null;
+  student?: Student | null;
+};
+
+const parseJsonValue = <T>(value: unknown, fallback: T): T => {
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+    return value as T;
+  }
+  if (typeof value !== 'string') return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const parseStringArray = (value: unknown): string[] => {
+  const parsed = parseJsonValue<unknown[]>(value, []);
+  return parsed.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean);
+};
+
+const parseObjectArray = (value: unknown): Record<string, unknown>[] => {
+  const parsed = parseJsonValue<unknown[]>(value, []);
+  return parsed.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null);
+};
+
+const parseObjectRecord = (value: unknown): Record<string, unknown> | null => {
+  const parsed = parseJsonValue<unknown>(value, null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+};
+
+const toValidDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const clampHomeworkScore = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return clampNumber(Math.round(numeric), 0, 100);
+};
+
+const normalizeHomeworkTemplateTags = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return parseStringArray(value);
+};
+
+const normalizeHomeworkBlocks = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'object' && item !== null) as Record<string, unknown>[];
+  }
+  return parseObjectArray(value);
+};
+
+const normalizeHomeworkAttachments = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+      .map((item) => ({
+        id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
+        url: typeof item.url === 'string' ? item.url : '',
+        fileName: typeof item.fileName === 'string' ? item.fileName : '',
+        size: Number.isFinite(Number(item.size)) ? Math.max(0, Number(item.size)) : 0,
+      }))
+      .filter((item) => item.url);
+  }
+  return parseObjectArray(value);
+};
+
+const normalizeHomeworkAssignmentStatus = (
+  value: unknown,
+):
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'SENT'
+  | 'SUBMITTED'
+  | 'RETURNED'
+  | 'REVIEWED'
+  | 'OVERDUE' => {
+  const normalized = typeof value === 'string' ? value.toUpperCase() : '';
+  if (
+    normalized === 'DRAFT' ||
+    normalized === 'SCHEDULED' ||
+    normalized === 'SENT' ||
+    normalized === 'SUBMITTED' ||
+    normalized === 'RETURNED' ||
+    normalized === 'REVIEWED' ||
+    normalized === 'OVERDUE'
+  ) {
+    return normalized;
+  }
+  return 'DRAFT';
+};
+
+const normalizeHomeworkSendMode = (value: unknown): 'AUTO_AFTER_LESSON_DONE' | 'MANUAL' =>
+  value === 'AUTO_AFTER_LESSON_DONE' ? 'AUTO_AFTER_LESSON_DONE' : 'MANUAL';
+
+const normalizeHomeworkSubmissionStatus = (value: unknown): 'DRAFT' | 'SUBMITTED' | 'REVIEWED' => {
+  const normalized = typeof value === 'string' ? value.toUpperCase() : '';
+  if (normalized === 'DRAFT' || normalized === 'SUBMITTED' || normalized === 'REVIEWED') return normalized;
+  return 'DRAFT';
+};
+
+const resolveAssignmentViewStatus = (assignment: { status: string; deadlineAt?: Date | null }, now = new Date()) => {
+  const status = normalizeHomeworkAssignmentStatus(assignment.status);
+  const deadline = assignment.deadlineAt ? new Date(assignment.deadlineAt) : null;
+  const isOverdueCandidate = status === 'SENT' || status === 'RETURNED';
+  if (isOverdueCandidate && deadline && deadline.getTime() < now.getTime()) return 'OVERDUE' as const;
+  return status;
+};
+
+type HomeworkAssignmentBucketV2 = 'all' | 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
+
+const normalizeHomeworkAssignmentBucketV2 = (value: unknown): HomeworkAssignmentBucketV2 => {
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  if (
+    normalized === 'all' ||
+    normalized === 'draft' ||
+    normalized === 'sent' ||
+    normalized === 'review' ||
+    normalized === 'reviewed' ||
+    normalized === 'overdue'
+  ) {
+    return normalized;
+  }
+  return 'all';
+};
+
+const resolveAssignmentBucketWhereV2 = (bucket: HomeworkAssignmentBucketV2, now: Date): Record<string, unknown> => {
+  if (bucket === 'draft') return { status: { in: ['DRAFT', 'SCHEDULED'] } };
+  if (bucket === 'sent') return { status: { in: ['SENT', 'RETURNED'] } };
+  if (bucket === 'review') return { status: 'SUBMITTED' };
+  if (bucket === 'reviewed') return { status: 'REVIEWED' };
+  if (bucket === 'overdue') {
+    return {
+      OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
+    };
+  }
+  return {};
+};
+
+const attachLatestSubmissionMetaToAssignments = async (items: any[]) => {
+  if (!items.length) return items;
+  const assignmentIds = items
+    .map((item) => Number(item.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (!assignmentIds.length) return items;
+
+  const submissions = await (prisma as any).homeworkSubmission.findMany({
+    where: { assignmentId: { in: assignmentIds } },
+    orderBy: [{ assignmentId: 'asc' }, { attemptNo: 'desc' }, { id: 'desc' }],
+    select: {
+      assignmentId: true,
+      attemptNo: true,
+      status: true,
+      submittedAt: true,
+    },
+  });
+
+  const latestByAssignmentId = new Map<number, any>();
+  submissions.forEach((submission: any) => {
+    if (!latestByAssignmentId.has(submission.assignmentId)) {
+      latestByAssignmentId.set(submission.assignmentId, submission);
+    }
+  });
+
+  return items.map((item) => {
+    const latest = latestByAssignmentId.get(item.id);
+    return {
+      ...item,
+      latestSubmissionAttemptNo: latest?.attemptNo ?? null,
+      latestSubmissionStatus: latest ? normalizeHomeworkSubmissionStatus(latest.status) : null,
+      latestSubmissionSubmittedAt: latest?.submittedAt ?? null,
+    };
+  });
+};
+
+const serializeHomeworkTemplateV2 = (template: any) => ({
+  id: template.id,
+  teacherId: Number(template.teacherId),
+  createdByTeacherId: template.createdByTeacherId ? Number(template.createdByTeacherId) : null,
+  title: template.title ?? '',
+  tags: normalizeHomeworkTemplateTags(template.tags),
+  subject: template.subject ?? null,
+  level: template.level ?? null,
+  blocks: normalizeHomeworkBlocks(template.blocks),
+  isArchived: Boolean(template.isArchived),
+  createdAt: template.createdAt,
+  updatedAt: template.updatedAt,
+});
+
+const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => ({
+  id: assignment.id,
+  teacherId: Number(assignment.teacherId),
+  studentId: assignment.studentId,
+  lessonId: assignment.lessonId ?? null,
+  templateId: assignment.templateId ?? null,
+  legacyHomeworkId: assignment.legacyHomeworkId ?? null,
+  title: assignment.title ?? '',
+  status: resolveAssignmentViewStatus(assignment, now),
+  sendMode: normalizeHomeworkSendMode(assignment.sendMode),
+  deadlineAt: assignment.deadlineAt ?? null,
+  sentAt: assignment.sentAt ?? null,
+  contentSnapshot: normalizeHomeworkBlocks(assignment.contentSnapshot),
+  teacherComment: assignment.teacherComment ?? null,
+  reviewedAt: assignment.reviewedAt ?? null,
+  reminder24hSentAt: assignment.reminder24hSentAt ?? null,
+  reminderMorningSentAt: assignment.reminderMorningSentAt ?? null,
+  reminder3hSentAt: assignment.reminder3hSentAt ?? null,
+  overdueReminderCount: Number.isFinite(Number(assignment.overdueReminderCount))
+    ? Number(assignment.overdueReminderCount)
+    : 0,
+  lastOverdueReminderAt: assignment.lastOverdueReminderAt ?? null,
+  createdAt: assignment.createdAt,
+  updatedAt: assignment.updatedAt,
+  latestSubmissionAttemptNo: Number.isFinite(Number(assignment.latestSubmissionAttemptNo))
+    ? Number(assignment.latestSubmissionAttemptNo)
+    : null,
+  latestSubmissionStatus: assignment.latestSubmissionStatus
+    ? normalizeHomeworkSubmissionStatus(assignment.latestSubmissionStatus)
+    : null,
+  latestSubmissionSubmittedAt: assignment.latestSubmissionSubmittedAt ?? null,
+  score: {
+    autoScore: clampHomeworkScore(assignment.autoScore),
+    manualScore: clampHomeworkScore(assignment.manualScore),
+    finalScore: clampHomeworkScore(assignment.finalScore),
+  },
+});
+
+const serializeHomeworkSubmissionV2 = (submission: any) => ({
+  id: submission.id,
+  assignmentId: submission.assignmentId,
+  studentId: submission.studentId,
+  reviewerTeacherId: submission.reviewerTeacherId ? Number(submission.reviewerTeacherId) : null,
+  attemptNo: submission.attemptNo,
+  status: normalizeHomeworkSubmissionStatus(submission.status),
+  answerText: submission.answerText ?? null,
+  attachments: normalizeHomeworkAttachments(submission.attachments),
+  voice: normalizeHomeworkAttachments(submission.voice),
+  testAnswers: parseObjectRecord(submission.testAnswers),
+  teacherComment: submission.teacherComment ?? null,
+  submittedAt: submission.submittedAt ?? null,
+  reviewedAt: submission.reviewedAt ?? null,
+  createdAt: submission.createdAt,
+  updatedAt: submission.updatedAt,
+  score: {
+    autoScore: clampHomeworkScore(submission.autoScore),
+    manualScore: clampHomeworkScore(submission.manualScore),
+    finalScore: clampHomeworkScore(submission.finalScore),
+  },
+});
+
+const normalizeAnswerString = (value: unknown) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
+const normalizeQuestionPoints = (question: Record<string, unknown>) => {
+  const points = Number(question.points);
+  if (!Number.isFinite(points) || points <= 0) return 1;
+  return points;
+};
+
+const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswersRaw: unknown): number | null => {
+  const answers = parseObjectRecord(testAnswersRaw);
+  if (!answers) return null;
+  const questions = blocks
+    .filter((block) => block.type === 'TEST')
+    .flatMap((block) => {
+      const q = block.questions;
+      return Array.isArray(q) ? q : [];
+    })
+    .filter((question): question is Record<string, unknown> => typeof question === 'object' && question !== null);
+
+  const autoQuestions = questions.filter((question) => question.type !== 'SHORT_ANSWER');
+  if (autoQuestions.length === 0) return null;
+
+  let earned = 0;
+  let maxPoints = 0;
+
+  for (const question of autoQuestions) {
+    const questionId = typeof question.id === 'string' ? question.id : '';
+    if (!questionId) continue;
+    const points = normalizeQuestionPoints(question);
+    maxPoints += points;
+    const answer = answers[questionId];
+    const type = String(question.type ?? '');
+
+    if (type === 'SINGLE_CHOICE') {
+      const correctIds = Array.isArray(question.correctOptionIds)
+        ? question.correctOptionIds.filter((item): item is string => typeof item === 'string')
+        : [];
+      const selected = Array.isArray(answer) ? answer[0] : answer;
+      if (typeof selected === 'string' && correctIds.length === 1 && selected === correctIds[0]) {
+        earned += points;
+      }
+      continue;
+    }
+
+    if (type === 'MULTIPLE_CHOICE') {
+      const correctIds = Array.isArray(question.correctOptionIds)
+        ? question.correctOptionIds.filter((item): item is string => typeof item === 'string')
+        : [];
+      const selectedIds = Array.isArray(answer)
+        ? answer.filter((item): item is string => typeof item === 'string')
+        : [];
+      const correctSet = new Set(correctIds);
+      const selectedSet = new Set(selectedIds);
+      const correctTotal = correctSet.size;
+      if (correctTotal === 0) continue;
+      let correctSelected = 0;
+      let incorrectSelected = 0;
+      selectedSet.forEach((selectedId) => {
+        if (correctSet.has(selectedId)) correctSelected += 1;
+        else incorrectSelected += 1;
+      });
+      const ratio = Math.max(0, (correctSelected - incorrectSelected) / correctTotal);
+      earned += ratio * points;
+      continue;
+    }
+
+    if (type === 'MATCHING') {
+      const pairs = Array.isArray(question.matchingPairs)
+        ? question.matchingPairs.filter(
+            (pair): pair is { left: string; right: string } =>
+              typeof pair === 'object' &&
+              pair !== null &&
+              typeof (pair as { left?: unknown }).left === 'string' &&
+              typeof (pair as { right?: unknown }).right === 'string',
+          )
+        : [];
+      if (pairs.length === 0) continue;
+      const answerPairsMap = new Map<string, string>();
+      if (Array.isArray(answer)) {
+        answer.forEach((entry) => {
+          if (
+            typeof entry === 'object' &&
+            entry !== null &&
+            typeof (entry as { left?: unknown }).left === 'string' &&
+            typeof (entry as { right?: unknown }).right === 'string'
+          ) {
+            answerPairsMap.set((entry as { left: string }).left, (entry as { right: string }).right);
+          }
+        });
+      } else if (answer && typeof answer === 'object') {
+        Object.entries(answer as Record<string, unknown>).forEach(([left, right]) => {
+          if (typeof right === 'string') {
+            answerPairsMap.set(left, right);
+          }
+        });
+      }
+      const correctPairs = pairs.filter((pair) => answerPairsMap.get(pair.left) === pair.right).length;
+      earned += (correctPairs / pairs.length) * points;
+      continue;
+    }
+  }
+
+  if (maxPoints <= 0) return null;
+  return clampNumber(Math.round((earned / maxPoints) * 100), 0, 100);
+};
+
+const resolveStudentAccessLinks = async (user: User): Promise<StudentAccessLink[]> => {
+  const normalizedUsername = normalizeTelegramUsername(user.username);
+  const students = await prisma.student.findMany({
+    where: {
+      OR: [
+        { telegramId: user.telegramUserId },
+        ...(normalizedUsername ? [{ username: normalizedUsername }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  if (students.length === 0) return [];
+  const studentIds = students.map((student) => student.id);
+  const links = (await prisma.teacherStudent.findMany({
+    where: { studentId: { in: studentIds }, isArchived: false },
+    include: { student: true, teacher: true },
+    orderBy: [{ teacherId: 'asc' }, { studentId: 'asc' }],
+  })) as StudentAccessLink[];
+
+  const byPair = new Map<string, StudentAccessLink>();
+  links.forEach((link) => {
+    byPair.set(`${link.teacherId.toString()}:${link.studentId}`, link);
+  });
+  return Array.from(byPair.values());
+};
+
+const pickStudentAccessLink = (
+  links: StudentAccessLink[],
+  requestedTeacherId?: number | null,
+  requestedStudentId?: number | null,
+) => {
+  const teacherId = Number.isFinite(Number(requestedTeacherId)) ? Number(requestedTeacherId) : null;
+  const studentId = Number.isFinite(Number(requestedStudentId)) ? Number(requestedStudentId) : null;
+
+  if (teacherId !== null && studentId !== null) {
+    return links.find((link) => Number(link.teacherId) === teacherId && link.studentId === studentId) ?? null;
+  }
+
+  if (teacherId !== null) {
+    return links.find((link) => Number(link.teacherId) === teacherId) ?? null;
+  }
+
+  if (studentId !== null) {
+    return links.find((link) => link.studentId === studentId) ?? null;
+  }
+
+  if (links.length === 1) return links[0];
+  return null;
+};
+
+const ensureStudentAccessLink = async (
+  user: User,
+  requestedTeacherId?: number | null,
+  requestedStudentId?: number | null,
+) => {
+  const links = await resolveStudentAccessLinks(user);
+  if (links.length === 0) {
+    throw new Error('student_context_not_found');
+  }
+  const active = pickStudentAccessLink(links, requestedTeacherId, requestedStudentId);
+  if (!active) {
+    throw new Error('student_context_required');
+  }
+  return { links, active };
+};
+
+const ensureTeacherStudentLinkV2 = async (teacherId: bigint, studentId: number) => {
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId, studentId } },
+    include: { student: true, teacher: true },
+  });
+  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+  return link;
+};
+
+const formatHomeworkDeadlineLabel = (deadlineAt: Date | null, timeZone?: string | null) => {
+  if (!deadlineAt) return 'без дедлайна';
+  return formatInTimeZone(deadlineAt, 'dd.MM HH:mm', { timeZone: resolveTimeZone(timeZone) });
+};
+
+const buildHomeworkNotificationText = (
+  kind: HomeworkV2NotificationKind,
+  assignment: { title: string; deadlineAt?: Date | null; teacherComment?: string | null },
+  timeZone?: string | null,
+) => {
+  const deadlineLabel = formatHomeworkDeadlineLabel(assignment.deadlineAt ?? null, timeZone);
+  if (kind === 'ASSIGNED') return `📚 Новая домашка: ${assignment.title}\nДедлайн: ${deadlineLabel}`;
+  if (kind === 'REVIEWED') return `✅ Домашка проверена: ${assignment.title}\nИтог доступен в приложении.`;
+  if (kind === 'RETURNED')
+    return `🛠 Домашка возвращена на доработку: ${assignment.title}\nКомментарий: ${assignment.teacherComment ?? '—'}`;
+  if (kind === 'REMINDER_24H') return `⏰ Напоминание: дедлайн через 24 часа\n${assignment.title}\nДо: ${deadlineLabel}`;
+  if (kind === 'REMINDER_MORNING') return `🌤 Сегодня дедлайн по домашке\n${assignment.title}\nДо: ${deadlineLabel}`;
+  if (kind === 'REMINDER_3H') return `⌛ Дедлайн скоро (через 3 часа)\n${assignment.title}\nДо: ${deadlineLabel}`;
+  return `⚠️ Просрочена домашка: ${assignment.title}\nДедлайн был: ${deadlineLabel}`;
+};
+
+const createNotificationLogEntry = async (payload: {
+  teacherId: bigint;
+  studentId?: number | null;
+  type: string;
+  dedupeKey?: string | null;
+}) => {
+  try {
+    return await prisma.notificationLog.create({
+      data: {
+        teacherId: payload.teacherId,
+        studentId: payload.studentId ?? null,
+        lessonId: null,
+        type: payload.type,
+        source: null,
+        channel: 'TELEGRAM',
+        scheduledFor: null,
+        status: 'PENDING',
+        dedupeKey: payload.dedupeKey ?? null,
+      },
+    });
+  } catch (error) {
+    const prismaError = error as { code?: string } | null;
+    if (prismaError?.code === 'P2002' || prismaError?.code === 'P2003') {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const finalizeNotificationLogEntry = async (logId: number, payload: { status: 'SENT' | 'FAILED'; errorText?: string }) => {
+  await prisma.notificationLog.update({
+    where: { id: logId },
+    data: {
+      status: payload.status,
+      sentAt: payload.status === 'SENT' ? new Date() : null,
+      errorText: payload.errorText ?? null,
+    },
+  });
+};
+
+const sendHomeworkNotificationToStudent = async (payload: {
+  teacherId: bigint;
+  studentId: number;
+  type: string;
+  dedupeKey?: string;
+  text: string;
+}) => {
+  const student = await prisma.student.findUnique({ where: { id: payload.studentId } });
+  if (!student) return { status: 'skipped' as const };
+  const telegramId = await resolveStudentTelegramId(student);
+  if (!telegramId) return { status: 'skipped' as const };
+
+  const log = await createNotificationLogEntry({
+    teacherId: payload.teacherId,
+    studentId: payload.studentId,
+    type: payload.type,
+    dedupeKey: payload.dedupeKey ?? null,
+  });
+  if (!log) return { status: 'skipped' as const };
+
+  try {
+    await sendNotificationTelegramMessage(telegramId, payload.text);
+    await finalizeNotificationLogEntry(log.id, { status: 'SENT' });
+    return { status: 'sent' as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLogEntry(log.id, { status: 'FAILED', errorText: message });
+    return { status: 'failed' as const, error: message };
+  }
+};
+
+const resolveHomeworkFallbackDeadline = (now: Date, timeZone?: string | null) => {
+  const dateKey = formatInTimeZone(addDays(now, 2), 'yyyy-MM-dd', { timeZone: resolveTimeZone(timeZone) });
+  return toUtcDateFromTimeZone(dateKey, '20:00', timeZone);
+};
+
+const resolveHomeworkDefaultDeadline = async (teacherId: bigint, studentId: number, lessonId?: number | null) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
+  let referenceDate = new Date();
+  if (lessonId) {
+    const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+    if (lesson && lesson.teacherId === teacherId) {
+      referenceDate = lesson.startAt;
+    }
+  }
+  const nextLesson = await prisma.lesson.findFirst({
+    where: {
+      teacherId,
+      status: { not: 'CANCELED' },
+      startAt: { gt: referenceDate },
+      OR: [{ studentId }, { participants: { some: { studentId } } }],
+    },
+    orderBy: { startAt: 'asc' },
+  });
+  if (nextLesson) {
+    return { deadlineAt: nextLesson.startAt, warning: null as string | null };
+  }
+  return {
+    deadlineAt: resolveHomeworkFallbackDeadline(referenceDate, teacher?.timezone ?? null),
+    warning: 'NO_NEXT_LESSON',
+  };
 };
 
 const settleLessonPayments = async (lessonId: number, teacherId: bigint) => {
@@ -3161,6 +3796,7 @@ const deleteLesson = async (user: User, lessonId: number, applyToSeries?: boolea
 const markLessonCompleted = async (user: User, lessonId: number) => {
   const teacher = await ensureTeacher(user);
   const { lesson, links } = await settleLessonPayments(lessonId, teacher.chatId);
+  await dispatchScheduledHomeworkAssignmentsForLesson(lesson.id);
   const primaryLink = links.find((link: any) => link.studentId === lesson.studentId) ?? null;
   const participantIds = lesson.participants.map((participant: any) => participant.studentId);
   const participantNames = resolveLessonParticipantNamesFromParticipants(lesson.participants as any, links as any);
@@ -3385,6 +4021,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
 
   if (normalizedStatus === 'COMPLETED') {
     const result = await settleLessonPayments(lessonId, teacher.chatId);
+    await dispatchScheduledHomeworkAssignmentsForLesson(result.lesson.id);
     const participantIds = result.lesson.participants.map((participant: any) => participant.studentId);
     const participantNames = resolveLessonParticipantNamesFromParticipants(result.lesson.participants as any, result.links as any);
     await safeLogActivityEvent({
@@ -3664,7 +4301,840 @@ const remindHomeworkById = async (user: User, homeworkId: number) => {
   return { status: 'queued', homework: result };
 };
 
-const AUTO_CONFIRM_GRACE_MINUTES = 30;
+const listStudentContextV2 = async (user: User, requestedTeacherId?: number | null, requestedStudentId?: number | null) => {
+  const links = await resolveStudentAccessLinks(user);
+  const active = pickStudentAccessLink(links, requestedTeacherId, requestedStudentId);
+  return {
+    contexts: links.map((link) => ({
+      teacherId: Number(link.teacherId),
+      studentId: link.studentId,
+      teacherName: link.teacher?.name ?? link.teacher?.username ?? 'Преподаватель',
+      teacherUsername: link.teacher?.username ?? null,
+      studentName: link.customName || link.student?.username || 'Ученик',
+      studentUsername: link.student?.username ?? null,
+    })),
+    activeTeacherId: active ? Number(active.teacherId) : null,
+    activeStudentId: active?.studentId ?? null,
+  };
+};
+
+const listHomeworkTemplatesV2 = async (user: User, params: { query?: string | null; includeArchived?: boolean }) => {
+  const teacher = await ensureTeacher(user);
+  const query = params.query?.trim() ?? '';
+  const where: Record<string, unknown> = {
+    teacherId: teacher.chatId,
+    ...(params.includeArchived ? {} : { isArchived: false }),
+  };
+  if (query) {
+    where.OR = [{ title: { contains: query } }, { tags: { contains: query } }];
+  }
+
+  const templates = await (prisma as any).homeworkTemplate.findMany({
+    where,
+    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+  });
+  return {
+    items: templates.map(serializeHomeworkTemplateV2),
+  };
+};
+
+const createHomeworkTemplateV2 = async (user: User, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  if (!title) throw new Error('Название шаблона обязательно');
+  const template = await (prisma as any).homeworkTemplate.create({
+    data: {
+      teacherId: teacher.chatId,
+      createdByTeacherId: teacher.chatId,
+      title,
+      tags: JSON.stringify(normalizeHomeworkTemplateTags(body.tags)),
+      subject: typeof body.subject === 'string' ? body.subject.trim() || null : null,
+      level: typeof body.level === 'string' ? body.level.trim() || null : null,
+      blocks: JSON.stringify(normalizeHomeworkBlocks(body.blocks)),
+      isArchived: false,
+    },
+  });
+  return { template: serializeHomeworkTemplateV2(template) };
+};
+
+const updateHomeworkTemplateV2 = async (user: User, templateId: number, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const template = await (prisma as any).homeworkTemplate.findUnique({ where: { id: templateId } });
+  if (!template || template.teacherId !== teacher.chatId) throw new Error('Шаблон не найден');
+
+  const data: Record<string, unknown> = {};
+  if (typeof body.title === 'string') {
+    const title = body.title.trim();
+    if (!title) throw new Error('Название шаблона обязательно');
+    data.title = title;
+  }
+  if ('tags' in body) data.tags = JSON.stringify(normalizeHomeworkTemplateTags(body.tags));
+  if ('subject' in body) data.subject = typeof body.subject === 'string' ? body.subject.trim() || null : null;
+  if ('level' in body) data.level = typeof body.level === 'string' ? body.level.trim() || null : null;
+  if ('blocks' in body) data.blocks = JSON.stringify(normalizeHomeworkBlocks(body.blocks));
+  if (typeof body.isArchived === 'boolean') data.isArchived = body.isArchived;
+
+  const updated = await (prisma as any).homeworkTemplate.update({
+    where: { id: templateId },
+    data,
+  });
+  return { template: serializeHomeworkTemplateV2(updated) };
+};
+
+const listHomeworkAssignmentsV2 = async (
+  user: User,
+  params: {
+    studentId?: number | null;
+    lessonId?: number | null;
+    status?: string | null;
+    bucket?: string | null;
+    limit?: number;
+    offset?: number;
+  },
+) => {
+  const teacher = await ensureTeacher(user);
+  const limit = clampNumber(Number(params.limit ?? DEFAULT_PAGE_SIZE), 1, MAX_PAGE_SIZE);
+  const offset = clampNumber(Number(params.offset ?? 0), 0, 100_000);
+  const now = new Date();
+  const where: Record<string, unknown> = { teacherId: teacher.chatId };
+  if (params.studentId !== null && params.studentId !== undefined && Number.isFinite(Number(params.studentId))) {
+    where.studentId = Number(params.studentId);
+  }
+  if (params.lessonId !== null && params.lessonId !== undefined && Number.isFinite(Number(params.lessonId))) {
+    where.lessonId = Number(params.lessonId);
+  }
+  if (params.status && params.status !== 'all') {
+    where.status = normalizeHomeworkAssignmentStatus(params.status);
+  } else {
+    Object.assign(where, resolveAssignmentBucketWhereV2(normalizeHomeworkAssignmentBucketV2(params.bucket), now));
+  }
+
+  const total = await (prisma as any).homeworkAssignment.count({ where });
+  const rawItems = await (prisma as any).homeworkAssignment.findMany({
+    where,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: offset,
+    take: limit,
+  });
+  const items = await attachLatestSubmissionMetaToAssignments(rawItems);
+  return {
+    items: items.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
+    total,
+    nextOffset: offset + limit < total ? offset + limit : null,
+  };
+};
+
+const getHomeworkAssignmentsSummaryV2 = async (
+  user: User,
+  params: { studentId?: number | null; lessonId?: number | null },
+) => {
+  const teacher = await ensureTeacher(user);
+  const now = new Date();
+  const baseWhere: Record<string, unknown> = { teacherId: teacher.chatId };
+  if (params.studentId !== null && params.studentId !== undefined && Number.isFinite(Number(params.studentId))) {
+    baseWhere.studentId = Number(params.studentId);
+  }
+  if (params.lessonId !== null && params.lessonId !== undefined && Number.isFinite(Number(params.lessonId))) {
+    baseWhere.lessonId = Number(params.lessonId);
+  }
+
+  const buildWhere = (bucket: HomeworkAssignmentBucketV2) => ({
+    ...baseWhere,
+    ...resolveAssignmentBucketWhereV2(bucket, now),
+  });
+
+  const [totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount] = await Promise.all([
+    (prisma as any).homeworkAssignment.count({ where: baseWhere }),
+    (prisma as any).homeworkAssignment.count({ where: buildWhere('draft') }),
+    (prisma as any).homeworkAssignment.count({ where: buildWhere('sent') }),
+    (prisma as any).homeworkAssignment.count({ where: buildWhere('review') }),
+    (prisma as any).homeworkAssignment.count({ where: buildWhere('reviewed') }),
+    (prisma as any).homeworkAssignment.count({ where: buildWhere('overdue') }),
+  ]);
+
+  return { totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount };
+};
+
+const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const studentId = Number(body.studentId);
+  if (!Number.isFinite(studentId)) throw new Error('studentId обязателен');
+  await ensureTeacherStudentLinkV2(teacher.chatId, studentId);
+
+  const templateId = Number(body.templateId);
+  const hasTemplateId = Number.isFinite(templateId);
+  const template = hasTemplateId
+    ? await (prisma as any).homeworkTemplate.findFirst({
+        where: { id: templateId, teacherId: teacher.chatId },
+      })
+    : null;
+  if (hasTemplateId && !template) throw new Error('Шаблон не найден');
+
+  const lessonIdRaw = Number(body.lessonId);
+  const lessonId = Number.isFinite(lessonIdRaw) ? lessonIdRaw : null;
+  if (lessonId !== null) {
+    const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+    if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+  }
+
+  const resolvedTitle =
+    (typeof body.title === 'string' && body.title.trim()) ||
+    (template?.title ? String(template.title) : '') ||
+    'Домашнее задание';
+  const snapshot = normalizeHomeworkBlocks(body.contentSnapshot ?? template?.blocks ?? []);
+  const sendMode = normalizeHomeworkSendMode(body.sendMode);
+  const status = body.status
+    ? normalizeHomeworkAssignmentStatus(body.status)
+    : sendMode === 'AUTO_AFTER_LESSON_DONE'
+      ? 'SCHEDULED'
+      : 'DRAFT';
+  const deadlineAt =
+    toValidDate(body.deadlineAt) ?? (await resolveHomeworkDefaultDeadline(teacher.chatId, studentId, lessonId)).deadlineAt;
+  const sentAt = status === 'SENT' ? toValidDate(body.sentAt) ?? new Date() : null;
+  const assignment = await (prisma as any).homeworkAssignment.create({
+    data: {
+      teacherId: teacher.chatId,
+      studentId,
+      lessonId,
+      templateId: template?.id ?? null,
+      legacyHomeworkId: Number.isFinite(Number(body.legacyHomeworkId)) ? Number(body.legacyHomeworkId) : null,
+      title: resolvedTitle,
+      status,
+      sendMode,
+      deadlineAt,
+      sentAt,
+      contentSnapshot: JSON.stringify(snapshot),
+    },
+  });
+
+  if (status === 'SENT' && teacher.homeworkNotifyOnAssign) {
+    await sendHomeworkNotificationToStudent({
+      teacherId: teacher.chatId,
+      studentId,
+      type: 'HOMEWORK_ASSIGNED',
+      dedupeKey: `HOMEWORK_ASSIGNED:${assignment.id}`,
+      text: buildHomeworkNotificationText('ASSIGNED', assignment, teacher.timezone),
+    });
+  }
+
+  return { assignment: serializeHomeworkAssignmentV2(assignment) };
+};
+
+const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const existing = await (prisma as any).homeworkAssignment.findFirst({
+    where: { id: assignmentId, teacherId: teacher.chatId },
+  });
+  if (!existing) throw new Error('Домашка не найдена');
+
+  const data: Record<string, unknown> = {};
+  if (typeof body.title === 'string') {
+    const title = body.title.trim();
+    if (!title) throw new Error('Название обязательно');
+    data.title = title;
+  }
+  if ('status' in body) data.status = normalizeHomeworkAssignmentStatus(body.status);
+  if ('sendMode' in body) data.sendMode = normalizeHomeworkSendMode(body.sendMode);
+  if ('deadlineAt' in body) data.deadlineAt = toValidDate(body.deadlineAt);
+  if ('sentAt' in body) data.sentAt = toValidDate(body.sentAt);
+  if ('contentSnapshot' in body) data.contentSnapshot = JSON.stringify(normalizeHomeworkBlocks(body.contentSnapshot));
+  if ('teacherComment' in body) data.teacherComment = typeof body.teacherComment === 'string' ? body.teacherComment : null;
+  if ('autoScore' in body) data.autoScore = clampHomeworkScore(body.autoScore);
+  if ('manualScore' in body) data.manualScore = clampHomeworkScore(body.manualScore);
+  if ('finalScore' in body) data.finalScore = clampHomeworkScore(body.finalScore);
+
+  const nextStatus =
+    'status' in data ? normalizeHomeworkAssignmentStatus(data.status) : normalizeHomeworkAssignmentStatus(existing.status);
+  if (nextStatus === 'SENT' && !existing.sentAt && !('sentAt' in data)) {
+    data.sentAt = new Date();
+  }
+
+  const updated = await (prisma as any).homeworkAssignment.update({
+    where: { id: assignmentId },
+    data,
+  });
+
+  if (
+    nextStatus === 'SENT' &&
+    normalizeHomeworkAssignmentStatus(existing.status) !== 'SENT' &&
+    teacher.homeworkNotifyOnAssign
+  ) {
+    await sendHomeworkNotificationToStudent({
+      teacherId: teacher.chatId,
+      studentId: updated.studentId,
+      type: 'HOMEWORK_ASSIGNED',
+      dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}`,
+      text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+    });
+  }
+
+  return { assignment: serializeHomeworkAssignmentV2(updated) };
+};
+
+const listHomeworkSubmissionsV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+    where: { id: assignmentId, teacherId: teacher.chatId },
+  });
+  if (!assignment) throw new Error('Домашка не найдена');
+  const items = await (prisma as any).homeworkSubmission.findMany({
+    where: { assignmentId },
+    orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+  });
+  return { items: items.map(serializeHomeworkSubmissionV2) };
+};
+
+const createHomeworkSubmissionV2 = async (
+  user: User,
+  role: RequestRole,
+  assignmentId: number,
+  body: Record<string, unknown>,
+  requestedTeacherId?: number | null,
+  requestedStudentId?: number | null,
+) => {
+  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+  });
+  if (!assignment) throw new Error('Домашка не найдена');
+
+  let studentId: number;
+  if (role === 'STUDENT') {
+    const studentContext = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
+    if (
+      assignment.studentId !== studentContext.active.studentId ||
+      Number(assignment.teacherId) !== Number(studentContext.active.teacherId)
+    ) {
+      throw new Error('forbidden');
+    }
+    studentId = studentContext.active.studentId;
+  } else {
+    const teacher = await ensureTeacher(user);
+    if (assignment.teacherId !== teacher.chatId) throw new Error('forbidden');
+    studentId = assignment.studentId;
+  }
+
+  const latest = await (prisma as any).homeworkSubmission.findFirst({
+    where: { assignmentId },
+    orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+  });
+  const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
+  const shouldSubmit = Boolean(body.submit);
+
+  let targetAttempt = latest?.attemptNo ?? 1;
+  let mode: 'create' | 'update' = 'create';
+  if (latest && normalizeHomeworkSubmissionStatus(latest.status) === 'DRAFT') {
+    targetAttempt = latest.attemptNo;
+    mode = 'update';
+  } else if (latest && normalizeHomeworkSubmissionStatus(latest.status) !== 'DRAFT') {
+    if (assignmentStatus !== 'RETURNED') {
+      throw new Error('Домашка уже сдана. Новая попытка доступна после возврата на доработку.');
+    }
+    targetAttempt = latest.attemptNo + 1;
+    mode = 'create';
+  }
+
+  const answerText = typeof body.answerText === 'string' ? body.answerText : null;
+  const attachments = normalizeHomeworkAttachments(body.attachments);
+  const voice = normalizeHomeworkAttachments(body.voice);
+  const testAnswers = parseObjectRecord(body.testAnswers);
+  const autoScore = calculateHomeworkAutoScore(normalizeHomeworkBlocks(assignment.contentSnapshot), testAnswers);
+
+  const submissionPayload: Record<string, unknown> = {
+    answerText,
+    attachments: JSON.stringify(attachments),
+    voice: JSON.stringify(voice),
+    testAnswers: testAnswers ? JSON.stringify(testAnswers) : null,
+    autoScore,
+  };
+
+  if (shouldSubmit) {
+    submissionPayload.status = 'SUBMITTED';
+    submissionPayload.submittedAt = new Date();
+  } else {
+    submissionPayload.status = 'DRAFT';
+  }
+
+  const submission =
+    mode === 'update'
+      ? await (prisma as any).homeworkSubmission.update({
+          where: { assignmentId_attemptNo: { assignmentId, attemptNo: targetAttempt } },
+          data: submissionPayload,
+        })
+      : await (prisma as any).homeworkSubmission.create({
+          data: {
+            assignmentId,
+            studentId,
+            attemptNo: targetAttempt,
+            ...submissionPayload,
+          },
+        });
+
+  const assignmentUpdateData: Record<string, unknown> = {};
+  if (shouldSubmit) {
+    assignmentUpdateData.status = 'SUBMITTED';
+    assignmentUpdateData.autoScore = autoScore;
+    assignmentUpdateData.updatedAt = new Date();
+  }
+
+  const updatedAssignment =
+    Object.keys(assignmentUpdateData).length > 0
+      ? await (prisma as any).homeworkAssignment.update({
+          where: { id: assignmentId },
+          data: assignmentUpdateData,
+        })
+      : assignment;
+
+  return {
+    submission: serializeHomeworkSubmissionV2(submission),
+    assignment: serializeHomeworkAssignmentV2(updatedAssignment),
+  };
+};
+
+const reviewHomeworkAssignmentV2 = async (user: User, assignmentId: number, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+    where: { id: assignmentId, teacherId: teacher.chatId },
+  });
+  if (!assignment) throw new Error('Домашка не найдена');
+
+  const action = body.action === 'RETURNED' ? 'RETURNED' : body.action === 'REVIEWED' ? 'REVIEWED' : null;
+  if (!action) throw new Error('Некорректное действие проверки');
+
+  const submissionId = Number(body.submissionId);
+  const submission = Number.isFinite(submissionId)
+    ? await (prisma as any).homeworkSubmission.findFirst({ where: { id: submissionId, assignmentId } })
+    : await (prisma as any).homeworkSubmission.findFirst({
+        where: { assignmentId },
+        orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+      });
+  if (!submission) throw new Error('Попытка не найдена');
+
+  const teacherComment = typeof body.teacherComment === 'string' ? body.teacherComment.trim() : '';
+  if (action === 'RETURNED' && !teacherComment) {
+    throw new Error('Комментарий обязателен при возврате на доработку');
+  }
+
+  const autoScore = clampHomeworkScore(body.autoScore ?? submission.autoScore ?? assignment.autoScore);
+  const manualScore = clampHomeworkScore(body.manualScore ?? submission.manualScore ?? assignment.manualScore);
+  const overrideFinal = clampHomeworkScore(body.finalScore);
+  const finalScore = overrideFinal ?? (manualScore ?? autoScore);
+  const now = new Date();
+
+  const updatedSubmission = await (prisma as any).homeworkSubmission.update({
+    where: { id: submission.id },
+    data: {
+      status: 'REVIEWED',
+      reviewerTeacherId: teacher.chatId,
+      teacherComment: teacherComment || null,
+      autoScore,
+      manualScore,
+      finalScore,
+      reviewedAt: now,
+    },
+  });
+
+  const updatedAssignment = await (prisma as any).homeworkAssignment.update({
+    where: { id: assignmentId },
+    data: {
+      status: action,
+      teacherComment: teacherComment || null,
+      reviewedAt: now,
+      autoScore,
+      manualScore,
+      finalScore,
+    },
+  });
+
+  await sendHomeworkNotificationToStudent({
+    teacherId: teacher.chatId,
+    studentId: updatedAssignment.studentId,
+    type: action === 'RETURNED' ? 'HOMEWORK_RETURNED' : 'HOMEWORK_REVIEWED',
+    dedupeKey: `${action === 'RETURNED' ? 'HOMEWORK_RETURNED' : 'HOMEWORK_REVIEWED'}:${updatedAssignment.id}:${updatedSubmission.id}`,
+    text: buildHomeworkNotificationText(
+      action === 'RETURNED' ? 'RETURNED' : 'REVIEWED',
+      { ...updatedAssignment, teacherComment: teacherComment || null },
+      teacher.timezone,
+    ),
+  });
+
+  return {
+    assignment: serializeHomeworkAssignmentV2(updatedAssignment),
+    submission: serializeHomeworkSubmissionV2(updatedSubmission),
+  };
+};
+
+const listStudentHomeworkAssignmentsV2 = async (
+  user: User,
+  requestedTeacherId: number | null | undefined,
+  requestedStudentId: number | null | undefined,
+  params: { filter?: string | null; limit?: number; offset?: number },
+) => {
+  const { active } = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
+  const limit = clampNumber(Number(params.limit ?? DEFAULT_PAGE_SIZE), 1, MAX_PAGE_SIZE);
+  const offset = clampNumber(Number(params.offset ?? 0), 0, 100_000);
+  const now = new Date();
+  const filter = params.filter ?? 'active';
+
+  const where: Record<string, unknown> = {
+    teacherId: active.teacherId,
+    studentId: active.studentId,
+  };
+  if (filter === 'submitted') {
+    where.status = 'SUBMITTED';
+  } else if (filter === 'reviewed') {
+    where.status = 'REVIEWED';
+  } else if (filter === 'active') {
+    where.status = { in: ['SENT', 'RETURNED', 'OVERDUE', 'SUBMITTED'] };
+  } else if (filter === 'overdue') {
+    where.OR = [
+      { status: 'OVERDUE' },
+      { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
+    ];
+  }
+
+  const total = await (prisma as any).homeworkAssignment.count({ where });
+  const rawItems = await (prisma as any).homeworkAssignment.findMany({
+    where,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: offset,
+    take: limit,
+  });
+  const items = await attachLatestSubmissionMetaToAssignments(rawItems);
+
+  return {
+    items: items.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
+    total,
+    nextOffset: offset + limit < total ? offset + limit : null,
+  };
+};
+
+const getStudentHomeworkAssignmentDetailV2 = async (
+  user: User,
+  requestedTeacherId: number | null | undefined,
+  requestedStudentId: number | null | undefined,
+  assignmentId: number,
+) => {
+  const { active } = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
+  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      teacherId: active.teacherId,
+      studentId: active.studentId,
+    },
+  });
+  if (!assignment) throw new Error('Домашка не найдена');
+
+  const submissions = await (prisma as any).homeworkSubmission.findMany({
+    where: { assignmentId },
+    orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+  });
+
+  return {
+    assignment: serializeHomeworkAssignmentV2(assignment, new Date()),
+    submissions: submissions.map((item: any) => serializeHomeworkSubmissionV2(item)),
+  };
+};
+
+const getStudentHomeworkSummaryV2 = async (
+  user: User,
+  requestedTeacherId: number | null | undefined,
+  requestedStudentId: number | null | undefined,
+) => {
+  const { active } = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
+  const now = new Date();
+  const assignments = await (prisma as any).homeworkAssignment.findMany({
+    where: { teacherId: active.teacherId, studentId: active.studentId },
+    select: { status: true, deadlineAt: true },
+  });
+
+  const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', {
+    timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
+  });
+  let activeCount = 0;
+  let overdueCount = 0;
+  let submittedCount = 0;
+  let reviewedCount = 0;
+  let dueTodayCount = 0;
+
+  assignments.forEach((item: any) => {
+    const status = resolveAssignmentViewStatus(item, now);
+    if (status === 'REVIEWED') reviewedCount += 1;
+    if (status === 'SUBMITTED') submittedCount += 1;
+    if (status === 'OVERDUE') overdueCount += 1;
+    if (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE' || status === 'SUBMITTED') activeCount += 1;
+    if (item.deadlineAt) {
+      const deadlineKey = formatInTimeZone(item.deadlineAt, 'yyyy-MM-dd', {
+        timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
+      });
+      if (deadlineKey === todayKey && (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE')) {
+        dueTodayCount += 1;
+      }
+    }
+  });
+
+  return { activeCount, overdueCount, submittedCount, reviewedCount, dueTodayCount };
+};
+
+const updateStudentPreferencesV2 = async (
+  user: User,
+  requestedTeacherId: number | null | undefined,
+  requestedStudentId: number | null | undefined,
+  body: Record<string, unknown>,
+) => {
+  const { active } = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
+  const data: Record<string, unknown> = {};
+  if ('timezone' in body) {
+    if (body.timezone === null) data.timezone = null;
+    else if (typeof body.timezone === 'string') data.timezone = body.timezone.trim() || null;
+  }
+  const student = await prisma.student.update({
+    where: { id: active.studentId },
+    data,
+  });
+  return { student };
+};
+
+const dispatchScheduledHomeworkAssignmentsForLesson = async (lessonId: number) => {
+  const scheduledAssignments = await (prisma as any).homeworkAssignment.findMany({
+    where: { lessonId, status: 'SCHEDULED' },
+    include: { teacher: true },
+  });
+  const now = new Date();
+  for (const assignment of scheduledAssignments) {
+    const updated = await (prisma as any).homeworkAssignment.updateMany({
+      where: { id: assignment.id, status: 'SCHEDULED' },
+      data: { status: 'SENT', sentAt: now },
+    });
+    if (!updated.count) continue;
+    if (!assignment.teacher?.homeworkNotifyOnAssign) continue;
+    await sendHomeworkNotificationToStudent({
+      teacherId: assignment.teacherId,
+      studentId: assignment.studentId,
+      type: 'HOMEWORK_ASSIGNED',
+      dedupeKey: `HOMEWORK_ASSIGNED:${assignment.id}`,
+      text: buildHomeworkNotificationText('ASSIGNED', assignment, assignment.teacher?.timezone ?? null),
+    });
+  }
+};
+
+const runHomeworkAssignmentAutomationForTeacher = async (teacher: any, now: Date) => {
+  const reminderMorningTime = isValidTimeString(teacher.homeworkReminderMorningTime) ? teacher.homeworkReminderMorningTime : '10:00';
+  const overdueReminderTime = isValidTimeString(teacher.homeworkOverdueReminderTime) ? teacher.homeworkOverdueReminderTime : '10:00';
+  const overdueMaxCount = clampNumber(Number(teacher.homeworkOverdueReminderMaxCount ?? 3), 1, 10);
+
+  const assignments = await (prisma as any).homeworkAssignment.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: { in: ['SENT', 'RETURNED', 'OVERDUE'] },
+    },
+    include: { student: true },
+  });
+
+  for (const assignment of assignments) {
+    const studentTimeZone = resolveTimeZone(assignment.student?.timezone ?? teacher.timezone);
+    const nowTimeLabel = formatInTimeZone(now, 'HH:mm', { timeZone: studentTimeZone });
+    const deadlineAt = toValidDate(assignment.deadlineAt);
+    if (deadlineAt && deadlineAt.getTime() < now.getTime() && (assignment.status === 'SENT' || assignment.status === 'RETURNED')) {
+      await (prisma as any).homeworkAssignment.update({
+        where: { id: assignment.id },
+        data: { status: 'OVERDUE' },
+      });
+      assignment.status = 'OVERDUE';
+    }
+
+    if (!deadlineAt) continue;
+    const diffMs = deadlineAt.getTime() - now.getTime();
+    const deadlineDateKey = formatInTimeZone(deadlineAt, 'yyyy-MM-dd', { timeZone: studentTimeZone });
+    const nowDateKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: studentTimeZone });
+
+    if (teacher.homeworkReminder24hEnabled && !assignment.reminder24hSentAt && diffMs > 0 && diffMs <= 24 * 60 * 60 * 1000) {
+      const result = await sendHomeworkNotificationToStudent({
+        teacherId: assignment.teacherId,
+        studentId: assignment.studentId,
+        type: 'HOMEWORK_REMINDER_24H',
+        dedupeKey: `HOMEWORK_REMINDER_24H:${assignment.id}`,
+        text: buildHomeworkNotificationText('REMINDER_24H', assignment, studentTimeZone),
+      });
+      if (result.status === 'sent') {
+        await (prisma as any).homeworkAssignment.update({
+          where: { id: assignment.id },
+          data: { reminder24hSentAt: now },
+        });
+      }
+    }
+
+    if (teacher.homeworkReminder3hEnabled && !assignment.reminder3hSentAt && diffMs > 0 && diffMs <= 3 * 60 * 60 * 1000) {
+      const result = await sendHomeworkNotificationToStudent({
+        teacherId: assignment.teacherId,
+        studentId: assignment.studentId,
+        type: 'HOMEWORK_REMINDER_3H',
+        dedupeKey: `HOMEWORK_REMINDER_3H:${assignment.id}`,
+        text: buildHomeworkNotificationText('REMINDER_3H', assignment, studentTimeZone),
+      });
+      if (result.status === 'sent') {
+        await (prisma as any).homeworkAssignment.update({
+          where: { id: assignment.id },
+          data: { reminder3hSentAt: now },
+        });
+      }
+    }
+
+    if (
+      teacher.homeworkReminderMorningEnabled &&
+      !assignment.reminderMorningSentAt &&
+      deadlineDateKey === nowDateKey &&
+      nowTimeLabel === reminderMorningTime
+    ) {
+      const result = await sendHomeworkNotificationToStudent({
+        teacherId: assignment.teacherId,
+        studentId: assignment.studentId,
+        type: 'HOMEWORK_REMINDER_MORNING',
+        dedupeKey: `HOMEWORK_REMINDER_MORNING:${assignment.id}`,
+        text: buildHomeworkNotificationText('REMINDER_MORNING', assignment, studentTimeZone),
+      });
+      if (result.status === 'sent') {
+        await (prisma as any).homeworkAssignment.update({
+          where: { id: assignment.id },
+          data: { reminderMorningSentAt: now },
+        });
+      }
+    }
+
+    if (
+      teacher.homeworkOverdueRemindersEnabled &&
+      assignment.status === 'OVERDUE' &&
+      nowTimeLabel === overdueReminderTime &&
+      Number(assignment.overdueReminderCount ?? 0) < overdueMaxCount
+    ) {
+      const lastOverdueDateKey = assignment.lastOverdueReminderAt
+        ? formatInTimeZone(assignment.lastOverdueReminderAt, 'yyyy-MM-dd', { timeZone: studentTimeZone })
+        : null;
+      if (lastOverdueDateKey !== nowDateKey) {
+        const result = await sendHomeworkNotificationToStudent({
+          teacherId: assignment.teacherId,
+          studentId: assignment.studentId,
+          type: 'HOMEWORK_OVERDUE',
+          dedupeKey: `HOMEWORK_OVERDUE:${assignment.id}:${nowDateKey}`,
+          text: buildHomeworkNotificationText('OVERDUE', assignment, studentTimeZone),
+        });
+        if (result.status === 'sent') {
+          await (prisma as any).homeworkAssignment.update({
+            where: { id: assignment.id },
+            data: {
+              overdueReminderCount: Number(assignment.overdueReminderCount ?? 0) + 1,
+              lastOverdueReminderAt: now,
+            },
+          });
+        }
+      }
+    }
+  }
+};
+
+const HOMEWORK_UPLOAD_TTL_SEC = 15 * 60;
+const HOMEWORK_UPLOAD_DIR = path.resolve(process.cwd(), 'tmp', 'uploads');
+const pendingHomeworkUploads = new Map<
+  string,
+  { objectKey: string; contentType: string; maxSize: number; expiresAt: number }
+>();
+
+const readRawBuffer = async (req: IncomingMessage) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+};
+
+const cleanupPendingHomeworkUploads = () => {
+  const nowTs = Date.now();
+  for (const [token, value] of pendingHomeworkUploads.entries()) {
+    if (value.expiresAt <= nowTs) pendingHomeworkUploads.delete(token);
+  }
+};
+
+const sanitizeFileName = (value: string) =>
+  value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 120) || 'file';
+
+const createFilePresignUploadV2 = (req: IncomingMessage, body: Record<string, unknown>) => {
+  cleanupPendingHomeworkUploads();
+  const rawFileName = typeof body.fileName === 'string' ? body.fileName : 'file';
+  const fileName = sanitizeFileName(rawFileName);
+  const contentType = typeof body.contentType === 'string' && body.contentType.trim() ? body.contentType : 'application/octet-stream';
+  const size = clampNumber(Number(body.size ?? 0), 1, 50 * 1024 * 1024);
+  const token = crypto.randomUUID();
+  const objectKey = `${Date.now()}_${crypto.randomUUID()}_${fileName}`;
+  pendingHomeworkUploads.set(token, {
+    objectKey,
+    contentType,
+    maxSize: size,
+    expiresAt: Date.now() + HOMEWORK_UPLOAD_TTL_SEC * 1000,
+  });
+
+  const uploadUrl = `${getBaseUrl(req)}/api/v2/files/upload/${token}`;
+  const fileUrl = `${getBaseUrl(req)}/api/v2/files/object/${objectKey}`;
+  return {
+    uploadUrl,
+    method: 'PUT' as const,
+    headers: { 'Content-Type': contentType },
+    fileUrl,
+    objectKey,
+    expiresInSeconds: HOMEWORK_UPLOAD_TTL_SEC,
+  };
+};
+
+const handlePresignedUploadPutV2 = async (req: IncomingMessage, res: ServerResponse, token: string) => {
+  cleanupPendingHomeworkUploads();
+  const pending = pendingHomeworkUploads.get(token);
+  if (!pending || pending.expiresAt <= Date.now()) {
+    res.statusCode = 410;
+    return res.end('upload_token_expired');
+  }
+  const data = await readRawBuffer(req);
+  if (data.length > pending.maxSize) {
+    res.statusCode = 413;
+    return res.end('payload_too_large');
+  }
+
+  const fullPath = path.join(HOMEWORK_UPLOAD_DIR, pending.objectKey);
+  const normalizedRoot = path.resolve(HOMEWORK_UPLOAD_DIR);
+  const normalizedPath = path.resolve(fullPath);
+  if (!normalizedPath.startsWith(normalizedRoot)) {
+    res.statusCode = 400;
+    return res.end('invalid_object_key');
+  }
+
+  await fs.mkdir(path.dirname(normalizedPath), { recursive: true });
+  await fs.writeFile(normalizedPath, data);
+  pendingHomeworkUploads.delete(token);
+  res.statusCode = 200;
+  return res.end('ok');
+};
+
+const handleUploadedFileObjectGetV2 = async (res: ServerResponse, objectKeyRaw: string) => {
+  const objectKey = objectKeyRaw.replace(/\\/g, '/');
+  const fullPath = path.join(HOMEWORK_UPLOAD_DIR, objectKey);
+  const normalizedRoot = path.resolve(HOMEWORK_UPLOAD_DIR);
+  const normalizedPath = path.resolve(fullPath);
+  if (!normalizedPath.startsWith(normalizedRoot)) {
+    return notFound(res);
+  }
+  try {
+    const file = await fs.readFile(normalizedPath);
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(file);
+  } catch {
+    notFound(res);
+  }
+};
+
+const AUTO_CONFIRM_GRACE_MINUTES = 5;
 const AUTOMATION_TICK_MS = 5 * 60_000;
 const QUIET_HOURS_START = 22;
 const QUIET_HOURS_END = 9;
@@ -3718,6 +5188,7 @@ const runLessonAutomationTick = async () => {
             data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
             include: { participants: { include: { student: true } } },
           });
+          await dispatchScheduledHomeworkAssignmentsForLesson(updatedLesson.id);
           const participantIds = updatedLesson.participants.map((participant: any) => participant.studentId);
           const participantLinks = participantIds.length
             ? await prisma.teacherStudent.findMany({
@@ -3831,6 +5302,8 @@ const runLessonAutomationTick = async () => {
         console.error('Не удалось отправить авто-напоминание об оплате', error);
       }
     }
+
+    await runHomeworkAssignmentAutomationForTeacher(teacher, now);
   }
   } finally {
     isLessonAutomationRunning = false;
@@ -4107,18 +5580,29 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   const { pathname } = url;
   const role = getRequestRole(req);
   const requestedStudentId = getRequestedStudentId(req);
+  const requestedTeacherId = getRequestedTeacherId(req);
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Role, X-Student-Id');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Role, X-Student-Id, X-Teacher-Id');
     return res.end();
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
+    const fileUploadMatch = pathname.match(/^\/api\/v2\/files\/upload\/([a-zA-Z0-9-]+)$/);
+    if (req.method === 'PUT' && fileUploadMatch) {
+      return handlePresignedUploadPutV2(req, res, fileUploadMatch[1]);
+    }
+
+    const fileObjectMatch = pathname.match(/^\/api\/v2\/files\/object\/(.+)$/);
+    if (req.method === 'GET' && fileObjectMatch) {
+      return handleUploadedFileObjectGetV2(res, fileObjectMatch[1]);
+    }
+
     if (req.method === 'POST' && pathname === '/api/yookassa/webhook') {
       let payload: any;
       try {
@@ -4475,6 +5959,153 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'PATCH' && pathname === '/api/settings') {
       const body = await readBody(req);
       const data = await updateSettings(requireApiUser(), body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/student/context') {
+      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await listStudentContextV2(requireApiUser(), requestedTeacherId, requestedStudentId);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'PATCH' && pathname === '/api/v2/student/preferences') {
+      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const body = await readBody(req);
+      const data = await updateStudentPreferencesV2(requireApiUser(), requestedTeacherId, requestedStudentId, body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/student/homework/summary') {
+      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await getStudentHomeworkSummaryV2(requireApiUser(), requestedTeacherId, requestedStudentId);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/student/homework/assignments') {
+      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await listStudentHomeworkAssignmentsV2(requireApiUser(), requestedTeacherId, requestedStudentId, {
+        filter: url.searchParams.get('filter'),
+        limit: Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE),
+        offset: Number(url.searchParams.get('offset') ?? 0),
+      });
+      return sendJson(res, 200, data);
+    }
+
+    const studentHomeworkAssignmentDetailMatch = pathname.match(/^\/api\/v2\/student\/homework\/assignments\/(\d+)$/);
+    if (req.method === 'GET' && studentHomeworkAssignmentDetailMatch) {
+      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(studentHomeworkAssignmentDetailMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const data = await getStudentHomeworkAssignmentDetailV2(
+        requireApiUser(),
+        requestedTeacherId,
+        requestedStudentId,
+        assignmentId,
+      );
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/files/presign-upload') {
+      const body = await readBody(req);
+      const data = createFilePresignUploadV2(req, body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/homework/templates') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await listHomeworkTemplatesV2(requireApiUser(), {
+        query: url.searchParams.get('query'),
+        includeArchived: url.searchParams.get('includeArchived') === '1',
+      });
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/homework/templates') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const body = await readBody(req);
+      const data = await createHomeworkTemplateV2(requireApiUser(), body);
+      return sendJson(res, 201, data);
+    }
+
+    const homeworkTemplateUpdateMatch = pathname.match(/^\/api\/v2\/homework\/templates\/(\d+)$/);
+    if (req.method === 'PATCH' && homeworkTemplateUpdateMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const templateId = Number(homeworkTemplateUpdateMatch[1]);
+      if (!Number.isFinite(templateId)) return badRequest(res, 'invalid_template_id');
+      const body = await readBody(req);
+      const data = await updateHomeworkTemplateV2(requireApiUser(), templateId, body);
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/homework/assignments') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await listHomeworkAssignmentsV2(requireApiUser(), {
+        studentId: parseOptionalNumberQueryParam(url.searchParams.get('studentId')),
+        lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
+        status: url.searchParams.get('status'),
+        bucket: url.searchParams.get('bucket'),
+        limit: Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE),
+        offset: Number(url.searchParams.get('offset') ?? 0),
+      });
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v2/homework/assignments/summary') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await getHomeworkAssignmentsSummaryV2(requireApiUser(), {
+        studentId: parseOptionalNumberQueryParam(url.searchParams.get('studentId')),
+        lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
+      });
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/homework/assignments') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const body = await readBody(req);
+      const data = await createHomeworkAssignmentV2(requireApiUser(), body);
+      return sendJson(res, 201, data);
+    }
+
+    const homeworkAssignmentUpdateMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)$/);
+    if (req.method === 'PATCH' && homeworkAssignmentUpdateMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(homeworkAssignmentUpdateMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const body = await readBody(req);
+      const data = await updateHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
+      return sendJson(res, 200, data);
+    }
+
+    const homeworkSubmissionsMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/submissions$/);
+    if (homeworkSubmissionsMatch) {
+      const assignmentId = Number(homeworkSubmissionsMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      if (req.method === 'GET') {
+        if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+        const data = await listHomeworkSubmissionsV2(requireApiUser(), assignmentId);
+        return sendJson(res, 200, data);
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const data = await createHomeworkSubmissionV2(
+          requireApiUser(),
+          role,
+          assignmentId,
+          body,
+          requestedTeacherId,
+          requestedStudentId,
+        );
+        return sendJson(res, 201, data);
+      }
+    }
+
+    const homeworkReviewMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review$/);
+    if (req.method === 'POST' && homeworkReviewMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(homeworkReviewMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const body = await readBody(req);
+      const data = await reviewHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
       return sendJson(res, 200, data);
     }
 

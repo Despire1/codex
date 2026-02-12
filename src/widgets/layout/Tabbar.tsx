@@ -1,16 +1,17 @@
 import { type FC } from 'react';
-import { tabs, type TabId } from '../../app/tabs';
+import { tabs, type AppTab, type TabId } from '../../app/tabs';
 import styles from './Tabbar.module.css';
 
 interface TabbarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  tabsList?: readonly AppTab[];
 }
 
-export const Tabbar: FC<TabbarProps> = ({ activeTab, onTabChange }) => {
+export const Tabbar: FC<TabbarProps> = ({ activeTab, onTabChange, tabsList = tabs }) => {
   return (
     <nav className={styles.tabbar}>
-      {tabs.map((tab) => (
+      {tabsList.map((tab) => (
         <button
           key={tab.id}
           type="button"

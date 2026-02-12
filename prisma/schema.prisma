@@ -31,8 +31,20 @@ model Teacher {
   paymentReminderMaxCount Int           @default(3)
   notifyTeacherOnAutoPaymentReminder Boolean @default(false)
   notifyTeacherOnManualPaymentReminder Boolean @default(true)
+  homeworkNotifyOnAssign Boolean        @default(true)
+  homeworkReminder24hEnabled Boolean    @default(true)
+  homeworkReminderMorningEnabled Boolean @default(true)
+  homeworkReminderMorningTime String    @default("10:00")
+  homeworkReminder3hEnabled Boolean     @default(false)
+  homeworkOverdueRemindersEnabled Boolean @default(true)
+  homeworkOverdueReminderTime String    @default("10:00")
+  homeworkOverdueReminderMaxCount Int   @default(3)
   students              TeacherStudent[]
   homeworks             Homework[]
+  homeworkTemplates     HomeworkTemplate[]  @relation("HomeworkTemplateTeacher")
+  homeworkTemplatesCreated HomeworkTemplate[] @relation("HomeworkTemplateCreator")
+  homeworkAssignments   HomeworkAssignment[] @relation("HomeworkAssignmentTeacher")
+  homeworkSubmissionsReviewed HomeworkSubmission[] @relation("HomeworkSubmissionReviewer")
   lessons               Lesson[]
   notificationLogs      NotificationLog[]
   activityEvents        ActivityEvent[]
@@ -46,11 +58,14 @@ model Student {
   telegramId           BigInt?
   isActivated          Boolean              @default(false)
   activatedAt          DateTime?
+  timezone             String?
   pricePerLesson       Int                  @default(0)
   paymentRemindersEnabled Boolean           @default(true)
   teacherLinks         TeacherStudent[]
   homeworks            Homework[]           @relation("HomeworkStudent")
   takenHomeworks       Homework[]           @relation("HomeworkTakenBy")
+  homeworkAssignments  HomeworkAssignment[] @relation("HomeworkAssignmentStudent")
+  homeworkSubmissions  HomeworkSubmission[] @relation("HomeworkSubmissionStudent")
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
   paymentEvents        PaymentEvent[]
@@ -98,6 +113,94 @@ model Homework {
   lastReminderAt DateTime?
 }
 
+model HomeworkTemplate {
+  id                 Int      @id @default(autoincrement())
+  teacherId          BigInt
+  createdByTeacherId BigInt?
+  title              String
+  tags               String   @default("[]")
+  subject            String?
+  level              String?
+  blocks             String   @default("[]")
+  isArchived         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  teacher            Teacher  @relation("HomeworkTemplateTeacher", fields: [teacherId], references: [chatId])
+  createdByTeacher   Teacher? @relation("HomeworkTemplateCreator", fields: [createdByTeacherId], references: [chatId])
+  assignments        HomeworkAssignment[]
+
+  @@index([teacherId, isArchived, updatedAt])
+}
+
+model HomeworkAssignment {
+  id                     Int      @id @default(autoincrement())
+  teacherId              BigInt
+  studentId              Int
+  lessonId               Int?
+  templateId             Int?
+  legacyHomeworkId       Int?
+  title                  String
+  status                 String   @default("DRAFT")
+  sendMode               String   @default("MANUAL")
+  deadlineAt             DateTime?
+  sentAt                 DateTime?
+  contentSnapshot        String   @default("[]")
+  autoScore              Int?
+  manualScore            Int?
+  finalScore             Int?
+  teacherComment         String?
+  reviewedAt             DateTime?
+  reminder24hSentAt      DateTime?
+  reminderMorningSentAt  DateTime?
+  reminder3hSentAt       DateTime?
+  overdueReminderCount   Int      @default(0)
+  lastOverdueReminderAt  DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  teacher                Teacher  @relation("HomeworkAssignmentTeacher", fields: [teacherId], references: [chatId])
+  student                Student  @relation("HomeworkAssignmentStudent", fields: [studentId], references: [id])
+  lesson                 Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  template               HomeworkTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  submissions            HomeworkSubmission[]
+
+  @@index([teacherId, studentId, status])
+  @@index([teacherId, lessonId])
+  @@index([studentId, deadlineAt])
+  @@index([teacherId, deadlineAt])
+  @@unique([legacyHomeworkId])
+}
+
+model HomeworkSubmission {
+  id              Int      @id @default(autoincrement())
+  assignmentId    Int
+  studentId       Int
+  reviewerTeacherId BigInt?
+  attemptNo       Int
+  status          String   @default("DRAFT")
+  answerText      String?
+  attachments     String   @default("[]")
+  voice           String   @default("[]")
+  testAnswers     String?
+  autoScore       Int?
+  manualScore     Int?
+  finalScore      Int?
+  teacherComment  String?
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  assignment      HomeworkAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student         Student            @relation("HomeworkSubmissionStudent", fields: [studentId], references: [id])
+  reviewerTeacher Teacher?           @relation("HomeworkSubmissionReviewer", fields: [reviewerTeacherId], references: [chatId])
+
+  @@unique([assignmentId, attemptNo])
+  @@index([assignmentId, status])
+  @@index([studentId, submittedAt])
+}
+
 model Lesson {
   id                  Int                 @id @default(autoincrement())
   teacherId           BigInt
@@ -127,6 +230,7 @@ model Lesson {
   paymentEvents       PaymentEvent[]
   notificationLogs    NotificationLog[]
   activityEvents      ActivityEvent[]
+  homeworkAssignments HomeworkAssignment[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])

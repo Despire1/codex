@@ -21,7 +21,8 @@
     "prisma:reset": "prisma migrate reset --force --skip-generate",
     "prisma:repair": "./scripts/prisma-repair.sh",
     "prisma:generate": "prisma generate",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "backfill:homework:v2": "tsx scripts/backfill-homework-v2.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

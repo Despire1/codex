@@ -42,6 +42,14 @@ type SettingsPatch = Partial<
     | 'paymentReminderMaxCount'
     | 'notifyTeacherOnAutoPaymentReminder'
     | 'notifyTeacherOnManualPaymentReminder'
+    | 'homeworkNotifyOnAssign'
+    | 'homeworkReminder24hEnabled'
+    | 'homeworkReminderMorningEnabled'
+    | 'homeworkReminderMorningTime'
+    | 'homeworkReminder3hEnabled'
+    | 'homeworkOverdueRemindersEnabled'
+    | 'homeworkOverdueReminderTime'
+    | 'homeworkOverdueReminderMaxCount'
   >
 >;
 

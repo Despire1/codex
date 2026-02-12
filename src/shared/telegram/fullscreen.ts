@@ -4,7 +4,7 @@ import { type TelegramWindow } from './types';
 const isDev = import.meta.env.DEV;
 
 const trackEvent = (event: string, payload: Record<string, unknown>) => {
-  const analytics = (window as TelegramWindow).analytics;
+  const analytics = (window as unknown as TelegramWindow).analytics;
   if (analytics?.track) {
     analytics.track(event, payload);
   }
@@ -66,7 +66,7 @@ const setBodyFlag = (className: string, enabled: boolean) => {
 };
 
 export const initTelegramFullscreen = () => {
-  const tg = (window as TelegramWindow).Telegram?.WebApp;
+  const tg = (window as unknown as TelegramWindow).Telegram?.WebApp;
 
   if (!tg) {
     return;

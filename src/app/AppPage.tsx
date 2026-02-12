@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
-import { api } from '../shared/api/client';
+import { api, type StudentContextLink } from '../shared/api/client';
 import { useToast } from '../shared/lib/toast';
 import { TimeZoneProvider } from '../shared/lib/timezoneContext';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
@@ -14,14 +14,13 @@ import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
 import { Tabbar } from '../widgets/layout/Tabbar';
 import { Sidebar } from '../widgets/layout/Sidebar';
-import { type SidebarNavItem } from '../widgets/layout/model/navigation';
-import { tabIdByPath, tabPathById, tabs, type TabId } from './tabs';
+import { buildSidebarNavItems, type SidebarNavItem } from '../widgets/layout/model/navigation';
+import { getTabsByRole, tabPathById, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
 import { AppModals } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
-import { StudentRoleNotice } from '../widgets/student-role/StudentRoleNotice';
 import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
@@ -72,15 +71,23 @@ const initialTeacher: Teacher = {
   paymentReminderMaxCount: 3,
   notifyTeacherOnAutoPaymentReminder: false,
   notifyTeacherOnManualPaymentReminder: true,
+  homeworkNotifyOnAssign: true,
+  homeworkReminder24hEnabled: true,
+  homeworkReminderMorningEnabled: true,
+  homeworkReminderMorningTime: '10:00',
+  homeworkReminder3hEnabled: false,
+  homeworkOverdueRemindersEnabled: true,
+  homeworkOverdueReminderTime: '10:00',
+  homeworkOverdueReminderMaxCount: 3,
 };
 
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
-type TabPath = (typeof tabs)[number]['path'];
 
 const desktopTitleByTab: Record<TabId, string> = {
   dashboard: 'Обзор',
   students: 'Ученики',
   schedule: 'Расписание',
+  homeworks: 'Домашки',
   analytics: 'Аналитика',
   settings: 'Настройки',
 };
@@ -94,6 +101,8 @@ const AppPageContent = () => {
   const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
   const hasAccess = sessionState === 'authenticated' && hasTelegramAccess;
+  const isStudentRole = sessionUser?.role?.toUpperCase() === 'STUDENT';
+  const hasTeacherAccess = hasAccess && !isStudentRole;
   const [teacher, setTeacher] = useState<Teacher>(initialTeacher);
   const resolvedTimeZone = useMemo(() => resolveTimeZone(teacher.timezone), [teacher.timezone]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -102,6 +111,10 @@ const AppPageContent = () => {
   const [studentListReloadKey, setStudentListReloadKey] = useState(0);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
+  const [studentContexts, setStudentContexts] = useState<StudentContextLink[]>([]);
+  const [activeStudentContext, setActiveStudentContext] = useState<StudentContextLink | null>(null);
+  const [studentContextLoading, setStudentContextLoading] = useState(false);
+  const [studentContextRevision, setStudentContextRevision] = useState(0);
   const isMobile = useIsMobile(767);
   const isDesktop = useIsDesktop();
   const device = isMobile ? 'mobile' : 'desktop';
@@ -134,7 +147,7 @@ const AppPageContent = () => {
   const studentCardFilters = useStudentCardFiltersInternal();
 
   const studentsData = useStudentsDataInternal({
-    hasAccess,
+    hasAccess: hasTeacherAccess,
     timeZone: resolvedTimeZone,
     selectedStudentId,
     studentActiveTab,
@@ -212,7 +225,7 @@ const AppPageContent = () => {
   const { homeworks } = studentsHomework;
 
   const scheduleLessons = useScheduleLessonsRangeInternal({
-    hasAccess,
+    hasAccess: hasTeacherAccess,
     timeZone: resolvedTimeZone,
     monthAnchor,
     monthOffset,
@@ -231,12 +244,17 @@ const AppPageContent = () => {
     removeLessonsFromRanges,
   } = scheduleLessons;
 
+  const availableTabs = useMemo(
+    () => getTabsByRole(isStudentRole ? 'STUDENT' : 'TEACHER'),
+    [isStudentRole],
+  );
+
   const activeTab = useMemo<TabId>(() => {
-    const directMatch = tabIdByPath[location.pathname];
-    if (directMatch) return directMatch;
-    const matchedTab = tabs.find((tab) => location.pathname.startsWith(`${tab.path}/`));
+    const matchedTab = availableTabs.find(
+      (tab) => location.pathname === tab.path || location.pathname.startsWith(`${tab.path}/`),
+    );
     return matchedTab?.id ?? 'dashboard';
-  }, [location.pathname]);
+  }, [availableTabs, location.pathname]);
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
   const desktopDateLabel = useMemo(
@@ -251,7 +269,7 @@ const AppPageContent = () => {
   );
 
   const dashboardState = useDashboardStateInternal({
-    hasAccess,
+    hasAccess: hasTeacherAccess,
     timeZone: resolvedTimeZone,
     isActive: activeTab === 'dashboard',
     buildLessonRange,
@@ -259,8 +277,8 @@ const AppPageContent = () => {
   });
 
   const dashboardSummary = useDashboardSummaryInternal({
-    hasAccess,
-    isActive: activeTab === 'dashboard',
+    hasAccess: hasTeacherAccess,
+    isActive: hasTeacherAccess && activeTab === 'dashboard',
   });
   const { summary: dashboardSummaryData } = dashboardSummary;
   const isZeroSummary =
@@ -319,8 +337,8 @@ const AppPageContent = () => {
   });
 
   useScheduleLessonsLoaderInternal({
-    hasAccess,
-    isActive: activeTab === 'schedule',
+    hasAccess: hasTeacherAccess,
+    isActive: hasTeacherAccess && activeTab === 'schedule',
     scheduleView,
     dayViewDate,
     buildDayRange,
@@ -376,7 +394,7 @@ const AppPageContent = () => {
 
   const { openCreateStudentModal } = studentsActions;
   const { openLessonModal } = lessonActions;
-  const knownPaths = useMemo(() => new Set<TabPath>(tabs.map((tab) => tab.path)), []);
+  const knownPaths = useMemo(() => new Set<string>(availableTabs.map((tab) => tab.path)), [availableTabs]);
 
   const openCreateLesson = useCallback(
     (date?: Date) => {
@@ -436,8 +454,70 @@ const AppPageContent = () => {
     guardedNavigate('/settings/notifications');
   }, [guardedNavigate]);
 
+  const sidebarItems = useMemo(() => buildSidebarNavItems(availableTabs), [availableTabs]);
+
+  const applyStudentContext = useCallback((context: StudentContextLink | null) => {
+    if (!context) {
+      setActiveStudentContext(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('student_active_teacher_id');
+        window.localStorage.removeItem('student_active_student_id');
+      }
+      return;
+    }
+
+    setActiveStudentContext(context);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('student_active_teacher_id', String(context.teacherId));
+      window.localStorage.setItem('student_active_student_id', String(context.studentId));
+    }
+    setStudentContextRevision((prev) => prev + 1);
+  }, []);
+
   useEffect(() => {
-    if (!hasAccess) return;
+    if (!hasAccess || !isStudentRole) return;
+
+    let cancelled = false;
+    setStudentContextLoading(true);
+    api
+      .getStudentContext()
+      .then((data) => {
+        if (cancelled) return;
+        setStudentContexts(data.contexts);
+
+        const storedTeacherIdRaw =
+          typeof window !== 'undefined' ? window.localStorage.getItem('student_active_teacher_id') : null;
+        const storedTeacherId = storedTeacherIdRaw ? Number(storedTeacherIdRaw) : Number.NaN;
+
+        const byStorage = Number.isFinite(storedTeacherId)
+          ? data.contexts.find((context) => context.teacherId === storedTeacherId)
+          : null;
+        const byBackend = data.activeTeacherId
+          ? data.contexts.find((context) => context.teacherId === data.activeTeacherId)
+          : null;
+
+        const fallbackContext = data.contexts.length === 1 ? data.contexts[0] : null;
+        applyStudentContext(byStorage ?? byBackend ?? fallbackContext);
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load student context', error);
+        if (cancelled) return;
+        setStudentContexts([]);
+        applyStudentContext(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setStudentContextLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyStudentContext, hasAccess, isStudentRole]);
+
+  useEffect(() => {
+    if (!hasTeacherAccess) return;
     if (initialBootstrapDone.current) return;
     const loadInitial = async () => {
       try {
@@ -481,7 +561,7 @@ const AppPageContent = () => {
     buildWeekRange,
     dashboardState.weekRange,
     dayViewDate,
-    hasAccess,
+    hasTeacherAccess,
     scheduleView,
     studentsHomework.replaceHomeworks,
   ]);
@@ -489,7 +569,7 @@ const AppPageContent = () => {
 
 
   const resolveLastVisitedPath = useCallback(() => {
-    const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY) as TabPath | null;
+    const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY);
     if (stored && knownPaths.has(stored)) {
       return stored;
     }
@@ -497,7 +577,7 @@ const AppPageContent = () => {
   }, [knownPaths]);
 
   useEffect(() => {
-    const currentPath = location.pathname as TabPath;
+    const currentPath = location.pathname;
     if (knownPaths.has(currentPath)) {
       localStorage.setItem(LAST_VISITED_ROUTE_KEY, currentPath);
     }
@@ -581,13 +661,13 @@ const AppPageContent = () => {
 
   const studentsRouteProps = useMemo(
     () => ({
-      hasAccess,
+      hasAccess: hasTeacherAccess,
       teacher,
       lessons,
       onActiveTabChange: setStudentActiveTab,
       studentListReloadKey,
     }),
-    [hasAccess, lessons, setStudentActiveTab, studentListReloadKey, teacher],
+    [hasTeacherAccess, lessons, setStudentActiveTab, studentListReloadKey, teacher],
   );
 
   const scheduleRouteProps = useMemo(
@@ -608,6 +688,27 @@ const AppPageContent = () => {
     [guardedNavigate, teacher],
   );
 
+  const homeworksRouteProps = useMemo<{ mode: 'teacher' | 'student' }>(
+    () => ({
+      mode: isStudentRole ? 'student' : 'teacher',
+    }),
+    [isStudentRole],
+  );
+
+  const studentDashboardRouteProps = useMemo(
+    () => ({
+      activeTeacherName: activeStudentContext?.teacherName ?? null,
+    }),
+    [activeStudentContext?.teacherName],
+  );
+
+  const studentSettingsRouteProps = useMemo(
+    () => ({
+      activeTeacherName: activeStudentContext?.teacherName ?? null,
+    }),
+    [activeStudentContext?.teacherName],
+  );
+
   const dashboardSummaryRouteProps = useMemo(
     () => ({
       summary: dashboardSummaryData,
@@ -623,15 +724,57 @@ const AppPageContent = () => {
     return <SessionFallback state={fallbackState} />;
   }
 
-  const isStudentRole = sessionUser?.role?.toUpperCase() === 'STUDENT';
-
-  if (isStudentRole) {
+  if (isStudentRole && studentContextLoading) {
     return (
       <div id="app" className={`${layoutStyles.page} app-content`}>
         <div className="app-surface">
           <div className={layoutStyles.pageInner}>
             <main className={layoutStyles.content}>
-              <StudentRoleNotice />
+              <div className={layoutStyles.content}>Загружаем контекст ученика…</div>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isStudentRole && studentContexts.length === 0) {
+    return (
+      <div id="app" className={`${layoutStyles.page} app-content`}>
+        <div className="app-surface">
+          <div className={layoutStyles.pageInner}>
+            <main className={layoutStyles.content}>
+              <div className={layoutStyles.content}>
+                Вы не привязаны ни к одному преподавателю. Попросите преподавателя добавить ваш Telegram username.
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isStudentRole && studentContexts.length > 1 && !activeStudentContext) {
+    return (
+      <div id="app" className={`${layoutStyles.page} app-content`}>
+        <div className="app-surface">
+          <div className={layoutStyles.pageInner}>
+            <main className={layoutStyles.content}>
+              <div className={layoutStyles.content}>
+                <h2>Выберите преподавателя</h2>
+                {studentContexts.map((context) => (
+                  <button
+                    key={`${context.teacherId}_${context.studentId}`}
+                    type="button"
+                    onClick={() => {
+                      applyStudentContext(context);
+                      guardedNavigate(tabPathById.dashboard);
+                    }}
+                  >
+                    {context.teacherName} · {context.studentName}
+                  </button>
+                ))}
+              </div>
             </main>
           </div>
         </div>
@@ -661,16 +804,17 @@ const AppPageContent = () => {
                           pathname={location.pathname}
                           onNavigate={onSidebarNavigate}
                           onToggleCollapsed={onSidebarToggle}
+                          items={sidebarItems}
                         />
                       ) : null}
 
                       <div className={layoutStyles.mainColumn}>
-                        {isDesktop ? (
+                        {isDesktop && !isStudentRole ? (
                           <Topbar
                             teacher={teacher}
                             title={desktopTopbarTitle}
                             subtitle={desktopDateLabel}
-                            showCreateLesson={activeTab === 'dashboard'}
+                            showCreateLesson={activeTab === 'dashboard' && hasTeacherAccess}
                             onOpenNotifications={onOpenNotifications}
                             onCreateLesson={onTopbarCreateLesson}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
@@ -679,26 +823,35 @@ const AppPageContent = () => {
 
                         <main className={layoutStyles.content}>
                           <AppRoutes
+                            key={isStudentRole ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}` : 'teacher'}
+                            isStudentRole={isStudentRole}
                             resolveLastVisitedPath={resolveLastVisitedPath}
                             dashboard={dashboardRouteProps}
                             students={studentsRouteProps}
                             schedule={scheduleRouteProps}
                             settings={settingsRouteProps}
                             dashboardSummary={dashboardSummaryRouteProps}
+                            homeworks={homeworksRouteProps}
+                            studentDashboard={studentDashboardRouteProps}
+                            studentSettings={studentSettingsRouteProps}
                           />
                         </main>
 
-                        {!isDesktop ? <Tabbar activeTab={activeTab} onTabChange={onTabbarNavigate} /> : null}
+                        {!isDesktop ? (
+                          <Tabbar activeTab={activeTab} onTabChange={onTabbarNavigate} tabsList={availableTabs} />
+                        ) : null}
                       </div>
                     </div>
                   </div>
 
-                  <AppModals
-                    linkedStudents={linkedStudents}
-                    dialogState={dialogState}
-                    onCloseDialog={closeDialog}
-                    onDialogStateChange={setDialogState}
-                  />
+                  {!isStudentRole ? (
+                    <AppModals
+                      linkedStudents={linkedStudents}
+                      dialogState={dialogState}
+                      onCloseDialog={closeDialog}
+                      onDialogStateChange={setDialogState}
+                    />
+                  ) : null}
                 </div>
                 {showSubscriptionGate ? <SubscriptionGate /> : null}
                     </TimeZoneProvider>

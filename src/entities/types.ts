@@ -25,12 +25,21 @@ export interface Teacher {
   paymentReminderMaxCount: number;
   notifyTeacherOnAutoPaymentReminder: boolean;
   notifyTeacherOnManualPaymentReminder: boolean;
+  homeworkNotifyOnAssign: boolean;
+  homeworkReminder24hEnabled: boolean;
+  homeworkReminderMorningEnabled: boolean;
+  homeworkReminderMorningTime: string;
+  homeworkReminder3hEnabled: boolean;
+  homeworkOverdueRemindersEnabled: boolean;
+  homeworkOverdueReminderTime: string;
+  homeworkOverdueReminderMaxCount: number;
 }
 
 export interface Student {
   id: number;
   username?: string;
   telegramId?: number;
+  timezone?: string | null;
   pricePerLesson?: number;
   isActivated?: boolean;
   activatedAt?: string | null;
@@ -75,6 +84,150 @@ export interface Homework {
   takenAt?: string | null;
   takenByStudentId?: number | null;
   timeSpentMinutes?: number | null;
+}
+
+export type HomeworkTemplateBlockType = 'TEXT' | 'MEDIA' | 'TEST' | 'STUDENT_RESPONSE';
+
+export type HomeworkTestQuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'SHORT_ANSWER' | 'MATCHING';
+
+export interface HomeworkTestOption {
+  id: string;
+  text: string;
+}
+
+export interface HomeworkTestMatchingPair {
+  id: string;
+  left: string;
+  right: string;
+}
+
+export interface HomeworkTestQuestion {
+  id: string;
+  type: HomeworkTestQuestionType;
+  prompt: string;
+  options?: HomeworkTestOption[];
+  correctOptionIds?: string[];
+  acceptedAnswers?: string[];
+  matchingPairs?: HomeworkTestMatchingPair[];
+  explanation?: string | null;
+  points?: number | null;
+}
+
+export interface HomeworkBlockText {
+  id: string;
+  type: 'TEXT';
+  content: string;
+}
+
+export interface HomeworkBlockMedia {
+  id: string;
+  type: 'MEDIA';
+  attachments: HomeworkAttachment[];
+}
+
+export interface HomeworkBlockTest {
+  id: string;
+  type: 'TEST';
+  title?: string | null;
+  questions: HomeworkTestQuestion[];
+}
+
+export interface HomeworkBlockStudentResponse {
+  id: string;
+  type: 'STUDENT_RESPONSE';
+  allowText: boolean;
+  allowFiles: boolean;
+  allowPhotos: boolean;
+  allowDocuments: boolean;
+  allowAudio: boolean;
+  allowVideo: boolean;
+  allowVoice: boolean;
+}
+
+export type HomeworkBlock =
+  | HomeworkBlockText
+  | HomeworkBlockMedia
+  | HomeworkBlockTest
+  | HomeworkBlockStudentResponse;
+
+export interface HomeworkTemplate {
+  id: number;
+  teacherId: number;
+  createdByTeacherId?: number | null;
+  title: string;
+  tags: string[];
+  subject?: string | null;
+  level?: string | null;
+  blocks: HomeworkBlock[];
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type HomeworkAssignmentStatus =
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'SENT'
+  | 'SUBMITTED'
+  | 'RETURNED'
+  | 'REVIEWED'
+  | 'OVERDUE';
+
+export type HomeworkSendMode = 'AUTO_AFTER_LESSON_DONE' | 'MANUAL';
+
+export interface HomeworkScore {
+  autoScore?: number | null;
+  manualScore?: number | null;
+  finalScore?: number | null;
+}
+
+export interface HomeworkAssignment {
+  id: number;
+  teacherId: number;
+  studentId: number;
+  lessonId?: number | null;
+  templateId?: number | null;
+  legacyHomeworkId?: number | null;
+  title: string;
+  status: HomeworkAssignmentStatus;
+  sendMode: HomeworkSendMode;
+  deadlineAt?: string | null;
+  sentAt?: string | null;
+  contentSnapshot: HomeworkBlock[];
+  teacherComment?: string | null;
+  reviewedAt?: string | null;
+  reminder24hSentAt?: string | null;
+  reminderMorningSentAt?: string | null;
+  reminder3hSentAt?: string | null;
+  overdueReminderCount: number;
+  lastOverdueReminderAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  latestSubmissionAttemptNo?: number | null;
+  latestSubmissionStatus?: HomeworkSubmissionStatus | null;
+  latestSubmissionSubmittedAt?: string | null;
+  score: HomeworkScore;
+}
+
+export type HomeworkSubmissionStatus = 'DRAFT' | 'SUBMITTED' | 'REVIEWED';
+
+export interface HomeworkSubmission {
+  id: number;
+  assignmentId: number;
+  studentId: number;
+  reviewerTeacherId?: number | null;
+  attemptNo: number;
+  status: HomeworkSubmissionStatus;
+  answerText?: string | null;
+  attachments: HomeworkAttachment[];
+  voice: HomeworkAttachment[];
+  testAnswers?: Record<string, unknown> | null;
+  teacherComment?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  score: HomeworkScore;
 }
 
 export interface LessonParticipant {
