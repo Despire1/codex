@@ -25,12 +25,15 @@ type RouteProps = {
   element: ReactNode;
 };
 
+type RouteParams = Record<string, string>;
+
 type RouterContextValue = {
   location: Location;
   navigate: (to: string, options?: NavigateOptions) => void;
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
+const RouteParamsContext = createContext<RouteParams>({});
 
 const normalizePath = (path: string) => {
   if (!path) return '/';
@@ -41,17 +44,47 @@ const normalizePath = (path: string) => {
   return withLeading;
 };
 
-const matchPath = (routePath: string, currentPath: string) => {
+const splitPathSegments = (path: string) => normalizePath(path).split('/').filter(Boolean);
+
+const safeDecodeParam = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const matchPath = (routePath: string, currentPath: string): { params: RouteParams } | null => {
   const normalizedRoute = normalizePath(routePath);
   const normalizedCurrent = normalizePath(currentPath);
 
-  if (normalizedRoute === '*' || normalizedRoute === '/*') return true;
-  if (normalizedRoute.endsWith('/*')) {
-    const base = normalizedRoute.slice(0, -2);
-    return normalizedCurrent === base || normalizedCurrent.startsWith(`${base}/`);
+  if (normalizedRoute === '*' || normalizedRoute === '/*') return { params: {} };
+
+  const hasWildcardTail = normalizedRoute.endsWith('/*');
+  const routeForMatching = hasWildcardTail ? normalizedRoute.slice(0, -2) || '/' : normalizedRoute;
+  const routeSegments = splitPathSegments(routeForMatching);
+  const currentSegments = splitPathSegments(normalizedCurrent);
+
+  if (!hasWildcardTail && routeSegments.length !== currentSegments.length) return null;
+  if (hasWildcardTail && currentSegments.length < routeSegments.length) return null;
+
+  const params: RouteParams = {};
+  for (let index = 0; index < routeSegments.length; index += 1) {
+    const routeSegment = routeSegments[index];
+    const currentSegment = currentSegments[index];
+    if (currentSegment === undefined) return null;
+
+    if (routeSegment.startsWith(':')) {
+      const key = routeSegment.slice(1);
+      if (!key) return null;
+      params[key] = safeDecodeParam(currentSegment);
+      continue;
+    }
+
+    if (routeSegment !== currentSegment) return null;
   }
 
-  return normalizedRoute === normalizedCurrent;
+  return { params };
 };
 
 export const BrowserRouter = ({ children }: PropsWithChildren) => {
@@ -102,16 +135,25 @@ export const useLocation = () => useRouterContext().location;
 
 export const useNavigate = () => useRouterContext().navigate;
 
+export const useParams = <T extends Record<string, string | undefined> = Record<string, string | undefined>>() =>
+  useContext(RouteParamsContext) as T;
+
 export const Route = (_: RouteProps) => null;
 
 export const Routes = ({ children }: PropsWithChildren) => {
   const { location } = useRouterContext();
   const routes = Children.toArray(children) as ReactElement<RouteProps>[];
-  const match = routes.find((route) => matchPath(route.props.path, location.pathname));
+  const match = routes
+    .map((route) => ({ route, matched: matchPath(route.props.path, location.pathname) }))
+    .find((entry) => entry.matched !== null);
 
   if (!match) return null;
 
-  return <>{match.props.element}</>;
+  return (
+    <RouteParamsContext.Provider value={match.matched?.params ?? {}}>
+      {match.route.props.element}
+    </RouteParamsContext.Provider>
+  );
 };
 
 export const Navigate = ({ to, replace = true }: { to: string; replace?: boolean }) => {

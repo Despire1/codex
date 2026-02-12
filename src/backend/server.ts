@@ -5065,7 +5065,11 @@ const createFilePresignUploadV2 = (req: IncomingMessage, body: Record<string, un
   const rawFileName = typeof body.fileName === 'string' ? body.fileName : 'file';
   const fileName = sanitizeFileName(rawFileName);
   const contentType = typeof body.contentType === 'string' && body.contentType.trim() ? body.contentType : 'application/octet-stream';
-  const size = clampNumber(Number(body.size ?? 0), 1, 50 * 1024 * 1024);
+  const requestedSize = Number(body.size ?? 0);
+  const size =
+    Number.isFinite(requestedSize) && requestedSize > 0
+      ? clampNumber(requestedSize, 1, 50 * 1024 * 1024)
+      : 50 * 1024 * 1024;
   const token = crypto.randomUUID();
   const objectKey = `${Date.now()}_${crypto.randomUUID()}_${fileName}`;
   pendingHomeworkUploads.set(token, {
@@ -5075,8 +5079,10 @@ const createFilePresignUploadV2 = (req: IncomingMessage, body: Record<string, un
     expiresAt: Date.now() + HOMEWORK_UPLOAD_TTL_SEC * 1000,
   });
 
-  const uploadUrl = `${getBaseUrl(req)}/api/v2/files/upload/${token}`;
-  const fileUrl = `${getBaseUrl(req)}/api/v2/files/object/${objectKey}`;
+  const configuredBaseUrl = (process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL ?? '').trim().replace(/\/$/, '');
+  const baseUrl = configuredBaseUrl || '';
+  const uploadUrl = `${baseUrl}/api/v2/files/upload/${token}`;
+  const fileUrl = `${baseUrl}/api/v2/files/object/${objectKey}`;
   return {
     uploadUrl,
     method: 'PUT' as const,
@@ -5585,7 +5591,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Role, X-Student-Id, X-Teacher-Id');
     return res.end();
   }

@@ -13,7 +13,7 @@ import {
   createInitialTemplateEditorDraft,
   createTemplateEditorDraftFromTemplate,
 } from '../../../features/homework-template-editor/model/lib/blocks';
-import { HomeworkTemplateEditorDraft, HomeworkTemplateEditorMode } from '../../../features/homework-template-editor/model/types';
+import { HomeworkTemplateEditorDraft } from '../../../features/homework-template-editor/model/types';
 import { HomeworkTemplateEditorModal } from '../../../features/homework-template-editor/ui/HomeworkTemplateEditorModal';
 import { describeTemplateBlocks } from '../../../entities/homework-template/model/lib/describeTemplateBlocks';
 import { HomeworkTemplate } from '../../../entities/types';
@@ -62,7 +62,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onDeadlineFromChange,
   onDeadlineToChange,
   onShowArchivedTemplatesChange,
-  onCreateTemplate,
+  onOpenCreateTemplateScreen,
   onUpdateTemplate,
   onDuplicateTemplate,
   onArchiveTemplate,
@@ -75,7 +75,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 }) => {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
-  const [templateMode, setTemplateMode] = useState<HomeworkTemplateEditorMode>('create');
   const [editingTemplate, setEditingTemplate] = useState<HomeworkTemplate | null>(null);
   const [templateDraft, setTemplateDraft] = useState<HomeworkTemplateEditorDraft>(createInitialTemplateEditorDraft());
   const studentsById = useMemo(() => new Map(students.map((item) => [item.id, item.name])), [students]);
@@ -91,15 +90,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     [summary.draftCount, summary.overdueCount, summary.reviewCount, summary.reviewedCount, summary.sentCount],
   );
 
-  const openCreateTemplateModal = () => {
-    setTemplateMode('create');
-    setEditingTemplate(null);
-    setTemplateDraft(createInitialTemplateEditorDraft());
-    setIsTemplateModalOpen(true);
-  };
-
   const openEditTemplateModal = (template: HomeworkTemplate) => {
-    setTemplateMode('edit');
     setEditingTemplate(template);
     setTemplateDraft(createTemplateEditorDraftFromTemplate(template));
     setIsTemplateModalOpen(true);
@@ -116,10 +107,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       level: templateDraft.level.trim() || null,
       blocks: templateDraft.blocks,
     };
-    if (templateMode === 'edit' && editingTemplate) {
-      return onUpdateTemplate(editingTemplate.id, payload);
-    }
-    return onCreateTemplate(payload);
+    if (!editingTemplate) return false;
+    return onUpdateTemplate(editingTemplate.id, payload);
   };
 
   return (
@@ -140,7 +129,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       </div>
 
       <div className={viewStyles.actionBar}>
-        <button type="button" className={controls.primaryButton} onClick={openCreateTemplateModal}>
+        <button type="button" className={controls.primaryButton} onClick={onOpenCreateTemplateScreen}>
           Создать шаблон
         </button>
         <button
@@ -328,12 +317,15 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
       <HomeworkTemplateEditorModal
         open={isTemplateModalOpen}
-        mode={templateMode}
+        mode="edit"
         draft={templateDraft}
         submitting={submittingTemplate}
         onDraftChange={setTemplateDraft}
         onSubmit={submitTemplateEditor}
-        onClose={() => setIsTemplateModalOpen(false)}
+        onClose={() => {
+          setIsTemplateModalOpen(false);
+          setEditingTemplate(null);
+        }}
       />
 
       <HomeworkAssignModal

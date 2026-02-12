@@ -66,7 +66,7 @@ export interface TeacherHomeworksViewModel {
   onDeadlineFromChange: (value: string) => void;
   onDeadlineToChange: (value: string) => void;
   onShowArchivedTemplatesChange: (value: boolean) => void;
-  onCreateTemplate: (payload: TeacherTemplateUpsertPayload) => Promise<boolean>;
+  onOpenCreateTemplateScreen: () => void;
   onUpdateTemplate: (templateId: number, payload: TeacherTemplateUpsertPayload) => Promise<boolean>;
   onDuplicateTemplate: (template: HomeworkTemplate) => Promise<void>;
   onArchiveTemplate: (template: HomeworkTemplate) => Promise<void>;
@@ -105,4 +105,3 @@ export interface StudentHomeworkDetailModel {
   onRefresh: () => void;
   onSubmitPayload: (payload: StudentHomeworkSubmitPayload) => Promise<boolean>;
 }
-

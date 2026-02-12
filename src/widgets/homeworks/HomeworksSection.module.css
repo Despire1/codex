@@ -124,6 +124,9 @@
   padding: 10px;
   background: var(--color-slate-50);
   text-align: left;
+  color: inherit;
+  text-decoration: none;
+  display: block;
 }
 
 .assignmentCardClickable {

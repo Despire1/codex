@@ -1,10 +1,13 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { HomeworkAssignment, HomeworkSubmission, HomeworkTemplate } from '../../entities/types';
 import { TeacherAssignmentBucket } from '../../entities/homework-assignment/model/lib/assignmentBuckets';
 import { api } from '../../shared/api/client';
 import { useToast } from '../../shared/lib/toast';
 import { StudentHomeworkDetailView, StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
+import { createInitialTemplateEditorDraft } from '../../features/homework-template-editor/model/lib/blocks';
+import { HomeworkTemplateEditorDraft } from '../../features/homework-template-editor/model/types';
+import { HomeworkTemplateCreateScreen } from '../../features/homework-template-editor/ui/HomeworkTemplateCreateScreen';
 import { StudentHomeworksView } from './student/StudentHomeworksView';
 import { TeacherHomeworksView } from './teacher/TeacherHomeworksView';
 import {
@@ -41,9 +44,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const assignmentIdMatch = location.pathname.match(/\/homeworks\/(\d+)$/);
-  const assignmentId = assignmentIdMatch ? Number(assignmentIdMatch[1]) : Number.NaN;
+  const { assignmentId: assignmentIdParam } = useParams<{ assignmentId?: string }>();
+  const assignmentId = assignmentIdParam ? Number(assignmentIdParam) : Number.NaN;
   const hasStudentAssignmentId = mode === 'student' && Number.isFinite(assignmentId) && assignmentId > 0;
+  const isTeacherTemplateCreateRoute = mode === 'teacher' && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
 
   const [templates, setTemplates] = useState<HomeworkTemplate[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
@@ -76,12 +80,20 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [reviewSubmissions, setReviewSubmissions] = useState<HomeworkSubmission[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [createTemplateDraft, setCreateTemplateDraft] = useState<HomeworkTemplateEditorDraft>(
+    createInitialTemplateEditorDraft(),
+  );
 
   const [studentDetailAssignment, setStudentDetailAssignment] = useState<HomeworkAssignment | null>(null);
   const [studentDetailSubmissions, setStudentDetailSubmissions] = useState<HomeworkSubmission[]>([]);
   const [studentDetailLoading, setStudentDetailLoading] = useState(false);
   const [studentDetailSubmitting, setStudentDetailSubmitting] = useState(false);
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTeacherTemplateCreateRoute) return;
+    setCreateTemplateDraft(createInitialTemplateEditorDraft());
+  }, [isTeacherTemplateCreateRoute]);
 
   const loadTeacherStudents = useCallback(async () => {
     setLoadingStudents(true);
@@ -344,6 +356,20 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     [loadTeacherTemplates, showToast],
   );
 
+  const handleCreateTemplateFromScreen = useCallback(async () => {
+    const payload: TeacherTemplateUpsertPayload = {
+      title: createTemplateDraft.title,
+      tags: createTemplateDraft.tagsText
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      subject: createTemplateDraft.subject.trim() || null,
+      level: createTemplateDraft.level.trim() || null,
+      blocks: createTemplateDraft.blocks,
+    };
+    return handleCreateTemplate(payload);
+  }, [createTemplateDraft, handleCreateTemplate]);
+
   const handleCreateAssignment = useCallback(
     async (payload: TeacherAssignmentCreatePayload) => {
       if (!payload.studentId) {
@@ -519,7 +545,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         onDeadlineFromChange={setDeadlineFrom}
         onDeadlineToChange={setDeadlineTo}
         onShowArchivedTemplatesChange={setShowArchivedTemplates}
-        onCreateTemplate={handleCreateTemplate}
+        onOpenCreateTemplateScreen={() => navigate('/homeworks/templates/new')}
         onUpdateTemplate={handleUpdateTemplate}
         onDuplicateTemplate={handleDuplicateTemplate}
         onArchiveTemplate={handleArchiveTemplate}
@@ -546,7 +572,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       deadlineTo,
       handleArchiveTemplate,
       handleCreateAssignment,
-      handleCreateTemplate,
       handleDuplicateTemplate,
       handleOpenReview,
       handleSendAssignmentNow,
@@ -557,6 +582,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       loadingStudents,
       loadingSummary,
       loadingTemplates,
+      navigate,
       reviewAssignment,
       reviewLoading,
       reviewSubmissions,
@@ -575,6 +601,17 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   );
 
   if (mode === 'teacher') {
+    if (isTeacherTemplateCreateRoute) {
+      return (
+        <HomeworkTemplateCreateScreen
+          draft={createTemplateDraft}
+          submitting={submittingTemplate}
+          onDraftChange={setCreateTemplateDraft}
+          onSubmit={handleCreateTemplateFromScreen}
+          onBack={() => navigate('/homeworks')}
+        />
+      );
+    }
     return teacherView;
   }
 

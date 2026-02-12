@@ -1,5 +1,4 @@
 import {
-  HomeworkBlock,
   HomeworkBlockMedia,
   HomeworkBlockStudentResponse,
   HomeworkBlockTest,
@@ -85,11 +84,11 @@ export const createStudentResponseBlock = (): HomeworkBlockStudentResponse => ({
   id: createHomeworkBlockId(),
   type: 'STUDENT_RESPONSE',
   allowText: true,
-  allowFiles: true,
-  allowPhotos: true,
-  allowDocuments: true,
-  allowAudio: true,
-  allowVideo: true,
+  allowFiles: false,
+  allowPhotos: false,
+  allowDocuments: false,
+  allowAudio: false,
+  allowVideo: false,
   allowVoice: true,
 });
 
@@ -98,7 +97,7 @@ export const createInitialTemplateEditorDraft = (): HomeworkTemplateEditorDraft 
   tagsText: '',
   subject: '',
   level: '',
-  blocks: [createTextBlock(), createStudentResponseBlock()],
+  blocks: [createTextBlock()],
 });
 
 export const createTemplateEditorDraftFromTemplate = (template: HomeworkTemplate): HomeworkTemplateEditorDraft => ({
@@ -106,11 +105,5 @@ export const createTemplateEditorDraftFromTemplate = (template: HomeworkTemplate
   tagsText: (template.tags ?? []).join(', '),
   subject: template.subject ?? '',
   level: template.level ?? '',
-  blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createStudentResponseBlock()],
+  blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createTextBlock()],
 });
-
-export const ensureTemplateHasStudentResponseBlock = (blocks: HomeworkBlock[]) => {
-  const hasStudentResponse = blocks.some((block) => block.type === 'STUDENT_RESPONSE');
-  if (hasStudentResponse) return blocks;
-  return [...blocks, createStudentResponseBlock()];
-};
