@@ -1,6 +1,7 @@
 import {
   ActivityCategory,
   ActivityFeedListResponse,
+  ActivityFeedUnreadStatus,
   Homework,
   HomeworkAssignment,
   HomeworkAttachment,
@@ -74,6 +75,11 @@ export type SessionUser = {
 export type DashboardSummary = {
   studentsCount: number;
   lessonsCount: number;
+  todayPlanRub: number;
+  todayPlanDeltaPercent: number;
+  unpaidRub: number;
+  unpaidStudentsCount: number;
+  receivableWeekRub: number;
   telegramConnected: boolean;
   timezone: string | null;
   teacherId: number;
@@ -123,6 +129,17 @@ export type StudentContextResponse = {
 };
 
 export type HomeworkAssignmentBucket = 'all' | 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
+export type HomeworkAssignmentsTab =
+  | 'all'
+  | 'inbox'
+  | 'draft'
+  | 'scheduled'
+  | 'in_progress'
+  | 'review'
+  | 'closed'
+  | 'overdue';
+export type HomeworkAssignmentsSort = 'urgency' | 'deadline' | 'student' | 'updated' | 'created';
+export type HomeworkAssignmentProblemFilter = 'overdue' | 'returned' | 'config_error';
 
 export type HomeworkAssignmentsSummary = {
   totalCount: number;
@@ -131,6 +148,14 @@ export type HomeworkAssignmentsSummary = {
   reviewCount: number;
   reviewedCount: number;
   overdueCount: number;
+  inboxCount: number;
+  scheduledCount: number;
+  inProgressCount: number;
+  closedCount: number;
+  configErrorCount: number;
+  returnedCount: number;
+  reviewedThisMonthCount: number;
+  sentTodayCount: number;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -226,6 +251,12 @@ export const api = {
     const suffix = query.toString();
     return apiFetch<ActivityFeedListResponse>(`/api/activity-feed${suffix ? `?${suffix}` : ''}`);
   },
+  getActivityFeedUnreadStatus: () => apiFetch<ActivityFeedUnreadStatus>('/api/activity-feed/unread-status'),
+  markActivityFeedSeen: (payload?: { seenThrough?: string }) =>
+    apiFetch<ActivityFeedUnreadStatus>('/api/activity-feed/mark-seen', {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
   getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
   updateSettings: (payload: Partial<SettingsPayload>) =>
     apiFetch<{ settings: SettingsPayload }>('/api/settings', {
@@ -515,6 +546,10 @@ export const api = {
     lessonId?: number;
     status?: string;
     bucket?: HomeworkAssignmentBucket;
+    tab?: HomeworkAssignmentsTab;
+    q?: string;
+    sort?: HomeworkAssignmentsSort;
+    problemFilters?: HomeworkAssignmentProblemFilter[];
     limit?: number;
     offset?: number;
   }) => {
@@ -523,6 +558,12 @@ export const api = {
     if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
     if (params?.status) search.set('status', params.status);
     if (params?.bucket) search.set('bucket', params.bucket);
+    if (params?.tab) search.set('tab', params.tab);
+    if (params?.q) search.set('q', params.q);
+    if (params?.sort) search.set('sort', params.sort);
+    if (params?.problemFilters?.length) {
+      search.set('problemFilters', params.problemFilters.join(','));
+    }
     if (typeof params?.limit === 'number') search.set('limit', String(params.limit));
     if (typeof params?.offset === 'number') search.set('offset', String(params.offset));
     const suffix = search.toString();
@@ -560,6 +601,8 @@ export const api = {
       title: string;
       status: HomeworkAssignment['status'];
       sendMode: HomeworkAssignment['sendMode'];
+      lessonId: number | null;
+      templateId: number | null;
       deadlineAt: string | null;
       sentAt: string | null;
       contentSnapshot: HomeworkBlock[];
@@ -571,6 +614,33 @@ export const api = {
   ) =>
     apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}`, {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  remindHomeworkAssignmentV2: (assignmentId: number) =>
+    apiFetch<{ status: 'sent' | 'skipped' | 'failed'; assignment: HomeworkAssignment }>(
+      `/api/v2/homework/assignments/${assignmentId}/remind`,
+      { method: 'POST' },
+    ),
+  deleteHomeworkAssignmentV2: (assignmentId: number) =>
+    apiFetch<{ deletedId: number }>(`/api/v2/homework/assignments/${assignmentId}`, {
+      method: 'DELETE',
+    }),
+  bulkHomeworkAssignmentsV2: (payload: {
+    ids: number[];
+    action: 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+  }) =>
+    apiFetch<{
+      action: 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+      total: number;
+      successCount: number;
+      errorCount: number;
+      results: Array<{
+        id: number;
+        ok: boolean;
+        message?: string;
+      }>;
+    }>('/api/v2/homework/assignments/bulk', {
+      method: 'POST',
       body: JSON.stringify(payload),
     }),
   listHomeworkSubmissionsV2: (assignmentId: number) =>

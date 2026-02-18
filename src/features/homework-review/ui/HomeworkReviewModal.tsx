@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { HomeworkAssignment, HomeworkSubmission } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { Modal } from '../../../shared/ui/Modal/Modal';
@@ -45,6 +45,14 @@ export const HomeworkReviewModal: FC<HomeworkReviewModalProps> = ({
   const [teacherComment, setTeacherComment] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setAutoScore('');
+    setManualScore('');
+    setFinalScore('');
+    setTeacherComment('');
+    setError(null);
+  }, [assignment?.id, latestSubmission?.id, open]);
+
   const handleClose = () => {
     if (submitting) return;
     setError(null);
@@ -71,7 +79,6 @@ export const HomeworkReviewModal: FC<HomeworkReviewModalProps> = ({
       setError('Не удалось сохранить проверку');
       return;
     }
-    onClose();
   };
 
   if (!assignment) {

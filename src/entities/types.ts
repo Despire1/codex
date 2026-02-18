@@ -174,6 +174,7 @@ export type HomeworkAssignmentStatus =
   | 'OVERDUE';
 
 export type HomeworkSendMode = 'AUTO_AFTER_LESSON_DONE' | 'MANUAL';
+export type HomeworkAssignmentProblemFlag = 'OVERDUE' | 'RETURNED' | 'CONFIG_ERROR' | 'SUBMITTED';
 
 export interface HomeworkScore {
   autoScore?: number | null;
@@ -185,11 +186,18 @@ export interface HomeworkAssignment {
   id: number;
   teacherId: number;
   studentId: number;
+  studentName?: string | null;
+  studentUsername?: string | null;
   lessonId?: number | null;
+  lessonStartAt?: string | null;
   templateId?: number | null;
+  templateTitle?: string | null;
   legacyHomeworkId?: number | null;
   title: string;
   status: HomeworkAssignmentStatus;
+  isOverdue?: boolean;
+  hasConfigError?: boolean;
+  problemFlags?: HomeworkAssignmentProblemFlag[];
   sendMode: HomeworkSendMode;
   deadlineAt?: string | null;
   sentAt?: string | null;
@@ -376,4 +384,10 @@ export interface ActivityFeedItem {
 export interface ActivityFeedListResponse {
   items: ActivityFeedItem[];
   nextCursor: string | null;
+}
+
+export interface ActivityFeedUnreadStatus {
+  hasUnread: boolean;
+  latestOccurredAt: string | null;
+  seenAt: string | null;
 }

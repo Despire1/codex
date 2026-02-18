@@ -20,6 +20,9 @@ import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useDashboardState } from './model/useDashboardState';
 import { DashboardActivityFilters, useDashboardActivityFeed } from './model/useDashboardActivityFeed';
+import { useDashboardActivityUnread } from './model/useDashboardActivityUnread';
+import type { DashboardSummary } from '../../shared/api/client';
+import { MobileDashboard } from './components/mobile/MobileDashboard';
 
 interface DashboardSectionProps {
   lessons: Lesson[];
@@ -31,6 +34,8 @@ interface DashboardSectionProps {
   onOpenLesson: (lesson: Lesson) => void;
   onOpenLessonDay: (lesson: Lesson) => void;
   onOpenStudent: (studentId: number) => void;
+  onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
+  dashboardSummary: DashboardSummary | null;
 }
 
 const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
@@ -58,10 +63,22 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   onOpenLesson,
   onOpenLessonDay,
   onOpenStudent,
+  onOpenHomeworkAssign,
+  dashboardSummary,
 }) => {
   const timeZone = useTimeZone();
-  const { markLessonCompleted, togglePaid, remindLessonPayment } = useLessonActions();
+  const {
+    markLessonCompleted,
+    togglePaid,
+    remindLessonPayment,
+    openRescheduleModal,
+    startEditLesson,
+    requestDeleteLessonFromList,
+  } = useLessonActions();
   const { unpaidEntries, setWeekRange } = useDashboardState();
+  const isDashboardMobile = useIsMobile(1023);
+  const [isMobileActivityRequested, setIsMobileActivityRequested] = useState(false);
+  const activityFeedEnabled = !isDashboardMobile || isMobileActivityRequested;
   const {
     items: activityItems,
     loading: activityLoading,
@@ -71,14 +88,21 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
     setFilters: setActivityFilters,
     loadMore: loadMoreActivity,
     refresh: refreshActivity,
-  } = useDashboardActivityFeed(timeZone);
+  } = useDashboardActivityFeed(timeZone, {
+    pageSize: isDashboardMobile ? 10 : 20,
+    enabled: activityFeedEnabled,
+  });
+  const {
+    hasUnread: hasUnreadActivity,
+    refresh: refreshUnreadActivity,
+    markSeen: markActivityAsSeen,
+  } = useDashboardActivityUnread(isDashboardMobile);
   const now = new Date();
   const todayZoned = toZonedDate(now, timeZone);
   const hasSyncedActivityForLessonsRef = useRef(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
-  const isDashboardMobile = useIsMobile(1023);
   const showWeeklyCalendar = !isDashboardMobile;
   const lessonsActivitySignature = useMemo(
     () =>
@@ -188,10 +212,19 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
     async (lessonId: number, studentId?: number) => {
       const result = await remindLessonPayment(lessonId, studentId);
       void refreshActivity();
+      void refreshUnreadActivity();
       return result;
     },
-    [refreshActivity, remindLessonPayment],
+    [refreshActivity, refreshUnreadActivity, remindLessonPayment],
   );
+
+  const handleRequestMobileActivityFeed = useCallback(() => {
+    if (isMobileActivityRequested) {
+      void refreshActivity();
+      return;
+    }
+    setIsMobileActivityRequested(true);
+  }, [isMobileActivityRequested, refreshActivity]);
 
   const handleApplyActivityFilters = useCallback(
     (next: DashboardActivityFilters) => {
@@ -230,7 +263,46 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       return;
     }
     void refreshActivity();
-  }, [lessonsActivitySignature, refreshActivity]);
+    void refreshUnreadActivity();
+  }, [lessonsActivitySignature, refreshActivity, refreshUnreadActivity]);
+
+  if (isDashboardMobile) {
+    return (
+      <MobileDashboard
+        lessons={lessons}
+        linkedStudents={linkedStudents}
+        teacher={teacher}
+        unpaidEntries={unpaidEntries}
+        summary={dashboardSummary}
+        onAddStudent={onAddStudent}
+        onCreateLesson={onCreateLesson}
+        onOpenSchedule={onOpenSchedule}
+        onOpenLesson={onOpenLesson}
+        onOpenStudent={onOpenStudent}
+        onOpenHomeworkAssign={onOpenHomeworkAssign}
+        onTogglePaid={togglePaid}
+        onCompleteLesson={markLessonCompleted}
+        onRemindLessonPayment={handleRemindLessonPayment}
+        onRescheduleLesson={(lesson) => openRescheduleModal(lesson, { skipNavigation: true })}
+        onEditLesson={startEditLesson}
+        onDeleteLesson={requestDeleteLessonFromList}
+        hasUnreadActivity={hasUnreadActivity}
+        activityItems={activityItems}
+        activityLoading={activityLoading}
+        activityLoadingMore={activityLoadingMore}
+        activityHasMore={activityHasMore}
+        activityFilters={activityFilters}
+        activityStudents={activityStudents}
+        activityFeedRequested={isMobileActivityRequested}
+        onRequestActivityFeed={handleRequestMobileActivityFeed}
+        onRefreshActivity={refreshActivity}
+        onRefreshUnreadActivity={refreshUnreadActivity}
+        onMarkActivityAsSeen={markActivityAsSeen}
+        onLoadMoreActivity={loadMoreActivity}
+        onApplyActivityFilters={handleApplyActivityFilters}
+      />
+    );
+  }
 
   return (
     <section

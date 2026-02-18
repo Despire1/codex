@@ -16,6 +16,7 @@ interface DashboardHomeProps {
   onOpenLesson: (lesson: Lesson) => void;
   onOpenLessonDay: (lesson: Lesson) => void;
   onOpenStudent: (studentId: number) => void;
+  onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
   dashboardSummary: {
     summary: DashboardSummary | null;
     isLoading: boolean;
@@ -39,5 +40,5 @@ export const DashboardHome: FC<DashboardHomeProps> = ({ dashboardSummary, ...das
     return <OnboardingEmptyState onRefreshSummary={dashboardSummary.refresh} />;
   }
 
-  return <DashboardSection {...dashboardProps} />;
+  return <DashboardSection {...dashboardProps} dashboardSummary={dashboardSummary.summary} />;
 };

@@ -72,7 +72,7 @@
 
 @media (max-width: 720px) {
   .container {
-    top: 16px;
+    top: calc(var(--app-safe-top) + var(--app-safe-top-extra) + var(--app-safe-top-boost) + 16px);
     bottom: auto;
   }
 

@@ -1,0 +1,173 @@
+.root {
+  display: grid;
+  gap: 12px;
+  padding: 0 0 8px;
+  overflow-x: hidden;
+  touch-action: pan-y;
+}
+
+.unpaidCard {
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 10px 24px var(--shadow-slate-900-08);
+  display: grid;
+  gap: 10px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sectionAction {
+  border: none;
+  background: transparent;
+  color: var(--color-blue-600);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bottomSpacer {
+  height: 88px;
+}
+
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(76px + var(--app-safe-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-blue-600);
+  color: var(--color-white) !important;
+  -webkit-text-fill-color: var(--color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 30px var(--shadow-blue-600-30);
+  z-index: 33;
+}
+
+.fabPopover {
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  border-radius: 14px;
+  box-shadow: 0 16px 34px var(--shadow-slate-900-20);
+  padding: 8px;
+  min-width: 220px;
+  transform-origin: bottom right;
+  animation: fabPopoverIn 0.18s ease-out;
+}
+
+.fabPopoverActions {
+  display: grid;
+  gap: 6px;
+}
+
+.fabPopoverAction {
+  border: 1px solid var(--color-slate-200);
+  border-radius: 10px;
+  background: var(--color-slate-50);
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-700);
+}
+
+.unpaidSheet,
+.lessonSheet,
+.activitySheet {
+  max-height: 82vh;
+}
+
+.activitySheet {
+  max-height: 85vh;
+}
+
+.activitySheetContent {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.sheetActions {
+  display: grid;
+  gap: 8px;
+}
+
+.sheetAction {
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-slate-50);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-700);
+}
+
+.sheetActionDanger {
+  color: var(--color-red-600);
+  border-color: var(--color-red-500);
+  background: var(--color-red-50);
+}
+
+.sheetCancel {
+  border: none;
+  background: transparent;
+  min-height: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-500);
+}
+
+.lessonSheetContent {
+  display: grid;
+  gap: 12px;
+}
+
+.lessonSheetHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.lessonSheetTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.lessonSheetMeta {
+  font-size: 12px;
+  color: var(--color-slate-500);
+}
+
+@keyframes fabPopoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

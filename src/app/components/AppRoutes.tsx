@@ -26,6 +26,7 @@ interface AppRoutesProps {
     onOpenLesson: (lesson: Lesson) => void;
     onOpenLessonDay: (lesson: Lesson) => void;
     onOpenStudent: (studentId: number) => void;
+    onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
   };
   dashboardSummary: {
     summary: DashboardSummary | null;

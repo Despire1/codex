@@ -1,7 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { HomeworkAssignment, HomeworkSubmission, HomeworkTemplate } from '../../entities/types';
-import { TeacherAssignmentBucket } from '../../entities/homework-assignment/model/lib/assignmentBuckets';
+import { ActivityFeedItem, HomeworkAssignment, HomeworkSubmission, HomeworkTemplate } from '../../entities/types';
 import { api } from '../../shared/api/client';
 import { useToast } from '../../shared/lib/toast';
 import { StudentHomeworkDetailView, StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
@@ -13,15 +12,30 @@ import { TeacherHomeworksView } from './teacher/TeacherHomeworksView';
 import {
   StudentHomeworkFilter,
   StudentHomeworkSummary,
+  TeacherAssignModalRequest,
   TeacherAssignmentCreatePayload,
   TeacherAssignmentsSummary,
+  TeacherBulkAction,
+  TeacherHomeworkProblemFilter,
+  TeacherHomeworkSort,
   TeacherHomeworkStudentOption,
+  TeacherHomeworkTab,
   TeacherTemplateUpsertPayload,
 } from './types';
+import { toggleHomeworkTemplateFavoriteTags, isHomeworkTemplateFavorite } from './teacher/model/lib/templatePresentation';
 
 interface HomeworksSectionProps {
   mode: 'teacher' | 'student';
 }
+
+type HomeworksNavigationState = {
+  openAssignModal?: boolean;
+  studentId?: number | null;
+  lessonId?: number | null;
+};
+
+const TEACHER_PAGE_SIZE = 10;
+const STUDENT_PAGE_SIZE = 20;
 
 const emptySummary: StudentHomeworkSummary = {
   activeCount: 0,
@@ -38,6 +52,14 @@ const emptyTeacherSummary: TeacherAssignmentsSummary = {
   reviewCount: 0,
   reviewedCount: 0,
   overdueCount: 0,
+  inboxCount: 0,
+  scheduledCount: 0,
+  inProgressCount: 0,
+  closedCount: 0,
+  configErrorCount: 0,
+  returnedCount: 0,
+  reviewedThisMonthCount: 0,
+  sentTodayCount: 0,
 };
 
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
@@ -54,19 +76,31 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [students, setStudents] = useState<TeacherHomeworkStudentOption[]>([]);
   const [teacherSummary, setTeacherSummary] = useState<TeacherAssignmentsSummary>(emptyTeacherSummary);
   const [studentSummary, setStudentSummary] = useState<StudentHomeworkSummary>(emptySummary);
-  const [studentFilter, setStudentFilter] = useState<StudentHomeworkFilter>('active');
 
-  const [activeBucket, setActiveBucket] = useState<TeacherAssignmentBucket>('sent');
+  const [activeTab, setActiveTab] = useState<TeacherHomeworkTab>('inbox');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<TeacherHomeworkSort>('urgency');
+  const [problemFilters, setProblemFilters] = useState<TeacherHomeworkProblemFilter[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
-  const [deadlineFrom, setDeadlineFrom] = useState('');
-  const [deadlineTo, setDeadlineTo] = useState('');
-  const [showArchivedTemplates, setShowArchivedTemplates] = useState(false);
+
+  const [assignmentsNextOffset, setAssignmentsNextOffset] = useState<number | null>(null);
+  const [hasMoreAssignments, setHasMoreAssignments] = useState(false);
+
+  const [studentFilter, setStudentFilter] = useState<StudentHomeworkFilter>('active');
+  const [studentNextOffset, setStudentNextOffset] = useState<number | null>(null);
+  const [studentHasMore, setStudentHasMore] = useState(false);
+
+  const [assignModalRequest, setAssignModalRequest] = useState<TeacherAssignModalRequest | null>(null);
 
   const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [loadingMoreAssignments, setLoadingMoreAssignments] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
+
   const [loadingStudentList, setLoadingStudentList] = useState(false);
+  const [loadingStudentListMore, setLoadingStudentListMore] = useState(false);
 
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -80,6 +114,16 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [reviewSubmissions, setReviewSubmissions] = useState<HomeworkSubmission[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewQueueActive, setReviewQueueActive] = useState(false);
+
+  const [detailAssignment, setDetailAssignment] = useState<HomeworkAssignment | null>(null);
+  const [detailSubmissions, setDetailSubmissions] = useState<HomeworkSubmission[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const [homeworkActivityItems, setHomeworkActivityItems] = useState<ActivityFeedItem[]>([]);
+  const [homeworkActivityLoading, setHomeworkActivityLoading] = useState(false);
+  const [homeworkActivityHasUnread, setHomeworkActivityHasUnread] = useState(false);
+
   const [createTemplateDraft, setCreateTemplateDraft] = useState<HomeworkTemplateEditorDraft>(
     createInitialTemplateEditorDraft(),
   );
@@ -90,10 +134,40 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [studentDetailSubmitting, setStudentDetailSubmitting] = useState(false);
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
 
+  const [teacherInitialized, setTeacherInitialized] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
   useEffect(() => {
     if (!isTeacherTemplateCreateRoute) return;
     setCreateTemplateDraft(createInitialTemplateEditorDraft());
   }, [isTeacherTemplateCreateRoute]);
+
+  useEffect(() => {
+    if (mode !== 'teacher') return;
+    const state = (location.state ?? null) as HomeworksNavigationState | null;
+    if (!state || !state.openAssignModal) return;
+    const requestedStudentId =
+      typeof state.studentId === 'number' && Number.isFinite(state.studentId) ? state.studentId : null;
+    const requestedLessonId =
+      typeof state.lessonId === 'number' && Number.isFinite(state.lessonId) ? state.lessonId : null;
+
+    if (requestedStudentId !== null) {
+      setSelectedStudentId(requestedStudentId);
+    }
+    setAssignModalRequest({
+      requestId: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      open: true,
+      studentId: requestedStudentId,
+      lessonId: requestedLessonId,
+    });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, mode, navigate]);
 
   const loadTeacherStudents = useCallback(async () => {
     setLoadingStudents(true);
@@ -128,7 +202,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     setLoadingTemplates(true);
     setTemplatesError(null);
     try {
-      const response = await api.listHomeworkTemplatesV2({ includeArchived: showArchivedTemplates });
+      const response = await api.listHomeworkTemplatesV2({ includeArchived: true });
       setTemplates(response.items);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -137,56 +211,13 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     } finally {
       setLoadingTemplates(false);
     }
-  }, [showArchivedTemplates]);
+  }, []);
 
-  const loadTeacherAssignments = useCallback(async (
-    options?: {
-      bucket?: TeacherAssignmentBucket;
-      studentId?: number | null;
-      deadlineFrom?: string;
-      deadlineTo?: string;
-    },
-  ) => {
-    const targetBucket = options?.bucket ?? activeBucket;
-    const targetStudentId = options?.studentId ?? selectedStudentId;
-    const targetDeadlineFrom = options?.deadlineFrom ?? deadlineFrom;
-    const targetDeadlineTo = options?.deadlineTo ?? deadlineTo;
-    setLoadingAssignments(true);
-    setAssignmentsError(null);
-    try {
-      const response = await api.listHomeworkAssignmentsV2({
-        bucket: targetBucket,
-        studentId: targetStudentId ?? undefined,
-        limit: 100,
-        offset: 0,
-      });
-
-      const deadlineFromDate = targetDeadlineFrom ? new Date(`${targetDeadlineFrom}T00:00:00`) : null;
-      const deadlineToDate = targetDeadlineTo ? new Date(`${targetDeadlineTo}T23:59:59`) : null;
-      const filteredItems = response.items.filter((item) => {
-        if (!item.deadlineAt) return !deadlineFromDate && !deadlineToDate;
-        const deadlineDate = new Date(item.deadlineAt);
-        if (Number.isNaN(deadlineDate.getTime())) return false;
-        if (deadlineFromDate && deadlineDate < deadlineFromDate) return false;
-        if (deadlineToDate && deadlineDate > deadlineToDate) return false;
-        return true;
-      });
-      setAssignments(filteredItems);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to load homework assignments', error);
-      setAssignmentsError('Не удалось загрузить выданные домашки');
-    } finally {
-      setLoadingAssignments(false);
-    }
-  }, [activeBucket, deadlineFrom, deadlineTo, selectedStudentId]);
-
-  const loadTeacherSummary = useCallback(async (options?: { studentId?: number | null }) => {
-    const targetStudentId = options?.studentId ?? selectedStudentId;
+  const loadTeacherSummary = useCallback(async (studentId = selectedStudentId) => {
     setLoadingSummary(true);
     setSummaryError(null);
     try {
-      const response = await api.getHomeworkAssignmentsSummaryV2({ studentId: targetStudentId ?? undefined });
+      const response = await api.getHomeworkAssignmentsSummaryV2({ studentId: studentId ?? undefined });
       setTeacherSummary(response);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -197,29 +228,141 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }
   }, [selectedStudentId]);
 
-  const loadTeacherData = useCallback(async () => {
-    const jobs = [loadTeacherStudents(), loadTeacherTemplates(), loadTeacherAssignments(), loadTeacherSummary()];
-    await Promise.allSettled(jobs);
-  }, [loadTeacherAssignments, loadTeacherStudents, loadTeacherSummary, loadTeacherTemplates]);
+  const fetchTeacherAssignments = useCallback(async (options: {
+    offset: number;
+    append: boolean;
+    tab?: TeacherHomeworkTab;
+    studentId?: number | null;
+    search?: string;
+    sort?: TeacherHomeworkSort;
+    problemFilters?: TeacherHomeworkProblemFilter[];
+  }) => {
+    if (options.append) {
+      setLoadingMoreAssignments(true);
+    } else {
+      setLoadingAssignments(true);
+    }
+    setAssignmentsError(null);
 
-  const loadStudentList = useCallback(async () => {
-    setLoadingStudentList(true);
+    const targetTab = options.tab ?? activeTab;
+    const targetStudentId = options.studentId ?? selectedStudentId;
+    const targetSearch = options.search ?? debouncedSearchQuery;
+    const targetSort = options.sort ?? sortBy;
+    const targetProblemFilters = options.problemFilters ?? problemFilters;
+
     try {
-      const [summaryData, assignmentsData] = await Promise.all([
-        api.getStudentHomeworkSummaryV2(),
-        api.listStudentHomeworkAssignmentsV2({ filter: studentFilter, limit: 100, offset: 0 }),
-      ]);
-      setStudentSummary(summaryData);
-      setAssignments(assignmentsData.items);
+      const response = await api.listHomeworkAssignmentsV2({
+        tab: targetTab,
+        studentId: targetStudentId ?? undefined,
+        q: targetSearch || undefined,
+        sort: targetSort,
+        problemFilters: targetProblemFilters,
+        limit: TEACHER_PAGE_SIZE,
+        offset: options.offset,
+      });
+
+      setAssignments((prev) => (options.append ? [...prev, ...response.items] : response.items));
+      setAssignmentsNextOffset(response.nextOffset);
+      setHasMoreAssignments(response.nextOffset !== null);
+
+      return response.items;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load homework assignments', error);
+      setAssignmentsError('Не удалось загрузить выданные домашки');
+      if (!options.append) {
+        setAssignments([]);
+        setAssignmentsNextOffset(null);
+        setHasMoreAssignments(false);
+      }
+      return [] as HomeworkAssignment[];
+    } finally {
+      if (options.append) {
+        setLoadingMoreAssignments(false);
+      } else {
+        setLoadingAssignments(false);
+      }
+    }
+  }, [activeTab, debouncedSearchQuery, problemFilters, selectedStudentId, sortBy]);
+
+  const loadTeacherActivityUnread = useCallback(async () => {
+    try {
+      const unread = await api.getActivityFeedUnreadStatus();
+      setHomeworkActivityHasUnread(unread.hasUnread);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load homework unread status', error);
+      setHomeworkActivityHasUnread(false);
+    }
+  }, []);
+
+  const loadTeacherActivityFeed = useCallback(async () => {
+    setHomeworkActivityLoading(true);
+    try {
+      const response = await api.listActivityFeed({
+        categories: ['HOMEWORK'],
+        limit: 20,
+      });
+      setHomeworkActivityItems(response.items);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load homework activity feed', error);
+      setHomeworkActivityItems([]);
+    } finally {
+      setHomeworkActivityLoading(false);
+    }
+  }, []);
+
+  const markTeacherActivitySeen = useCallback(async (seenThrough?: string) => {
+    try {
+      const status = await api.markActivityFeedSeen(seenThrough ? { seenThrough } : undefined);
+      setHomeworkActivityHasUnread(status.hasUnread);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to mark homework activity feed as seen', error);
+    }
+  }, []);
+
+  const loadStudentList = useCallback(async (options?: { append?: boolean }) => {
+    const append = options?.append ?? false;
+    const targetOffset = append ? (studentNextOffset ?? 0) : 0;
+
+    if (append) {
+      setLoadingStudentListMore(true);
+    } else {
+      setLoadingStudentList(true);
+    }
+
+    try {
+      if (!append) {
+        const summaryData = await api.getStudentHomeworkSummaryV2();
+        setStudentSummary(summaryData);
+      }
+      const assignmentsData = await api.listStudentHomeworkAssignmentsV2({
+        filter: studentFilter,
+        limit: STUDENT_PAGE_SIZE,
+        offset: targetOffset,
+      });
+      setAssignments((prev) => (append ? [...prev, ...assignmentsData.items] : assignmentsData.items));
+      setStudentNextOffset(assignmentsData.nextOffset);
+      setStudentHasMore(assignmentsData.nextOffset !== null);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to load student homework list', error);
-      setStudentSummary(emptySummary);
-      setAssignments([]);
+      if (!append) {
+        setStudentSummary(emptySummary);
+        setAssignments([]);
+      }
+      setStudentNextOffset(null);
+      setStudentHasMore(false);
     } finally {
-      setLoadingStudentList(false);
+      if (append) {
+        setLoadingStudentListMore(false);
+      } else {
+        setLoadingStudentList(false);
+      }
     }
-  }, [studentFilter]);
+  }, [studentFilter, studentNextOffset]);
 
   const loadStudentDetail = useCallback(async () => {
     if (!hasStudentAssignmentId) return;
@@ -241,16 +384,67 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   }, [assignmentId, hasStudentAssignmentId]);
 
   useEffect(() => {
-    if (mode === 'teacher') {
-      void loadTeacherData();
+    if (mode !== 'teacher') {
+      setTeacherInitialized(false);
       return;
     }
+    if (isTeacherTemplateCreateRoute) return;
+    if (teacherInitialized) return;
+
+    let isMounted = true;
+    void Promise.allSettled([
+      loadTeacherStudents(),
+      loadTeacherTemplates(),
+      loadTeacherSummary(),
+      fetchTeacherAssignments({ offset: 0, append: false }),
+      loadTeacherActivityUnread(),
+    ]).then(() => {
+      if (!isMounted) return;
+      setTeacherInitialized(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    fetchTeacherAssignments,
+    isTeacherTemplateCreateRoute,
+    loadTeacherActivityUnread,
+    loadTeacherStudents,
+    loadTeacherSummary,
+    loadTeacherTemplates,
+    mode,
+    teacherInitialized,
+  ]);
+
+  useEffect(() => {
+    if (mode !== 'teacher' || !teacherInitialized || isTeacherTemplateCreateRoute) return;
+    void fetchTeacherAssignments({ offset: 0, append: false });
+  }, [
+    activeTab,
+    debouncedSearchQuery,
+    fetchTeacherAssignments,
+    isTeacherTemplateCreateRoute,
+    mode,
+    problemFilters,
+    selectedStudentId,
+    sortBy,
+    teacherInitialized,
+  ]);
+
+  useEffect(() => {
+    if (mode !== 'teacher' || !teacherInitialized || isTeacherTemplateCreateRoute) return;
+    void loadTeacherSummary();
+  }, [isTeacherTemplateCreateRoute, loadTeacherSummary, mode, selectedStudentId, teacherInitialized]);
+
+  useEffect(() => {
+    if (mode === 'teacher') return;
     if (hasStudentAssignmentId) {
       void loadStudentDetail();
       return;
     }
-    void loadStudentList();
-  }, [hasStudentAssignmentId, loadStudentDetail, loadStudentList, loadTeacherData, mode]);
+    void loadStudentList({ append: false });
+  }, [hasStudentAssignmentId, loadStudentDetail, loadStudentList, mode, studentFilter]);
 
   const handleCreateTemplate = useCallback(
     async (payload: TeacherTemplateUpsertPayload) => {
@@ -343,18 +537,33 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       setSubmittingTemplate(true);
       try {
         await api.updateHomeworkTemplateV2(template.id, { isArchived: true });
-        showToast({ message: 'Шаблон удалён из активных', variant: 'success' });
+        showToast({ message: 'Шаблон перенесён в архив', variant: 'success' });
         await loadTeacherTemplates();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to archive homework template', error);
-        showToast({ message: 'Не удалось удалить шаблон', variant: 'error' });
+        showToast({ message: 'Не удалось архивировать шаблон', variant: 'error' });
       } finally {
         setSubmittingTemplate(false);
       }
     },
     [loadTeacherTemplates, showToast],
   );
+
+  const handleToggleTemplateFavorite = useCallback(async (template: HomeworkTemplate) => {
+    setSubmittingTemplate(true);
+    try {
+      const nextTags = toggleHomeworkTemplateFavoriteTags(template.tags, !isHomeworkTemplateFavorite(template));
+      await api.updateHomeworkTemplateV2(template.id, { tags: nextTags });
+      await loadTeacherTemplates();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle template favorite', error);
+      showToast({ message: 'Не удалось обновить избранное', variant: 'error' });
+    } finally {
+      setSubmittingTemplate(false);
+    }
+  }, [loadTeacherTemplates, showToast]);
 
   const handleCreateTemplateFromScreen = useCallback(async () => {
     const payload: TeacherTemplateUpsertPayload = {
@@ -378,35 +587,42 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       }
 
       const status = payload.sendNow ? 'SENT' : payload.sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
-      const targetBucket: TeacherAssignmentBucket = payload.sendNow ? 'sent' : 'draft';
+      const targetTab: TeacherHomeworkTab = payload.sendNow
+        ? 'in_progress'
+        : payload.sendMode === 'AUTO_AFTER_LESSON_DONE'
+          ? 'scheduled'
+          : 'draft';
       const targetStudentId = payload.studentId;
+
       setSubmittingAssignment(true);
       try {
         await api.createHomeworkAssignmentV2({
           studentId: payload.studentId,
+          lessonId: payload.lessonId ?? undefined,
           templateId: payload.templateId ?? undefined,
           title: payload.title?.trim() || undefined,
           sendMode: payload.sendMode,
           status,
           deadlineAt: payload.deadlineAt,
         });
+
         showToast({
           message: payload.sendNow ? 'Домашка выдана ученику' : 'Домашка сохранена',
           variant: 'success',
         });
-        setActiveBucket(targetBucket);
+
+        setActiveTab(targetTab);
         setSelectedStudentId(targetStudentId);
-        setDeadlineFrom('');
-        setDeadlineTo('');
         await Promise.all([
-          loadTeacherAssignments({
-            bucket: targetBucket,
+          fetchTeacherAssignments({
+            offset: 0,
+            append: false,
+            tab: targetTab,
             studentId: targetStudentId,
-            deadlineFrom: '',
-            deadlineTo: '',
           }),
-          loadTeacherSummary({ studentId: targetStudentId }),
+          loadTeacherSummary(targetStudentId),
         ]);
+
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -417,7 +633,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         setSubmittingAssignment(false);
       }
     },
-    [loadTeacherAssignments, loadTeacherSummary, showToast],
+    [fetchTeacherAssignments, loadTeacherSummary, showToast],
   );
 
   const handleSendAssignmentNow = useCallback(
@@ -428,30 +644,132 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           sentAt: new Date().toISOString(),
         });
         showToast({ message: 'Домашка отправлена ученику', variant: 'success' });
-        setActiveBucket('sent');
-        await Promise.all([loadTeacherAssignments({ bucket: 'sent' }), loadTeacherSummary()]);
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to send assignment now', error);
         showToast({ message: 'Не удалось отправить домашку', variant: 'error' });
       }
     },
-    [loadTeacherAssignments, loadTeacherSummary, showToast],
+    [fetchTeacherAssignments, loadTeacherSummary, showToast],
   );
 
-  const handleOpenReview = useCallback(async (assignment: HomeworkAssignment) => {
-    setReviewAssignment(assignment);
-    setReviewLoading(true);
+  const handleRemindAssignment = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      try {
+        const response = await api.remindHomeworkAssignmentV2(assignment.id);
+        if (response.status === 'sent') {
+          showToast({ message: 'Напоминание отправлено', variant: 'success' });
+        } else {
+          showToast({ message: 'Напоминание не отправлено (нет канала)', variant: 'error' });
+        }
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherActivityUnread()]);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to remind assignment', error);
+        showToast({ message: 'Не удалось отправить напоминание', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherActivityUnread, showToast],
+  );
+
+  const handleDeleteAssignment = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      try {
+        await api.deleteHomeworkAssignmentV2(assignment.id);
+        showToast({ message: 'Домашка удалена', variant: 'success' });
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to delete assignment', error);
+        showToast({ message: 'Не удалось удалить домашку', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+  );
+
+  const handleFixConfigError = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      try {
+        await api.updateHomeworkAssignmentV2(assignment.id, {
+          sendMode: 'MANUAL',
+        });
+        showToast({ message: 'Ошибка настройки исправлена', variant: 'success' });
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to fix assignment config', error);
+        showToast({ message: 'Не удалось исправить конфигурацию', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+  );
+
+  const handleBulkAction = useCallback(
+    async ({ action, ids }: { action: TeacherBulkAction; ids: number[] }) => {
+      if (!ids.length) return;
+      try {
+        const response = await api.bulkHomeworkAssignmentsV2({ action, ids });
+        if (response.errorCount > 0) {
+          showToast({
+            message: `Готово частично: ${response.successCount}/${response.total}`,
+            variant: 'error',
+          });
+        } else {
+          showToast({
+            message: `Массовое действие выполнено: ${response.successCount}`,
+            variant: 'success',
+          });
+        }
+        await Promise.all([
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+          loadTeacherActivityUnread(),
+        ]);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to run bulk action', error);
+        showToast({ message: 'Не удалось выполнить массовое действие', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherActivityUnread, loadTeacherSummary, showToast],
+  );
+
+  const handleOpenReview = useCallback(
+    async (assignment: HomeworkAssignment, options?: { preserveQueue?: boolean }) => {
+      if (!options?.preserveQueue) {
+        setReviewQueueActive(false);
+      }
+      setReviewAssignment(assignment);
+      setReviewLoading(true);
+      try {
+        const response = await api.listHomeworkSubmissionsV2(assignment.id);
+        setReviewSubmissions(response.items);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load submissions for review', error);
+        showToast({ message: 'Не удалось загрузить попытки', variant: 'error' });
+        setReviewSubmissions([]);
+      } finally {
+        setReviewLoading(false);
+      }
+    },
+    [showToast],
+  );
+
+  const handleOpenDetail = useCallback(async (assignment: HomeworkAssignment) => {
+    setDetailAssignment(assignment);
+    setDetailLoading(true);
     try {
       const response = await api.listHomeworkSubmissionsV2(assignment.id);
-      setReviewSubmissions(response.items);
+      setDetailSubmissions(response.items);
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error('Failed to load submissions for review', error);
-      showToast({ message: 'Не удалось загрузить попытки', variant: 'error' });
-      setReviewSubmissions([]);
+      console.error('Failed to load submissions for detail', error);
+      setDetailSubmissions([]);
+      showToast({ message: 'Не удалось загрузить детали', variant: 'error' });
     } finally {
-      setReviewLoading(false);
+      setDetailLoading(false);
     }
   }, [showToast]);
 
@@ -472,9 +790,32 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           message: payload.action === 'REVIEWED' ? 'Домашка проверена' : 'Домашка возвращена на доработку',
           variant: 'success',
         });
-        setReviewAssignment(null);
-        setReviewSubmissions([]);
-        await Promise.all([loadTeacherAssignments(), loadTeacherSummary()]);
+        if (reviewQueueActive) {
+          setActiveTab('review');
+          const nextQueueItems = await fetchTeacherAssignments({
+            offset: 0,
+            append: false,
+            tab: 'review',
+          });
+          await Promise.all([loadTeacherSummary(), loadTeacherActivityUnread()]);
+          const nextAssignment = nextQueueItems[0];
+          if (nextAssignment) {
+            await handleOpenReview(nextAssignment, { preserveQueue: true });
+          } else {
+            setReviewQueueActive(false);
+            setReviewAssignment(null);
+            setReviewSubmissions([]);
+            showToast({ message: 'Очередь на проверку завершена', variant: 'success' });
+          }
+        } else {
+          setReviewAssignment(null);
+          setReviewSubmissions([]);
+          await Promise.all([
+            fetchTeacherAssignments({ offset: 0, append: false }),
+            loadTeacherSummary(),
+            loadTeacherActivityUnread(),
+          ]);
+        }
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -485,8 +826,32 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         setReviewSubmitting(false);
       }
     },
-    [loadTeacherAssignments, loadTeacherSummary, reviewAssignment, showToast],
+    [
+      fetchTeacherAssignments,
+      handleOpenReview,
+      loadTeacherActivityUnread,
+      loadTeacherSummary,
+      reviewAssignment,
+      reviewQueueActive,
+      showToast,
+    ],
   );
+
+  const handleStartReviewQueue = useCallback(async () => {
+    setReviewQueueActive(true);
+    setActiveTab('review');
+    const items = await fetchTeacherAssignments({
+      offset: 0,
+      append: false,
+      tab: 'review',
+    });
+    if (!items.length) {
+      setReviewQueueActive(false);
+      showToast({ message: 'В очереди на проверку сейчас пусто', variant: 'error' });
+      return;
+    }
+    await handleOpenReview(items[0], { preserveQueue: true });
+  }, [fetchTeacherAssignments, handleOpenReview, showToast]);
 
   const handleStudentDetailSubmit = useCallback(
     async (payload: StudentHomeworkSubmitPayload) => {
@@ -496,7 +861,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       try {
         await api.createHomeworkSubmissionV2(studentDetailAssignment.id, payload);
         await loadStudentDetail();
-        await loadStudentList();
+        await loadStudentList({ append: false });
         showToast({
           message: payload.submit ? 'Домашка отправлена' : 'Черновик сохранён',
           variant: 'success',
@@ -521,12 +886,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         templates={templates}
         students={students}
         summary={teacherSummary}
-        activeBucket={activeBucket}
+        activeTab={activeTab}
+        searchQuery={searchQuery}
+        sortBy={sortBy}
+        problemFilters={problemFilters}
         selectedStudentId={selectedStudentId}
-        deadlineFrom={deadlineFrom}
-        deadlineTo={deadlineTo}
-        showArchivedTemplates={showArchivedTemplates}
         loadingAssignments={loadingAssignments}
+        loadingMoreAssignments={loadingMoreAssignments}
+        hasMoreAssignments={hasMoreAssignments}
         loadingTemplates={loadingTemplates}
         loadingSummary={loadingSummary}
         loadingStudents={loadingStudents}
@@ -540,55 +907,123 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         reviewSubmissions={reviewSubmissions}
         reviewLoading={reviewLoading}
         reviewSubmitting={reviewSubmitting}
-        onBucketChange={setActiveBucket}
+        detailAssignment={detailAssignment}
+        detailSubmissions={detailSubmissions}
+        detailLoading={detailLoading}
+        assignModalRequest={assignModalRequest}
+        homeworkActivityItems={homeworkActivityItems}
+        homeworkActivityLoading={homeworkActivityLoading}
+        homeworkActivityHasUnread={homeworkActivityHasUnread}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          if (tab !== 'review') {
+            setReviewQueueActive(false);
+          }
+        }}
+        onSearchChange={setSearchQuery}
+        onSortChange={setSortBy}
+        onToggleProblemFilter={(filter) =>
+          setProblemFilters((prev) =>
+            prev.includes(filter) ? prev.filter((item) => item !== filter) : [...prev, filter],
+          )
+        }
         onSelectedStudentIdChange={setSelectedStudentId}
-        onDeadlineFromChange={setDeadlineFrom}
-        onDeadlineToChange={setDeadlineTo}
-        onShowArchivedTemplatesChange={setShowArchivedTemplates}
         onOpenCreateTemplateScreen={() => navigate('/homeworks/templates/new')}
         onUpdateTemplate={handleUpdateTemplate}
         onDuplicateTemplate={handleDuplicateTemplate}
         onArchiveTemplate={handleArchiveTemplate}
+        onToggleTemplateFavorite={handleToggleTemplateFavorite}
         onCreateAssignment={handleCreateAssignment}
         onSendAssignmentNow={handleSendAssignmentNow}
+        onRemindAssignment={handleRemindAssignment}
+        onDeleteAssignment={handleDeleteAssignment}
+        onFixConfigError={handleFixConfigError}
+        onBulkAction={handleBulkAction}
         onOpenReview={(assignment) => {
           void handleOpenReview(assignment);
         }}
         onCloseReview={() => {
+          setReviewQueueActive(false);
           setReviewAssignment(null);
           setReviewSubmissions([]);
         }}
+        onStartReviewQueue={() => {
+          void handleStartReviewQueue();
+        }}
+        onOpenDetail={(assignment) => {
+          void handleOpenDetail(assignment);
+        }}
+        onCloseDetail={() => {
+          setDetailAssignment(null);
+          setDetailSubmissions([]);
+        }}
+        onLoadMoreAssignments={() => {
+          if (assignmentsNextOffset === null) return;
+          void fetchTeacherAssignments({ offset: assignmentsNextOffset, append: true });
+        }}
+        onConsumeAssignModalRequest={() => setAssignModalRequest(null)}
         onSubmitReview={handleSubmitReview}
         onRefresh={() => {
-          void loadTeacherData();
+          void Promise.all([
+            fetchTeacherAssignments({ offset: 0, append: false }),
+            loadTeacherSummary(),
+            loadTeacherTemplates(),
+            loadTeacherStudents(),
+          ]);
         }}
+        onLoadHomeworkActivity={() => {
+          void loadTeacherActivityFeed();
+        }}
+        onMarkHomeworkActivitySeen={markTeacherActivitySeen}
       />
     ),
     [
-      activeBucket,
+      activeTab,
       assignments,
       assignmentsError,
-      deadlineFrom,
-      deadlineTo,
+      assignmentsNextOffset,
+      assignModalRequest,
+      detailAssignment,
+      detailLoading,
+      detailSubmissions,
+      fetchTeacherAssignments,
       handleArchiveTemplate,
+      handleBulkAction,
       handleCreateAssignment,
+      handleDeleteAssignment,
       handleDuplicateTemplate,
+      handleFixConfigError,
+      handleOpenDetail,
       handleOpenReview,
+      handleRemindAssignment,
       handleSendAssignmentNow,
+      handleStartReviewQueue,
       handleSubmitReview,
+      handleToggleTemplateFavorite,
       handleUpdateTemplate,
-      loadTeacherData,
+      hasMoreAssignments,
+      homeworkActivityHasUnread,
+      homeworkActivityItems,
+      homeworkActivityLoading,
+      loadTeacherActivityFeed,
+      loadTeacherStudents,
+      loadTeacherSummary,
+      loadTeacherTemplates,
       loadingAssignments,
+      loadingMoreAssignments,
       loadingStudents,
       loadingSummary,
       loadingTemplates,
+      markTeacherActivitySeen,
       navigate,
+      problemFilters,
       reviewAssignment,
       reviewLoading,
       reviewSubmissions,
       reviewSubmitting,
+      searchQuery,
       selectedStudentId,
-      showArchivedTemplates,
+      sortBy,
       students,
       studentsError,
       submittingAssignment,
@@ -638,9 +1073,18 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       summary={studentSummary}
       filter={studentFilter}
       loading={loadingStudentList}
-      onFilterChange={setStudentFilter}
+      loadingMore={loadingStudentListMore}
+      hasMore={studentHasMore}
+      onFilterChange={(next) => {
+        setStudentFilter(next);
+        setStudentNextOffset(null);
+      }}
       onRefresh={() => {
-        void loadStudentList();
+        void loadStudentList({ append: false });
+      }}
+      onLoadMore={() => {
+        if (studentNextOffset === null) return;
+        void loadStudentList({ append: true });
       }}
       onOpenAssignment={(assignment) => navigate(`/homeworks/${assignment.id}`)}
     />

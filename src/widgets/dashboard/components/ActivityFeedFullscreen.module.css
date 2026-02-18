@@ -45,6 +45,13 @@
   max-height: none;
 }
 
+.loadingMoreState {
+  color: var(--color-slate-500);
+  font-size: 13px;
+  text-align: center;
+  padding: 4px 0 10px;
+}
+
 .loadMoreButton {
   align-self: stretch;
   width: 100%;

@@ -4,4 +4,19 @@
   z-index: 1200;
   overflow: hidden;
   border-radius: 14px;
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  will-change: opacity, transform;
+}
+
+.popoverOpen {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.popoverClosing {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  pointer-events: none;
 }

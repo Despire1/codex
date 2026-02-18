@@ -27,6 +27,7 @@ declare module '@prisma/client' {
     notifyTeacherOnManualPaymentReminder: boolean;
     payments: Payment[];
     activityEvents: ActivityEvent[];
+    activityFeedSeenAt: Date | null;
     createdAt: Date;
   };
 

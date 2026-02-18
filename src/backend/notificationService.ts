@@ -445,11 +445,7 @@ export const sendStudentLessonReminderManual = async ({
   if (!lesson || lesson.studentId !== studentId) {
     return { status: 'skipped' as const, reason: 'lesson_not_found' as const };
   }
-  const teacher = await prisma.teacher.findUnique({ where: { chatId: lesson.teacherId } });
   const student = await prisma.student.findUnique({ where: { id: studentId } });
-  if (!teacher?.studentNotificationsEnabled) {
-    return { status: 'skipped' as const, reason: 'notifications_disabled' as const };
-  }
   if (!student) {
     return { status: 'skipped' as const, reason: 'student_not_found' as const };
   }

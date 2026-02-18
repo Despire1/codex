@@ -48,6 +48,7 @@ model Teacher {
   lessons               Lesson[]
   notificationLogs      NotificationLog[]
   activityEvents        ActivityEvent[]
+  activityFeedSeenAt    DateTime?
   createdAt             DateTime        @default(now())
   authUser              TeacherAuth?
 }

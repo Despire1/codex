@@ -181,11 +181,14 @@ export const OnboardingEmptyState: FC<OnboardingEmptyStateProps> = ({ onRefreshS
       setReminderOpen(false);
     } catch (error) {
       const code = parseErrorCode(error);
-      if (code === 'student_not_activated' || code === 'notifications_disabled') {
+      if (code === 'student_not_activated') {
         showToast({ message: 'Подключи Telegram, чтобы отправлять напоминания', variant: 'error' });
         trackEvent('telegram_connect_error', { userId: onboarding.teacherId, device, source: reminderSource });
         setReminderOpen(false);
         setConnectOpen(true);
+      } else if (code === 'notifications_disabled') {
+        showToast({ message: 'Включите уведомления ученикам в настройках', variant: 'error' });
+        setReminderOpen(false);
       } else {
         showToast({ message: 'Не удалось отправить напоминание', variant: 'error' });
       }

@@ -28,8 +28,11 @@ export const StudentHomeworksView: FC<StudentHomeworksViewModel> = ({
   summary,
   filter,
   loading,
+  loadingMore,
+  hasMore,
   onFilterChange,
   onRefresh,
+  onLoadMore,
   onOpenAssignment,
 }) => {
   return (
@@ -90,10 +93,19 @@ export const StudentHomeworksView: FC<StudentHomeworksViewModel> = ({
                 ) : null}
               </button>
             ))}
+            {hasMore ? (
+              <button
+                type="button"
+                className={controls.secondaryButton}
+                onClick={onLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Загрузка…' : 'Показать еще'}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
     </section>
   );
 };
-

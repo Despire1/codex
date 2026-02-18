@@ -326,6 +326,12 @@ const composeFallbackMessage = (item: ActivityFeedItem, lessonContext: string | 
   return withStudentContext;
 };
 
+const normalizeStudentDetails = (details: string) =>
+  details
+    .replace(/\busername\s*:/gi, 'Telegram:')
+    .replace(/\bpricePerLesson\s*:/gi, 'Цена занятия:')
+    .replace(/\bprice\s*per\s*lesson\s*:/gi, 'Цена занятия:');
+
 export const buildActivityTimelinePresentation = (
   item: ActivityFeedItem,
   timeZone: string,
@@ -351,14 +357,15 @@ export const buildActivityTimelinePresentation = (
         : 'success';
 
   const lessonDetails = item.category === 'LESSON' ? composeLessonDetails(item, timeZone) : null;
+  const baseDetails =
+    item.status === 'FAILED'
+      ? resolveFailureDetails(item)
+      : (lessonDetails ?? item.details?.trim() ?? null);
 
   return {
     timeLabel: resolveTimeLabel(item.occurredAt, timeZone),
     message,
-    details:
-      item.status === 'FAILED'
-        ? resolveFailureDetails(item)
-        : (lessonDetails ?? item.details?.trim() ?? null),
+    details: baseDetails && item.category === 'STUDENT' ? normalizeStudentDetails(baseDetails) : baseDetails,
     tone,
   };
 };

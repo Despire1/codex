@@ -1,6 +1,16 @@
-import { HomeworkAssignment, HomeworkBlock, HomeworkSubmission, HomeworkTemplate } from '../../entities/types';
-import { TeacherAssignmentBucket } from '../../entities/homework-assignment/model/lib/assignmentBuckets';
-import { HomeworkAssignmentsSummary } from '../../shared/api/client';
+import {
+  ActivityFeedItem,
+  HomeworkAssignment,
+  HomeworkBlock,
+  HomeworkSubmission,
+  HomeworkTemplate,
+} from '../../entities/types';
+import {
+  HomeworkAssignmentProblemFilter,
+  HomeworkAssignmentsSort,
+  HomeworkAssignmentsSummary,
+  HomeworkAssignmentsTab,
+} from '../../shared/api/client';
 import { StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 
 export type StudentHomeworkFilter = 'active' | 'overdue' | 'submitted' | 'reviewed';
@@ -28,6 +38,7 @@ export type TeacherTemplateUpsertPayload = {
 
 export type TeacherAssignmentCreatePayload = {
   studentId: number;
+  lessonId?: number | null;
   templateId?: number | null;
   title?: string;
   sendMode: HomeworkAssignment['sendMode'];
@@ -35,19 +46,33 @@ export type TeacherAssignmentCreatePayload = {
   deadlineAt: string | null;
 };
 
+export type TeacherAssignModalRequest = {
+  requestId: string;
+  open: boolean;
+  studentId: number | null;
+  lessonId: number | null;
+};
+
+export type TeacherBulkAction = 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+
 export type TeacherAssignmentsSummary = HomeworkAssignmentsSummary;
+export type TeacherHomeworkTab = HomeworkAssignmentsTab;
+export type TeacherHomeworkSort = HomeworkAssignmentsSort;
+export type TeacherHomeworkProblemFilter = HomeworkAssignmentProblemFilter;
 
 export interface TeacherHomeworksViewModel {
   assignments: HomeworkAssignment[];
   templates: HomeworkTemplate[];
   students: TeacherHomeworkStudentOption[];
   summary: TeacherAssignmentsSummary;
-  activeBucket: TeacherAssignmentBucket;
+  activeTab: TeacherHomeworkTab;
+  searchQuery: string;
+  sortBy: TeacherHomeworkSort;
+  problemFilters: TeacherHomeworkProblemFilter[];
   selectedStudentId: number | null;
-  deadlineFrom: string;
-  deadlineTo: string;
-  showArchivedTemplates: boolean;
   loadingAssignments: boolean;
+  loadingMoreAssignments: boolean;
+  hasMoreAssignments: boolean;
   loadingTemplates: boolean;
   loadingSummary: boolean;
   loadingStudents: boolean;
@@ -61,19 +86,36 @@ export interface TeacherHomeworksViewModel {
   reviewSubmissions: HomeworkSubmission[];
   reviewLoading: boolean;
   reviewSubmitting: boolean;
-  onBucketChange: (bucket: TeacherAssignmentBucket) => void;
+  detailAssignment: HomeworkAssignment | null;
+  detailSubmissions: HomeworkSubmission[];
+  detailLoading: boolean;
+  assignModalRequest: TeacherAssignModalRequest | null;
+  homeworkActivityItems: ActivityFeedItem[];
+  homeworkActivityLoading: boolean;
+  homeworkActivityHasUnread: boolean;
+  onTabChange: (tab: TeacherHomeworkTab) => void;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: TeacherHomeworkSort) => void;
+  onToggleProblemFilter: (filter: TeacherHomeworkProblemFilter) => void;
   onSelectedStudentIdChange: (studentId: number | null) => void;
-  onDeadlineFromChange: (value: string) => void;
-  onDeadlineToChange: (value: string) => void;
-  onShowArchivedTemplatesChange: (value: boolean) => void;
   onOpenCreateTemplateScreen: () => void;
   onUpdateTemplate: (templateId: number, payload: TeacherTemplateUpsertPayload) => Promise<boolean>;
   onDuplicateTemplate: (template: HomeworkTemplate) => Promise<void>;
   onArchiveTemplate: (template: HomeworkTemplate) => Promise<void>;
+  onToggleTemplateFavorite: (template: HomeworkTemplate) => Promise<void>;
   onCreateAssignment: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
   onSendAssignmentNow: (assignment: HomeworkAssignment) => Promise<void>;
+  onRemindAssignment: (assignment: HomeworkAssignment) => Promise<void>;
+  onDeleteAssignment: (assignment: HomeworkAssignment) => Promise<void>;
+  onFixConfigError: (assignment: HomeworkAssignment) => Promise<void>;
+  onBulkAction: (payload: { ids: number[]; action: TeacherBulkAction }) => Promise<void>;
   onOpenReview: (assignment: HomeworkAssignment) => void;
   onCloseReview: () => void;
+  onStartReviewQueue: () => void;
+  onOpenDetail: (assignment: HomeworkAssignment) => void;
+  onCloseDetail: () => void;
+  onLoadMoreAssignments: () => void;
+  onConsumeAssignModalRequest: () => void;
   onSubmitReview: (payload: {
     action: 'REVIEWED' | 'RETURNED';
     submissionId: number;
@@ -83,6 +125,8 @@ export interface TeacherHomeworksViewModel {
     teacherComment: string | null;
   }) => Promise<boolean>;
   onRefresh: () => void;
+  onLoadHomeworkActivity: () => void;
+  onMarkHomeworkActivitySeen: (seenThrough?: string) => Promise<void>;
 }
 
 export interface StudentHomeworksViewModel {
@@ -90,8 +134,11 @@ export interface StudentHomeworksViewModel {
   summary: StudentHomeworkSummary;
   filter: StudentHomeworkFilter;
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   onFilterChange: (next: StudentHomeworkFilter) => void;
   onRefresh: () => void;
+  onLoadMore: () => void;
   onOpenAssignment: (assignment: HomeworkAssignment) => void;
 }
 

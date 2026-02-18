@@ -12,6 +12,8 @@ interface HomeworkAssignModalProps {
   students: TeacherHomeworkStudentOption[];
   submitting: boolean;
   defaultStudentId: number | null;
+  defaultLessonId?: number | null;
+  defaultTemplateId?: number | null;
   onSubmit: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
   onClose: () => void;
 }
@@ -19,6 +21,7 @@ interface HomeworkAssignModalProps {
 type AssignmentDraft = {
   title: string;
   studentId: number | null;
+  lessonId: number | null;
   templateId: number | null;
   sendMode: 'MANUAL' | 'AUTO_AFTER_LESSON_DONE';
   sendNow: boolean;
@@ -27,10 +30,15 @@ type AssignmentDraft = {
 
 type AssignmentDeliveryMode = 'SEND_NOW' | 'SAVE_DRAFT' | 'AUTO_AFTER_LESSON';
 
-const buildInitialDraft = (defaultStudentId: number | null): AssignmentDraft => ({
+const buildInitialDraft = (
+  defaultStudentId: number | null,
+  defaultLessonId: number | null,
+  defaultTemplateId: number | null,
+): AssignmentDraft => ({
   title: '',
   studentId: defaultStudentId,
-  templateId: null,
+  lessonId: defaultLessonId,
+  templateId: defaultTemplateId,
   sendMode: 'MANUAL',
   sendNow: false,
   deadlineAt: '',
@@ -61,10 +69,14 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   students,
   submitting,
   defaultStudentId,
+  defaultLessonId = null,
+  defaultTemplateId = null,
   onSubmit,
   onClose,
 }) => {
-  const [draft, setDraft] = useState<AssignmentDraft>(buildInitialDraft(defaultStudentId));
+  const [draft, setDraft] = useState<AssignmentDraft>(
+    buildInitialDraft(defaultStudentId, defaultLessonId, defaultTemplateId),
+  );
   const selectedTemplate = useMemo(
     () => templates.find((template) => template.id === draft.templateId) ?? null,
     [draft.templateId, templates],
@@ -77,8 +89,8 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
 
   useEffect(() => {
     if (!open) return;
-    setDraft(buildInitialDraft(defaultStudentId));
-  }, [defaultStudentId, open]);
+    setDraft(buildInitialDraft(defaultStudentId, defaultLessonId, defaultTemplateId));
+  }, [defaultLessonId, defaultStudentId, defaultTemplateId, open]);
 
   const handleClose = () => {
     if (submitting) return;
@@ -90,6 +102,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     if (!draft.studentId) return;
     const success = await onSubmit({
       studentId: draft.studentId,
+      lessonId: draft.lessonId,
       templateId: draft.templateId,
       title: draft.title,
       sendMode: draft.sendMode,
@@ -167,6 +180,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
           {!students.length ? (
             <div className={styles.inlineHint}>Нет учеников. Сначала добавь ученика в разделе «Ученики».</div>
           ) : null}
+          {draft.lessonId ? <div className={styles.inlineText}>Привязка к уроку #{draft.lessonId}</div> : null}
         </section>
 
         <section className={styles.section}>

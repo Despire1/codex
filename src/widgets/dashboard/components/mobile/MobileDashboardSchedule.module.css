@@ -1,0 +1,210 @@
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 10px 24px var(--shadow-slate-900-08);
+  display: grid;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.openButton {
+  border: none;
+  background: transparent;
+  color: var(--color-blue-600);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-slate-500);
+  font-size: 13px;
+}
+
+.dayTimelineList {
+  display: grid;
+  gap: 0;
+}
+
+.dayItem {
+  border: none;
+  background: transparent;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  padding: 6px 0;
+  text-align: left;
+}
+
+.timelineCol {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.timelineLine {
+  flex: 1;
+  width: 2px;
+  min-height: 26px;
+  border-radius: 999px;
+  background: var(--color-slate-200);
+}
+
+.time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-slate-500);
+  padding-top: 2px;
+}
+
+.timeHighlight {
+  color: var(--color-blue-700);
+}
+
+.timelineDot {
+  position: absolute;
+  top: 18px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-blue-600);
+  box-shadow: 0 0 0 4px var(--color-blue-50);
+}
+
+.info {
+  min-width: 0;
+  border-bottom: 1px solid var(--color-slate-100);
+  padding-bottom: 10px;
+}
+
+.dayItem:last-child .info {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dayItemHighlight .name {
+  color: var(--color-slate-900);
+  font-weight: 800;
+}
+
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--color-slate-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rangeLabel {
+  font-size: 11px;
+  color: var(--color-slate-400);
+  white-space: nowrap;
+}
+
+.badge {
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.dayItemPast .time {
+  color: var(--color-slate-400);
+}
+
+.dayItemPast .name {
+  color: var(--color-slate-500);
+  text-decoration: line-through;
+}
+
+.dayItemPast .subtitle,
+.dayItemPast .rangeLabel {
+  color: var(--color-slate-400);
+}
+
+.badge_done {
+  background: var(--color-slate-200);
+  color: var(--color-slate-600);
+}
+
+.badge_soon {
+  background: var(--color-blue-100);
+  color: var(--color-blue-700);
+}
+
+.badge_muted {
+  background: var(--color-gray-100);
+  color: var(--color-slate-600);
+}
+
+.weekList {
+  display: grid;
+  gap: 8px;
+}
+
+.weekRow {
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-slate-50);
+  text-align: left;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.weekRowToday {
+  border-color: var(--color-blue-200);
+  background: var(--color-blue-50);
+}
+
+.weekLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.weekMeta {
+  font-size: 12px;
+  color: var(--color-slate-500);
+}

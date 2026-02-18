@@ -113,14 +113,25 @@ const pickBestLesson = (lessons: Lesson[]) => {
   return [...lessons].sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())[0];
 };
 
+const lessonHasStudent = (lesson: Lesson, studentId?: number | null) => {
+  if (!studentId) return true;
+  if (lesson.studentId === studentId) return true;
+  if (!lesson.participants || lesson.participants.length === 0) return false;
+  return lesson.participants.some((participant) => participant.studentId === studentId);
+};
+
 const resolveCreatedLesson = (current: Lesson | null, lessons: Lesson[], studentId?: number | null) => {
+  const pool = studentId ? lessons.filter((lesson) => lessonHasStudent(lesson, studentId)) : lessons;
+
   if (current) {
     const updated = lessons.find((lesson) => lesson.id === current.id);
-    return updated ?? current;
-  }
-  const pool = studentId ? lessons.filter((lesson) => lesson.studentId === studentId) : lessons;
-  if (pool.length === 0 && studentId) {
-    return pickBestLesson(lessons);
+    if (updated && lessonHasStudent(updated, studentId)) {
+      return updated;
+    }
+    if (!updated && lessonHasStudent(current, studentId)) {
+      return current;
+    }
+    return pickBestLesson(pool);
   }
   return pickBestLesson(pool);
 };

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { URL } from 'node:url';
-import { addDays, addYears } from 'date-fns';
+import { addDays, addYears, endOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
@@ -44,6 +44,18 @@ import {
 import { resolveStudentTelegramId } from './studentContacts';
 import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
 import { listActivityFeedForTeacher, logActivityEvent } from './activityFeedService';
+import {
+  badRequest,
+  notFound,
+  readBody,
+  sendJson,
+} from './server/lib/http';
+import { createAuthService } from './server/modules/auth';
+import { clampNumber, isValidTimeString } from './server/lib/runtimeLimits';
+import { createAuthTransferHandlers } from './server/routes/authTransfer';
+import { createAuthSessionHandlers } from './server/routes/authSession';
+import { tryHandleAuthRoutes } from './server/routes/authRoutes';
+import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -86,6 +98,39 @@ const ONBOARDING_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 0);
 const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
 const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
+const authService = createAuthService({
+  sessionCookieName: SESSION_COOKIE_NAME,
+  sessionTtlMinutes: SESSION_TTL_MINUTES,
+  localAuthBypass: LOCAL_AUTH_BYPASS,
+  localDevUser: {
+    telegramUserId: LOCAL_DEV_TELEGRAM_ID,
+    username: LOCAL_DEV_USERNAME,
+    firstName: LOCAL_DEV_FIRST_NAME,
+    lastName: LOCAL_DEV_LAST_NAME,
+  },
+});
+const { createSession, getSessionTokenHash, getSessionUser, resolveSessionUser } = authService;
+const authTransferHandlers = createAuthTransferHandlers({
+  createSession,
+  getSessionUser,
+  port: PORT,
+  transferRedirectUrl: TRANSFER_REDIRECT_URL,
+  transferTokenTtlSec: TRANSFER_TOKEN_TTL_SEC,
+  transferTokenMinTtlSec: TRANSFER_TOKEN_MIN_TTL_SEC,
+  transferTokenMaxTtlSec: TRANSFER_TOKEN_MAX_TTL_SEC,
+  rateLimitTransferCreatePerMin: RATE_LIMIT_TRANSFER_CREATE_PER_MIN,
+  rateLimitTransferCreateIpPerMin: RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN,
+  rateLimitTransferConsumeIpPerMin: RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN,
+  rateLimitTransferConsumeTokenPerMin: RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN,
+});
+const authSessionHandlers = createAuthSessionHandlers({
+  createSession,
+  sessionCookieName: SESSION_COOKIE_NAME,
+  telegramBotToken: TELEGRAM_BOT_TOKEN,
+  telegramInitDataTtlSec: TELEGRAM_INITDATA_TTL_SEC,
+  telegramReplaySkewSec: TELEGRAM_REPLAY_SKEW_SEC,
+  rateLimitWebappPerMin: RATE_LIMIT_WEBAPP_PER_MIN,
+});
 let isLessonAutomationRunning = false;
 const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
   const nowMs = now.getTime();
@@ -225,236 +270,6 @@ const safeLogActivityEvent = async (payload: Parameters<typeof logActivityEvent>
     console.error('Failed to log activity event', error);
   }
 };
-
-const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.end(JSON.stringify(serializeBigInt(payload)));
-};
-
-const notFound = (res: ServerResponse) => sendJson(res, 404, { message: 'Not found' });
-
-const badRequest = (res: ServerResponse, message: string) => sendJson(res, 400, { message });
-
-const serializeBigInt = (value: unknown) =>
-  JSON.parse(
-    JSON.stringify(value, (_, v) => {
-      if (typeof v === 'bigint') return Number(v);
-      if (v instanceof Date) return v.toISOString();
-      return v;
-    }),
-  );
-
-const readBody = async (req: IncomingMessage) => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  if (chunks.length === 0) return {} as Record<string, unknown>;
-  const raw = Buffer.concat(chunks).toString('utf8');
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    throw new Error('Invalid JSON body');
-  }
-};
-
-const parseCookies = (header?: string) => {
-  const cookies: Record<string, string> = {};
-  if (!header) return cookies;
-  header.split(';').forEach((part) => {
-    const [rawKey, ...rawValue] = part.trim().split('=');
-    if (!rawKey) return;
-    cookies[rawKey] = decodeURIComponent(rawValue.join('='));
-  });
-  return cookies;
-};
-
-const buildCookie = (name: string, value: string, options: { maxAgeSeconds?: number; secure?: boolean } = {}) => {
-  const segments = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
-  if (options.secure ?? true) {
-    segments.push('Secure');
-  }
-  if (options.maxAgeSeconds !== undefined) {
-    segments.push(`Max-Age=${options.maxAgeSeconds}`);
-  }
-  return segments.join('; ');
-};
-
-const getRequestIp = (req: IncomingMessage) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0]?.trim() ?? '';
-  }
-  if (Array.isArray(forwarded)) {
-    return forwarded[0] ?? '';
-  }
-  return req.socket.remoteAddress ?? '';
-};
-
-const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
-
-const randomToken = (lengthBytes = 32) => crypto.randomBytes(lengthBytes).toString('base64url');
-
-const getForwardedHost = (req: IncomingMessage) => {
-  const forwardedHost = req.headers['x-forwarded-host'];
-  if (typeof forwardedHost === 'string') {
-    return forwardedHost.split(',')[0]?.trim() ?? '';
-  }
-  if (Array.isArray(forwardedHost)) {
-    return forwardedHost[0] ?? '';
-  }
-  return '';
-};
-
-const getBaseUrl = (req: IncomingMessage) => {
-  const configured = process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL;
-  if (configured) return configured.replace(/\/$/, '');
-  const forwardedHost = getForwardedHost(req);
-  const host = forwardedHost || req.headers.host || `localhost:${PORT}`;
-  const isLocalhost = host.includes('localhost') || host.startsWith('127.0.0.1');
-  const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
-  const forwardedProtocol = forwardedProto.split(',')[0];
-  const protocol = isLocalhost ? 'http' : forwardedProtocol || 'https';
-  return `${protocol}://${host}`;
-};
-
-const isLocalhostRequest = (req: IncomingMessage) => {
-  const forwardedHost = getForwardedHost(req);
-  const host = forwardedHost || req.headers.host || '';
-  return host.includes('localhost') || host.startsWith('127.0.0.1');
-};
-
-const isSecureRequest = (req: IncomingMessage) => {
-  const isLocalhost = isLocalhostRequest(req);
-  if (isLocalhost) return false;
-  const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string' ? req.headers['x-forwarded-proto'] : '';
-  const forwardedProtocol = forwardedProto.split(',')[0]?.trim();
-  if (forwardedProtocol) return forwardedProtocol === 'https';
-  return true;
-};
-
-const verifyTelegramInitData = (initData: string) => {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return { ok: false, reason: 'signature_invalid' as const };
-  }
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  if (!hash) {
-    return { ok: false, reason: 'signature_invalid' as const };
-  }
-  params.delete('hash');
-  const dataCheckString = Array.from(params.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(TELEGRAM_BOT_TOKEN).digest();
-  const expectedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-  const expectedBuffer = Buffer.from(expectedHash, 'hex');
-  const actualBuffer = Buffer.from(hash, 'hex');
-  if (expectedBuffer.length !== actualBuffer.length) {
-    return { ok: false, reason: 'signature_invalid' as const };
-  }
-  if (!crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
-    return { ok: false, reason: 'signature_invalid' as const };
-  }
-  return { ok: true as const, params };
-};
-
-const getSessionUser = async (req: IncomingMessage) => {
-  const cookies = parseCookies(req.headers.cookie);
-  const token = cookies[SESSION_COOKIE_NAME];
-  if (!token) return null;
-  const tokenHash = hashToken(token);
-  const now = new Date();
-  const session = await prisma.session.findFirst({
-    where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
-    include: { user: true },
-  });
-  return session?.user ?? null;
-};
-
-const ensureLocalDevUser = async () => {
-  const existing = await prisma.user.findUnique({ where: { telegramUserId: LOCAL_DEV_TELEGRAM_ID } });
-  if (existing) {
-    if (!existing.subscriptionStartAt) {
-      return prisma.user.update({
-        where: { id: existing.id },
-        data: { subscriptionStartAt: new Date(), subscriptionEndAt: null },
-      });
-    }
-    return existing;
-  }
-  return prisma.user.create({
-    data: {
-      telegramUserId: LOCAL_DEV_TELEGRAM_ID,
-      username: LOCAL_DEV_USERNAME,
-      firstName: LOCAL_DEV_FIRST_NAME,
-      lastName: LOCAL_DEV_LAST_NAME,
-      role: 'TEACHER',
-      subscriptionStartAt: new Date(),
-    },
-  });
-};
-
-const resolveSessionUser = async (req: IncomingMessage, res: ServerResponse) => {
-  const sessionUser = await getSessionUser(req);
-  if (sessionUser) return sessionUser;
-  if (!LOCAL_AUTH_BYPASS || !isLocalhostRequest(req)) return null;
-  const localUser = await ensureLocalDevUser();
-  await createSession(localUser.id, req, res);
-  return localUser;
-};
-
-const getSessionTokenHash = (req: IncomingMessage) => {
-  const cookies = parseCookies(req.headers.cookie);
-  const token = cookies[SESSION_COOKIE_NAME];
-  if (!token) return null;
-  return hashToken(token);
-};
-
-const createSession = async (userId: number, req: IncomingMessage, res: ServerResponse) => {
-  const ttlMinutes = Number.isFinite(SESSION_TTL_MINUTES) ? SESSION_TTL_MINUTES : 1440;
-  const token = randomToken(32);
-  const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
-  await prisma.session.create({
-    data: {
-      userId,
-      tokenHash,
-      expiresAt,
-      ip: getRequestIp(req) || null,
-      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
-    },
-  });
-  res.setHeader(
-    'Set-Cookie',
-    buildCookie(SESSION_COOKIE_NAME, token, { maxAgeSeconds: ttlMinutes * 60, secure: isSecureRequest(req) }),
-  );
-  return { expiresAt };
-};
-
-type RateLimitEntry = { count: number; resetAt: number };
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-const isRateLimited = (key: string, limit: number, windowMs: number) => {
-  const now = Date.now();
-  const existing = rateLimitStore.get(key);
-  if (!existing || existing.resetAt <= now) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  if (existing.count >= limit) return true;
-  existing.count += 1;
-  return false;
-};
-
-const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-const isValidTimeString = (value: string) => /^\d{2}:\d{2}$/.test(value);
 
 const formatTeacherName = (user: User) => {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
@@ -1384,6 +1199,83 @@ const listActivityFeed = async (
   return listActivityFeedForTeacher(teacher.chatId, filters);
 };
 
+const resolveLatestActivityFeedOccurredAt = async (teacherId: bigint) => {
+  const [activityEvent, paymentEvent, notificationLog] = await Promise.all([
+    prisma.activityEvent.findFirst({
+      where: { teacherId },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      select: { occurredAt: true },
+    }),
+    prisma.paymentEvent.findFirst({
+      where: {
+        OR: [{ teacherId }, { teacherId: null, lesson: { teacherId } }],
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { createdAt: true },
+    }),
+    prisma.notificationLog.findFirst({
+      where: { teacherId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const timestamps = [activityEvent?.occurredAt, paymentEvent?.createdAt, notificationLog?.createdAt].filter(
+    (value): value is Date => Boolean(value),
+  );
+  if (timestamps.length === 0) return null;
+
+  return timestamps.reduce((latest, item) => (item.getTime() > latest.getTime() ? item : latest), timestamps[0]);
+};
+
+const buildActivityFeedUnreadStatus = (latestOccurredAt: Date | null, seenAt: Date | null) => ({
+  hasUnread: Boolean(latestOccurredAt && (!seenAt || latestOccurredAt.getTime() > seenAt.getTime())),
+  latestOccurredAt,
+  seenAt,
+});
+
+const getActivityFeedUnreadStatus = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  const latestOccurredAt = await resolveLatestActivityFeedOccurredAt(teacher.chatId);
+
+  return buildActivityFeedUnreadStatus(latestOccurredAt, teacher.activityFeedSeenAt ?? null);
+};
+
+const markActivityFeedSeen = async (user: User, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const latestOccurredAt = await resolveLatestActivityFeedOccurredAt(teacher.chatId);
+  const rawSeenThrough = body.seenThrough;
+  let seenThrough: Date | null = null;
+
+  if (rawSeenThrough !== undefined) {
+    if (typeof rawSeenThrough !== 'string') throw new Error('invalid_seen_through');
+    seenThrough = toValidDate(rawSeenThrough);
+    if (!seenThrough) throw new Error('invalid_seen_through');
+  }
+
+  let nextSeenAt = teacher.activityFeedSeenAt ?? null;
+  const boundedSeenThrough =
+    seenThrough && latestOccurredAt && seenThrough.getTime() > latestOccurredAt.getTime()
+      ? latestOccurredAt
+      : seenThrough;
+  const targetSeenAt = boundedSeenThrough ?? latestOccurredAt;
+
+  if (targetSeenAt && (!nextSeenAt || targetSeenAt.getTime() > nextSeenAt.getTime())) {
+    const updatedTeacher = await prisma.teacher.update({
+      where: { chatId: teacher.chatId },
+      data: {
+        activityFeedSeenAt: targetSeenAt,
+      },
+      select: {
+        activityFeedSeenAt: true,
+      },
+    });
+    nextSeenAt = updatedTeacher.activityFeedSeenAt;
+  }
+
+  return buildActivityFeedUnreadStatus(latestOccurredAt, nextSeenAt);
+};
+
 const listStudentLessons = async (
   user: User,
   studentId: number,
@@ -1516,6 +1408,25 @@ const listLessonsForRange = async (
 
 const getDashboardSummary = async (user: User) => {
   const teacher = await ensureTeacher(user);
+  const resolvedTimeZone = resolveTimeZone(teacher.timezone);
+  const now = new Date();
+  const todayZoned = toZonedDate(now, resolvedTimeZone);
+  const todayKey = format(todayZoned, 'yyyy-MM-dd');
+  const previousWindowStartKey = format(addDays(todayZoned, -7), 'yyyy-MM-dd');
+  const previousWindowStartUtc = toUtcDateFromTimeZone(previousWindowStartKey, '00:00', resolvedTimeZone);
+  const weekEndKey = format(endOfWeek(todayZoned, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const weekEndUtc = toUtcEndOfDay(weekEndKey, resolvedTimeZone);
+
+  const resolveLessonAmountRub = (lesson: {
+    price: number;
+    participants: Array<{ price: number }>;
+  }) => {
+    if (lesson.participants.length > 0) {
+      return lesson.participants.reduce((sum, participant) => sum + Math.max(0, Number(participant.price) || 0), 0);
+    }
+    return Math.max(0, Number(lesson.price) || 0);
+  };
+
   const [studentsCount, lessonsCount] = await Promise.all([
     prisma.teacherStudent.count({
       where: { teacherId: teacher.chatId, isArchived: false },
@@ -1525,9 +1436,103 @@ const getDashboardSummary = async (user: User) => {
     }),
   ]);
 
+  const plannedLessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: { not: 'CANCELED' },
+      startAt: {
+        gte: previousWindowStartUtc,
+        lte: weekEndUtc,
+      },
+    },
+    include: {
+      participants: {
+        select: {
+          studentId: true,
+          price: true,
+          isPaid: true,
+        },
+      },
+    },
+  });
+
+  const plannedByDay = new Map<string, number>();
+  plannedLessons.forEach((lesson) => {
+    const dayKey = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+    const amount = resolveLessonAmountRub(lesson);
+    plannedByDay.set(dayKey, (plannedByDay.get(dayKey) ?? 0) + amount);
+  });
+
+  const todayPlanRub = plannedByDay.get(todayKey) ?? 0;
+  const previousSevenDaysTotal = Array.from({ length: 7 }).reduce<number>((sum, _unused, index) => {
+    const key = format(addDays(todayZoned, -(index + 1)), 'yyyy-MM-dd');
+    return sum + (plannedByDay.get(key) ?? 0);
+  }, 0);
+  const previousSevenDaysAverage = previousSevenDaysTotal / 7;
+  const todayPlanDeltaPercent =
+    previousSevenDaysAverage > 0
+      ? Math.round(((todayPlanRub - previousSevenDaysAverage) / previousSevenDaysAverage) * 100)
+      : todayPlanRub > 0
+        ? 100
+        : 0;
+
+  const weekScheduledRub = plannedLessons.reduce((sum, lesson) => {
+    if (lesson.status !== 'SCHEDULED') return sum;
+    const startMs = lesson.startAt.getTime();
+    if (startMs < now.getTime() || startMs > weekEndUtc.getTime()) return sum;
+    return sum + resolveLessonAmountRub(lesson);
+  }, 0);
+
+  const unpaidLessons = await prisma.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      status: { not: 'CANCELED' },
+      OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
+      AND: [
+        {
+          OR: [{ isPaid: false }, { participants: { some: { isPaid: false } } }],
+        },
+      ],
+    },
+    include: {
+      participants: {
+        select: {
+          studentId: true,
+          price: true,
+          isPaid: true,
+        },
+      },
+    },
+  });
+
+  let unpaidRub = 0;
+  const unpaidStudentIds = new Set<number>();
+  unpaidLessons.forEach((lesson) => {
+    if (lesson.participants.length > 0) {
+      lesson.participants.forEach((participant) => {
+        if (participant.isPaid) return;
+        unpaidRub += Math.max(0, Number(participant.price) || 0);
+        unpaidStudentIds.add(participant.studentId);
+      });
+      return;
+    }
+
+    if (lesson.isPaid) return;
+    unpaidRub += Math.max(0, Number(lesson.price) || 0);
+    unpaidStudentIds.add(lesson.studentId);
+  });
+
+  const unpaidStudentsCount = unpaidStudentIds.size;
+  const receivableWeekRub = unpaidRub + weekScheduledRub;
+
   return {
     studentsCount,
     lessonsCount,
+    todayPlanRub,
+    todayPlanDeltaPercent,
+    unpaidRub,
+    unpaidStudentsCount,
+    receivableWeekRub,
     telegramConnected: Boolean(TELEGRAM_BOT_TOKEN) && teacher.studentNotificationsEnabled,
     timezone: teacher.timezone ?? null,
     teacherId: Number(teacher.chatId),
@@ -1576,9 +1581,6 @@ const sendLessonReminder = async (
   if (result.status === 'skipped') {
     if (result.reason === 'student_not_activated') {
       throw new Error('student_not_activated');
-    }
-    if (result.reason === 'notifications_disabled') {
-      throw new Error('notifications_disabled');
     }
     throw new Error('reminder_skipped');
   }
@@ -2079,7 +2081,16 @@ type HomeworkV2NotificationKind =
   | 'REMINDER_24H'
   | 'REMINDER_MORNING'
   | 'REMINDER_3H'
+  | 'MANUAL_REMINDER'
   | 'OVERDUE';
+
+type HttpError = Error & { statusCode?: number };
+
+const createHttpError = (message: string, statusCode: number): HttpError => {
+  const error = new Error(message) as HttpError;
+  error.statusCode = statusCode;
+  return error;
+};
 
 type StudentAccessLink = {
   teacherId: bigint;
@@ -2205,6 +2216,17 @@ const resolveAssignmentViewStatus = (assignment: { status: string; deadlineAt?: 
 };
 
 type HomeworkAssignmentBucketV2 = 'all' | 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
+type HomeworkAssignmentsTabV2 =
+  | 'all'
+  | 'inbox'
+  | 'draft'
+  | 'scheduled'
+  | 'in_progress'
+  | 'review'
+  | 'closed'
+  | 'overdue';
+type HomeworkAssignmentsSortV2 = 'urgency' | 'deadline' | 'student' | 'updated' | 'created';
+type HomeworkAssignmentProblemFilterV2 = 'overdue' | 'returned' | 'config_error';
 
 const normalizeHomeworkAssignmentBucketV2 = (value: unknown): HomeworkAssignmentBucketV2 => {
   const normalized = typeof value === 'string' ? value.toLowerCase() : '';
@@ -2221,6 +2243,56 @@ const normalizeHomeworkAssignmentBucketV2 = (value: unknown): HomeworkAssignment
   return 'all';
 };
 
+const normalizeHomeworkAssignmentsTabV2 = (value: unknown): HomeworkAssignmentsTabV2 => {
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  if (
+    normalized === 'all' ||
+    normalized === 'inbox' ||
+    normalized === 'draft' ||
+    normalized === 'scheduled' ||
+    normalized === 'in_progress' ||
+    normalized === 'review' ||
+    normalized === 'closed' ||
+    normalized === 'overdue'
+  ) {
+    return normalized;
+  }
+  return 'all';
+};
+
+const normalizeHomeworkAssignmentsSortV2 = (value: unknown): HomeworkAssignmentsSortV2 => {
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  if (
+    normalized === 'urgency' ||
+    normalized === 'deadline' ||
+    normalized === 'student' ||
+    normalized === 'updated' ||
+    normalized === 'created'
+  ) {
+    return normalized;
+  }
+  return 'urgency';
+};
+
+const normalizeHomeworkAssignmentProblemFiltersV2 = (value: unknown): HomeworkAssignmentProblemFilterV2[] => {
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+
+  const normalized = rawItems
+    .map((item) => String(item).toLowerCase())
+    .filter(
+      (item): item is HomeworkAssignmentProblemFilterV2 =>
+        item === 'overdue' || item === 'returned' || item === 'config_error',
+    );
+  return Array.from(new Set(normalized));
+};
+
 const resolveAssignmentBucketWhereV2 = (bucket: HomeworkAssignmentBucketV2, now: Date): Record<string, unknown> => {
   if (bucket === 'draft') return { status: { in: ['DRAFT', 'SCHEDULED'] } };
   if (bucket === 'sent') return { status: { in: ['SENT', 'RETURNED'] } };
@@ -2229,6 +2301,31 @@ const resolveAssignmentBucketWhereV2 = (bucket: HomeworkAssignmentBucketV2, now:
   if (bucket === 'overdue') {
     return {
       OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
+    };
+  }
+  return {};
+};
+
+const resolveAssignmentTabWhereV2 = (tab: HomeworkAssignmentsTabV2, now: Date): Record<string, unknown> => {
+  if (tab === 'draft') return { status: 'DRAFT' };
+  if (tab === 'scheduled') return { status: 'SCHEDULED' };
+  if (tab === 'in_progress') return { status: { in: ['SENT', 'RETURNED'] } };
+  if (tab === 'review') return { status: 'SUBMITTED' };
+  if (tab === 'closed') return { status: 'REVIEWED' };
+  if (tab === 'overdue') {
+    return {
+      OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
+    };
+  }
+  if (tab === 'inbox') {
+    return {
+      OR: [
+        { status: 'SUBMITTED' },
+        { status: 'RETURNED' },
+        { status: 'OVERDUE' },
+        { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
+        { sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
+      ],
     };
   }
   return {};
@@ -2270,6 +2367,126 @@ const attachLatestSubmissionMetaToAssignments = async (items: any[]) => {
   });
 };
 
+const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[], now: Date) => {
+  if (!assignments.length) return assignments;
+  const studentIds = Array.from(
+    new Set(
+      assignments
+        .map((item) => Number(item.studentId))
+        .filter((studentId) => Number.isFinite(studentId) && studentId > 0),
+    ),
+  );
+  const links = studentIds.length
+    ? await prisma.teacherStudent.findMany({
+        where: { teacherId, studentId: { in: studentIds }, isArchived: false },
+        select: { studentId: true, customName: true },
+      })
+    : [];
+  const linkByStudentId = new Map<number, { studentId: number; customName: string }>(
+    links.map((link) => [link.studentId, link]),
+  );
+
+  return assignments.map((assignment) => {
+    const resolvedStatus = resolveAssignmentViewStatus(assignment, now);
+    const isOverdue = resolvedStatus === 'OVERDUE';
+    const hasConfigError = normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' && !assignment.lessonId;
+    const studentLink = linkByStudentId.get(assignment.studentId);
+    const studentName =
+      studentLink?.customName?.trim() ||
+      assignment.student?.username?.trim() ||
+      `Ученик #${assignment.studentId}`;
+    return {
+      ...assignment,
+      studentName,
+      studentUsername: assignment.student?.username ?? null,
+      lessonStartAt: assignment.lesson?.startAt ?? null,
+      templateTitle: assignment.template?.title ?? null,
+      hasConfigError,
+      isOverdue,
+      problemFlags: Array.from(
+        new Set(
+          [
+            isOverdue ? 'OVERDUE' : null,
+            resolvedStatus === 'RETURNED' ? 'RETURNED' : null,
+            hasConfigError ? 'CONFIG_ERROR' : null,
+            resolvedStatus === 'SUBMITTED' ? 'SUBMITTED' : null,
+          ].filter(Boolean),
+        ),
+      ),
+    };
+  });
+};
+
+const matchesAssignmentSearchQuery = (assignment: any, queryLower: string) => {
+  const fields = [
+    assignment.title,
+    assignment.studentName,
+    assignment.studentUsername,
+    assignment.templateTitle,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.toLowerCase());
+  return fields.some((value) => value.includes(queryLower));
+};
+
+const sortHomeworkAssignmentsV2 = (items: any[], sort: HomeworkAssignmentsSortV2) => {
+  if (sort === 'created') {
+    return items.sort((left, right) => {
+      const rightCreated = new Date(right.createdAt).getTime();
+      const leftCreated = new Date(left.createdAt).getTime();
+      return rightCreated - leftCreated || Number(right.id) - Number(left.id);
+    });
+  }
+  if (sort === 'updated') {
+    return items.sort((left, right) => {
+      const rightUpdated = new Date(right.updatedAt).getTime();
+      const leftUpdated = new Date(left.updatedAt).getTime();
+      return rightUpdated - leftUpdated || Number(right.id) - Number(left.id);
+    });
+  }
+  if (sort === 'deadline') {
+    return items.sort((left, right) => {
+      const leftDeadline = toValidDate(left.deadlineAt)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const rightDeadline = toValidDate(right.deadlineAt)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return leftDeadline - rightDeadline || Number(right.id) - Number(left.id);
+    });
+  }
+  if (sort === 'student') {
+    return items.sort((left, right) => {
+      const leftStudent = String(left.studentName ?? '').toLowerCase();
+      const rightStudent = String(right.studentName ?? '').toLowerCase();
+      if (leftStudent < rightStudent) return -1;
+      if (leftStudent > rightStudent) return 1;
+      const rightCreated = new Date(right.createdAt).getTime();
+      const leftCreated = new Date(left.createdAt).getTime();
+      return rightCreated - leftCreated;
+    });
+  }
+
+  const priority = (item: any) => {
+    if (item.hasConfigError) return 0;
+    if (item.isOverdue) return 1;
+    if (item.status === 'SUBMITTED') return 2;
+    if (item.status === 'RETURNED') return 3;
+    if (item.status === 'SCHEDULED') return 4;
+    if (item.status === 'SENT') return 5;
+    if (item.status === 'DRAFT') return 6;
+    if (item.status === 'REVIEWED') return 7;
+    return 8;
+  };
+
+  return items.sort((left, right) => {
+    const priorityDiff = priority(left) - priority(right);
+    if (priorityDiff !== 0) return priorityDiff;
+    const leftDeadline = toValidDate(left.deadlineAt)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const rightDeadline = toValidDate(right.deadlineAt)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    if (leftDeadline !== rightDeadline) return leftDeadline - rightDeadline;
+    const rightCreated = new Date(right.createdAt).getTime();
+    const leftCreated = new Date(left.createdAt).getTime();
+    return rightCreated - leftCreated;
+  });
+};
+
 const serializeHomeworkTemplateV2 = (template: any) => ({
   id: template.id,
   teacherId: Number(template.teacherId),
@@ -2284,43 +2501,66 @@ const serializeHomeworkTemplateV2 = (template: any) => ({
   updatedAt: template.updatedAt,
 });
 
-const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => ({
-  id: assignment.id,
-  teacherId: Number(assignment.teacherId),
-  studentId: assignment.studentId,
-  lessonId: assignment.lessonId ?? null,
-  templateId: assignment.templateId ?? null,
-  legacyHomeworkId: assignment.legacyHomeworkId ?? null,
-  title: assignment.title ?? '',
-  status: resolveAssignmentViewStatus(assignment, now),
-  sendMode: normalizeHomeworkSendMode(assignment.sendMode),
-  deadlineAt: assignment.deadlineAt ?? null,
-  sentAt: assignment.sentAt ?? null,
-  contentSnapshot: normalizeHomeworkBlocks(assignment.contentSnapshot),
-  teacherComment: assignment.teacherComment ?? null,
-  reviewedAt: assignment.reviewedAt ?? null,
-  reminder24hSentAt: assignment.reminder24hSentAt ?? null,
-  reminderMorningSentAt: assignment.reminderMorningSentAt ?? null,
-  reminder3hSentAt: assignment.reminder3hSentAt ?? null,
-  overdueReminderCount: Number.isFinite(Number(assignment.overdueReminderCount))
-    ? Number(assignment.overdueReminderCount)
-    : 0,
-  lastOverdueReminderAt: assignment.lastOverdueReminderAt ?? null,
-  createdAt: assignment.createdAt,
-  updatedAt: assignment.updatedAt,
-  latestSubmissionAttemptNo: Number.isFinite(Number(assignment.latestSubmissionAttemptNo))
-    ? Number(assignment.latestSubmissionAttemptNo)
-    : null,
-  latestSubmissionStatus: assignment.latestSubmissionStatus
-    ? normalizeHomeworkSubmissionStatus(assignment.latestSubmissionStatus)
-    : null,
-  latestSubmissionSubmittedAt: assignment.latestSubmissionSubmittedAt ?? null,
-  score: {
-    autoScore: clampHomeworkScore(assignment.autoScore),
-    manualScore: clampHomeworkScore(assignment.manualScore),
-    finalScore: clampHomeworkScore(assignment.finalScore),
-  },
-});
+const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
+  const status = resolveAssignmentViewStatus(assignment, now);
+  const isOverdue = status === 'OVERDUE';
+  const hasConfigError = normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' && !assignment.lessonId;
+  const problemFlags = Array.from(
+    new Set(
+      [
+        isOverdue ? 'OVERDUE' : null,
+        status === 'RETURNED' ? 'RETURNED' : null,
+        hasConfigError ? 'CONFIG_ERROR' : null,
+        status === 'SUBMITTED' ? 'SUBMITTED' : null,
+      ].filter(Boolean),
+    ),
+  );
+
+  return {
+    id: assignment.id,
+    teacherId: Number(assignment.teacherId),
+    studentId: assignment.studentId,
+    studentName: assignment.studentName ?? null,
+    studentUsername: assignment.studentUsername ?? assignment.student?.username ?? null,
+    lessonId: assignment.lessonId ?? null,
+    lessonStartAt: assignment.lessonStartAt ?? assignment.lesson?.startAt ?? null,
+    templateId: assignment.templateId ?? null,
+    templateTitle: assignment.templateTitle ?? assignment.template?.title ?? null,
+    legacyHomeworkId: assignment.legacyHomeworkId ?? null,
+    title: assignment.title ?? '',
+    status,
+    isOverdue,
+    hasConfigError,
+    problemFlags,
+    sendMode: normalizeHomeworkSendMode(assignment.sendMode),
+    deadlineAt: assignment.deadlineAt ?? null,
+    sentAt: assignment.sentAt ?? null,
+    contentSnapshot: normalizeHomeworkBlocks(assignment.contentSnapshot),
+    teacherComment: assignment.teacherComment ?? null,
+    reviewedAt: assignment.reviewedAt ?? null,
+    reminder24hSentAt: assignment.reminder24hSentAt ?? null,
+    reminderMorningSentAt: assignment.reminderMorningSentAt ?? null,
+    reminder3hSentAt: assignment.reminder3hSentAt ?? null,
+    overdueReminderCount: Number.isFinite(Number(assignment.overdueReminderCount))
+      ? Number(assignment.overdueReminderCount)
+      : 0,
+    lastOverdueReminderAt: assignment.lastOverdueReminderAt ?? null,
+    createdAt: assignment.createdAt,
+    updatedAt: assignment.updatedAt,
+    latestSubmissionAttemptNo: Number.isFinite(Number(assignment.latestSubmissionAttemptNo))
+      ? Number(assignment.latestSubmissionAttemptNo)
+      : null,
+    latestSubmissionStatus: assignment.latestSubmissionStatus
+      ? normalizeHomeworkSubmissionStatus(assignment.latestSubmissionStatus)
+      : null,
+    latestSubmissionSubmittedAt: assignment.latestSubmissionSubmittedAt ?? null,
+    score: {
+      autoScore: clampHomeworkScore(assignment.autoScore),
+      manualScore: clampHomeworkScore(assignment.manualScore),
+      finalScore: clampHomeworkScore(assignment.finalScore),
+    },
+  };
+};
 
 const serializeHomeworkSubmissionV2 = (submission: any) => ({
   id: submission.id,
@@ -2544,6 +2784,7 @@ const buildHomeworkNotificationText = (
   if (kind === 'REMINDER_24H') return `⏰ Напоминание: дедлайн через 24 часа\n${assignment.title}\nДо: ${deadlineLabel}`;
   if (kind === 'REMINDER_MORNING') return `🌤 Сегодня дедлайн по домашке\n${assignment.title}\nДо: ${deadlineLabel}`;
   if (kind === 'REMINDER_3H') return `⌛ Дедлайн скоро (через 3 часа)\n${assignment.title}\nДо: ${deadlineLabel}`;
+  if (kind === 'MANUAL_REMINDER') return `🔔 Напоминание по домашке\n${assignment.title}\nДедлайн: ${deadlineLabel}`;
   return `⚠️ Просрочена домашка: ${assignment.title}\nДедлайн был: ${deadlineLabel}`;
 };
 
@@ -4388,6 +4629,10 @@ const listHomeworkAssignmentsV2 = async (
     lessonId?: number | null;
     status?: string | null;
     bucket?: string | null;
+    tab?: string | null;
+    q?: string | null;
+    sort?: string | null;
+    problemFilters?: string | null;
     limit?: number;
     offset?: number;
   },
@@ -4396,31 +4641,106 @@ const listHomeworkAssignmentsV2 = async (
   const limit = clampNumber(Number(params.limit ?? DEFAULT_PAGE_SIZE), 1, MAX_PAGE_SIZE);
   const offset = clampNumber(Number(params.offset ?? 0), 0, 100_000);
   const now = new Date();
-  const where: Record<string, unknown> = { teacherId: teacher.chatId };
+  const where: Record<string, any> = { teacherId: teacher.chatId };
   if (params.studentId !== null && params.studentId !== undefined && Number.isFinite(Number(params.studentId))) {
     where.studentId = Number(params.studentId);
   }
   if (params.lessonId !== null && params.lessonId !== undefined && Number.isFinite(Number(params.lessonId))) {
     where.lessonId = Number(params.lessonId);
   }
+  const tab = normalizeHomeworkAssignmentsTabV2(params.tab);
+  const sort = normalizeHomeworkAssignmentsSortV2(params.sort);
+  const problemFilters = normalizeHomeworkAssignmentProblemFiltersV2(params.problemFilters);
+  const query = typeof params.q === 'string' ? params.q.trim() : '';
+
   if (params.status && params.status !== 'all') {
     where.status = normalizeHomeworkAssignmentStatus(params.status);
+  } else if (tab !== 'all') {
+    Object.assign(where, resolveAssignmentTabWhereV2(tab, now));
   } else {
     Object.assign(where, resolveAssignmentBucketWhereV2(normalizeHomeworkAssignmentBucketV2(params.bucket), now));
   }
 
-  const total = await (prisma as any).homeworkAssignment.count({ where });
+  if (problemFilters.length > 0) {
+    const conditions = problemFilters.map((filterName) => {
+      if (filterName === 'overdue') {
+        return {
+          OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
+        };
+      }
+      if (filterName === 'returned') {
+        return { status: 'RETURNED' };
+      }
+      return {
+        sendMode: 'AUTO_AFTER_LESSON_DONE',
+        lessonId: null,
+      };
+    });
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), { OR: conditions }];
+  }
+
+  if (query) {
+    const matchedLinks = await prisma.teacherStudent.findMany({
+      where: {
+        teacherId: teacher.chatId,
+        isArchived: false,
+        customName: { contains: query, mode: 'insensitive' },
+      },
+      select: { studentId: true },
+    });
+    const matchedStudentIds = matchedLinks.map((link) => link.studentId);
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      {
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { student: { username: { contains: query, mode: 'insensitive' } } },
+          { template: { title: { contains: query, mode: 'insensitive' } } },
+          ...(matchedStudentIds.length ? [{ studentId: { in: matchedStudentIds } }] : []),
+        ],
+      },
+    ];
+  }
+
+  const shouldSortInMemory = sort === 'urgency' || sort === 'student' || Boolean(query);
+  const orderBy: Record<string, 'asc' | 'desc'>[] =
+    sort === 'deadline'
+      ? [{ deadlineAt: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }]
+      : sort === 'updated'
+        ? [{ updatedAt: 'desc' }, { id: 'desc' }]
+        : [{ createdAt: 'desc' }, { id: 'desc' }];
+
+  const total = shouldSortInMemory
+    ? undefined
+    : await (prisma as any).homeworkAssignment.count({ where });
   const rawItems = await (prisma as any).homeworkAssignment.findMany({
     where,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    skip: offset,
-    take: limit,
+    include: {
+      student: {
+        select: { username: true },
+      },
+      lesson: {
+        select: { startAt: true },
+      },
+      template: {
+        select: { title: true },
+      },
+    },
+    orderBy,
+    ...(shouldSortInMemory ? {} : { skip: offset, take: limit }),
   });
-  const items = await attachLatestSubmissionMetaToAssignments(rawItems);
+  const withSubmissionMeta = await attachLatestSubmissionMetaToAssignments(rawItems);
+  const withDisplayMeta = await attachAssignmentDisplayMeta(teacher.chatId, withSubmissionMeta, now);
+  const filteredByQuery = query
+    ? withDisplayMeta.filter((item) => matchesAssignmentSearchQuery(item, query.toLowerCase()))
+    : withDisplayMeta;
+  const sorted = sortHomeworkAssignmentsV2(filteredByQuery, sort);
+  const pagedItems = shouldSortInMemory ? sorted.slice(offset, offset + limit) : sorted;
+  const resolvedTotal = shouldSortInMemory ? sorted.length : total ?? sorted.length;
   return {
-    items: items.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
-    total,
-    nextOffset: offset + limit < total ? offset + limit : null,
+    items: pagedItems.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
+    total: resolvedTotal,
+    nextOffset: offset + limit < resolvedTotal ? offset + limit : null,
   };
 };
 
@@ -4430,6 +4750,7 @@ const getHomeworkAssignmentsSummaryV2 = async (
 ) => {
   const teacher = await ensureTeacher(user);
   const now = new Date();
+  const resolvedTimeZone = resolveTimeZone(teacher.timezone);
   const baseWhere: Record<string, unknown> = { teacherId: teacher.chatId };
   if (params.studentId !== null && params.studentId !== undefined && Number.isFinite(Number(params.studentId))) {
     baseWhere.studentId = Number(params.studentId);
@@ -4443,16 +4764,72 @@ const getHomeworkAssignmentsSummaryV2 = async (
     ...resolveAssignmentBucketWhereV2(bucket, now),
   });
 
-  const [totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount] = await Promise.all([
+  const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+  const todayStart = toUtcDateFromTimeZone(todayKey, '00:00', resolvedTimeZone);
+  const todayEnd = toUtcEndOfDay(todayKey, resolvedTimeZone);
+  const monthStartKey = formatInTimeZone(now, 'yyyy-MM-01', { timeZone: resolvedTimeZone });
+  const monthStart = toUtcDateFromTimeZone(monthStartKey, '00:00', resolvedTimeZone);
+  const nextMonthZoned = toZonedDate(monthStart, resolvedTimeZone);
+  nextMonthZoned.setMonth(nextMonthZoned.getMonth() + 1);
+  const nextMonthStart = toUtcDateFromTimeZone(format(nextMonthZoned, 'yyyy-MM-dd'), '00:00', resolvedTimeZone);
+
+  const [totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount, scheduledCount, inProgressCount, closedCount, configErrorCount, returnedCount, reviewedThisMonthCount, sentTodayCount, inboxCount] = await Promise.all([
     (prisma as any).homeworkAssignment.count({ where: baseWhere }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('draft') }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('sent') }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('review') }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('reviewed') }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('overdue') }),
+    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'SCHEDULED' } }),
+    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: { in: ['SENT', 'RETURNED'] } } }),
+    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'REVIEWED' } }),
+    (prisma as any).homeworkAssignment.count({
+      where: { ...baseWhere, sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
+    }),
+    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'RETURNED' } }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        status: 'REVIEWED',
+        reviewedAt: { gte: monthStart, lt: nextMonthStart },
+      },
+    }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        sentAt: { gte: todayStart, lte: todayEnd },
+      },
+    }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        OR: [
+          { status: 'SUBMITTED' },
+          { status: 'RETURNED' },
+          { status: 'OVERDUE' },
+          { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
+          { sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
+        ],
+      },
+    }),
   ]);
 
-  return { totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount };
+  return {
+    totalCount,
+    draftCount,
+    sentCount,
+    reviewCount,
+    reviewedCount,
+    overdueCount,
+    inboxCount,
+    scheduledCount,
+    inProgressCount,
+    closedCount,
+    configErrorCount,
+    returnedCount,
+    reviewedThisMonthCount,
+    sentTodayCount,
+  };
 };
 
 const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unknown>) => {
@@ -4522,10 +4899,11 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
 
 const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body: Record<string, unknown>) => {
   const teacher = await ensureTeacher(user);
-  const existing = await (prisma as any).homeworkAssignment.findFirst({
-    where: { id: assignmentId, teacherId: teacher.chatId },
+  const existing = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
   });
-  if (!existing) throw new Error('Домашка не найдена');
+  if (!existing) throw createHttpError('Домашка не найдена', 404);
+  if (existing.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
 
   const data: Record<string, unknown> = {};
   if (typeof body.title === 'string') {
@@ -4535,6 +4913,32 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
   }
   if ('status' in body) data.status = normalizeHomeworkAssignmentStatus(body.status);
   if ('sendMode' in body) data.sendMode = normalizeHomeworkSendMode(body.sendMode);
+  if ('lessonId' in body) {
+    const lessonIdRaw = Number(body.lessonId);
+    if (body.lessonId === null || body.lessonId === undefined || body.lessonId === '') {
+      data.lessonId = null;
+    } else if (Number.isFinite(lessonIdRaw)) {
+      const lesson = await prisma.lesson.findUnique({ where: { id: lessonIdRaw } });
+      if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+      data.lessonId = lessonIdRaw;
+    } else {
+      throw new Error('Некорректный lessonId');
+    }
+  }
+  if ('templateId' in body) {
+    const templateIdRaw = Number(body.templateId);
+    if (body.templateId === null || body.templateId === undefined || body.templateId === '') {
+      data.templateId = null;
+    } else if (Number.isFinite(templateIdRaw)) {
+      const template = await (prisma as any).homeworkTemplate.findFirst({
+        where: { id: templateIdRaw, teacherId: teacher.chatId },
+      });
+      if (!template) throw new Error('Шаблон не найден');
+      data.templateId = templateIdRaw;
+    } else {
+      throw new Error('Некорректный templateId');
+    }
+  }
   if ('deadlineAt' in body) data.deadlineAt = toValidDate(body.deadlineAt);
   if ('sentAt' in body) data.sentAt = toValidDate(body.sentAt);
   if ('contentSnapshot' in body) data.contentSnapshot = JSON.stringify(normalizeHomeworkBlocks(body.contentSnapshot));
@@ -4569,6 +4973,153 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
   }
 
   return { assignment: serializeHomeworkAssignmentV2(updated) };
+};
+
+const sendManualHomeworkReminderForAssignmentV2 = async (teacher: any, assignment: any) => {
+  const result = await sendHomeworkNotificationToStudent({
+    teacherId: teacher.chatId,
+    studentId: assignment.studentId,
+    type: 'HOMEWORK_REMINDER_MANUAL',
+    dedupeKey: `HOMEWORK_REMINDER_MANUAL:${assignment.id}:${Date.now()}`,
+    text: buildHomeworkNotificationText('MANUAL_REMINDER', assignment, teacher.timezone),
+  });
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: assignment.studentId,
+    category: 'HOMEWORK',
+    action: 'REMIND',
+    status: result.status === 'sent' ? 'SUCCESS' : 'FAILED',
+    source: 'USER',
+    title: 'Отправлено напоминание по домашке',
+    details: `Assignment #${assignment.id}`,
+    payload: { assignmentId: assignment.id, status: result.status },
+  });
+
+  return result;
+};
+
+const remindHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+  });
+  if (!assignment) throw createHttpError('Домашка не найдена', 404);
+  if (assignment.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+
+  const result = await sendManualHomeworkReminderForAssignmentV2(teacher, assignment);
+  return {
+    status: result.status,
+    assignment: serializeHomeworkAssignmentV2(assignment),
+  };
+};
+
+const deleteHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const existing = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+  });
+  if (!existing) throw createHttpError('Домашка не найдена', 404);
+  if (existing.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+  await (prisma as any).homeworkAssignment.delete({ where: { id: assignmentId } });
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: existing.studentId,
+    category: 'HOMEWORK',
+    action: 'DELETE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Домашка удалена',
+    details: `Assignment #${assignmentId}`,
+    payload: { assignmentId },
+  });
+
+  return { deletedId: assignmentId };
+};
+
+const bulkHomeworkAssignmentsV2 = async (user: User, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const ids = Array.isArray(body.ids)
+    ? Array.from(
+        new Set(
+          body.ids
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        ),
+      )
+    : [];
+  if (!ids.length) throw new Error('ids обязательны');
+
+  const actionRaw = typeof body.action === 'string' ? body.action.toUpperCase() : '';
+  const action =
+    actionRaw === 'SEND_NOW' || actionRaw === 'REMIND' || actionRaw === 'MOVE_TO_DRAFT' || actionRaw === 'DELETE'
+      ? actionRaw
+      : null;
+  if (!action) throw new Error('Некорректное действие');
+
+  const assignments = await (prisma as any).homeworkAssignment.findMany({
+    where: {
+      id: { in: ids },
+      teacherId: teacher.chatId,
+    },
+  });
+  const assignmentById = new Map<number, any>(assignments.map((assignment: any) => [assignment.id, assignment]));
+  const results: Array<{ id: number; ok: boolean; message?: string }> = [];
+  let successCount = 0;
+
+  for (const id of ids) {
+    const assignment = assignmentById.get(id);
+    if (!assignment) {
+      results.push({ id, ok: false, message: 'Домашка не найдена' });
+      continue;
+    }
+
+    try {
+      if (action === 'SEND_NOW') {
+        const nextStatus = normalizeHomeworkAssignmentStatus(assignment.status) === 'SENT' ? 'SENT' : 'SENT';
+        const updated = await (prisma as any).homeworkAssignment.update({
+          where: { id },
+          data: {
+            status: nextStatus,
+            sentAt: assignment.sentAt ?? new Date(),
+          },
+        });
+        if (normalizeHomeworkAssignmentStatus(assignment.status) !== 'SENT' && teacher.homeworkNotifyOnAssign) {
+          await sendHomeworkNotificationToStudent({
+            teacherId: teacher.chatId,
+            studentId: updated.studentId,
+            type: 'HOMEWORK_ASSIGNED',
+            dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}`,
+            text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+          });
+        }
+      } else if (action === 'REMIND') {
+        await sendManualHomeworkReminderForAssignmentV2(teacher, assignment);
+      } else if (action === 'MOVE_TO_DRAFT') {
+        await (prisma as any).homeworkAssignment.update({
+          where: { id },
+          data: { status: 'DRAFT' },
+        });
+      } else if (action === 'DELETE') {
+        await (prisma as any).homeworkAssignment.delete({ where: { id } });
+      }
+
+      successCount += 1;
+      results.push({ id, ok: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown_error';
+      results.push({ id, ok: false, message });
+    }
+  }
+
+  return {
+    action,
+    total: ids.length,
+    successCount,
+    errorCount: ids.length - successCount,
+    results,
+  };
 };
 
 const listHomeworkSubmissionsV2 = async (user: User, assignmentId: number) => {
@@ -5700,226 +6251,17 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 403, { message: 'subscription_required' });
     }
 
-    if (req.method === 'GET' && pathname === '/transfer') {
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.setHeader('Referrer-Policy', 'no-referrer');
-      return res.end(`<!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Вход в аккаунт</title>
-    <style>
-      body { font-family: sans-serif; background: #f5f6fa; margin: 0; padding: 32px; color: #101828; }
-      .card { max-width: 520px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
-      h1 { font-size: 20px; margin: 0 0 12px; }
-      p { margin: 0 0 16px; color: #475467; }
-      button { background: #3b82f6; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Подтверждаем вход…</h1>
-      <p id="status">Проверяем ссылку и открываем кабинет.</p>
-      <button id="retry" style="display:none;">Запросить новую ссылку</button>
-    </div>
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('t');
-      const statusEl = document.getElementById('status');
-      const retryBtn = document.getElementById('retry');
-      const showError = (message) => {
-        statusEl.textContent = message;
-        retryBtn.style.display = 'inline-block';
-        retryBtn.addEventListener('click', () => {
-          window.location.href = '/';
-        });
-      };
-      if (!token) {
-        showError('Ссылка недействительна. Откройте Mini App и создайте новую ссылку.');
-      } else {
-        fetch('/auth/transfer/consume', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ token }),
-        })
-          .then(async (response) => {
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              throw new Error(data.message || 'Не удалось подтвердить вход.');
-            }
-            const redirectUrl = data.redirect_url || '/';
-            window.location.replace(redirectUrl);
-          })
-          .catch(() => {
-            showError('Ссылка устарела или уже использована. Создайте новую в Telegram.');
-          });
-      }
-    </script>
-  </body>
-        </html>`);
-    }
-
-    if (req.method === 'GET' && pathname === '/auth/session') {
-      const user = await resolveSessionUser(req, res);
-      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
-      return sendJson(res, 200, { user });
-    }
-
-    if (req.method === 'POST' && pathname === '/auth/telegram/webapp') {
-      const body = await readBody(req);
-      const initData = typeof body.initData === 'string' ? body.initData : '';
-      if (!initData) return badRequest(res, 'invalid_init_data');
-      if (isRateLimited(`webapp:${getRequestIp(req)}`, RATE_LIMIT_WEBAPP_PER_MIN, 60_000)) {
-        return sendJson(res, 429, { message: 'rate_limited' });
-      }
-      const verification = verifyTelegramInitData(initData);
-      if (!verification.ok) {
-        return sendJson(res, 401, { message: verification.reason });
-      }
-      const authDateRaw = verification.params.get('auth_date');
-      const userRaw = verification.params.get('user');
-      const authDate = authDateRaw ? Number(authDateRaw) : NaN;
-      if (!userRaw || !Number.isFinite(authDate)) {
-        return badRequest(res, 'invalid_init_data');
-      }
-      const nowSec = Math.floor(Date.now() / 1000);
-      const initDataTtlSec = Number.isFinite(TELEGRAM_INITDATA_TTL_SEC) ? TELEGRAM_INITDATA_TTL_SEC : 300;
-      if (nowSec - authDate > initDataTtlSec) {
-        return sendJson(res, 401, { message: 'auth_date_expired' });
-      }
-      let telegramUser: any;
-      try {
-        telegramUser = JSON.parse(userRaw);
-      } catch (error) {
-        return badRequest(res, 'invalid_init_data');
-      }
-      if (!telegramUser?.id) {
-        return badRequest(res, 'invalid_init_data');
-      }
-      const telegramUserId = BigInt(telegramUser.id);
-      const existingUser = await prisma.user.findUnique({ where: { telegramUserId } });
-      const isNewUser = !existingUser;
-      const userRecord = existingUser
-        ? await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              username: telegramUser.username ?? null,
-              firstName: telegramUser.first_name ?? null,
-              lastName: telegramUser.last_name ?? null,
-              photoUrl: telegramUser.photo_url ?? null,
-            },
-          })
-        : await prisma.user.create({
-            data: {
-              telegramUserId,
-              username: telegramUser.username ?? null,
-              firstName: telegramUser.first_name ?? null,
-              lastName: telegramUser.last_name ?? null,
-              photoUrl: telegramUser.photo_url ?? null,
-            },
-          });
-      const lastAuthDate = existingUser?.lastAuthDate ?? userRecord.lastAuthDate;
-      if (lastAuthDate && authDate + TELEGRAM_REPLAY_SKEW_SEC < lastAuthDate) {
-        return badRequest(res, 'invalid_init_data');
-      }
-      await prisma.user.update({
-        where: { id: userRecord.id },
-        data: { lastAuthDate: authDate },
-      });
-      const session = await createSession(userRecord.id, req, res);
-      return sendJson(res, 200, {
-        user: userRecord,
-        session: { expiresAt: session.expiresAt },
-        isNewUser,
-      });
-    }
-
-    if (req.method === 'POST' && pathname === '/auth/transfer/create') {
-      const user = await getSessionUser(req);
-      if (!user) return sendJson(res, 401, { message: 'unauthorized' });
-      const ip = getRequestIp(req);
-      if (isRateLimited(`transfer:create:ip:${ip}`, RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN, 60_000)) {
-        return sendJson(res, 429, { message: 'rate_limited' });
-      }
-      if (isRateLimited(`transfer:create:${user.id}`, RATE_LIMIT_TRANSFER_CREATE_PER_MIN, 60_000)) {
-        return sendJson(res, 429, { message: 'rate_limited' });
-      }
-      const token = randomToken(32);
-      const tokenHash = hashToken(token);
-      const configuredTtlSec = Number.isFinite(TRANSFER_TOKEN_TTL_SEC) ? TRANSFER_TOKEN_TTL_SEC : 120;
-      const ttlSeconds = clampNumber(configuredTtlSec, TRANSFER_TOKEN_MIN_TTL_SEC, TRANSFER_TOKEN_MAX_TTL_SEC);
-      const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-      await prisma.transferToken.create({
-        data: {
-          userId: user.id,
-          tokenHash,
-          expiresAt,
-          createdIp: getRequestIp(req) || null,
-          createdUserAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
-        },
-      });
-      const baseUrl = getBaseUrl(req);
-      const transferUrl = new URL(baseUrl);
-      if (transferUrl.hostname === 'localhost' || transferUrl.hostname === '127.0.0.1') {
-        transferUrl.protocol = 'http:';
-        transferUrl.port = '5173';
-      }
-      const url = `${transferUrl.toString().replace(/\/$/, '')}/transfer?t=${token}`;
-      return sendJson(res, 200, { url, expires_in: ttlSeconds });
-    }
-
-    if (req.method === 'POST' && pathname === '/auth/transfer/consume') {
-      const body = await readBody(req);
-      const token = typeof body.token === 'string' ? body.token : '';
-      if (!token) return badRequest(res, 'invalid_token');
-      const ip = getRequestIp(req);
-      if (isRateLimited(`transfer:consume:ip:${ip}`, RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN, 60_000)) {
-        return sendJson(res, 429, { message: 'rate_limited' });
-      }
-      if (isRateLimited(`transfer:consume:token:${token}`, RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN, 60_000)) {
-        return sendJson(res, 429, { message: 'rate_limited' });
-      }
-      const tokenHash = hashToken(token);
-      const record = await prisma.transferToken.findFirst({ where: { tokenHash } });
-      if (!record) {
-        return badRequest(res, 'invalid_token');
-      }
-      if (record.usedAt || record.expiresAt.getTime() < Date.now()) {
-        return sendJson(res, 410, { message: 'token_expired_or_used' });
-      }
-      const consumeResult = await prisma.$transaction(async (tx) => {
-        const updateResult = await tx.transferToken.updateMany({
-          where: { id: record.id, usedAt: null, expiresAt: { gte: new Date() } },
-          data: { usedAt: new Date() },
-        });
-        if (updateResult.count === 0) {
-          return false;
-        }
-        await tx.transferToken.deleteMany({ where: { id: record.id } });
-        return true;
-      });
-      if (!consumeResult) {
-        return sendJson(res, 410, { message: 'token_expired_or_used' });
-      }
-      const session = await createSession(record.userId, req, res);
-      return sendJson(res, 200, { redirect_url: TRANSFER_REDIRECT_URL, session: { expiresAt: session.expiresAt } });
-    }
-
-    if (req.method === 'POST' && pathname === '/auth/logout') {
-      const cookies = parseCookies(req.headers.cookie);
-      const token = cookies[SESSION_COOKIE_NAME];
-      if (token) {
-        await prisma.session.updateMany({
-          where: { tokenHash: hashToken(token), revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      }
-      res.setHeader('Set-Cookie', buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0, secure: isSecureRequest(req) }));
-      return sendJson(res, 200, { status: 'ok' });
+    if (
+      await tryHandleAuthRoutes({
+        req,
+        res,
+        pathname,
+        resolveSessionUser,
+        authSessionHandlers,
+        authTransferHandlers,
+      })
+    ) {
+      return;
     }
 
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
@@ -5968,47 +6310,27 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 200, data);
     }
 
-    if (req.method === 'GET' && pathname === '/api/v2/student/context') {
-      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await listStudentContextV2(requireApiUser(), requestedTeacherId, requestedStudentId);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'PATCH' && pathname === '/api/v2/student/preferences') {
-      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const body = await readBody(req);
-      const data = await updateStudentPreferencesV2(requireApiUser(), requestedTeacherId, requestedStudentId, body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/v2/student/homework/summary') {
-      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await getStudentHomeworkSummaryV2(requireApiUser(), requestedTeacherId, requestedStudentId);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/v2/student/homework/assignments') {
-      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await listStudentHomeworkAssignmentsV2(requireApiUser(), requestedTeacherId, requestedStudentId, {
-        filter: url.searchParams.get('filter'),
-        limit: Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE),
-        offset: Number(url.searchParams.get('offset') ?? 0),
-      });
-      return sendJson(res, 200, data);
-    }
-
-    const studentHomeworkAssignmentDetailMatch = pathname.match(/^\/api\/v2\/student\/homework\/assignments\/(\d+)$/);
-    if (req.method === 'GET' && studentHomeworkAssignmentDetailMatch) {
-      if (role !== 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(studentHomeworkAssignmentDetailMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const data = await getStudentHomeworkAssignmentDetailV2(
-        requireApiUser(),
+    if (
+      await tryHandleStudentV2Routes({
+        req,
+        res,
+        pathname,
+        url,
+        role,
         requestedTeacherId,
         requestedStudentId,
-        assignmentId,
-      );
-      return sendJson(res, 200, data);
+        defaultPageSize: DEFAULT_PAGE_SIZE,
+        requireApiUser,
+        handlers: {
+          listStudentContextV2,
+          updateStudentPreferencesV2,
+          getStudentHomeworkSummaryV2,
+          listStudentHomeworkAssignmentsV2,
+          getStudentHomeworkAssignmentDetailV2,
+        },
+      })
+    ) {
+      return;
     }
 
     if (req.method === 'POST' && pathname === '/api/v2/files/presign-upload') {
@@ -6050,6 +6372,10 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
         status: url.searchParams.get('status'),
         bucket: url.searchParams.get('bucket'),
+        tab: url.searchParams.get('tab'),
+        q: url.searchParams.get('q'),
+        sort: url.searchParams.get('sort'),
+        problemFilters: url.searchParams.get('problemFilters'),
         limit: Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE),
         offset: Number(url.searchParams.get('offset') ?? 0),
       });
@@ -6072,13 +6398,35 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 201, data);
     }
 
+    if (req.method === 'POST' && pathname === '/api/v2/homework/assignments/bulk') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const body = await readBody(req);
+      const data = await bulkHomeworkAssignmentsV2(requireApiUser(), body);
+      return sendJson(res, 200, data);
+    }
+
     const homeworkAssignmentUpdateMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)$/);
-    if (req.method === 'PATCH' && homeworkAssignmentUpdateMatch) {
+    if (homeworkAssignmentUpdateMatch) {
       if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
       const assignmentId = Number(homeworkAssignmentUpdateMatch[1]);
       if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const body = await readBody(req);
-      const data = await updateHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
+      if (req.method === 'PATCH') {
+        const body = await readBody(req);
+        const data = await updateHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
+        return sendJson(res, 200, data);
+      }
+      if (req.method === 'DELETE') {
+        const data = await deleteHomeworkAssignmentV2(requireApiUser(), assignmentId);
+        return sendJson(res, 200, data);
+      }
+    }
+
+    const homeworkAssignmentRemindMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/remind$/);
+    if (req.method === 'POST' && homeworkAssignmentRemindMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(homeworkAssignmentRemindMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const data = await remindHomeworkAssignmentV2(requireApiUser(), assignmentId);
       return sendJson(res, 200, data);
     }
 
@@ -6157,6 +6505,23 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           ? data.entries.filter((entry) => entry.studentId === requestedStudentId)
           : data.entries;
       return sendJson(res, 200, { entries: filteredEntries });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/activity-feed/unread-status') {
+      if (role === 'STUDENT') {
+        return sendJson(res, 403, { message: 'forbidden' });
+      }
+      const data = await getActivityFeedUnreadStatus(requireApiUser());
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/activity-feed/mark-seen') {
+      if (role === 'STUDENT') {
+        return sendJson(res, 403, { message: 'forbidden' });
+      }
+      const body = await readBody(req);
+      const data = await markActivityFeedSeen(requireApiUser(), body);
+      return sendJson(res, 200, data);
     }
 
     if (req.method === 'GET' && pathname === '/api/activity-feed') {
@@ -6482,7 +6847,15 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
     return notFound(res);
   } catch (error) {
+    const statusCodeRaw = (error as { statusCode?: unknown } | null)?.statusCode;
+    const statusCode =
+      typeof statusCodeRaw === 'number' && Number.isFinite(statusCodeRaw)
+        ? Math.trunc(statusCodeRaw)
+        : null;
     const message = error instanceof Error ? error.message : 'Unexpected error';
+    if (statusCode && statusCode >= 400 && statusCode <= 599) {
+      return sendJson(res, statusCode, { message });
+    }
     return badRequest(res, message);
   }
 };

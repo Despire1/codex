@@ -1,0 +1,87 @@
+.root {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px var(--shadow-slate-900-08);
+}
+
+.titleGroup {
+  display: grid;
+  gap: 2px;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.date {
+  color: var(--color-slate-500);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notificationButton {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notificationDot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-red-500);
+}
+
+.toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  background: var(--color-gray-100);
+  border-radius: 10px;
+  padding: 2px;
+}
+
+.toggleButton {
+  border: none;
+  background: transparent;
+  color: var(--color-slate-600);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  min-width: 68px;
+}
+
+.toggleButtonActive {
+  background: var(--color-white);
+  color: var(--color-slate-900);
+  box-shadow: 0 6px 16px var(--shadow-slate-900-08);
+}

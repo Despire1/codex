@@ -19,6 +19,7 @@ interface AnchoredPopoverProps {
 
 const DEFAULT_OFFSET = 8;
 const VIEWPORT_PADDING = 8;
+const TRANSITION_DURATION_MS = 180;
 
 const getOppositeSide = (side: PopoverSide): PopoverSide => {
   switch (side) {
@@ -50,6 +51,9 @@ export const AnchoredPopover = ({
 }: AnchoredPopoverProps) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(isOpen);
+  const [activeAnchorEl, setActiveAnchorEl] = useState<HTMLElement | null>(anchorEl);
   const candidates = useMemo(
     () => uniqueSides([side, getOppositeSide(side), 'bottom', 'top', 'right', 'left']),
     [side],
@@ -115,8 +119,9 @@ export const AnchoredPopover = ({
   };
 
   const updatePosition = () => {
-    if (!anchorEl || !popoverRef.current) return;
-    const anchorRect = anchorEl.getBoundingClientRect();
+    const resolvedAnchorEl = anchorEl ?? activeAnchorEl;
+    if (!resolvedAnchorEl || !popoverRef.current) return;
+    const anchorRect = resolvedAnchorEl.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
 
     let nextPosition = getPosition(side, anchorRect, popoverRect);
@@ -150,14 +155,43 @@ export const AnchoredPopover = ({
   };
 
   useLayoutEffect(() => {
-    if (!isOpen) return;
+    if (!shouldRender || !isOpen) return;
     updatePosition();
-  }, [isOpen, anchorEl, side, align, offset, children]);
+  }, [shouldRender, isOpen, anchorEl, activeAnchorEl, side, align, offset]);
+
+  useEffect(() => {
+    if (!isOpen || !anchorEl) return undefined;
+
+    setActiveAnchorEl(anchorEl);
+    setShouldRender(true);
+
+    const rafId = window.requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [isOpen, anchorEl]);
+
+  useEffect(() => {
+    if (isOpen || !shouldRender) return undefined;
+
+    setIsVisible(false);
+    const timeoutId = window.setTimeout(() => {
+      setShouldRender(false);
+      setActiveAnchorEl(null);
+    }, TRANSITION_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOpen, shouldRender]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
 
-    const handleOutside = (event: MouseEvent) => {
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       if (popoverRef.current?.contains(target)) return;
       if (anchorEl?.contains(target)) return;
@@ -178,25 +212,27 @@ export const AnchoredPopover = ({
     const handleReposition = () => updatePosition();
 
     document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleReposition);
     window.addEventListener('scroll', handleReposition, true);
 
     return () => {
       document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
   }, [anchorEl, isOpen, onClose, preventCloseOnOtherPopoverClick]);
 
-  if (!isOpen || !anchorEl) return null;
+  if (!shouldRender || !activeAnchorEl) return null;
 
   return createPortal(
     <div
       ref={popoverRef}
       data-anchored-popover-root="true"
-      className={`${styles.popover} ${className}`.trim()}
+      className={`${styles.popover} ${isVisible ? styles.popoverOpen : styles.popoverClosing} ${className}`.trim()}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >
       {children}

@@ -172,10 +172,10 @@ const AppPageContent = () => {
   } = studentsData;
 
   const guardedNavigate = useCallback(
-    (to: string) => {
+    (to: string, options?: { replace?: boolean; state?: unknown }) => {
       const active = getActiveEntry();
       if (!active || !active.entry.isDirty) {
-        navigate(to);
+        navigate(to, options);
         return;
       }
 
@@ -190,7 +190,7 @@ const AppPageContent = () => {
             .then((ok) => {
               if (!ok) return;
               clearEntry(active.key);
-              navigate(to);
+              navigate(to, options);
             })
             .catch(() => {
               showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
@@ -199,7 +199,7 @@ const AppPageContent = () => {
         onCancel: () => {
           active.entry.onDiscard?.();
           clearEntry(active.key);
-          navigate(to);
+          navigate(to, options);
         },
       });
     },
@@ -413,10 +413,11 @@ const AppPageContent = () => {
         lessonIso,
         date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
         undefined,
-        { skipNavigation: true },
+        { skipNavigation: true, variant: isMobile ? 'sheet' : 'modal' },
       );
     },
     [
+      isMobile,
       openLessonModal,
       resolvedTimeZone,
       setDayViewDate,
@@ -590,9 +591,8 @@ const AppPageContent = () => {
   }, [openCreateLesson]);
 
   const onDashboardAddStudent = useCallback(() => {
-    guardedNavigate(tabPathById.students);
-    openCreateStudentModal();
-  }, [guardedNavigate, openCreateStudentModal]);
+    openCreateStudentModal({ variant: isMobile ? 'sheet' : 'modal' });
+  }, [isMobile, openCreateStudentModal]);
 
   const onDashboardOpenSchedule = useCallback(() => {
     guardedNavigate(tabPathById.schedule);
@@ -634,6 +634,19 @@ const AppPageContent = () => {
     [guardedNavigate, setSelectedStudentId],
   );
 
+  const onDashboardOpenHomeworkAssign = useCallback(
+    (studentId?: number | null, lessonId?: number | null) => {
+      guardedNavigate(tabPathById.homeworks, {
+        state: {
+          openAssignModal: true,
+          studentId: typeof studentId === 'number' ? studentId : null,
+          lessonId: typeof lessonId === 'number' ? lessonId : null,
+        },
+      });
+    },
+    [guardedNavigate],
+  );
+
   const dashboardRouteProps = useMemo(
     () => ({
       teacher,
@@ -645,6 +658,7 @@ const AppPageContent = () => {
       onOpenLesson: onDashboardOpenLesson,
       onOpenLessonDay: onDashboardOpenLessonDay,
       onOpenStudent: onDashboardOpenStudent,
+      onOpenHomeworkAssign: onDashboardOpenHomeworkAssign,
     }),
     [
       linkedStudents,
@@ -652,6 +666,7 @@ const AppPageContent = () => {
       onDashboardAddStudent,
       onDashboardOpenLesson,
       onDashboardOpenLessonDay,
+      onDashboardOpenHomeworkAssign,
       onDashboardOpenSchedule,
       onDashboardOpenStudent,
       openCreateLesson,
