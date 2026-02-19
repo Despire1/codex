@@ -90,6 +90,17 @@ export type HomeworkTemplateBlockType = 'TEXT' | 'MEDIA' | 'TEST' | 'STUDENT_RES
 
 export type HomeworkTestQuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'SHORT_ANSWER' | 'MATCHING';
 
+export type HomeworkTestQuestionKind =
+  | 'CHOICE'
+  | 'SHORT_TEXT'
+  | 'LONG_TEXT'
+  | 'AUDIO'
+  | 'FILE'
+  | 'FILL_WORD'
+  | 'MATCHING'
+  | 'ORDERING'
+  | 'TABLE';
+
 export interface HomeworkTestOption {
   id: string;
   text: string;
@@ -101,14 +112,35 @@ export interface HomeworkTestMatchingPair {
   right: string;
 }
 
+export interface HomeworkTestTableRow {
+  id: string;
+  lead: string;
+  answers: string[];
+}
+
+export interface HomeworkTestTableConfig {
+  leadHeader: string;
+  answerHeaders: string[];
+  rows: HomeworkTestTableRow[];
+  partialCredit?: boolean | null;
+}
+
 export interface HomeworkTestQuestion {
   id: string;
   type: HomeworkTestQuestionType;
+  uiQuestionKind?: HomeworkTestQuestionKind;
+  uiRequired?: boolean;
   prompt: string;
   options?: HomeworkTestOption[];
   correctOptionIds?: string[];
   acceptedAnswers?: string[];
   matchingPairs?: HomeworkTestMatchingPair[];
+  fillInTheBlankText?: string;
+  orderingItems?: HomeworkTestOption[];
+  table?: HomeworkTestTableConfig | null;
+  caseSensitive?: boolean;
+  allowPartialCredit?: boolean;
+  shuffleOptions?: boolean;
   explanation?: string | null;
   points?: number | null;
 }

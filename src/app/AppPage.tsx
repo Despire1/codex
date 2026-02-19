@@ -39,6 +39,11 @@ import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useSc
 import { UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
 import { useAppDialogs } from './model/useAppDialogs';
 import { useLinkedStudents } from './model/useLinkedStudents';
+import {
+  dispatchHomeworkTemplateCreateTopbarCommand,
+  type HomeworkTemplateCreateTopbarState,
+  subscribeHomeworkTemplateCreateTopbarState,
+} from '../features/homework-template-editor/model/lib/createTemplateTopbarBridge';
 
 const resolveAnalyticsSource = (source: string) => {
   if (source === 'onboarding_hero') return 'hero_cta';
@@ -117,6 +122,11 @@ const AppPageContent = () => {
   const [studentContextRevision, setStudentContextRevision] = useState(0);
   const isMobile = useIsMobile(767);
   const isDesktop = useIsDesktop();
+  const [templateCreateTopbarState, setTemplateCreateTopbarState] = useState<HomeworkTemplateCreateTopbarState>({
+    submitting: false,
+    hasValidationErrors: false,
+    draftSavedAtLabel: null,
+  });
   const device = isMobile ? 'mobile' : 'desktop';
   const {
     dialogState,
@@ -256,7 +266,16 @@ const AppPageContent = () => {
     return matchedTab?.id ?? 'dashboard';
   }, [availableTabs, location.pathname]);
 
+  const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
+  const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
+
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
+  const desktopTopbarResolvedTitle = isTeacherTemplateEditorRoute
+    ? isTeacherTemplateEditRoute
+      ? 'Редактирование шаблона'
+      : 'Создание шаблона'
+    : desktopTopbarTitle;
   const desktopDateLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('ru-RU', {
@@ -267,6 +286,21 @@ const AppPageContent = () => {
       }).format(new Date()),
     [],
   );
+  const desktopTopbarResolvedSubtitle = isTeacherTemplateEditorRoute
+    ? templateCreateTopbarState.draftSavedAtLabel
+      ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
+      : isTeacherTemplateEditRoute
+        ? 'Обновите настройки и вопросы шаблона'
+        : 'Новое домашнее задание'
+    : desktopDateLabel;
+  const templateCreateActionLabel = isTeacherTemplateEditRoute ? 'Сохранить шаблон' : 'Создать шаблон';
+  const templateCreateSubmittingLabel = isTeacherTemplateEditRoute ? 'Сохраняю…' : 'Создаю…';
+
+  useEffect(() => {
+    return subscribeHomeworkTemplateCreateTopbarState((state) => {
+      setTemplateCreateTopbarState(state);
+    });
+  }, []);
 
   const dashboardState = useDashboardStateInternal({
     hasAccess: hasTeacherAccess,
@@ -827,16 +861,28 @@ const AppPageContent = () => {
                         {isDesktop && !isStudentRole ? (
                           <Topbar
                             teacher={teacher}
-                            title={desktopTopbarTitle}
-                            subtitle={desktopDateLabel}
-                            showCreateLesson={activeTab === 'dashboard' && hasTeacherAccess}
+                            title={desktopTopbarResolvedTitle}
+                            subtitle={desktopTopbarResolvedSubtitle}
+                            showCreateLesson={activeTab === 'dashboard' && hasTeacherAccess && !isTeacherTemplateEditorRoute}
+                            showTemplateCreateActions={isTeacherTemplateEditorRoute}
+                            showTemplateSaveDraft={!isTeacherTemplateEditRoute}
+                            showBackButton={isTeacherTemplateEditorRoute}
+                            onBack={() => guardedNavigate(tabPathById.homeworks)}
+                            onSaveDraft={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
+                            onCreateTemplate={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
+                            templateCreateSubmitting={templateCreateTopbarState.submitting}
+                            templateCreateSubmitDisabled={templateCreateTopbarState.hasValidationErrors}
+                            templateCreateActionLabel={templateCreateActionLabel}
+                            templateCreateSubmittingLabel={templateCreateSubmittingLabel}
                             onOpenNotifications={onOpenNotifications}
                             onCreateLesson={onTopbarCreateLesson}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
                           />
                         ) : null}
 
-                        <main className={layoutStyles.content}>
+                        <main
+                          className={`${layoutStyles.content} ${isTeacherTemplateEditorRoute ? layoutStyles.contentNoScroll : ''}`}
+                        >
                           <AppRoutes
                             key={isStudentRole ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}` : 'teacher'}
                             isStudentRole={isStudentRole}

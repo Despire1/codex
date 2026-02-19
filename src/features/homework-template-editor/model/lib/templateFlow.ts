@@ -59,6 +59,12 @@ const createOpenAnswerResponseBlock = (): HomeworkBlockStudentResponse => ({
   allowVoice: true,
 });
 
+const getQuestionKind = (question: HomeworkTestQuestion) => {
+  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return 'CHOICE';
+  if (question.type === 'MATCHING') return 'MATCHING';
+  return question.uiQuestionKind ?? 'SHORT_TEXT';
+};
+
 export const buildBlocksFromPreset = (presetId: HomeworkTemplatePresetId): HomeworkBlock[] => {
   if (presetId === 'TEST_ONLY') {
     return [createTestBlock()];
@@ -74,14 +80,47 @@ export const buildBlocksFromPreset = (presetId: HomeworkTemplatePresetId): Homew
 
 const isQuestionConfigured = (question: HomeworkTestQuestion) => {
   if (!question.prompt.trim()) return false;
-  if (question.type === 'SHORT_ANSWER') return true;
-  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') {
+  const kind = getQuestionKind(question);
+
+  if (kind === 'CHOICE') {
     const options = question.options ?? [];
     const filledOptions = options.filter((option) => option.text.trim().length > 0);
     return filledOptions.length >= 2;
   }
-  const pairs = question.matchingPairs ?? [];
-  return pairs.some((pair) => pair.left.trim().length > 0 || pair.right.trim().length > 0);
+
+  if (kind === 'MATCHING') {
+    const pairs = question.matchingPairs ?? [];
+    const configuredPairs = pairs.filter((pair) => pair.left.trim().length > 0 && pair.right.trim().length > 0);
+    return configuredPairs.length >= 2;
+  }
+
+  if (kind === 'FILL_WORD') {
+    const text = question.fillInTheBlankText?.trim() ?? '';
+    const placeholders = Array.from(text.matchAll(/\[___\]/g)).length;
+    if (!placeholders) return false;
+    const answers = (question.acceptedAnswers ?? []).slice(0, placeholders).map((answer) => answer.trim());
+    return answers.length === placeholders && answers.every(Boolean);
+  }
+
+  if (kind === 'ORDERING') {
+    const items = (question.orderingItems ?? []).map((item) => item.text.trim()).filter(Boolean);
+    return items.length >= 2;
+  }
+
+  if (kind === 'TABLE') {
+    const table = question.table;
+    if (!table) return false;
+    const answerColumns = (table.answerHeaders ?? []).length;
+    if (!answerColumns) return false;
+    const hasConfiguredRow = (table.rows ?? []).some((row) => {
+      if (!row.lead.trim()) return false;
+      const answers = (row.answers ?? []).slice(0, answerColumns).map((answer) => answer.trim());
+      return answers.length === answerColumns && answers.every(Boolean);
+    });
+    return hasConfiguredRow;
+  }
+
+  return true;
 };
 
 export const summarizeTemplateBlocks = (blocks: HomeworkBlock[]) => {

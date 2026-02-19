@@ -1,0 +1,197 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-gray-100);
+  border-radius: 26px;
+  padding: 16px 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.leftGroup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.menuButton {
+  border: none;
+  background: transparent;
+  color: var(--color-gray-500);
+  width: 32px;
+  height: 32px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.menuButton:hover {
+  background: var(--color-gray-100);
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.backButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  color: var(--color-gray-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.backButton:hover {
+  background: var(--color-gray-50);
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-gray-500);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ghostButton {
+  border: none;
+  background: transparent;
+  color: var(--color-gray-500);
+  padding: 9px 12px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ghostButton:hover {
+  background: var(--color-gray-100);
+}
+
+.ghostButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.bellButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  color: var(--color-gray-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 6px 16px var(--shadow-slate-900-06);
+}
+
+.bellButton:hover {
+  background: var(--color-gray-50);
+}
+
+.bellDot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-red-500);
+  border: 1px solid var(--color-white);
+}
+
+.submitButton {
+  border: 1px solid var(--color-gray-900);
+  background: var(--color-gray-900);
+  color: var(--color-white);
+  border-radius: 16px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 8px 18px var(--shadow-slate-900-08);
+}
+
+.submitButton:hover {
+  background: #1f2937;
+}
+
+.submitButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.submitIcon {
+  color: #a3e635;
+}
+
+@media (max-width: 1080px) {
+  .header {
+    border-radius: 20px;
+    padding: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 767px) {
+  .menuButton {
+    display: inline-flex;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .ghostButton span {
+    display: none;
+  }
+
+  .submitButton {
+    padding: 10px 12px;
+  }
+
+  .submitButton span {
+    display: none;
+  }
+}

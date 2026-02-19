@@ -43,6 +43,12 @@ export const resolveAssignmentResponseConfig = (assignment: HomeworkAssignment):
     (block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE',
   );
   const hasTest = assignment.contentSnapshot.some((block) => block.type === 'TEST' && (block.questions?.length ?? 0) > 0);
+  const testQuestions = assignment.contentSnapshot
+    .filter((block): block is Extract<HomeworkAssignment['contentSnapshot'][number], { type: 'TEST' }> => block.type === 'TEST')
+    .flatMap((block) => block.questions ?? []);
+
+  const testRequiresVoice = testQuestions.some((question) => question.uiQuestionKind === 'AUDIO');
+  const testRequiresFiles = testQuestions.some((question) => question.uiQuestionKind === 'FILE');
 
   const merged = responseFieldKeys.reduce<Record<string, boolean>>((acc, key) => {
     acc[key] = responseBlocks.some((block) => Boolean(block[key]));
@@ -53,29 +59,33 @@ export const resolveAssignmentResponseConfig = (assignment: HomeworkAssignment):
     hasTest,
     hasStudentResponse: responseBlocks.length > 0,
     allowText: Boolean(merged.allowText),
-    allowFiles: Boolean(merged.allowFiles),
+    allowFiles: Boolean(merged.allowFiles) || testRequiresFiles,
     allowPhotos: Boolean(merged.allowPhotos),
     allowDocuments: Boolean(merged.allowDocuments),
     allowAudio: Boolean(merged.allowAudio),
     allowVideo: Boolean(merged.allowVideo),
-    allowVoice: Boolean(merged.allowVoice),
+    allowVoice: Boolean(merged.allowVoice) || testRequiresVoice,
     allowsAnyManualResponse:
       Boolean(merged.allowText) ||
       Boolean(merged.allowFiles) ||
+      testRequiresFiles ||
       Boolean(merged.allowPhotos) ||
       Boolean(merged.allowDocuments) ||
       Boolean(merged.allowAudio) ||
       Boolean(merged.allowVideo) ||
-      Boolean(merged.allowVoice),
+      Boolean(merged.allowVoice) ||
+      testRequiresVoice,
     canSubmit:
       hasTest ||
       Boolean(merged.allowText) ||
       Boolean(merged.allowFiles) ||
+      testRequiresFiles ||
       Boolean(merged.allowPhotos) ||
       Boolean(merged.allowDocuments) ||
       Boolean(merged.allowAudio) ||
       Boolean(merged.allowVideo) ||
-      Boolean(merged.allowVoice),
+      Boolean(merged.allowVoice) ||
+      testRequiresVoice,
   };
 
   return {

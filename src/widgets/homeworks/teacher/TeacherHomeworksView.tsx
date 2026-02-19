@@ -3,18 +3,14 @@ import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';
 import { TeacherBulkAction, TeacherHomeworksViewModel } from '../types';
 import { HomeworkAssignModal } from '../../../features/homework-assign/ui/HomeworkAssignModal';
-import {
-  createInitialTemplateEditorDraft,
-  createTemplateEditorDraftFromTemplate,
-} from '../../../features/homework-template-editor/model/lib/blocks';
-import { HomeworkTemplateEditorDraft } from '../../../features/homework-template-editor/model/types';
-import { HomeworkTemplateEditorModal } from '../../../features/homework-template-editor/ui/HomeworkTemplateEditorModal';
 import { HomeworkAssignment, HomeworkTemplate } from '../../../entities/types';
 import { HomeworkReviewModal } from '../../../features/homework-review/ui/HomeworkReviewModal';
 import { Modal } from '../../../shared/ui/Modal/Modal';
+import { loadStoredCreateTemplateDraftSummary } from '../../../features/homework-template-editor/model/lib/createTemplateDraftStorage';
 import {
   HomeworkAlignLeftIcon,
   HomeworkBellRegularIcon,
+  HomeworkBookmarkRegularIcon,
   HomeworkBoltIcon,
   HomeworkChevronDownIcon,
   HomeworkCircleExclamationIcon,
@@ -52,12 +48,6 @@ const TAB_LABELS: Record<TeacherHomeworksViewModel['activeTab'], string> = {
   review: 'На проверке',
   closed: 'Закрыто',
   overdue: 'Просрочено',
-};
-
-const PROBLEM_LABELS: Record<NonNullable<TeacherHomeworksViewModel['problemFilters'][number]>, string> = {
-  overdue: 'Просрочено',
-  returned: 'Возвращено',
-  config_error: 'Ошибки настройки',
 };
 
 const SORT_LABELS: Array<{ id: TeacherHomeworksViewModel['sortBy']; label: string }> = [
@@ -214,7 +204,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   activeTab,
   searchQuery,
   sortBy,
-  problemFilters,
   selectedStudentId,
   loadingAssignments,
   loadingMoreAssignments,
@@ -242,12 +231,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onTabChange,
   onSearchChange,
   onSortChange,
-  onToggleProblemFilter,
   onSelectedStudentIdChange,
   onOpenCreateTemplateScreen,
-  onUpdateTemplate,
+  onOpenEditTemplateScreen,
   onDuplicateTemplate,
   onArchiveTemplate,
+  onRestoreTemplate,
   onToggleTemplateFavorite,
   onCreateAssignment,
   onSendAssignmentNow,
@@ -267,9 +256,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onLoadHomeworkActivity,
   onMarkHomeworkActivitySeen,
 }) => {
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isBulkPanelOpen, setIsBulkPanelOpen] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [assignDefaults, setAssignDefaults] = useState<{ studentId: number | null; lessonId: number | null; templateId: number | null }>({
@@ -277,8 +266,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     lessonId: null,
     templateId: null,
   });
-  const [editingTemplate, setEditingTemplate] = useState<HomeworkTemplate | null>(null);
-  const [templateDraft, setTemplateDraft] = useState<HomeworkTemplateEditorDraft>(createInitialTemplateEditorDraft());
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState<TeacherBulkAction>('SEND_NOW');
 
@@ -311,6 +298,17 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       .slice(0, 3);
   }, [templates]);
 
+  const archivedTemplates = useMemo(
+    () =>
+      templates
+        .filter((template) => template.isArchived)
+        .slice()
+        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
+    [templates],
+  );
+
+  const savedCreateDraft = useMemo(() => loadStoredCreateTemplateDraftSummary(), []);
+
   const allSelected = assignments.length > 0 && selectedIds.length === assignments.length;
 
   useEffect(() => {
@@ -333,27 +331,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     }
     onConsumeAssignModalRequest();
   }, [assignModalRequest, onConsumeAssignModalRequest, selectedStudentId]);
-
-  const openEditTemplateModal = (template: HomeworkTemplate) => {
-    setEditingTemplate(template);
-    setTemplateDraft(createTemplateEditorDraftFromTemplate(template));
-    setIsTemplateModalOpen(true);
-  };
-
-  const submitTemplateEditor = async () => {
-    const payload = {
-      title: templateDraft.title,
-      tags: templateDraft.tagsText
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
-      subject: templateDraft.subject.trim() || null,
-      level: templateDraft.level.trim() || null,
-      blocks: templateDraft.blocks,
-    };
-    if (!editingTemplate) return false;
-    return onUpdateTemplate(editingTemplate.id, payload);
-  };
 
   const openAssignModal = (defaults?: { studentId?: number | null; lessonId?: number | null; templateId?: number | null }) => {
     setAssignDefaults({
@@ -465,7 +442,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 onClick={() => onTabChange(tab)}
               >
                 {TAB_LABELS[tab]}
-                <span className={styles.tabCounter}>{countsByTab[tab]}</span>
+                {tab === 'inbox' || activeTab === tab ? (
+                  <span className={styles.tabCounter}>{countsByTab[tab]}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -520,62 +499,41 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           </div>
         ) : null}
 
-        <div className={styles.filtersRow}>
-          <span className={styles.problemLabel}>Фильтр проблем:</span>
-          {(Object.keys(PROBLEM_LABELS) as Array<keyof typeof PROBLEM_LABELS>).map((problemFilter) => {
-            const count =
-              problemFilter === 'overdue'
-                ? summary.overdueCount
-                : problemFilter === 'returned'
-                  ? summary.returnedCount
-                  : summary.configErrorCount;
-            return (
-              <label key={problemFilter} className={styles.problemItem}>
-                <input
-                  type="checkbox"
-                  className={styles.problemCheckbox}
-                  checked={problemFilters.includes(problemFilter)}
-                  onChange={() => onToggleProblemFilter(problemFilter)}
-                />
-                <span>{`${PROBLEM_LABELS[problemFilter]} (${count})`}</span>
-              </label>
-            );
-          })}
-
-          <div className={styles.filtersRight}>
-            <span className={styles.sortLabel}>Сортировка:</span>
-            <select
-              className={styles.sortInlineSelect}
-              value={sortBy}
-              onChange={(event) => onSortChange(event.target.value as TeacherHomeworksViewModel['sortBy'])}
-            >
-              {SORT_LABELS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         {isAdvancedFiltersOpen ? (
           <div className={styles.advancedFiltersRow}>
-            <label className={styles.studentFilterLabel}>
-              Ученик:
-              <select
-                className={styles.studentInlineSelect}
-                value={selectedStudentId ? String(selectedStudentId) : ''}
-                onChange={(event) => onSelectedStudentIdChange(event.target.value ? Number(event.target.value) : null)}
-                disabled={loadingStudents}
-              >
-                <option value="">Все ученики</option>
-                {students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className={styles.advancedFiltersControls}>
+              <label className={styles.inlineFilterGroup}>
+                <span className={styles.inlineFilterLabel}>Ученик:</span>
+                <select
+                  className={styles.inlineFilterSelect}
+                  value={selectedStudentId ? String(selectedStudentId) : ''}
+                  onChange={(event) => onSelectedStudentIdChange(event.target.value ? Number(event.target.value) : null)}
+                  disabled={loadingStudents}
+                >
+                  <option value="">Все ученики</option>
+                  {students.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className={styles.inlineFilterGroup}>
+                <span className={styles.inlineFilterLabel}>Сортировка:</span>
+                <select
+                  className={styles.inlineFilterSelect}
+                  value={sortBy}
+                  onChange={(event) => onSortChange(event.target.value as TeacherHomeworksViewModel['sortBy'])}
+                >
+                  {SORT_LABELS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <button type="button" className={styles.refreshButton} onClick={onRefresh}>
               Обновить
             </button>
@@ -871,9 +829,14 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       <section className={styles.templatesSection}>
         <div className={styles.templatesHeader}>
           <h2>Быстрые шаблоны</h2>
-          <button type="button" className={controls.secondaryButton} onClick={onOpenCreateTemplateScreen}>
-            Все шаблоны
-          </button>
+          <div className={styles.templatesHeaderActions}>
+            <button type="button" className={controls.secondaryButton} onClick={() => setIsArchiveModalOpen(true)}>
+              Архив ({archivedTemplates.length})
+            </button>
+            <button type="button" className={controls.secondaryButton} onClick={onOpenCreateTemplateScreen}>
+              Создать шаблон
+            </button>
+          </div>
         </div>
 
         {templatesError ? <div className={styles.error}>{templatesError}</div> : null}
@@ -881,6 +844,29 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
         {!loadingTemplates ? (
           <div className={styles.templatesGrid}>
+            {savedCreateDraft ? (
+              <article className={`${styles.templateCard} ${styles.templateDraftCard}`}>
+                <div className={styles.templateCardHead}>
+                  <span className={styles.templateDraftBadge}>
+                    <HomeworkBookmarkRegularIcon size={12} /> Черновик
+                  </span>
+                </div>
+                <h3 className={styles.templateTitle}>{savedCreateDraft.title}</h3>
+                <p className={styles.templatePreview}>{savedCreateDraft.preview}</p>
+                <div className={styles.templateFooter}>
+                  <span>
+                    Сохранен: {savedCreateDraft.savedAtLabel}
+                    {savedCreateDraft.questionCount > 0 ? ` · ${savedCreateDraft.questionCount} вопросов` : ''}
+                  </span>
+                  <div className={styles.templateActions}>
+                    <button type="button" className={controls.smallButton} onClick={onOpenCreateTemplateScreen}>
+                      Продолжить редактирование
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ) : null}
+
             {quickTemplates.map((template) => {
               const favorite = isHomeworkTemplateFavorite(template);
               const category = resolveHomeworkTemplateCategory(template);
@@ -915,7 +901,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       <button
                         type="button"
                         className={controls.smallButton}
-                        onClick={() => openEditTemplateModal(template)}
+                        onClick={() => onOpenEditTemplateScreen(template.id)}
                       >
                         Редактировать
                       </button>
@@ -954,18 +940,44 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         ) : null}
       </section>
 
-      <HomeworkTemplateEditorModal
-        open={isTemplateModalOpen}
-        mode="edit"
-        draft={templateDraft}
-        submitting={submittingTemplate}
-        onDraftChange={setTemplateDraft}
-        onSubmit={submitTemplateEditor}
-        onClose={() => {
-          setIsTemplateModalOpen(false);
-          setEditingTemplate(null);
-        }}
-      />
+      <Modal open={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} title="Архив шаблонов">
+        <div className={styles.archiveModalContent}>
+          {archivedTemplates.length === 0 ? (
+            <div className={styles.emptyTemplates}>В архиве пока нет шаблонов</div>
+          ) : (
+            <div className={styles.archiveTemplatesList}>
+              {archivedTemplates.map((template) => {
+                const category = resolveHomeworkTemplateCategory(template);
+                const estimated = formatHomeworkTemplateDuration(estimateHomeworkTemplateDurationMinutes(template));
+                return (
+                  <article key={`archived_${template.id}`} className={styles.archiveTemplateCard}>
+                    <div className={styles.templateCardHead}>
+                      <span className={styles.templateCategory}>{category}</span>
+                    </div>
+                    <h3 className={styles.templateTitle}>{template.title}</h3>
+                    <p className={styles.templatePreview}>{resolveHomeworkTemplatePreview(template)}</p>
+                    <div className={styles.templateFooter}>
+                      <span>{estimated}</span>
+                      <div className={styles.templateActions}>
+                        <button
+                          type="button"
+                          className={controls.smallButton}
+                          disabled={submittingTemplate}
+                          onClick={() => {
+                            void onRestoreTemplate(template);
+                          }}
+                        >
+                          Восстановить
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <HomeworkAssignModal
         open={isAssignmentModalOpen}

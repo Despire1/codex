@@ -4,6 +4,7 @@ import controls from '../../../shared/styles/controls.module.css';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import styles from './HomeworkReviewModal.module.css';
 import { getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
+import { resolveHomeworkStorageUrl } from '../../homework-submit/model/upload';
 
 interface HomeworkReviewModalProps {
   open: boolean;
@@ -119,12 +120,12 @@ export const HomeworkReviewModal: FC<HomeworkReviewModalProps> = ({
             <pre>{JSON.stringify(latestSubmission.testAnswers, null, 2)}</pre>
           ) : null}
           {(latestSubmission.attachments ?? []).map((attachment) => (
-            <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer">
+            <a key={attachment.id} href={resolveHomeworkStorageUrl(attachment.url)} target="_blank" rel="noreferrer">
               {attachment.fileName || attachment.url}
             </a>
           ))}
           {(latestSubmission.voice ?? []).map((voiceItem) => (
-            <audio key={voiceItem.id} controls src={voiceItem.url} />
+            <audio key={voiceItem.id} controls src={resolveHomeworkStorageUrl(voiceItem.url)} />
           ))}
         </section>
 

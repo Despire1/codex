@@ -13,7 +13,7 @@ import {
 } from '../../shared/api/client';
 import { StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 
-export type StudentHomeworkFilter = 'active' | 'overdue' | 'submitted' | 'reviewed';
+export type StudentHomeworkFilter = 'all' | 'new' | 'in_progress' | 'submitted' | 'reviewed';
 
 export type StudentHomeworkSummary = {
   activeCount: number;
@@ -99,9 +99,10 @@ export interface TeacherHomeworksViewModel {
   onToggleProblemFilter: (filter: TeacherHomeworkProblemFilter) => void;
   onSelectedStudentIdChange: (studentId: number | null) => void;
   onOpenCreateTemplateScreen: () => void;
-  onUpdateTemplate: (templateId: number, payload: TeacherTemplateUpsertPayload) => Promise<boolean>;
+  onOpenEditTemplateScreen: (templateId: number) => void;
   onDuplicateTemplate: (template: HomeworkTemplate) => Promise<void>;
   onArchiveTemplate: (template: HomeworkTemplate) => Promise<void>;
+  onRestoreTemplate: (template: HomeworkTemplate) => Promise<void>;
   onToggleTemplateFavorite: (template: HomeworkTemplate) => Promise<void>;
   onCreateAssignment: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
   onSendAssignmentNow: (assignment: HomeworkAssignment) => Promise<void>;

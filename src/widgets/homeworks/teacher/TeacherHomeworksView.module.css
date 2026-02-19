@@ -189,7 +189,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 12px;
 }
 
 .topActionsRow {
@@ -217,13 +217,13 @@
   border: 1px solid transparent;
   background: var(--color-white);
   border-radius: 999px;
-  padding: 10px 20px;
+  padding: 9px 16px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   color: var(--color-slate-500);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   transition: background 0.2s ease, color 0.2s ease;
@@ -237,13 +237,14 @@
 }
 
 .tabCounter {
-  border-radius: 999px;
+  border-radius: 6px;
   background: #a3e635;
   color: #111;
-  font-size: 11px;
+  -webkit-text-fill-color: #111;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  padding: 4px 7px;
+  padding: 2px 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -252,6 +253,7 @@
 .tabButtonActive .tabCounter {
   background: #a3e635;
   color: #111;
+  -webkit-text-fill-color: #111;
 }
 
 .actionsRow {
@@ -340,79 +342,35 @@
   cursor: not-allowed;
 }
 
-.filtersRow {
+.advancedFiltersRow {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 18px 24px 20px;
+  gap: 12px;
+  padding: 12px 24px 14px;
   border-bottom: 1px solid var(--color-slate-100);
 }
 
-.problemLabel {
-  margin-right: 2px;
-  color: var(--color-slate-400);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.advancedFiltersControls {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.problemItem {
+.inlineFilterGroup {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+}
+
+.inlineFilterLabel {
   color: var(--color-slate-600);
-  cursor: pointer;
-  transition: color 0.2s ease;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.problemItem:hover {
-  color: var(--color-slate-800);
-}
-
-.problemCheckbox {
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-slate-300);
-  border-radius: 7px;
-  background: var(--color-white);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-
-.problemCheckbox:checked {
-  border-color: #111;
-  background: #111;
-}
-
-.problemCheckbox:checked::after {
-  content: '✓';
-  color: var(--color-white);
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.filtersRight {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sortLabel {
-  color: var(--color-slate-400);
-  font-size: 12px;
-}
-
-.sortInlineSelect {
+.inlineFilterSelect {
   border: none;
   outline: none;
   background: transparent;
@@ -420,32 +378,8 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.advancedFiltersRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 24px 14px;
-}
-
-.studentFilterLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-slate-600);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.studentInlineSelect {
-  border: 1px solid var(--color-slate-200);
-  border-radius: 10px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
-  padding: 8px 10px;
-  min-width: 220px;
+  min-width: 120px;
+  padding: 0;
 }
 
 .refreshButton {
@@ -495,6 +429,18 @@
   vertical-align: middle;
   padding: 14px 24px;
   border-bottom: 1px solid var(--color-slate-100);
+}
+
+.table thead th:first-child,
+.table tbody td:first-child {
+  width: 46px;
+  padding-left: 16px;
+  padding-right: 10px;
+}
+
+.table thead th:nth-child(2),
+.table tbody td:nth-child(2) {
+  padding-left: 8px;
 }
 
 .rightCell {
@@ -1015,6 +961,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+}
+
+.templatesHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .templatesHeader h2 {
@@ -1047,6 +1000,12 @@
   gap: 8px;
 }
 
+.templateDraftCard {
+  border-style: dashed;
+  border-color: var(--color-blue-200);
+  background: linear-gradient(180deg, var(--color-white) 0%, var(--color-blue-50) 100%);
+}
+
 .templateCardHead {
   display: flex;
   justify-content: space-between;
@@ -1062,6 +1021,20 @@
   background: var(--color-blue-50);
   border-radius: 999px;
   padding: 3px 8px;
+}
+
+.templateDraftBadge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-blue-700);
+  background: var(--color-blue-100);
+  border-radius: 999px;
+  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .starButton {
@@ -1112,6 +1085,28 @@
   font-weight: 700;
   color: var(--color-slate-700);
   cursor: pointer;
+}
+
+.archiveModalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.archiveTemplatesList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.archiveTemplateCard {
+  border: 1px solid var(--color-slate-200);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--color-slate-50);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .modalState {
@@ -1238,10 +1233,6 @@
     width: 100%;
   }
 
-  .filtersRow {
-    padding: 14px;
-  }
-
   .tableWrap {
     display: none;
   }
@@ -1252,23 +1243,27 @@
     gap: 10px;
   }
 
-  .filtersRight {
-    width: 100%;
-    margin-left: 0;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  .sortInlineSelect,
-  .studentInlineSelect {
-    min-width: 0;
-    width: 100%;
-  }
-
   .advancedFiltersRow {
     width: 100%;
     flex-wrap: wrap;
     padding: 10px 14px 14px;
+  }
+
+  .advancedFiltersControls {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .inlineFilterGroup {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    align-items: center;
+  }
+
+  .inlineFilterSelect {
+    min-width: 0;
+    width: 100%;
   }
 
   .templatesGrid {

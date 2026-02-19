@@ -1,9 +1,19 @@
-import { ChangeEvent, FC, FormEvent, useEffect, useMemo, useState } from 'react';
-import { HomeworkTemplate } from '../../../entities/types';
-import controls from '../../../shared/styles/controls.module.css';
-import { Modal } from '../../../shared/ui/Modal/Modal';
+import { FC, FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { format } from 'date-fns';
+import { HomeworkTemplate, Lesson } from '../../../entities/types';
+import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
+import { api } from '../../../shared/api/client';
+import { useFocusTrap } from '../../../shared/lib/useFocusTrap';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { formatInTimeZone, toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
+import {
+  HomeworkChevronDownIcon,
+  HomeworkCircleCheckIcon,
+  HomeworkFileLinesIcon,
+  HomeworkPaperPlaneIcon,
+  HomeworkXMarkIcon,
+} from '../../../shared/ui/icons/HomeworkFaIcons';
 import { TeacherAssignmentCreatePayload, TeacherHomeworkStudentOption } from '../../../widgets/homeworks/types';
-import { describeTemplateBlocks } from '../../../entities/homework-template/model/lib/describeTemplateBlocks';
 import styles from './HomeworkAssignModal.module.css';
 
 interface HomeworkAssignModalProps {
@@ -18,49 +28,150 @@ interface HomeworkAssignModalProps {
   onClose: () => void;
 }
 
+type TemplateMode = 'FAVORITES' | 'NEW';
+type SendType = 'NOW' | 'AUTO_AFTER_LESSON';
+
 type AssignmentDraft = {
-  title: string;
   studentId: number | null;
-  lessonId: number | null;
+  templateMode: TemplateMode;
   templateId: number | null;
-  sendMode: 'MANUAL' | 'AUTO_AFTER_LESSON_DONE';
-  sendNow: boolean;
-  deadlineAt: string;
+  deadlineLocal: string;
+  sendType: SendType;
+  lessonId: number | null;
 };
 
-type AssignmentDeliveryMode = 'SEND_NOW' | 'SAVE_DRAFT' | 'AUTO_AFTER_LESSON';
-
-const buildInitialDraft = (
-  defaultStudentId: number | null,
-  defaultLessonId: number | null,
-  defaultTemplateId: number | null,
-): AssignmentDraft => ({
-  title: '',
-  studentId: defaultStudentId,
-  lessonId: defaultLessonId,
-  templateId: defaultTemplateId,
-  sendMode: 'MANUAL',
-  sendNow: false,
-  deadlineAt: '',
-});
-
-const toDateTimeLocalValue = (value: Date) => {
-  const shifted = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return shifted.toISOString().slice(0, 16);
+type NextLessonRef = {
+  id: number;
+  startAt: string;
 };
 
-const createQuickDeadline = (daysFromNow: number, hour: number) => {
-  const now = new Date();
-  const date = new Date(now);
-  date.setDate(now.getDate() + daysFromNow);
-  date.setHours(hour, 0, 0, 0);
-  return toDateTimeLocalValue(date);
+const FAVORITE_TAG = '__favorite';
+
+const isFavoriteTemplate = (template: HomeworkTemplate) =>
+  template.tags.some((tag) => tag.trim().toLowerCase() === FAVORITE_TAG);
+
+const sortTemplatesForModal = (templates: HomeworkTemplate[]) =>
+  templates
+    .slice()
+    .sort((left, right) => {
+      const leftFavorite = isFavoriteTemplate(left) ? 1 : 0;
+      const rightFavorite = isFavoriteTemplate(right) ? 1 : 0;
+      if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
+      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    });
+
+const resolveTemplateCategory = (template: HomeworkTemplate) => {
+  const subject = template.subject?.trim();
+  if (subject) return subject;
+  const firstTag = template.tags
+    .map((tag) => tag.trim())
+    .find((tag) => tag.length > 0 && tag.toLowerCase() !== FAVORITE_TAG);
+  return firstTag ?? 'Общее';
 };
 
-const resolveDeliveryMode = (draft: AssignmentDraft): AssignmentDeliveryMode => {
-  if (draft.sendNow) return 'SEND_NOW';
-  if (draft.sendMode === 'AUTO_AFTER_LESSON_DONE') return 'AUTO_AFTER_LESSON';
-  return 'SAVE_DRAFT';
+const estimateQuestionMinutes = (block: HomeworkTemplate['blocks'][number]) => {
+  if (block.type !== 'TEST') return 0;
+  const questionsCount = Array.isArray(block.questions) ? block.questions.length : 0;
+  return Math.max(questionsCount * 2, questionsCount > 0 ? 3 : 0);
+};
+
+const estimateTextMinutes = (block: HomeworkTemplate['blocks'][number]) => {
+  if (block.type !== 'TEXT') return 0;
+  const words = block.content.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 120));
+};
+
+const estimateMediaMinutes = (block: HomeworkTemplate['blocks'][number]) => {
+  if (block.type !== 'MEDIA') return 0;
+  return Array.isArray(block.attachments) ? block.attachments.length * 3 : 0;
+};
+
+const estimateStudentResponseMinutes = (block: HomeworkTemplate['blocks'][number]) => {
+  if (block.type !== 'STUDENT_RESPONSE') return 0;
+  let score = 0;
+  if (block.allowText) score += 5;
+  if (block.allowVoice) score += 4;
+  if (block.allowFiles || block.allowDocuments || block.allowPhotos || block.allowAudio || block.allowVideo) score += 3;
+  return score;
+};
+
+const estimateTemplateDuration = (template: HomeworkTemplate) => {
+  const estimated = template.blocks.reduce((total, block) => {
+    return total + estimateQuestionMinutes(block) + estimateTextMinutes(block) + estimateMediaMinutes(block) + estimateStudentResponseMinutes(block);
+  }, 0);
+  return Math.max(estimated, 5);
+};
+
+const formatTemplateDuration = (minutes: number) => {
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  if (restMinutes === 0) return `${hours} ч`;
+  return `${hours} ч ${restMinutes} мин`;
+};
+
+const createQuickDeadlineValue = (daysFromNow: number, timeZone: string) => {
+  const now = toZonedDate(new Date(), timeZone);
+  now.setDate(now.getDate() + daysFromNow);
+  now.setHours(20, 0, 0, 0);
+  return format(now, "yyyy-MM-dd'T'HH:mm");
+};
+
+const toLocalDateTimeValue = (iso: string, timeZone: string) =>
+  formatInTimeZone(iso, "yyyy-MM-dd'T'HH:mm", { timeZone });
+
+const toUtcIsoFromLocal = (value: string, timeZone: string) => {
+  const [datePart, timePart] = value.split('T');
+  if (!datePart || !timePart) return null;
+  const utcDate = toUtcDateFromTimeZone(datePart, timePart, timeZone);
+  if (Number.isNaN(utcDate.getTime())) return null;
+  return utcDate.toISOString();
+};
+
+const pickInitialStudentId = (students: TeacherHomeworkStudentOption[], defaultStudentId: number | null) => {
+  const hasDefault =
+    typeof defaultStudentId === 'number' && students.some((student) => student.id === defaultStudentId);
+  if (hasDefault) return defaultStudentId;
+  return students[0]?.id ?? null;
+};
+
+const pickInitialTemplateId = (templates: HomeworkTemplate[], defaultTemplateId: number | null) => {
+  const hasDefault =
+    typeof defaultTemplateId === 'number' && templates.some((template) => template.id === defaultTemplateId);
+  if (hasDefault) return defaultTemplateId;
+  return templates[0]?.id ?? null;
+};
+
+const resolveNextUpcomingLesson = (lessons: Lesson[]) => {
+  const nowTs = Date.now();
+  return lessons
+    .filter((lesson) => {
+      if (lesson.status === 'CANCELED') return false;
+      const lessonTs = new Date(lesson.startAt).getTime();
+      return Number.isFinite(lessonTs) && lessonTs > nowTs;
+    })
+    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())[0] ?? null;
+};
+
+const buildInitialDraft = (params: {
+  students: TeacherHomeworkStudentOption[];
+  templates: HomeworkTemplate[];
+  defaultStudentId: number | null;
+  defaultLessonId: number | null;
+  defaultTemplateId: number | null;
+}): AssignmentDraft => {
+  const initialStudentId = pickInitialStudentId(params.students, params.defaultStudentId);
+  const initialTemplateId = pickInitialTemplateId(params.templates, params.defaultTemplateId);
+  const hasTemplates = params.templates.length > 0;
+
+  return {
+    studentId: initialStudentId,
+    templateMode: hasTemplates ? 'FAVORITES' : 'NEW',
+    templateId: hasTemplates ? initialTemplateId : null,
+    deadlineLocal: '',
+    sendType: 'NOW',
+    lessonId: typeof params.defaultLessonId === 'number' ? params.defaultLessonId : null,
+  };
 };
 
 export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
@@ -74,246 +185,432 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   onSubmit,
   onClose,
 }) => {
-  const [draft, setDraft] = useState<AssignmentDraft>(
-    buildInitialDraft(defaultStudentId, defaultLessonId, defaultTemplateId),
+  const timeZone = useTimeZone();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
+  useFocusTrap(open, containerRef);
+
+  const sortedTemplates = useMemo(() => sortTemplatesForModal(templates), [templates]);
+  const quickTemplates = useMemo(() => sortedTemplates.slice(0, 5), [sortedTemplates]);
+  const templatesById = useMemo(() => new Map(sortedTemplates.map((template) => [template.id, template])), [sortedTemplates]);
+
+  const [draft, setDraft] = useState<AssignmentDraft>(() =>
+    buildInitialDraft({
+      students,
+      templates: sortedTemplates,
+      defaultStudentId,
+      defaultLessonId,
+      defaultTemplateId,
+    }),
   );
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [isResolvingNextLesson, setIsResolvingNextLesson] = useState(false);
+  const [nextLessonError, setNextLessonError] = useState<string | null>(null);
+  const [nextLesson, setNextLesson] = useState<NextLessonRef | null>(null);
+
   const selectedTemplate = useMemo(
-    () => templates.find((template) => template.id === draft.templateId) ?? null,
-    [draft.templateId, templates],
+    () => (draft.templateMode === 'FAVORITES' && draft.templateId ? templatesById.get(draft.templateId) ?? null : null),
+    [draft.templateId, draft.templateMode, templatesById],
   );
-  const selectedTemplateDescription = useMemo(
-    () => (selectedTemplate ? describeTemplateBlocks(selectedTemplate.blocks) : null),
-    [selectedTemplate],
-  );
-  const deliveryMode = resolveDeliveryMode(draft);
+
+  const hasStudents = students.length > 0;
+  const requiresTemplate = draft.templateMode === 'FAVORITES' && sortedTemplates.length > 0;
+  const hasValidTemplate = !requiresTemplate || Boolean(draft.templateId && templatesById.has(draft.templateId));
+  const requiresLesson = draft.sendType === 'AUTO_AFTER_LESSON';
+  const hasValidLesson = !requiresLesson || Boolean(draft.lessonId);
+
+  const canSubmit = hasStudents && Boolean(draft.studentId) && hasValidTemplate && hasValidLesson && !submitting;
+
+  const selectedLessonLabel = useMemo(() => {
+    if (!draft.lessonId) return null;
+    if (nextLesson?.id === draft.lessonId) {
+      return `Следующий урок: ${formatInTimeZone(nextLesson.startAt, 'd MMM, HH:mm', { timeZone })}`;
+    }
+    return `Привязка к уроку #${draft.lessonId}`;
+  }, [draft.lessonId, nextLesson, timeZone]);
+
+  const closeRequest = useCallback(() => {
+    if (submitting) return;
+    onClose();
+  }, [onClose, submitting]);
 
   useEffect(() => {
     if (!open) return;
-    setDraft(buildInitialDraft(defaultStudentId, defaultLessonId, defaultTemplateId));
+    setDraft(
+      buildInitialDraft({
+        students,
+        templates: sortedTemplates,
+        defaultStudentId,
+        defaultLessonId,
+        defaultTemplateId,
+      }),
+    );
+    setIsTemplatePickerOpen(false);
+    setIsResolvingNextLesson(false);
+    setNextLessonError(null);
+    setNextLesson(null);
   }, [defaultLessonId, defaultStudentId, defaultTemplateId, open]);
 
-  const handleClose = () => {
-    if (submitting) return;
-    onClose();
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeRequest();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [closeRequest, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (draft.templateMode !== 'FAVORITES') return;
+    if (draft.templateId && templatesById.has(draft.templateId)) return;
+    const fallbackTemplateId = quickTemplates[0]?.id ?? sortedTemplates[0]?.id ?? null;
+    setDraft((prev) => ({ ...prev, templateId: fallbackTemplateId }));
+  }, [draft.templateId, draft.templateMode, open, quickTemplates, sortedTemplates, templatesById]);
+
+  const resolveNextLesson = useCallback(async (studentId: number) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setIsResolvingNextLesson(true);
+    setNextLessonError(null);
+
+    try {
+      const response = await api.listStudentLessons(studentId, {
+        status: 'not_completed',
+        sort: 'asc',
+      });
+      if (requestIdRef.current !== requestId) return null;
+
+      const resolved = resolveNextUpcomingLesson(response.items);
+      if (!resolved) {
+        setNextLesson(null);
+        setNextLessonError('У ученика нет ближайшего активного урока.');
+        return null;
+      }
+
+      const nextLessonRef = { id: resolved.id, startAt: resolved.startAt };
+      setNextLesson(nextLessonRef);
+      setNextLessonError(null);
+      return nextLessonRef;
+    } catch (error) {
+      if (requestIdRef.current !== requestId) return null;
+      setNextLesson(null);
+      setNextLessonError('Не удалось загрузить ближайший урок.');
+      return null;
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setIsResolvingNextLesson(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!draft.studentId) return;
+    void resolveNextLesson(draft.studentId);
+  }, [draft.studentId, open, resolveNextLesson]);
+
+  const applyNextLesson = useCallback(async () => {
+    if (!draft.studentId) return;
+    const resolvedLesson = await resolveNextLesson(draft.studentId);
+    if (!resolvedLesson) {
+      setDraft((prev) => ({ ...prev, lessonId: null }));
+      return;
+    }
+
+    setDraft((prev) => ({
+      ...prev,
+      lessonId: resolvedLesson.id,
+      deadlineLocal: toLocalDateTimeValue(resolvedLesson.startAt, timeZone),
+    }));
+  }, [draft.studentId, resolveNextLesson, timeZone]);
+
+  const handleBackdropMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    closeRequest();
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!draft.studentId) return;
+    if (!draft.studentId || !canSubmit) return;
+
+    const templateId = draft.templateMode === 'FAVORITES' ? draft.templateId : null;
+    const deadlineAt = draft.deadlineLocal ? toUtcIsoFromLocal(draft.deadlineLocal, timeZone) : null;
+    const sendNow = draft.sendType === 'NOW';
+
     const success = await onSubmit({
       studentId: draft.studentId,
       lessonId: draft.lessonId,
-      templateId: draft.templateId,
-      title: draft.title,
-      sendMode: draft.sendMode,
-      sendNow: draft.sendNow,
-      deadlineAt: draft.deadlineAt ? new Date(draft.deadlineAt).toISOString() : null,
+      templateId,
+      sendMode: sendNow ? 'MANUAL' : 'AUTO_AFTER_LESSON_DONE',
+      sendNow,
+      deadlineAt,
     });
-    if (success) onClose();
+
+    if (success) {
+      onClose();
+    }
   };
 
-  const handleTextChange =
-    (field: 'title' | 'deadlineAt') => (event: ChangeEvent<HTMLInputElement>) => {
-      setDraft((prev) => ({
-        ...prev,
-        [field]: event.target.value,
-      }));
-    };
-
-  const setDeliveryMode = (mode: AssignmentDeliveryMode) => {
-    if (mode === 'SEND_NOW') {
-      setDraft((prev) => ({
-        ...prev,
-        sendNow: true,
-        sendMode: 'MANUAL',
-      }));
-      return;
-    }
-    if (mode === 'AUTO_AFTER_LESSON') {
-      setDraft((prev) => ({
-        ...prev,
-        sendNow: false,
-        sendMode: 'AUTO_AFTER_LESSON_DONE',
-      }));
-      return;
-    }
-    setDraft((prev) => ({
-      ...prev,
-      sendNow: false,
-      sendMode: 'MANUAL',
-    }));
-  };
-
-  const submitLabel =
-    deliveryMode === 'SEND_NOW'
-      ? 'Создать и отправить'
-      : deliveryMode === 'AUTO_AFTER_LESSON'
-        ? 'Создать и запланировать'
-        : 'Создать черновик';
+  if (!open) return null;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Выдать домашку ученику">
-      <form className={styles.modalForm} onSubmit={handleSubmit}>
-        <section className={styles.section}>
-          <h4 className={styles.sectionTitle}>1. Кому выдаем</h4>
-          <label className={styles.fieldLabel}>
-            Ученик
-            <select
-              className={controls.input}
-              value={draft.studentId ? String(draft.studentId) : ''}
-              onChange={(event) => {
-                const value = event.target.value;
-                setDraft((prev) => ({ ...prev, studentId: value ? Number(value) : null }));
-              }}
-              required
+    <div className={styles.overlay} onMouseDown={handleBackdropMouseDown}>
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Выдать домашнее задание" ref={containerRef}>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <div className={styles.header}>
+            <h2 className={styles.title}>Выдать домашнее задание</h2>
+            <button
+              type="button"
+              className={styles.closeButton}
+              onClick={closeRequest}
+              aria-label="Закрыть модальное окно"
+              disabled={submitting}
             >
-              <option value="" disabled>
-                Выберите ученика
-              </option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!students.length ? (
-            <div className={styles.inlineHint}>Нет учеников. Сначала добавь ученика в разделе «Ученики».</div>
-          ) : null}
-          {draft.lessonId ? <div className={styles.inlineText}>Привязка к уроку #{draft.lessonId}</div> : null}
-        </section>
+              <HomeworkXMarkIcon size={16} />
+            </button>
+          </div>
 
-        <section className={styles.section}>
-          <h4 className={styles.sectionTitle}>2. Что выдаем</h4>
-          <label className={styles.fieldLabel}>
-            Шаблон (опционально)
-            <select
-              className={controls.input}
-              value={draft.templateId ? String(draft.templateId) : ''}
-              onChange={(event) => {
-                const value = event.target.value;
-                setDraft((prev) => ({ ...prev, templateId: value ? Number(value) : null }));
-              }}
-            >
-              <option value="">Без шаблона</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.fieldLabel}>
-            Название домашки (опционально)
-            <input
-              className={controls.input}
-              type="text"
-              value={draft.title}
-              onChange={handleTextChange('title')}
-              placeholder="Если пусто, возьмем название из шаблона или «Домашнее задание»"
-            />
-          </label>
-          {selectedTemplate ? (
-            <div className={styles.templatePreview}>
-              <div className={styles.previewTitle}>Шаблон: {selectedTemplate.title}</div>
-              <div className={styles.previewBlocks}>
-                {selectedTemplateDescription?.items.map((item) => (
-                  <span key={item.id} className={styles.previewChip}>
-                    {item.title}
-                    {item.details ? `: ${item.details}` : ''}
-                  </span>
-                ))}
+          <div className={styles.body}>
+            <section className={styles.section}>
+              <label className={styles.label} htmlFor="homework-assign-student">
+                Кому
+              </label>
+              <div className={styles.selectWrap}>
+                <select
+                  id="homework-assign-student"
+                  className={styles.selectField}
+                  value={draft.studentId ? String(draft.studentId) : ''}
+                  onChange={(event) => {
+                    const nextStudentId = event.target.value ? Number(event.target.value) : null;
+                    setDraft((prev) => ({ ...prev, studentId: nextStudentId, lessonId: null }));
+                    setNextLesson(null);
+                    setNextLessonError(null);
+                  }}
+                  disabled={!hasStudents || submitting}
+                >
+                  <option value="" disabled>
+                    Выберите ученика...
+                  </option>
+                  {students.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+                <span className={styles.selectIcon} aria-hidden>
+                  <HomeworkChevronDownIcon size={12} />
+                </span>
               </div>
-              {selectedTemplateDescription?.firstTextPreview ? (
-                <div className={styles.previewText}>{selectedTemplateDescription.firstTextPreview}</div>
+              {!hasStudents ? <p className={styles.inlineWarning}>Нет учеников. Добавьте ученика в разделе «Ученики».</p> : null}
+            </section>
+
+            <section className={styles.section}>
+              <span className={styles.label}>Что (Шаблон)</span>
+              <div className={styles.templateModeGrid}>
+                <button
+                  type="button"
+                  className={`${styles.templateModeCard} ${draft.templateMode === 'FAVORITES' ? styles.templateModeCardActive : ''}`}
+                  onClick={() => {
+                    const fallbackTemplateId = draft.templateId ?? quickTemplates[0]?.id ?? sortedTemplates[0]?.id ?? null;
+                    setDraft((prev) => ({
+                      ...prev,
+                      templateMode: 'FAVORITES',
+                      templateId: fallbackTemplateId,
+                    }));
+                  }}
+                  disabled={!sortedTemplates.length || submitting}
+                >
+                  {draft.templateMode === 'FAVORITES' ? (
+                    <span className={styles.templateModeIcon} aria-hidden>
+                      <HomeworkCircleCheckIcon size={16} />
+                    </span>
+                  ) : null}
+                  <span className={styles.templateModeTitle}>Из избранного</span>
+                  <span className={styles.templateModeHint}>Быстрый выбор из топ-5</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`${styles.templateModeCard} ${draft.templateMode === 'NEW' ? styles.templateModeCardActive : ''}`}
+                  onClick={() => {
+                    setDraft((prev) => ({
+                      ...prev,
+                      templateMode: 'NEW',
+                      templateId: null,
+                    }));
+                    setIsTemplatePickerOpen(false);
+                  }}
+                  disabled={submitting}
+                >
+                  {draft.templateMode === 'NEW' ? (
+                    <span className={styles.templateModeIcon} aria-hidden>
+                      <HomeworkCircleCheckIcon size={16} />
+                    </span>
+                  ) : null}
+                  <span className={styles.templateModeTitle}>Новое задание</span>
+                  <span className={styles.templateModeHint}>Создать с нуля</span>
+                </button>
+              </div>
+
+              {draft.templateMode === 'FAVORITES' ? (
+                <>
+                  <div className={styles.templatePreviewCard}>
+                    <div className={styles.templatePreviewLeft}>
+                      <span className={styles.templatePreviewIcon} aria-hidden>
+                        <HomeworkFileLinesIcon size={16} />
+                      </span>
+                      <div className={styles.templatePreviewText}>
+                        <div className={styles.templatePreviewTitle}>{selectedTemplate?.title ?? 'Шаблон не выбран'}</div>
+                        <div className={styles.templatePreviewMeta}>
+                          {selectedTemplate
+                            ? `${resolveTemplateCategory(selectedTemplate)} · ${formatTemplateDuration(estimateTemplateDuration(selectedTemplate))}`
+                            : 'Выберите шаблон из списка'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.templateChangeButton}
+                      onClick={() => setIsTemplatePickerOpen((prev) => !prev)}
+                      disabled={!sortedTemplates.length || submitting}
+                    >
+                      Изменить
+                    </button>
+                  </div>
+
+                  {isTemplatePickerOpen ? (
+                    <div className={styles.templatePicker}>
+                      {sortedTemplates.map((template) => {
+                        const active = template.id === draft.templateId;
+                        return (
+                          <button
+                            key={template.id}
+                            type="button"
+                            className={`${styles.templatePickerOption} ${active ? styles.templatePickerOptionActive : ''}`}
+                            onClick={() => {
+                              setDraft((prev) => ({ ...prev, templateId: template.id }));
+                              setIsTemplatePickerOpen(false);
+                            }}
+                          >
+                            <span className={styles.templatePickerTitle}>{template.title}</span>
+                            <span className={styles.templatePickerMeta}>
+                              {resolveTemplateCategory(template)} · {formatTemplateDuration(estimateTemplateDuration(template))}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className={styles.templatePreviewCard}>
+                  <div className={styles.templatePreviewText}>
+                    <div className={styles.templatePreviewTitle}>Новое домашнее задание</div>
+                    <div className={styles.templatePreviewMeta}>Домашка будет создана без шаблона.</div>
+                  </div>
+                </div>
+              )}
+
+              {requiresTemplate && !hasValidTemplate ? (
+                <p className={styles.validationError}>Выберите шаблон для выдачи домашки.</p>
               ) : null}
-            </div>
-          ) : (
-            <div className={styles.inlineText}>
-              Можно выдать домашку без шаблона: ученик получит задание с базовым названием.
-            </div>
-          )}
-        </section>
+            </section>
 
-        <section className={styles.section}>
-          <h4 className={styles.sectionTitle}>3. Когда отправить</h4>
-          <div className={styles.deliveryModes}>
-            <button
-              type="button"
-              className={`${styles.deliveryButton} ${deliveryMode === 'SEND_NOW' ? styles.deliveryButtonActive : ''}`}
-              onClick={() => setDeliveryMode('SEND_NOW')}
-            >
-              Сразу ученику
+            <section className={styles.settingsGrid}>
+              <div className={styles.section}>
+                <label className={styles.label} htmlFor="homework-assign-deadline">
+                  Дедлайн
+                </label>
+                <div className={styles.datetimeWrap}>
+                  <input
+                    id="homework-assign-deadline"
+                    className={styles.datetimeField}
+                    type="datetime-local"
+                    value={draft.deadlineLocal}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, deadlineLocal: event.target.value }))}
+                    disabled={submitting}
+                  />
+                  <span className={styles.datetimeIcon} aria-hidden>
+                    <CalendarMonthIcon width={16} height={16} />
+                  </span>
+                </div>
+
+                <div className={styles.quickActions}>
+                  <button
+                    type="button"
+                    className={styles.quickButton}
+                    onClick={() => setDraft((prev) => ({ ...prev, deadlineLocal: createQuickDeadlineValue(2, timeZone) }))}
+                    disabled={submitting}
+                  >
+                    +2 дня
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.quickButton}
+                    onClick={() => {
+                      void applyNextLesson();
+                    }}
+                    disabled={submitting || !draft.studentId || isResolvingNextLesson}
+                  >
+                    {isResolvingNextLesson ? 'Ищем...' : 'След. урок'}
+                  </button>
+                </div>
+
+                {selectedLessonLabel ? <p className={styles.inlineInfo}>{selectedLessonLabel}</p> : null}
+                {nextLessonError ? <p className={styles.inlineWarning}>{nextLessonError}</p> : null}
+              </div>
+
+              <div className={styles.section}>
+                <span className={styles.label}>Отправка</span>
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioRow}>
+                    <input
+                      type="radio"
+                      name="homework-assign-send-type"
+                      value="NOW"
+                      checked={draft.sendType === 'NOW'}
+                      onChange={() => setDraft((prev) => ({ ...prev, sendType: 'NOW' }))}
+                      disabled={submitting}
+                    />
+                    <span>Отправить сейчас</span>
+                  </label>
+                  <label className={styles.radioRow}>
+                    <input
+                      type="radio"
+                      name="homework-assign-send-type"
+                      value="AUTO_AFTER_LESSON"
+                      checked={draft.sendType === 'AUTO_AFTER_LESSON'}
+                      onChange={() => {
+                        setDraft((prev) => ({ ...prev, sendType: 'AUTO_AFTER_LESSON' }));
+                        if (!draft.lessonId) {
+                          void applyNextLesson();
+                        }
+                      }}
+                      disabled={submitting || !draft.studentId}
+                    />
+                    <span>Авто после урока</span>
+                  </label>
+                </div>
+
+                {requiresLesson && !hasValidLesson ? (
+                  <p className={styles.validationError}>Для авто-отправки нужен ближайший урок. Нажмите «След. урок».</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+
+          <div className={styles.footer}>
+            <button type="button" className={styles.cancelButton} onClick={closeRequest} disabled={submitting}>
+              Отмена
             </button>
-            <button
-              type="button"
-              className={`${styles.deliveryButton} ${deliveryMode === 'SAVE_DRAFT' ? styles.deliveryButtonActive : ''}`}
-              onClick={() => setDeliveryMode('SAVE_DRAFT')}
-            >
-              Сохранить как черновик
-            </button>
-            <button
-              type="button"
-              className={`${styles.deliveryButton} ${deliveryMode === 'AUTO_AFTER_LESSON' ? styles.deliveryButtonActive : ''}`}
-              onClick={() => setDeliveryMode('AUTO_AFTER_LESSON')}
-            >
-              Авто после урока
+            <button type="submit" className={styles.submitButton} disabled={!canSubmit}>
+              <span>{submitting ? 'Выдаю…' : 'Выдать'}</span>
+              <HomeworkPaperPlaneIcon size={12} className={styles.submitIcon} />
             </button>
           </div>
-          <div className={styles.inlineText}>
-            {deliveryMode === 'SEND_NOW'
-              ? 'Домашка сразу появится у ученика.'
-              : deliveryMode === 'AUTO_AFTER_LESSON'
-                ? 'Домашка отправится автоматически при завершении урока.'
-                : 'Домашка сохранится у тебя в черновиках без отправки ученику.'}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <h4 className={styles.sectionTitle}>4. Дедлайн</h4>
-          <label className={styles.fieldLabel}>
-            Дата и время
-            <input
-              className={controls.input}
-              type="datetime-local"
-              value={draft.deadlineAt}
-              onChange={handleTextChange('deadlineAt')}
-            />
-          </label>
-          <div className={styles.quickButtons}>
-            <button
-              type="button"
-              className={controls.smallButton}
-              onClick={() => setDraft((prev) => ({ ...prev, deadlineAt: createQuickDeadline(1, 20) }))}
-            >
-              Завтра в 20:00
-            </button>
-            <button
-              type="button"
-              className={controls.smallButton}
-              onClick={() => setDraft((prev) => ({ ...prev, deadlineAt: createQuickDeadline(2, 20) }))}
-            >
-              Через 2 дня в 20:00
-            </button>
-            <button
-              type="button"
-              className={controls.smallButton}
-              onClick={() => setDraft((prev) => ({ ...prev, deadlineAt: '' }))}
-            >
-              Без дедлайна
-            </button>
-          </div>
-        </section>
-
-        <div className={styles.modalActions}>
-          <button type="button" className={controls.secondaryButton} onClick={handleClose} disabled={submitting}>
-            Отмена
-          </button>
-          <button type="submit" className={controls.primaryButton} disabled={submitting || !students.length || !draft.studentId}>
-            {submitting ? 'Сохраняю…' : submitLabel}
-          </button>
-        </div>
-      </form>
-    </Modal>
+        </form>
+      </div>
+    </div>
   );
 };

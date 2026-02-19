@@ -24,6 +24,7 @@ import {
   TeacherStudent,
   UnpaidLessonEntry,
 } from '../../entities/types';
+import { FormValidationIssue } from '../lib/form-validation/types';
 import { type OnboardingReminderTemplate } from '../lib/onboardingReminder';
 
 type SettingsPayload = Pick<
@@ -160,6 +161,45 @@ export type HomeworkAssignmentsSummary = {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
+const parseValidationIssues = (value: unknown): FormValidationIssue[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((rawIssue): FormValidationIssue | null => {
+      if (typeof rawIssue !== 'object' || rawIssue === null || Array.isArray(rawIssue)) return null;
+      const issue = rawIssue as Record<string, unknown>;
+      const rawPath = issue.path;
+      const path = Array.isArray(rawPath)
+        ? rawPath.filter((segment): segment is string | number => {
+            if (typeof segment === 'string') return true;
+            return typeof segment === 'number' && Number.isFinite(segment);
+          })
+        : [];
+      if (path.length === 0) return null;
+      const code = typeof issue.code === 'string' && issue.code.trim().length > 0 ? issue.code : 'validation_error';
+      const message = typeof issue.message === 'string' && issue.message.trim().length > 0 ? issue.message : 'Некорректное значение поля';
+      const severity = issue.severity === 'warning' ? 'warning' : 'error';
+      return { path, code, message, severity };
+    })
+    .filter((issue): issue is FormValidationIssue => Boolean(issue));
+};
+
+export class ApiRequestError extends Error {
+  status: number;
+  issues: FormValidationIssue[] | null;
+  body: unknown;
+
+  constructor(payload: { status: number; message: string; issues?: FormValidationIssue[] | null; body?: unknown }) {
+    super(payload.message);
+    this.name = 'ApiRequestError';
+    this.status = payload.status;
+    this.issues = payload.issues ?? null;
+    this.body = payload.body ?? null;
+  }
+}
+
+export const isApiRequestError = (error: unknown): error is ApiRequestError => error instanceof ApiRequestError;
+
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const roleHeader = typeof window !== 'undefined' ? window.localStorage.getItem('userRole') ?? undefined : undefined;
   const activeTeacherHeader =
@@ -180,8 +220,40 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Запрос не выполнен');
+    const contentType = response.headers.get('content-type') ?? '';
+    let body: unknown = null;
+    let message = 'Запрос не выполнен';
+    let issues: FormValidationIssue[] | null = null;
+
+    if (contentType.includes('application/json')) {
+      try {
+        body = await response.json();
+        if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+          const payload = body as Record<string, unknown>;
+          if (typeof payload.message === 'string' && payload.message.trim()) {
+            message = payload.message;
+          }
+          const parsedIssues = parseValidationIssues(payload.issues);
+          if (parsedIssues.length > 0) {
+            issues = parsedIssues;
+          }
+        }
+      } catch {
+        // Ignore invalid error payload and fallback to default message.
+      }
+    } else {
+      const text = await response.text();
+      if (text.trim()) {
+        message = text;
+      }
+    }
+
+    throw new ApiRequestError({
+      status: response.status,
+      message,
+      issues,
+      body,
+    });
   }
 
   return response.json() as Promise<T>;
@@ -681,7 +753,7 @@ export const api = {
       },
     ),
   listStudentHomeworkAssignmentsV2: (params?: {
-    filter?: 'active' | 'overdue' | 'submitted' | 'reviewed';
+    filter?: 'all' | 'active' | 'overdue' | 'submitted' | 'reviewed';
     limit?: number;
     offset?: number;
   }) => {

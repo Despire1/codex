@@ -8,7 +8,7 @@ import { addDays, addYears, endOfWeek, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
-import type { HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
+import type { HomeworkBlock, HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
   isValidMeetingLink,
@@ -56,6 +56,8 @@ import { createAuthTransferHandlers } from './server/routes/authTransfer';
 import { createAuthSessionHandlers } from './server/routes/authSession';
 import { tryHandleAuthRoutes } from './server/routes/authRoutes';
 import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
+import { RequestValidationError } from './server/lib/requestValidationError';
+import { validateHomeworkTemplatePayload } from './server/modules/homeworkTemplateValidation';
 
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
@@ -2158,17 +2160,41 @@ const normalizeHomeworkBlocks = (value: unknown) => {
   return parseObjectArray(value);
 };
 
+const normalizeHomeworkAttachmentUrl = (value: unknown) => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/api/v2/files/object/')) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.pathname.startsWith('/api/v2/files/object/')) {
+        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+      return trimmed;
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+};
+
 const normalizeHomeworkAttachments = (value: unknown) => {
   if (Array.isArray(value)) {
-    return value
+    const normalized = value
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .map((item) => ({
         id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
-        url: typeof item.url === 'string' ? item.url : '',
+        url: normalizeHomeworkAttachmentUrl(item.url),
         fileName: typeof item.fileName === 'string' ? item.fileName : '',
         size: Number.isFinite(Number(item.size)) ? Math.max(0, Number(item.size)) : 0,
       }))
       .filter((item) => item.url);
+    return Array.from(
+      new Map(
+        normalized.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const),
+      ).values(),
+    );
   }
   return parseObjectArray(value);
 };
@@ -2585,7 +2611,11 @@ const serializeHomeworkSubmissionV2 = (submission: any) => ({
   },
 });
 
-const normalizeAnswerString = (value: unknown) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+const normalizeAnswerString = (value: unknown, caseSensitive = false) => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return caseSensitive ? trimmed : trimmed.toLowerCase();
+};
 
 const normalizeQuestionPoints = (question: Record<string, unknown>) => {
   const points = Number(question.points);
@@ -2604,7 +2634,13 @@ const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswe
     })
     .filter((question): question is Record<string, unknown> => typeof question === 'object' && question !== null);
 
-  const autoQuestions = questions.filter((question) => question.type !== 'SHORT_ANSWER');
+  const autoQuestions = questions.filter((question) => {
+    const type = String(question.type ?? '');
+    if (type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE' || type === 'MATCHING') return true;
+    if (type !== 'SHORT_ANSWER') return false;
+    const kind = typeof question.uiQuestionKind === 'string' ? question.uiQuestionKind : '';
+    return kind === 'FILL_WORD' || kind === 'ORDERING' || kind === 'TABLE';
+  });
   if (autoQuestions.length === 0) return null;
 
   let earned = 0;
@@ -2617,6 +2653,7 @@ const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswe
     maxPoints += points;
     const answer = answers[questionId];
     const type = String(question.type ?? '');
+    const kind = typeof question.uiQuestionKind === 'string' ? question.uiQuestionKind : '';
 
     if (type === 'SINGLE_CHOICE') {
       const correctIds = Array.isArray(question.correctOptionIds)
@@ -2683,6 +2720,113 @@ const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswe
       }
       const correctPairs = pairs.filter((pair) => answerPairsMap.get(pair.left) === pair.right).length;
       earned += (correctPairs / pairs.length) * points;
+      continue;
+    }
+
+    if (type === 'SHORT_ANSWER' && kind === 'FILL_WORD') {
+      const caseSensitive = Boolean(question.caseSensitive);
+      const allowPartialCredit = question.allowPartialCredit !== false;
+      const expectedAnswers = Array.isArray(question.acceptedAnswers)
+        ? question.acceptedAnswers.filter((item): item is string => typeof item === 'string').map((item) => item.trim())
+        : [];
+      if (expectedAnswers.length === 0) continue;
+      const submittedAnswers = Array.isArray(answer)
+        ? answer.filter((item): item is string => typeof item === 'string')
+        : [];
+      const correctCount = expectedAnswers.reduce((sum, expectedAnswer, index) => {
+        const submitted = submittedAnswers[index];
+        if (!expectedAnswer) return sum;
+        if (normalizeAnswerString(submitted, caseSensitive) === normalizeAnswerString(expectedAnswer, caseSensitive)) {
+          return sum + 1;
+        }
+        return sum;
+      }, 0);
+
+      if (allowPartialCredit) {
+        earned += (correctCount / expectedAnswers.length) * points;
+      } else if (correctCount === expectedAnswers.length) {
+        earned += points;
+      }
+      continue;
+    }
+
+    if (type === 'SHORT_ANSWER' && kind === 'ORDERING') {
+      const expectedOrderIds = Array.isArray(question.orderingItems)
+        ? question.orderingItems
+            .filter(
+              (item): item is { id: string; text?: string } =>
+                typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string',
+            )
+            .map((item) => item.id)
+        : [];
+      if (expectedOrderIds.length < 2) continue;
+      const submittedOrderIds = Array.isArray(answer)
+        ? answer.filter((item): item is string => typeof item === 'string')
+        : [];
+      const correctPositions = expectedOrderIds.reduce((sum, expectedId, index) => {
+        if (submittedOrderIds[index] === expectedId) return sum + 1;
+        return sum;
+      }, 0);
+      const allowPartialCredit = Boolean(question.allowPartialCredit);
+      if (allowPartialCredit) {
+        earned += (correctPositions / expectedOrderIds.length) * points;
+      } else if (correctPositions === expectedOrderIds.length) {
+        earned += points;
+      }
+      continue;
+    }
+
+    if (type === 'SHORT_ANSWER' && kind === 'TABLE') {
+      const table = question.table;
+      if (!table || typeof table !== 'object' || Array.isArray(table)) continue;
+      const tableRecord = table as Record<string, unknown>;
+      const rows = Array.isArray(tableRecord.rows)
+        ? tableRecord.rows.filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null)
+        : [];
+      if (rows.length === 0) continue;
+
+      const answerMap = answer && typeof answer === 'object' && !Array.isArray(answer)
+        ? (answer as Record<string, unknown>)
+        : {};
+
+      let totalCells = 0;
+      let correctCells = 0;
+      const caseSensitive = Boolean(question.caseSensitive);
+
+      rows.forEach((row) => {
+        const rowId = typeof row.id === 'string' ? row.id : '';
+        if (!rowId) return;
+        const expectedAnswers = Array.isArray(row.answers)
+          ? row.answers.filter((item): item is string => typeof item === 'string')
+          : [];
+        const submittedRow = answerMap[rowId];
+        const submittedAnswers = Array.isArray(submittedRow)
+          ? submittedRow.filter((item): item is string => typeof item === 'string')
+          : [];
+
+        expectedAnswers.forEach((expectedAnswer, columnIndex) => {
+          const normalizedExpected = normalizeAnswerString(expectedAnswer, caseSensitive);
+          if (!normalizedExpected) return;
+          totalCells += 1;
+          const normalizedSubmitted = normalizeAnswerString(submittedAnswers[columnIndex], caseSensitive);
+          if (normalizedExpected === normalizedSubmitted) {
+            correctCells += 1;
+          }
+        });
+      });
+
+      if (totalCells === 0) continue;
+      const tablePartialCredit =
+        tableRecord.partialCredit === undefined ? undefined : Boolean(tableRecord.partialCredit);
+      const allowPartialCredit =
+        question.allowPartialCredit === undefined
+          ? (tablePartialCredit ?? true)
+          : Boolean(question.allowPartialCredit);
+      if (allowPartialCredit) {
+        earned += (correctCells / totalCells) * points;
+      } else if (correctCells === totalCells) {
+        earned += points;
+      }
       continue;
     }
   }
@@ -4582,6 +4726,15 @@ const listHomeworkTemplatesV2 = async (user: User, params: { query?: string | nu
 const createHomeworkTemplateV2 = async (user: User, body: Record<string, unknown>) => {
   const teacher = await ensureTeacher(user);
   const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const blocks = normalizeHomeworkBlocks(body.blocks) as unknown as HomeworkBlock[];
+  const validationResult = validateHomeworkTemplatePayload({
+    title,
+    blocks,
+  });
+  if (validationResult.errorIssues.length > 0) {
+    throw new RequestValidationError('Проверьте обязательные поля шаблона.', validationResult.issues);
+  }
+
   if (!title) throw new Error('Название шаблона обязательно');
   const template = await (prisma as any).homeworkTemplate.create({
     data: {
@@ -4591,7 +4744,7 @@ const createHomeworkTemplateV2 = async (user: User, body: Record<string, unknown
       tags: JSON.stringify(normalizeHomeworkTemplateTags(body.tags)),
       subject: typeof body.subject === 'string' ? body.subject.trim() || null : null,
       level: typeof body.level === 'string' ? body.level.trim() || null : null,
-      blocks: JSON.stringify(normalizeHomeworkBlocks(body.blocks)),
+      blocks: JSON.stringify(blocks),
       isArchived: false,
     },
   });
@@ -4603,16 +4756,32 @@ const updateHomeworkTemplateV2 = async (user: User, templateId: number, body: Re
   const template = await (prisma as any).homeworkTemplate.findUnique({ where: { id: templateId } });
   if (!template || template.teacherId !== teacher.chatId) throw new Error('Шаблон не найден');
 
+  const hasTitleUpdate = typeof body.title === 'string';
+  const hasBlocksUpdate = 'blocks' in body;
+  const nextTitle = typeof body.title === 'string' ? body.title.trim() : template.title;
+  const nextBlocks = hasBlocksUpdate
+    ? (normalizeHomeworkBlocks(body.blocks) as unknown as HomeworkBlock[])
+    : (normalizeHomeworkBlocks(template.blocks) as unknown as HomeworkBlock[]);
+
+  if (hasTitleUpdate || hasBlocksUpdate) {
+    const validationResult = validateHomeworkTemplatePayload({
+      title: nextTitle,
+      blocks: nextBlocks,
+    });
+    if (validationResult.errorIssues.length > 0) {
+      throw new RequestValidationError('Проверьте обязательные поля шаблона.', validationResult.issues);
+    }
+  }
+
   const data: Record<string, unknown> = {};
-  if (typeof body.title === 'string') {
-    const title = body.title.trim();
-    if (!title) throw new Error('Название шаблона обязательно');
-    data.title = title;
+  if (hasTitleUpdate) {
+    if (!nextTitle) throw new Error('Название шаблона обязательно');
+    data.title = nextTitle;
   }
   if ('tags' in body) data.tags = JSON.stringify(normalizeHomeworkTemplateTags(body.tags));
   if ('subject' in body) data.subject = typeof body.subject === 'string' ? body.subject.trim() || null : null;
   if ('level' in body) data.level = typeof body.level === 'string' ? body.level.trim() || null : null;
-  if ('blocks' in body) data.blocks = JSON.stringify(normalizeHomeworkBlocks(body.blocks));
+  if (hasBlocksUpdate) data.blocks = JSON.stringify(nextBlocks);
   if (typeof body.isArchived === 'boolean') data.isArchived = body.isArchived;
 
   const updated = await (prisma as any).homeworkTemplate.update({
@@ -5630,10 +5799,10 @@ const createFilePresignUploadV2 = (req: IncomingMessage, body: Record<string, un
     expiresAt: Date.now() + HOMEWORK_UPLOAD_TTL_SEC * 1000,
   });
 
-  const configuredBaseUrl = (process.env.APP_BASE_URL ?? process.env.PUBLIC_BASE_URL ?? '').trim().replace(/\/$/, '');
-  const baseUrl = configuredBaseUrl || '';
-  const uploadUrl = `${baseUrl}/api/v2/files/upload/${token}`;
-  const fileUrl = `${baseUrl}/api/v2/files/object/${objectKey}`;
+  // Relative URLs are resilient across localhost, tunnels and custom domains.
+  // The frontend resolves them against VITE_API_BASE or current origin.
+  const uploadUrl = `/api/v2/files/upload/${token}`;
+  const fileUrl = `/api/v2/files/object/${objectKey}`;
   return {
     uploadUrl,
     method: 'PUT' as const,
@@ -5672,7 +5841,23 @@ const handlePresignedUploadPutV2 = async (req: IncomingMessage, res: ServerRespo
   return res.end('ok');
 };
 
-const handleUploadedFileObjectGetV2 = async (res: ServerResponse, objectKeyRaw: string) => {
+const resolveUploadedFileContentType = (objectKey: string) => {
+  const extension = path.extname(objectKey).toLowerCase();
+  if (extension === '.m4a') return 'audio/mp4';
+  if (extension === '.webm') return 'audio/webm';
+  if (extension === '.ogg') return 'audio/ogg';
+  if (extension === '.mp3') return 'audio/mpeg';
+  if (extension === '.wav') return 'audio/wav';
+  if (extension === '.pdf') return 'application/pdf';
+  if (extension === '.png') return 'image/png';
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
+  if (extension === '.gif') return 'image/gif';
+  if (extension === '.mp4') return 'video/mp4';
+  if (extension === '.mov') return 'video/quicktime';
+  return 'application/octet-stream';
+};
+
+const handleUploadedFileObjectGetV2 = async (req: IncomingMessage, res: ServerResponse, objectKeyRaw: string) => {
   const objectKey = objectKeyRaw.replace(/\\/g, '/');
   const fullPath = path.join(HOMEWORK_UPLOAD_DIR, objectKey);
   const normalizedRoot = path.resolve(HOMEWORK_UPLOAD_DIR);
@@ -5681,10 +5866,49 @@ const handleUploadedFileObjectGetV2 = async (res: ServerResponse, objectKeyRaw: 
     return notFound(res);
   }
   try {
+    const stat = await fs.stat(normalizedPath);
+    const fileSize = stat.size;
+    const contentType = resolveUploadedFileContentType(objectKey);
+    const rangeHeader = req.headers.range;
     const file = await fs.readFile(normalizedPath);
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/octet-stream');
+
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    if (rangeHeader && fileSize > 0) {
+      const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+      if (match) {
+        const startRaw = match[1] ? Number(match[1]) : Number.NaN;
+        const endRaw = match[2] ? Number(match[2]) : Number.NaN;
+        const hasStart = Number.isFinite(startRaw);
+        const hasEnd = Number.isFinite(endRaw);
+
+        let start = hasStart ? startRaw : 0;
+        let end = hasEnd ? endRaw : fileSize - 1;
+
+        if (!hasStart && hasEnd) {
+          const suffixLength = Math.max(0, endRaw);
+          start = Math.max(0, fileSize - suffixLength);
+          end = fileSize - 1;
+        }
+
+        if (start > end || start < 0 || end >= fileSize) {
+          res.statusCode = 416;
+          res.setHeader('Content-Range', `bytes */${fileSize}`);
+          return res.end();
+        }
+
+        const chunk = file.subarray(start, end + 1);
+        res.statusCode = 206;
+        res.setHeader('Content-Length', String(chunk.length));
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+        return res.end(chunk);
+      }
+    }
+
+    res.statusCode = 200;
+    res.setHeader('Content-Length', String(file.length));
     res.end(file);
   } catch {
     notFound(res);
@@ -6157,7 +6381,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
     const fileObjectMatch = pathname.match(/^\/api\/v2\/files\/object\/(.+)$/);
     if (req.method === 'GET' && fileObjectMatch) {
-      return handleUploadedFileObjectGetV2(res, fileObjectMatch[1]);
+      return handleUploadedFileObjectGetV2(req, res, fileObjectMatch[1]);
     }
 
     if (req.method === 'POST' && pathname === '/api/yookassa/webhook') {
@@ -6847,16 +7071,23 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
     return notFound(res);
   } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return sendJson(res, error.statusCode, { message: error.message, issues: error.issues });
+    }
+
     const statusCodeRaw = (error as { statusCode?: unknown } | null)?.statusCode;
     const statusCode =
       typeof statusCodeRaw === 'number' && Number.isFinite(statusCodeRaw)
         ? Math.trunc(statusCodeRaw)
         : null;
     const message = error instanceof Error ? error.message : 'Unexpected error';
+    const issues = Array.isArray((error as { issues?: unknown } | null)?.issues)
+      ? (error as { issues: unknown[] }).issues
+      : undefined;
     if (statusCode && statusCode >= 400 && statusCode <= 599) {
-      return sendJson(res, statusCode, { message });
+      return sendJson(res, statusCode, issues ? { message, issues } : { message });
     }
-    return badRequest(res, message);
+    return issues ? sendJson(res, 400, { message, issues }) : badRequest(res, message);
   }
 };
 

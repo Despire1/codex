@@ -21,6 +21,24 @@
   min-width: 0;
 }
 
+.backButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  color: var(--color-slate-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.backButton:hover {
+  background: var(--color-slate-50);
+}
+
 .actionsCreateVisible {
   --create-slot-width: 176px;
   --actions-gap: 10px;
@@ -31,6 +49,12 @@
   --create-slot-width: 176px;
   --actions-gap: 10px;
   --bell-shift: calc(var(--create-slot-width) + var(--actions-gap));
+}
+
+.actionsTemplateMode {
+  --create-slot-width: 0px;
+  --actions-gap: 10px;
+  --bell-shift: 0px;
 }
 
 .title {
@@ -130,6 +154,58 @@
   background: var(--color-slate-800);
 }
 
+.templateSecondaryButton {
+  min-height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-slate-700);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.templateSecondaryButton:hover {
+  background: var(--color-slate-100);
+}
+
+.templateSecondaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.templatePrimaryButton {
+  min-height: 40px;
+  white-space: nowrap;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-slate-900);
+  color: var(--color-white);
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.templatePrimaryButton:hover {
+  background: var(--color-slate-800);
+}
+
+.templatePrimaryIcon {
+  color: #a3e635;
+}
+
+.templatePrimaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .createButtonSlot {
   display: inline-flex;
   justify-content: flex-end;
@@ -176,6 +252,12 @@
   }
 
   .teacherName {
+    display: none;
+  }
+}
+
+@media (max-width: 1399px) {
+  .templateSecondaryButton span {
     display: none;
   }
 }
