@@ -1,5 +1,5 @@
 import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, DashboardIcon } from '../../icons/MaterialIcons';
+import { ChevronLeftIcon, ChevronRightIcon, RobotIcon } from '../../icons/MaterialIcons';
 import { sidebarNavItems, type SidebarNavItem } from './model/navigation';
 import styles from './Sidebar.module.css';
 
@@ -186,7 +186,7 @@ export const Sidebar: FC<SidebarProps> = ({
       >
         <div className={styles.brand}>
           <span className={styles.brandLogo} aria-hidden>
-            <DashboardIcon width={20} height={20} />
+            <RobotIcon width={20} height={20} />
           </span>
           <span className={styles.brandText}>TeacherBot</span>
         </div>

@@ -161,8 +161,28 @@
   background: #1f2937;
 }
 
+.headerStartButton {
+  border: none;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: var(--color-white);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.28);
+}
+
+.headerStartButton:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
 .headerDraftButton:disabled,
-.headerSubmitButton:disabled {
+.headerSubmitButton:disabled,
+.headerStartButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -829,7 +849,8 @@
 .cancelRecordButton,
 .stopRecordButton,
 .lightButton,
-.bottomSubmitButton {
+.bottomSubmitButton,
+.bottomStartButton {
   border: none;
   border-radius: 14px;
   padding: 10px 14px;
@@ -1112,7 +1133,21 @@
   background: #1f2937;
 }
 
-.bottomSubmitButton:disabled {
+.bottomStartButton {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: var(--color-white);
+  border-radius: 16px;
+  padding: 14px 20px;
+  box-shadow: 0 12px 24px rgba(22, 163, 74, 0.24);
+  flex-shrink: 0;
+}
+
+.bottomStartButton:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
+.bottomSubmitButton:disabled,
+.bottomStartButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1545,7 +1580,8 @@
   }
 
   .headerDraftButton,
-  .headerSubmitButton {
+  .headerSubmitButton,
+  .headerStartButton {
     font-size: 13px;
     padding: 9px 12px;
   }
@@ -1599,6 +1635,11 @@
   }
 
   .bottomSubmitButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .bottomStartButton {
     width: 100%;
     justify-content: center;
   }

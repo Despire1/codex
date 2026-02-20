@@ -1,13 +1,18 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-type UnsavedChangesEntry = {
+export type UnsavedChangesEntry = {
   isDirty: boolean;
   onSave: () => Promise<boolean>;
   onDiscard?: () => void;
   message?: string;
+  title?: string;
+  confirmText?: string;
+  cancelText?: string;
+  cancelKeepsEditing?: boolean;
+  onSaveErrorMessage?: string;
 };
 
-type ActiveUnsavedEntry = {
+export type ActiveUnsavedEntry = {
   key: string;
   entry: UnsavedChangesEntry;
 };

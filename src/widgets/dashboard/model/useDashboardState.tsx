@@ -31,6 +31,7 @@ export type DashboardStateConfig = {
 export type DashboardStateValue = {
   weekRange: { start: Date; end: Date } | null;
   setWeekRange: (start: Date, end: Date) => void;
+  isWeekLessonsLoading: boolean;
   unpaidEntries: UnpaidLessonEntry[];
   loadUnpaidLessons: () => Promise<void>;
 };
@@ -64,9 +65,11 @@ export const useDashboardStateInternal = ({
     const weekStart = startOfWeek(nowZoned, { weekStartsOn: 1 });
     return { start: weekStart, end: addDays(weekStart, 6) };
   });
+  const [isWeekLessonsLoading, setIsWeekLessonsLoading] = useState(false);
   const [unpaidEntries, setUnpaidEntries] = useState<UnpaidLessonEntry[]>([]);
 
   const setWeekRange = useCallback((start: Date, end: Date) => {
+    setIsWeekLessonsLoading(true);
     setWeekRangeState({ start, end });
   }, []);
 
@@ -88,16 +91,31 @@ export const useDashboardStateInternal = ({
 
   useEffect(() => {
     if (!hasAccess || !isActive || !weekRange) return;
-    void loadLessonsForRange(buildLessonRange(weekRange.start, weekRange.end));
+    let canceled = false;
+    const loadWeekLessons = async () => {
+      setIsWeekLessonsLoading(true);
+      try {
+        await loadLessonsForRange(buildLessonRange(weekRange.start, weekRange.end));
+      } finally {
+        if (!canceled) {
+          setIsWeekLessonsLoading(false);
+        }
+      }
+    };
+    void loadWeekLessons();
+    return () => {
+      canceled = true;
+    };
   }, [buildLessonRange, hasAccess, isActive, loadLessonsForRange, weekRange]);
 
   return useMemo(
     () => ({
       weekRange,
       setWeekRange,
+      isWeekLessonsLoading,
       unpaidEntries,
       loadUnpaidLessons,
     }),
-    [loadUnpaidLessons, unpaidEntries, setWeekRange, weekRange],
+    [isWeekLessonsLoading, loadUnpaidLessons, unpaidEntries, setWeekRange, weekRange],
   );
 };

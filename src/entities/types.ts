@@ -201,12 +201,13 @@ export type HomeworkAssignmentStatus =
   | 'SCHEDULED'
   | 'SENT'
   | 'SUBMITTED'
+  | 'IN_REVIEW'
   | 'RETURNED'
   | 'REVIEWED'
   | 'OVERDUE';
 
 export type HomeworkSendMode = 'AUTO_AFTER_LESSON_DONE' | 'MANUAL';
-export type HomeworkAssignmentProblemFlag = 'OVERDUE' | 'RETURNED' | 'CONFIG_ERROR' | 'SUBMITTED';
+export type HomeworkAssignmentProblemFlag = 'OVERDUE' | 'RETURNED' | 'CONFIG_ERROR' | 'SUBMITTED' | 'IN_REVIEW';
 
 export interface HomeworkScore {
   autoScore?: number | null;
@@ -251,6 +252,13 @@ export interface HomeworkAssignment {
 
 export type HomeworkSubmissionStatus = 'DRAFT' | 'SUBMITTED' | 'REVIEWED';
 
+export interface HomeworkReviewDraft {
+  submissionId: number;
+  scoresById: Record<string, number>;
+  commentsById: Record<string, string>;
+  generalComment: string;
+}
+
 export interface HomeworkSubmission {
   id: number;
   assignmentId: number;
@@ -263,6 +271,7 @@ export interface HomeworkSubmission {
   voice: HomeworkAttachment[];
   testAnswers?: Record<string, unknown> | null;
   teacherComment?: string | null;
+  reviewDraft?: HomeworkReviewDraft | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
   createdAt: string;

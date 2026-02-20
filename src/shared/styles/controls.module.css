@@ -32,10 +32,15 @@
   padding: 12px;
   border: none;
   border-radius: 12px;
-  background: var(--color-blue-600);
-  color: var(--color-white);
+  background: var(--primary-button-bg, var(--color-blue-600));
+  color: var(--primary-button-text, var(--color-white));
+  -webkit-text-fill-color: var(--primary-button-text, var(--color-white));
   font-weight: 600;
   cursor: pointer;
+}
+
+.primaryButton:not(:disabled):hover {
+  background: var(--primary-button-hover-bg, var(--primary-button-bg, var(--color-blue-600)));
 }
 
 .primaryButton:disabled {

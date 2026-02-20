@@ -6,6 +6,7 @@ import {
   HomeworkAssignment,
   HomeworkAttachment,
   HomeworkBlock,
+  HomeworkReviewDraft,
   HomeworkSubmission,
   HomeworkStatus,
   HomeworkTemplate,
@@ -667,6 +668,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  getHomeworkAssignmentV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}`),
   updateHomeworkAssignmentV2: (
     assignmentId: number,
     payload: Partial<{
@@ -717,6 +720,27 @@ export const api = {
     }),
   listHomeworkSubmissionsV2: (assignmentId: number) =>
     apiFetch<{ items: HomeworkSubmission[] }>(`/api/v2/homework/assignments/${assignmentId}/submissions`),
+  startHomeworkReviewSessionV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment; submissions: HomeworkSubmission[] }>(
+      `/api/v2/homework/assignments/${assignmentId}/review-session`,
+      {
+        method: 'POST',
+      },
+    ),
+  saveHomeworkReviewDraftV2: (
+    assignmentId: number,
+    payload: {
+      submissionId?: number;
+      draft: HomeworkReviewDraft | null;
+    },
+  ) =>
+    apiFetch<{ assignment: HomeworkAssignment; submission: HomeworkSubmission | null }>(
+      `/api/v2/homework/assignments/${assignmentId}/review-draft`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
   createHomeworkSubmissionV2: (
     assignmentId: number,
     payload: {

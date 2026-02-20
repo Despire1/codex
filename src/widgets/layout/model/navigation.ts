@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from 'react';
 import { tabs, type AppTab, type TabId } from '../../../app/tabs';
+import { BookOpenIcon, CalendarIcon, ChartPieIcon, UserGroupIcon } from '../../../icons/MaterialIcons';
 
 export type SidebarNavSection = 'primary' | 'settings';
 export type SidebarNavMatch = 'exact' | 'prefix';
@@ -28,9 +29,16 @@ const matchByTab: Record<TabId, SidebarNavMatch> = {
   dashboard: 'exact',
   students: 'exact',
   schedule: 'exact',
-  homeworks: 'exact',
+  homeworks: 'prefix',
   analytics: 'exact',
   settings: 'prefix',
+};
+
+const iconByTab: Partial<Record<TabId, SidebarNavItem['icon']>> = {
+  dashboard: ChartPieIcon,
+  students: UserGroupIcon,
+  schedule: CalendarIcon,
+  homeworks: BookOpenIcon,
 };
 
 export const buildSidebarNavItems = (tabItems: readonly AppTab[]): SidebarNavItem[] =>
@@ -38,7 +46,7 @@ export const buildSidebarNavItems = (tabItems: readonly AppTab[]): SidebarNavIte
     id: tab.id,
     label: tab.label,
     href: tab.path,
-    icon: tab.icon,
+    icon: iconByTab[tab.id] ?? tab.icon,
     section: sectionByTab[tab.id],
     match: matchByTab[tab.id],
   }));

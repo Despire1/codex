@@ -20,6 +20,7 @@ import {
   faMicrophone,
   faPaperPlane,
   faPaperclip,
+  faPlay,
   faStar,
 } from '@fortawesome/free-solid-svg-icons';
 import {
@@ -29,6 +30,7 @@ import {
   HomeworkTestQuestion,
   HomeworkTestQuestionKind,
 } from '../../../entities/types';
+import { readHomeworkTemplateQuizSettingsFromBlocks, resolveHomeworkAttemptTimerConfig } from '../../../entities/homework-template/model/lib/quizSettings';
 import styles from './StudentHomeworkDetailView.module.css';
 import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/model/lib/assignmentBuckets';
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
@@ -51,6 +53,7 @@ interface StudentHomeworkDetailViewProps {
   requestError: string | null;
   onBack: () => void;
   onRefresh: () => void;
+  onStartAttempt: () => Promise<boolean>;
   onSubmitPayload: (payload: StudentHomeworkSubmitPayload) => Promise<boolean>;
 }
 
@@ -75,7 +78,6 @@ type QuestionCardModel =
     };
 
 const ESSAY_MIN_WORDS = 50;
-const PASS_THRESHOLD_PERCENT = 70;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -117,6 +119,17 @@ const formatDurationMs = (durationMs: number) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const formatMinutesLabel = (minutes: number) => {
+  if (!Number.isFinite(minutes) || minutes <= 0) return '—';
+  const rounded = Math.max(1, Math.round(minutes));
+  if (rounded >= 60) {
+    const hours = Math.floor(rounded / 60);
+    const restMinutes = rounded % 60;
+    return restMinutes > 0 ? `${hours}ч ${restMinutes}м` : `${hours}ч`;
+  }
+  return `${rounded} мин`;
 };
 
 const normalizeAudioMimeType = (value: string | null | undefined) => {
@@ -290,15 +303,47 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   requestError,
   onBack,
   onRefresh,
+  onStartAttempt,
   onSubmitPayload,
 }) => {
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const latestSubmission = useMemo(() => getLatestSubmission(submissions), [submissions]);
+  const latestDraftSubmission = useMemo(
+    () =>
+      submissions
+        .filter((submission) => submission.status === 'DRAFT')
+        .sort((left, right) => {
+          if (right.attemptNo !== left.attemptNo) return right.attemptNo - left.attemptNo;
+          return right.id - left.id;
+        })[0] ?? null,
+    [submissions],
+  );
   const canEdit = assignment ? canStudentEditSubmission(assignment) : false;
   const responseConfig = useMemo(
     () => (assignment ? resolveAssignmentResponseConfig(assignment) : null),
     [assignment],
   );
-  const canEditTest = canEdit && Boolean(responseConfig?.hasTest);
+  const quizSettings = useMemo(
+    () => readHomeworkTemplateQuizSettingsFromBlocks(assignment?.contentSnapshot ?? []),
+    [assignment?.contentSnapshot],
+  );
+  const timerConfig = useMemo(
+    () => resolveHomeworkAttemptTimerConfig(assignment?.contentSnapshot ?? []),
+    [assignment?.contentSnapshot],
+  );
+  const timedAttemptStartedAtTs = parseTimestamp(latestDraftSubmission?.createdAt);
+  const timedAttemptDeadlineTs =
+    timerConfig.enabled && timedAttemptStartedAtTs !== null && timerConfig.durationMs !== null
+      ? timedAttemptStartedAtTs + timerConfig.durationMs
+      : null;
+  const timedAttemptRemainingMs =
+    timedAttemptDeadlineTs === null ? null : Math.max(0, timedAttemptDeadlineTs - nowTs);
+  const requiresTimedAttemptStart = timerConfig.enabled && canEdit && timedAttemptStartedAtTs === null;
+  const isTimedAttemptExpired =
+    timerConfig.enabled && timedAttemptDeadlineTs !== null && timedAttemptDeadlineTs <= nowTs;
+  const canInteractWithAttempt = canEdit && !requiresTimedAttemptStart && !isTimedAttemptExpired;
+
+  const canEditTest = canInteractWithAttempt && Boolean(responseConfig?.hasTest);
   const canUploadAttachments =
     Boolean(responseConfig?.allowFiles) ||
     Boolean(responseConfig?.allowPhotos) ||
@@ -306,7 +351,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     Boolean(responseConfig?.allowAudio) ||
     Boolean(responseConfig?.allowVideo);
   const canUploadVoice = Boolean(responseConfig?.allowVoice);
-  const canEditText = canEdit && Boolean(responseConfig?.allowText);
+  const canEditText = canInteractWithAttempt && Boolean(responseConfig?.allowText);
 
   const [answerText, setAnswerText] = useState('');
   const [attachments, setAttachments] = useState<HomeworkAttachment[]>([]);
@@ -314,6 +359,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const [testAnswers, setTestAnswers] = useState<Record<string, unknown>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [startingAttempt, setStartingAttempt] = useState(false);
 
   const [recording, setRecording] = useState(false);
   const [recordingLevel, setRecordingLevel] = useState(0);
@@ -335,8 +381,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const recordingDurationIntervalRef = useRef<number | null>(null);
 
   const questionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  const [nowTs, setNowTs] = useState(() => Date.now());
+  const handledTimeoutAttemptKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setAnswerText(latestSubmission?.answerText ?? '');
@@ -454,7 +499,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   };
 
   const handleUploadAttachments = async (files: FileList | null) => {
-    if (!files || !files.length || !canEdit || !canUploadAttachments) return;
+    if (!files || !files.length || !canInteractWithAttempt || !canUploadAttachments) return;
 
     setLocalError(null);
     setUploading(true);
@@ -472,7 +517,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   };
 
   const startVoiceRecording = async () => {
-    if (!canEdit || recording || !canUploadVoice) return;
+    if (!canInteractWithAttempt || recording || !canUploadVoice) return;
     setLocalError(null);
 
     if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
@@ -563,8 +608,24 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     }));
   };
 
+  const handleStartTimedAttempt = async () => {
+    if (!requiresTimedAttemptStart || startingAttempt) return;
+    setLocalError(null);
+    setStartingAttempt(true);
+    const success = await onStartAttempt();
+    if (!success) {
+      setLocalError('Не удалось запустить таймер. Попробуйте еще раз.');
+    }
+    setStartingAttempt(false);
+  };
+
   const handleSubmit = async (submit: boolean) => {
     if (!assignment || !canEdit) return;
+    if (requiresTimedAttemptStart) {
+      setLocalError('Сначала нажмите «Начать», чтобы запустить таймер.');
+      return;
+    }
+    if (!canInteractWithAttempt) return;
     if (!responseConfig?.canSubmit) {
       setLocalError('В этом шаблоне не настроен способ сдачи. Обратись к преподавателю.');
       return;
@@ -590,11 +651,17 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       submit,
     };
 
-    const success = await onSubmitPayload(payload);
-    if (!success) {
-      setLocalError(submit ? 'Не удалось отправить домашку' : 'Не удалось сохранить черновик');
-    }
+    await onSubmitPayload(payload);
   };
+
+  useEffect(() => {
+    if (!isTimedAttemptExpired || !latestDraftSubmission || !canEdit) return;
+    const timeoutKey = String(latestDraftSubmission.id);
+    if (handledTimeoutAttemptKeyRef.current === timeoutKey) return;
+    handledTimeoutAttemptKeyRef.current = timeoutKey;
+    setLocalError('Время вышло. Попытка автоматически завершена как проваленная.');
+    onRefresh();
+  }, [canEdit, isTimedAttemptExpired, latestDraftSubmission, onRefresh]);
 
   const questionCards = useMemo<QuestionCardModel[]>(() => {
     if (!assignment) return [];
@@ -687,7 +754,12 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const displayMaxPoints = maxPoints > 0 ? maxPoints : 10;
 
   const latestScore = assignment
-    ? assignment.score.finalScore ?? assignment.score.manualScore ?? assignment.score.autoScore ?? null
+    ? (() => {
+        const raw = assignment.score.finalScore ?? assignment.score.manualScore ?? assignment.score.autoScore ?? null;
+        if (!Number.isFinite(raw)) return null;
+        const normalizedRaw = Number(raw);
+        return normalizedRaw > 10 ? normalizedRaw / 10 : normalizedRaw;
+      })()
     : null;
 
   const estimatedMinutes = Math.max(10, totalQuestions * 3);
@@ -695,19 +767,56 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const deadlineTs = parseTimestamp(assignment?.deadlineAt);
   const sentTs = parseTimestamp(assignment?.sentAt ?? assignment?.createdAt);
-  const remainingMs = deadlineTs === null ? null : Math.max(0, deadlineTs - nowTs);
+  const deadlineRemainingMs = deadlineTs === null ? null : Math.max(0, deadlineTs - nowTs);
+
+  const timeLabel = timerConfig.enabled
+    ? requiresTimedAttemptStart
+      ? formatMinutesLabel(timerConfig.durationMinutes ?? 0)
+      : formatCountdown(timedAttemptRemainingMs)
+    : formatCountdown(deadlineRemainingMs);
+  const timeHint = timerConfig.enabled
+    ? requiresTimedAttemptStart
+      ? 'таймер запустится после нажатия «Начать»'
+      : 'до конца попытки'
+    : deadlineRemainingMs === null
+      ? 'без ограничения по времени'
+      : 'до дедлайна';
 
   const timeProgressPercent = useMemo(() => {
+    if (timerConfig.enabled) {
+      if (requiresTimedAttemptStart) return 100;
+      if (
+        timedAttemptDeadlineTs !== null &&
+        timedAttemptStartedAtTs !== null &&
+        timedAttemptDeadlineTs > timedAttemptStartedAtTs
+      ) {
+        const ratio = (timedAttemptDeadlineTs - nowTs) / (timedAttemptDeadlineTs - timedAttemptStartedAtTs);
+        return clamp(Math.round(ratio * 100), 0, 100);
+      }
+      return timedAttemptRemainingMs && timedAttemptRemainingMs > 0 ? 100 : 0;
+    }
+
     if (deadlineTs === null) return Math.max(10, progressPercent);
     if (sentTs !== null && deadlineTs > sentTs) {
       const ratio = (deadlineTs - nowTs) / (deadlineTs - sentTs);
       return clamp(Math.round(ratio * 100), 0, 100);
     }
-    return remainingMs && remainingMs > 0 ? 100 : 0;
-  }, [deadlineTs, nowTs, progressPercent, remainingMs, sentTs]);
+    return deadlineRemainingMs && deadlineRemainingMs > 0 ? 100 : 0;
+  }, [
+    deadlineRemainingMs,
+    deadlineTs,
+    nowTs,
+    progressPercent,
+    requiresTimedAttemptStart,
+    sentTs,
+    timedAttemptDeadlineTs,
+    timedAttemptRemainingMs,
+    timedAttemptStartedAtTs,
+    timerConfig.enabled,
+  ]);
 
-  const timeLabel = formatCountdown(remainingMs);
-  const timeHint = remainingMs === null ? 'без ограничения по времени' : 'до дедлайна';
+  const passingScorePercent = quizSettings.passingScorePercent;
+  const attemptsLabel = quizSettings.attemptsLimit === null ? '∞' : String(quizSettings.attemptsLimit);
 
   const submitButtonLabel = assignment?.status === 'RETURNED' ? 'Пересдать' : 'Отправить';
 
@@ -1147,31 +1256,45 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
           </div>
 
           {canEdit ? (
-            <>
+            requiresTimedAttemptStart ? (
               <button
                 type="button"
-                className={styles.headerDraftButton}
-                disabled={submitting || uploading}
+                className={styles.headerStartButton}
+                disabled={startingAttempt || submitting || uploading}
                 onClick={() => {
-                  void handleSubmit(false);
+                  void handleStartTimedAttempt();
                 }}
               >
-                <FontAwesomeIcon icon={farBookmark} />
-                <span>Сохранить черновик</span>
+                <FontAwesomeIcon icon={faPlay} />
+                <span>{startingAttempt ? 'Запускаем...' : 'Начать'}</span>
               </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.headerDraftButton}
+                  disabled={submitting || uploading || !canInteractWithAttempt}
+                  onClick={() => {
+                    void handleSubmit(false);
+                  }}
+                >
+                  <FontAwesomeIcon icon={farBookmark} />
+                  <span>Сохранить черновик</span>
+                </button>
 
-              <button
-                type="button"
-                className={styles.headerSubmitButton}
-                disabled={submitting || uploading}
-                onClick={() => {
-                  void handleSubmit(true);
-                }}
-              >
-                <FontAwesomeIcon icon={faPaperPlane} />
-                <span>{submitButtonLabel}</span>
-              </button>
-            </>
+                <button
+                  type="button"
+                  className={styles.headerSubmitButton}
+                  disabled={submitting || uploading || !canInteractWithAttempt}
+                  onClick={() => {
+                    void handleSubmit(true);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faPaperPlane} />
+                  <span>{submitButtonLabel}</span>
+                </button>
+              </>
+            )
           ) : (
             <div className={styles.readonlyBadge}>Только просмотр</div>
           )}
@@ -1195,8 +1318,29 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             </div>
           ) : null}
 
+          {requiresTimedAttemptStart ? (
+            <div className={`${styles.notice} ${styles.noticeInfo}`}>
+              <span className={styles.noticeText}>
+                После нажатия «Начать» запустится таймер на {formatMinutesLabel(timerConfig.durationMinutes ?? 0)}.
+                Остановить его нельзя, а при окончании попытка считается проваленной.
+              </span>
+              <button
+                type="button"
+                className={styles.noticeAction}
+                disabled={startingAttempt || submitting || uploading}
+                onClick={() => {
+                  void handleStartTimedAttempt();
+                }}
+              >
+                {startingAttempt ? 'Запускаем...' : 'Начать'}
+              </button>
+            </div>
+          ) : null}
+
           {latestScore !== null ? (
-            <div className={`${styles.notice} ${styles.noticeSuccess}`}>Последний результат: {latestScore}/100</div>
+            <div className={`${styles.notice} ${styles.noticeSuccess}`}>
+              Последний результат: {Number.isInteger(latestScore) ? latestScore : latestScore.toFixed(1)}/10
+            </div>
           ) : null}
 
           <section className={styles.assignmentHero}>
@@ -1236,7 +1380,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   <FontAwesomeIcon icon={faCircleCheck} className={styles.heroStatGreenIcon} />
                   <span className={styles.heroStatLabel}>Проходной балл</span>
                 </div>
-                <p className={styles.heroStatValue}>{PASS_THRESHOLD_PERCENT}%</p>
+                <p className={styles.heroStatValue}>{passingScorePercent}%</p>
               </div>
 
               <div className={styles.heroStatCard}>
@@ -1244,7 +1388,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   <FontAwesomeIcon icon={faInfinity} className={styles.heroStatAccentIcon} />
                   <span className={styles.heroStatLabel}>Попытки</span>
                 </div>
-                <p className={styles.heroStatValue}>∞</p>
+                <p className={styles.heroStatValue}>{attemptsLabel}</p>
               </div>
             </div>
           </section>
@@ -1348,7 +1492,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                     <div className={styles.uploadControls}>
                       <label
                         className={`${styles.uploadButton} ${
-                          !canEdit || uploading || !canUploadAttachments ? styles.uploadButtonDisabled : ''
+                          !canInteractWithAttempt || uploading || !canUploadAttachments ? styles.uploadButtonDisabled : ''
                         }`}
                       >
                         <FontAwesomeIcon icon={faPaperclip} />
@@ -1358,7 +1502,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           type="file"
                           accept={responseConfig?.attachmentAccept}
                           multiple
-                          disabled={!canEdit || uploading || !canUploadAttachments}
+                          disabled={!canInteractWithAttempt || uploading || !canUploadAttachments}
                           onChange={(event) => {
                             void handleUploadAttachments(event.target.files);
                             event.target.value = '';
@@ -1379,7 +1523,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                             <span className={styles.attachmentName}>{item.fileName || item.url}</span>
                             <span className={styles.attachmentSize}>{formatFileSize(item.size)}</span>
                           </a>
-                          {canEdit ? (
+                          {canInteractWithAttempt ? (
                             <button
                               type="button"
                               className={styles.removeButton}
@@ -1414,7 +1558,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                         <button
                           type="button"
                           className={styles.recordButton}
-                          disabled={!canEdit || uploading}
+                          disabled={!canInteractWithAttempt || uploading}
                           onClick={() => {
                             void startVoiceRecording();
                           }}
@@ -1469,7 +1613,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                       {voice.map((item) => (
                         <div key={item.id} className={styles.attachmentRow}>
                           <audio controls src={resolveHomeworkStorageUrl(item.url)} className={styles.voicePlayer} />
-                          {canEdit ? (
+                          {canInteractWithAttempt ? (
                             <button
                               type="button"
                               className={styles.removeButton}
@@ -1490,21 +1634,35 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                 <div className={styles.submitSectionContent}>
                   <h3 className={styles.submitSectionTitle}>Готовы отправить?</h3>
                   <p className={styles.submitSectionText}>
-                    Проверьте все ответы перед отправкой. Вы сможете вернуться к любому вопросу до дедлайна.
+                    Проверьте все ответы перед отправкой. До истечения времени можно вернуться к любому вопросу.
                   </p>
                 </div>
                 {canEdit ? (
-                  <button
-                    type="button"
-                    className={styles.bottomSubmitButton}
-                    disabled={submitting || uploading}
-                    onClick={() => {
-                      void handleSubmit(true);
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faPaperPlane} />
-                    <span>{submitButtonLabel} задание</span>
-                  </button>
+                  requiresTimedAttemptStart ? (
+                    <button
+                      type="button"
+                      className={styles.bottomStartButton}
+                      disabled={startingAttempt || submitting || uploading}
+                      onClick={() => {
+                        void handleStartTimedAttempt();
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faPlay} />
+                      <span>{startingAttempt ? 'Запускаем...' : 'Начать попытку'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.bottomSubmitButton}
+                      disabled={submitting || uploading || !canInteractWithAttempt}
+                      onClick={() => {
+                        void handleSubmit(true);
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faPaperPlane} />
+                      <span>{submitButtonLabel} задание</span>
+                    </button>
+                  )
                 ) : (
                   <div className={styles.readonlyBadge}>Ответ сейчас доступен только для просмотра</div>
                 )}

@@ -8,28 +8,25 @@
   grid-template-areas:
     'attention'
     'today'
-    'upcoming'
+    'quickActions'
     'unpaid'
-    'activity'
-    'actions';
+    'activity';
 }
 
 .gridNoAttention {
   grid-template-areas:
     'today'
-    'upcoming'
+    'quickActions'
     'unpaid'
-    'activity'
-    'actions';
+    'activity';
 }
 
 .gridWithCalendar {
   grid-template-areas:
     'calendar'
-    'upcoming'
+    'quickActions'
     'unpaid'
-    'activity'
-    'actions';
+    'activity';
 }
 
 @media (min-width: 1024px) {
@@ -37,26 +34,23 @@
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
     grid-template-areas:
       'attention today'
-      'upcoming activity'
-      'upcoming unpaid'
-      'upcoming actions';
+      'quickActions activity'
+      'quickActions unpaid';
   }
 
   .gridNoAttention {
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
     grid-template-areas:
-      'upcoming today'
-      'upcoming activity'
-      'upcoming unpaid'
-      'upcoming actions';
+      'quickActions today'
+      'quickActions activity'
+      'quickActions unpaid';
   }
 
   .gridWithCalendar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
       'calendar calendar calendar'
-      'upcoming unpaid activity'
-      'actions actions actions';
+      'quickActions unpaid activity';
   }
 }
 
@@ -91,52 +85,6 @@
 .todayMeta {
   color: var(--color-slate-500);
   font-size: 13px;
-}
-
-.lessonList {
-  display: grid;
-  gap: 8px;
-}
-
-.lessonCard {
-  text-align: left;
-  background: var(--lesson-bg, var(--color-slate-50));
-  border: 1px solid var(--lesson-border, var(--color-slate-200));
-  border-radius: 12px;
-  padding: 10px;
-  display: grid;
-  gap: 4px;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.lessonCard:hover {
-  box-shadow: 0 8px 18px var(--lesson-shadow, var(--shadow-slate-900-08));
-  transform: translateY(-1px);
-}
-
-.lessonDay {
-  color: var(--color-slate-400);
-  font-size: 12px;
-}
-
-.lessonTimeRow {
-  font-weight: 600;
-}
-
-.lessonStudent {
-  color: var(--color-slate-500);
-  font-size: 13px;
-}
-
-.inlineAction {
-  margin-top: 8px;
-  border: none;
-  background: none;
-  color: var(--color-slate-500);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0;
 }
 
 .unpaidCard {
@@ -200,28 +148,12 @@
   max-height: 85vh;
 }
 
-.actionsRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.muted {
-  color: var(--color-slate-400);
-  font-size: 13px;
-}
-
 .attentionArea {
   grid-area: attention;
 }
 
 .todayArea {
   grid-area: today;
-}
-
-.upcomingArea {
-  grid-area: upcoming;
 }
 
 .activityCardShell {
@@ -237,8 +169,8 @@
   grid-area: unpaid;
 }
 
-.actionsArea {
-  grid-area: actions;
+.quickActionsArea {
+  grid-area: quickActions;
 }
 
 .calendarArea {

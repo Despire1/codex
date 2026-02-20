@@ -145,11 +145,7 @@ export const AnchoredPopover = ({
       };
     }
 
-    if (resolvedSide !== side) {
-      popoverRef.current.dataset.side = resolvedSide;
-    } else {
-      delete popoverRef.current.dataset.side;
-    }
+    popoverRef.current.dataset.side = resolvedSide;
 
     setPosition(nextPosition);
   };

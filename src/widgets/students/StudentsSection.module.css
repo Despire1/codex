@@ -2124,6 +2124,9 @@
 }
 
 .modalOverlay {
+  --primary-button-bg: #a3e635;
+  --primary-button-hover-bg: #94d82d;
+  --primary-button-text: #111;
   position: fixed;
   inset: 0;
   background: var(--overlay-black-40);

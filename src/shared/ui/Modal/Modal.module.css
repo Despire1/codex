@@ -1,4 +1,7 @@
 .backdrop {
+  --primary-button-bg: #a3e635;
+  --primary-button-hover-bg: #94d82d;
+  --primary-button-text: #111;
   position: fixed;
   inset: 0;
   background: rgba(5, 14, 40, 0.35);

@@ -1,0 +1,49 @@
+.card {
+  width: 100%;
+  border: none;
+  border-left: 2px solid var(--lesson-border, #a3e635);
+  border-radius: 8px;
+  background: var(--lesson-bg, var(--color-slate-100));
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px var(--lesson-shadow, var(--shadow-slate-900-16));
+}
+
+.card:focus-visible {
+  outline: 2px solid #84cc16;
+  outline-offset: 2px;
+}
+
+.cardCanceled {
+  opacity: 0.55;
+}
+
+.time {
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--lesson-time, var(--color-slate-700));
+  margin-bottom: 4px;
+}
+
+.name {
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--color-gray-900);
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

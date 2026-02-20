@@ -1,5 +1,11 @@
 import { CSSProperties, FC } from 'react';
 import {
+  HOMEWORK_TIMER_DEFAULT_MINUTES,
+  HOMEWORK_TIMER_MAX_MINUTES,
+  HOMEWORK_TIMER_MIN_MINUTES,
+  normalizeHomeworkTimerDurationMinutes,
+} from '../../../../entities/homework-template/model/lib/quizSettings';
+import {
   TemplateCreateStats,
   TemplateQuizSettings,
 } from '../../model/lib/createTemplateScreen';
@@ -168,10 +174,38 @@ export const TemplateSettingsSidebar: FC<TemplateSettingsSidebarProps> = ({
               onSettingsChange({
                 ...settings,
                 timerEnabled: event.target.checked,
+                timerDurationMinutes: event.target.checked
+                  ? settings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES
+                  : settings.timerDurationMinutes,
               })
             }
           />
         </label>
+
+        {settings.timerEnabled ? (
+          <div className={styles.timerControls}>
+            <label className={styles.timerLabel} htmlFor="template-timer-duration-minutes">
+              Время на выполнение
+            </label>
+            <div className={styles.timerInputRow}>
+              <input
+                id="template-timer-duration-minutes"
+                type="number"
+                inputMode="numeric"
+                min={HOMEWORK_TIMER_MIN_MINUTES}
+                max={HOMEWORK_TIMER_MAX_MINUTES}
+                value={settings.timerDurationMinutes ?? ''}
+                onChange={(event) =>
+                  onSettingsChange({
+                    ...settings,
+                    timerDurationMinutes: normalizeHomeworkTimerDurationMinutes(event.target.value),
+                  })
+                }
+              />
+              <span>мин</span>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className={styles.previewCard}>

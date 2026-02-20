@@ -4,6 +4,7 @@ import {
   HomeworkBlockTest,
   HomeworkTestQuestion,
 } from '../../../../entities/types';
+import { readHomeworkTemplateQuizSettingsFromTestBlock } from '../../../../entities/homework-template/model/lib/quizSettings';
 import { FormValidationIssue, FormValidationPath } from '../../../../shared/lib/form-validation/types';
 import { getQuestionKind } from './createTemplateScreen';
 import { summarizeTemplateBlocks } from './templateFlow';
@@ -363,6 +364,16 @@ export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBl
     (block.questions ?? []).forEach((question, questionIndex) => {
       validateQuestion(issues, blockIndex, question, questionIndex);
     });
+
+    const quizSettings = readHomeworkTemplateQuizSettingsFromTestBlock(block);
+    if (quizSettings.timerEnabled && quizSettings.timerDurationMinutes === null) {
+      pushIssue(
+        issues,
+        ['blocks', blockIndex, 'templateSettings', 'timerDurationMinutes'],
+        'template_timer_duration_required',
+        'Укажите время для таймера (в минутах).',
+      );
+    }
   });
 
   responseBlocks.forEach(({ block, blockIndex }) => {

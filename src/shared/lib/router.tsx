@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -29,9 +30,16 @@ type RouteProps = {
 
 type RouteParams = Record<string, string>;
 
+export type BlockNavigationTx = {
+  retry: () => void;
+};
+
+type BlockNavigationHandler = (tx: BlockNavigationTx) => void;
+
 type RouterContextValue = {
   location: Location;
   navigate: (to: string, options?: NavigateOptions) => void;
+  block: (handler: BlockNavigationHandler) => () => void;
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
@@ -95,35 +103,103 @@ export const BrowserRouter = ({ children }: PropsWithChildren) => {
     search: window.location.search,
     state: window.history.state ?? null,
   }));
+  const locationRef = useRef(location);
+  const blockerRef = useRef<BlockNavigationHandler | null>(null);
+  const allowNextPopRef = useRef(false);
+
+  const updateLocation = useCallback((nextLocation: Location) => {
+    locationRef.current = nextLocation;
+    setLocation(nextLocation);
+  }, []);
+
+  const commitNavigation = useCallback(
+    (
+      nextLocation: Location,
+      options?: {
+        replace?: boolean;
+      },
+    ) => {
+      const target = `${nextLocation.pathname}${nextLocation.search}`;
+      if (options?.replace) {
+        window.history.replaceState(nextLocation.state, '', target);
+      } else {
+        window.history.pushState(nextLocation.state, '', target);
+      }
+      updateLocation(nextLocation);
+    },
+    [updateLocation],
+  );
 
   const navigate = useCallback((to: string, options?: NavigateOptions) => {
     const url = new URL(to, window.location.origin);
     const targetPathname = normalizePath(url.pathname);
     const targetSearch = url.search;
-    const target = `${targetPathname}${targetSearch}`;
     const nextState = options?.state ?? null;
-    if (options?.replace) {
-      window.history.replaceState(nextState, '', target);
-    } else {
-      window.history.pushState(nextState, '', target);
+    const nextLocation = {
+      pathname: targetPathname,
+      search: targetSearch,
+      state: nextState,
+    };
+    const blocker = blockerRef.current;
+    if (!blocker) {
+      commitNavigation(nextLocation, options);
+      return;
     }
-    setLocation({ pathname: targetPathname, search: targetSearch, state: nextState });
+    blocker({
+      retry: () => {
+        commitNavigation(nextLocation, options);
+      },
+    });
+  }, [commitNavigation]);
+
+  const block = useCallback((handler: BlockNavigationHandler) => {
+    blockerRef.current = handler;
+    return () => {
+      if (blockerRef.current === handler) {
+        blockerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      setLocation({
+      const nextLocation = {
         pathname: normalizePath(window.location.pathname),
         search: window.location.search,
         state: event.state ?? null,
+      };
+
+      if (allowNextPopRef.current) {
+        allowNextPopRef.current = false;
+        updateLocation(nextLocation);
+        return;
+      }
+
+      const blocker = blockerRef.current;
+      if (!blocker) {
+        updateLocation(nextLocation);
+        return;
+      }
+
+      const currentLocation = locationRef.current;
+      window.history.pushState(
+        currentLocation.state ?? null,
+        '',
+        `${currentLocation.pathname}${currentLocation.search}`,
+      );
+      blocker({
+        retry: () => {
+          allowNextPopRef.current = true;
+          window.history.back();
+        },
       });
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [updateLocation]);
 
-  const value = useMemo<RouterContextValue>(() => ({ location, navigate }), [location, navigate]);
+  const value = useMemo<RouterContextValue>(() => ({ location, navigate, block }), [block, location, navigate]);
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 };
@@ -139,6 +215,8 @@ const useRouterContext = () => {
 export const useLocation = () => useRouterContext().location;
 
 export const useNavigate = () => useRouterContext().navigate;
+
+export const useBlockNavigation = () => useRouterContext().block;
 
 export const useParams = <T extends Record<string, string | undefined> = Record<string, string | undefined>>() =>
   useContext(RouteParamsContext) as T;

@@ -143,8 +143,8 @@ body.telegram-webapp select {
 }
 
 body.telegram-webapp button[class*='primaryButton'] {
-  color: var(--color-white) !important;
-  -webkit-text-fill-color: var(--color-white);
+  color: var(--primary-button-text, var(--color-white)) !important;
+  -webkit-text-fill-color: var(--primary-button-text, var(--color-white));
 }
 
 body.telegram-webapp [class*='tabbar'] button {

@@ -256,12 +256,24 @@ const createNotificationLog = async (payload: {
   scheduledFor?: Date | null;
   dedupeKey?: string | null;
   }) => {
+  const normalizedDedupeKey =
+    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0
+      ? payload.dedupeKey.trim()
+      : null;
+
   try {
     const teacherExists = await prisma.teacher.findUnique({
       where: { chatId: payload.teacherId },
       select: { chatId: true },
     });
     if (!teacherExists) return null;
+
+    if (normalizedDedupeKey) {
+      const existing = await prisma.notificationLog.findUnique({
+        where: { dedupeKey: normalizedDedupeKey },
+      });
+      if (existing) return null;
+    }
 
     return await prisma.notificationLog.create({
       data: {
@@ -273,14 +285,17 @@ const createNotificationLog = async (payload: {
         channel: payload.channel ?? 'TELEGRAM',
         scheduledFor: payload.scheduledFor ?? null,
         status: 'PENDING',
-        dedupeKey: payload.dedupeKey ?? null,
+        dedupeKey: normalizedDedupeKey,
       },
     });
   } catch (error) {
     const prismaError = error as { code?: string; meta?: { target?: unknown } } | null;
     const uniqueTarget = prismaError?.meta?.target;
     const isDedupeConflict =
-      prismaError?.code === 'P2002' && Array.isArray(uniqueTarget) && uniqueTarget.includes('dedupeKey');
+      prismaError?.code === 'P2002' &&
+      (Array.isArray(uniqueTarget)
+        ? uniqueTarget.includes('dedupeKey')
+        : error instanceof Error && error.message.includes('dedupeKey'));
     const isForeignKeyConflict = prismaError?.code === 'P2003';
     if (isDedupeConflict || isForeignKeyConflict) {
       return null;

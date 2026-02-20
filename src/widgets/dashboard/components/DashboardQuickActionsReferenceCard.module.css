@@ -1,0 +1,203 @@
+.card {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 32px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  padding: 32px;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.headerIconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(91, 141, 239, 0.2);
+  color: #3a6fdc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.actions {
+  display: grid;
+  gap: 12px;
+}
+
+.actionButton {
+  width: 100%;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 16px;
+  padding: 16px;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid #22c55e;
+  outline-offset: 2px;
+}
+
+.actionButtonPrimary {
+  background: linear-gradient(to right, #000 0%, #1f2937 100%);
+  color: #fff;
+  border: none;
+}
+
+.actionButtonPrimary:hover {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+  background: linear-gradient(to right, #000 0%, #1f2937 100%);
+}
+
+.actionMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.actionIconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.actionIconPrimary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.actionButtonPrimary:hover .actionIconPrimary {
+  background: #22c55e;
+  color: #000;
+}
+
+.actionIconBlue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.actionIconPurple {
+  background: #f3e8ff;
+  color: #9333ea;
+}
+
+.actionIconGreen {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.actionIconOrange {
+  background: #ffedd5;
+  color: #ea580c;
+}
+
+.actionLabel {
+  color: #111827;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 700;
+  text-align: left;
+}
+
+.actionLabelPrimary {
+  color: #fff;
+}
+
+.actionArrow {
+  color: #9ca3af;
+  font-size: 14px;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.actionButton:hover .actionArrow {
+  color: #22c55e;
+}
+
+.actionArrowPrimary {
+  color: #fff;
+}
+
+.actionButtonPrimary:hover .actionArrowPrimary {
+  color: #fff;
+}
+
+.tipSection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.tipCard {
+  background: linear-gradient(135deg, rgba(91, 141, 239, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.tipContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tipIconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  color: #3a6fdc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.tipTitle {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.tipText {
+  margin: 0;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.4;
+}

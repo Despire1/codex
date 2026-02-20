@@ -1,6 +1,6 @@
 import { startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useBlockNavigation, useLocation, useNavigate } from 'react-router-dom';
 import { Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api, type StudentContextLink } from '../shared/api/client';
@@ -36,7 +36,7 @@ import {
 } from '../widgets/students/model/useStudentCardFilters';
 import { useScheduleLessonsLoaderInternal } from '../widgets/schedule/model/useScheduleLessonsLoader';
 import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useScheduleLessonsRange';
-import { UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
+import { ActiveUnsavedEntry, UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
 import { useAppDialogs } from './model/useAppDialogs';
 import { useLinkedStudents } from './model/useLinkedStudents';
 import {
@@ -92,14 +92,19 @@ const desktopTitleByTab: Record<TabId, string> = {
   dashboard: 'Обзор',
   students: 'Ученики',
   schedule: 'Расписание',
-  homeworks: 'Домашки',
+  homeworks: 'Домашние задания',
   analytics: 'Аналитика',
   settings: 'Настройки',
+};
+
+type NavigationBlockTx = {
+  retry: () => void;
 };
 
 const AppPageContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const blockNavigation = useBlockNavigation();
   const { showToast } = useToast();
   const { getActiveEntry, clearEntry } = useUnsavedChanges();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
@@ -181,6 +186,45 @@ const AppPageContent = () => {
     clearStudentData,
   } = studentsData;
 
+  const showUnsavedChangesDialog = useCallback(
+    (active: ActiveUnsavedEntry, handlers: { onProceed: () => void; onStay?: () => void }) => {
+      const cancelKeepsEditing = Boolean(active.entry.cancelKeepsEditing);
+
+      openConfirmDialog({
+        title: active.entry.title ?? 'Несохранённые изменения',
+        message: active.entry.message ?? 'Вы изменили данные. Сохранить перед выходом?',
+        confirmText: active.entry.confirmText ?? 'Сохранить',
+        cancelText:
+          active.entry.cancelText ?? (cancelKeepsEditing ? 'Остаться' : 'Выйти без сохранения'),
+        onConfirm: () => {
+          active.entry
+            .onSave()
+            .then((ok) => {
+              if (!ok) return;
+              clearEntry(active.key);
+              handlers.onProceed();
+            })
+            .catch(() => {
+              showToast({
+                message: active.entry.onSaveErrorMessage ?? 'Не удалось сохранить изменения',
+                variant: 'error',
+              });
+            });
+        },
+        onCancel: () => {
+          if (cancelKeepsEditing) {
+            handlers.onStay?.();
+            return;
+          }
+          active.entry.onDiscard?.();
+          clearEntry(active.key);
+          handlers.onProceed();
+        },
+      });
+    },
+    [clearEntry, openConfirmDialog, showToast],
+  );
+
   const guardedNavigate = useCallback(
     (to: string, options?: { replace?: boolean; state?: unknown }) => {
       const active = getActiveEntry();
@@ -189,32 +233,54 @@ const AppPageContent = () => {
         return;
       }
 
-      openConfirmDialog({
-        title: 'Несохранённые изменения',
-        message: active.entry.message ?? 'Вы изменили тексты уведомлений. Сохранить перед выходом?',
-        confirmText: 'Сохранить',
-        cancelText: 'Выйти без сохранения',
-        onConfirm: () => {
-          active.entry
-            .onSave()
-            .then((ok) => {
-              if (!ok) return;
-              clearEntry(active.key);
-              navigate(to, options);
-            })
-            .catch(() => {
-              showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
-            });
-        },
-        onCancel: () => {
-          active.entry.onDiscard?.();
-          clearEntry(active.key);
+      showUnsavedChangesDialog(active, {
+        onProceed: () => {
+          skipNextBlockRef.current = true;
           navigate(to, options);
         },
       });
     },
-    [clearEntry, getActiveEntry, navigate, openConfirmDialog, showToast],
+    [getActiveEntry, navigate, showUnsavedChangesDialog],
   );
+  const blockDialogOpenRef = useRef(false);
+  const skipNextBlockRef = useRef(false);
+  const activeUnsavedEntry = getActiveEntry();
+  const hasUnsavedChanges = Boolean(activeUnsavedEntry?.entry.isDirty);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+
+    const unblock = blockNavigation((tx: NavigationBlockTx) => {
+      if (skipNextBlockRef.current) {
+        skipNextBlockRef.current = false;
+        tx.retry();
+        return;
+      }
+      if (blockDialogOpenRef.current) return;
+
+      const active = getActiveEntry();
+      if (!active || !active.entry.isDirty) {
+        tx.retry();
+        return;
+      }
+
+      blockDialogOpenRef.current = true;
+      showUnsavedChangesDialog(active, {
+        onProceed: () => {
+          blockDialogOpenRef.current = false;
+          tx.retry();
+        },
+        onStay: () => {
+          blockDialogOpenRef.current = false;
+        },
+      });
+    });
+
+    return () => {
+      blockDialogOpenRef.current = false;
+      unblock();
+    };
+  }, [blockNavigation, getActiveEntry, hasUnsavedChanges, showUnsavedChangesDialog]);
 
   const navigateToStudents = useCallback(() => {
     guardedNavigate(tabPathById.students);
@@ -268,6 +334,7 @@ const AppPageContent = () => {
 
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherHomeworkReviewRoute = !isStudentRole && /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
@@ -681,6 +748,14 @@ const AppPageContent = () => {
     [guardedNavigate],
   );
 
+  const onTopbarCreateAction = useCallback(() => {
+    if (activeTab === 'homeworks') {
+      onDashboardOpenHomeworkAssign();
+      return;
+    }
+    onTopbarCreateLesson();
+  }, [activeTab, onDashboardOpenHomeworkAssign, onTopbarCreateLesson]);
+
   const dashboardRouteProps = useMemo(
     () => ({
       teacher,
@@ -858,12 +933,18 @@ const AppPageContent = () => {
                       ) : null}
 
                       <div className={layoutStyles.mainColumn}>
-                        {isDesktop && !isStudentRole ? (
+                        {isDesktop && !isStudentRole && !isTeacherHomeworkReviewRoute ? (
                           <Topbar
                             teacher={teacher}
                             title={desktopTopbarResolvedTitle}
                             subtitle={desktopTopbarResolvedSubtitle}
-                            showCreateLesson={activeTab === 'dashboard' && hasTeacherAccess && !isTeacherTemplateEditorRoute}
+                            showCreateLesson={
+                              hasTeacherAccess &&
+                              !isTeacherTemplateEditorRoute &&
+                              (activeTab === 'dashboard' || activeTab === 'homeworks')
+                            }
+                            createButtonLabel={activeTab === 'homeworks' ? 'Выдать ДЗ' : 'Новое занятие'}
+                            createButtonIconAccent={activeTab === 'homeworks'}
                             showTemplateCreateActions={isTeacherTemplateEditorRoute}
                             showTemplateSaveDraft={!isTeacherTemplateEditRoute}
                             showBackButton={isTeacherTemplateEditorRoute}
@@ -875,7 +956,7 @@ const AppPageContent = () => {
                             templateCreateActionLabel={templateCreateActionLabel}
                             templateCreateSubmittingLabel={templateCreateSubmittingLabel}
                             onOpenNotifications={onOpenNotifications}
-                            onCreateLesson={onTopbarCreateLesson}
+                            onCreateLesson={onTopbarCreateAction}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
                           />
                         ) : null}

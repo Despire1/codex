@@ -9,6 +9,12 @@ import {
   HomeworkTestTableRow,
   HomeworkTestQuestionType,
 } from '../../../../entities/types';
+import {
+  DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS,
+  HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY,
+  HomeworkTemplateQuizSettings,
+  readHomeworkTemplateQuizSettingsFromBlocks,
+} from '../../../../entities/homework-template/model/lib/quizSettings';
 import { HomeworkTemplateEditorDraft } from '../types';
 import {
   createMediaBlock,
@@ -18,6 +24,7 @@ import {
   createTestQuestion,
   createTextBlock,
 } from './blocks';
+import { createAttachmentFromUrl as createAttachmentFromUrlInternal } from './templateMaterials';
 
 export type CreateTemplateType = 'TEST' | 'WRITTEN' | 'ORAL' | 'FILE' | 'COMBO' | 'EXTERNAL';
 
@@ -32,14 +39,7 @@ export type CreateQuestionKind =
   | 'ORDERING'
   | 'TABLE';
 
-export interface TemplateQuizSettings {
-  autoCheckEnabled: boolean;
-  passingScorePercent: number;
-  attemptsLimit: 1 | 2 | null;
-  showCorrectAnswers: boolean;
-  shuffleQuestions: boolean;
-  timerEnabled: boolean;
-}
+export type TemplateQuizSettings = HomeworkTemplateQuizSettings;
 
 export interface TemplateCreateStats {
   questionCount: number;
@@ -50,7 +50,6 @@ export interface TemplateCreateStats {
 
 const QUESTION_KIND_KEY = 'uiQuestionKind';
 const QUESTION_REQUIRED_KEY = 'uiRequired';
-const TEST_SETTINGS_KEY = 'templateSettings';
 
 const QUESTION_KIND_VALUES: CreateQuestionKind[] = [
   'CHOICE',
@@ -64,24 +63,9 @@ const QUESTION_KIND_VALUES: CreateQuestionKind[] = [
   'TABLE',
 ];
 
-export const DEFAULT_TEMPLATE_QUIZ_SETTINGS: TemplateQuizSettings = {
-  autoCheckEnabled: true,
-  passingScorePercent: 70,
-  attemptsLimit: null,
-  showCorrectAnswers: false,
-  shuffleQuestions: true,
-  timerEnabled: false,
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+export const DEFAULT_TEMPLATE_QUIZ_SETTINGS: TemplateQuizSettings = DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS;
 
 const toRecord = (value: unknown): Record<string, unknown> => (value as unknown as Record<string, unknown>);
-
-const clampPercent = (value: number) => {
-  if (!Number.isFinite(value)) return DEFAULT_TEMPLATE_QUIZ_SETTINGS.passingScorePercent;
-  return Math.max(0, Math.min(100, Math.round(value)));
-};
 
 const isCreateQuestionKind = (value: unknown): value is CreateQuestionKind =>
   typeof value === 'string' && QUESTION_KIND_VALUES.includes(value as CreateQuestionKind);
@@ -428,41 +412,7 @@ export const detectCreateTemplateType = (blocks: HomeworkBlock[]): CreateTemplat
 };
 
 export const readTemplateQuizSettings = (blocks: HomeworkBlock[]): TemplateQuizSettings => {
-  const testEntry = getPrimaryTestBlockEntry(blocks);
-  if (!testEntry) return DEFAULT_TEMPLATE_QUIZ_SETTINGS;
-
-  const rawRecord = toRecord(testEntry.block)[TEST_SETTINGS_KEY];
-  if (!isRecord(rawRecord)) return DEFAULT_TEMPLATE_QUIZ_SETTINGS;
-
-  const attemptsLimitRaw = rawRecord.attemptsLimit;
-  let attemptsLimit: 1 | 2 | null = DEFAULT_TEMPLATE_QUIZ_SETTINGS.attemptsLimit;
-  if (attemptsLimitRaw === 1 || attemptsLimitRaw === 2 || attemptsLimitRaw === null) {
-    attemptsLimit = attemptsLimitRaw as 1 | 2 | null;
-  }
-
-  return {
-    autoCheckEnabled:
-      typeof rawRecord.autoCheckEnabled === 'boolean'
-        ? rawRecord.autoCheckEnabled
-        : DEFAULT_TEMPLATE_QUIZ_SETTINGS.autoCheckEnabled,
-    passingScorePercent:
-      typeof rawRecord.passingScorePercent === 'number'
-        ? clampPercent(rawRecord.passingScorePercent)
-        : DEFAULT_TEMPLATE_QUIZ_SETTINGS.passingScorePercent,
-    attemptsLimit,
-    showCorrectAnswers:
-      typeof rawRecord.showCorrectAnswers === 'boolean'
-        ? rawRecord.showCorrectAnswers
-        : DEFAULT_TEMPLATE_QUIZ_SETTINGS.showCorrectAnswers,
-    shuffleQuestions:
-      typeof rawRecord.shuffleQuestions === 'boolean'
-        ? rawRecord.shuffleQuestions
-        : DEFAULT_TEMPLATE_QUIZ_SETTINGS.shuffleQuestions,
-    timerEnabled:
-      typeof rawRecord.timerEnabled === 'boolean'
-        ? rawRecord.timerEnabled
-        : DEFAULT_TEMPLATE_QUIZ_SETTINGS.timerEnabled,
-  };
+  return readHomeworkTemplateQuizSettingsFromBlocks(blocks);
 };
 
 export const writeTemplateQuizSettings = (
@@ -474,7 +424,7 @@ export const writeTemplateQuizSettings = (
 
   const nextTestBlock = {
     ...toRecord(testEntry.block),
-    [TEST_SETTINGS_KEY]: settings,
+    [HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY]: settings,
   } as unknown as HomeworkBlockTest;
 
   return blocks.map((block, index) => (index === testEntry.index ? nextTestBlock : block));
@@ -581,14 +531,7 @@ export const serializeEstimatedMinutes = (value: number | null): string => {
 };
 
 export const createAttachmentFromUrl = (value: string): HomeworkAttachment | null => {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return {
-    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    url: trimmed,
-    fileName: trimmed,
-    size: 0,
-  };
+  return createAttachmentFromUrlInternal(value);
 };
 
 export const buildTemplateCreateStats = (

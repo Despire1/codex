@@ -132,7 +132,7 @@ export const resolveStudentHomeworkCardKind = (
 ): StudentHomeworkCardKind => {
   const effectiveStatus = resolveEffectiveStatus(assignment, now);
   if (effectiveStatus === 'REVIEWED') return 'completed';
-  if (effectiveStatus === 'SUBMITTED') return 'submitted';
+  if (effectiveStatus === 'SUBMITTED' || effectiveStatus === 'IN_REVIEW') return 'submitted';
   if (effectiveStatus === 'OVERDUE') return 'overdue';
   if (assignment.latestSubmissionStatus === 'DRAFT' || effectiveStatus === 'RETURNED') return 'in_progress';
   return 'new';
@@ -224,7 +224,8 @@ export const resolveStudentHomeworkDeadlineMeta = (
 export const resolveStudentHomeworkScoreValue = (assignment: HomeworkAssignment) => {
   const raw = assignment.score?.finalScore ?? assignment.score?.manualScore ?? assignment.score?.autoScore;
   if (!Number.isFinite(raw)) return null;
-  const normalized = Number(raw);
+  const normalizedRaw = Number(raw);
+  const normalized = normalizedRaw > 10 ? normalizedRaw / 10 : normalizedRaw;
   return Math.max(0, Math.min(10, normalized));
 };
 

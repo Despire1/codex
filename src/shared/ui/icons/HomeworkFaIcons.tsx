@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBell as farBell, faBookmark as farBookmark, faStar as farStar } from '@fortawesome/free-regular-svg-icons';
 import {
   faArrowDown19,
+  faArrowUpRightFromSquare,
   faAlignLeft,
   faArrowsLeftRight,
   faBars,
@@ -15,9 +16,15 @@ import {
   faCircleInfo,
   faCloudArrowUp,
   faCopy,
+  faDownload,
+  faEye,
   faFileArrowUp,
+  faFileAudio,
+  faFileImage,
   faFileLines,
   faFilePdf,
+  faFileVideo,
+  faFileWord,
   faFilter,
   faGear,
   faGripVertical,
@@ -114,6 +121,22 @@ export const HomeworkFilePdfIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faFilePdf} {...props} />
 );
 
+export const HomeworkFileWordIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faFileWord} {...props} />
+);
+
+export const HomeworkFileImageIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faFileImage} {...props} />
+);
+
+export const HomeworkFileAudioIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faFileAudio} {...props} />
+);
+
+export const HomeworkFileVideoIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faFileVideo} {...props} />
+);
+
 export const HomeworkCircleExclamationIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faCircleExclamation} {...props} />
 );
@@ -192,6 +215,18 @@ export const HomeworkGripVerticalIcon: FC<HomeworkFaIconProps> = (props) => (
 
 export const HomeworkTrashIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faTrash} {...props} />
+);
+
+export const HomeworkEyeIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faEye} {...props} />
+);
+
+export const HomeworkDownloadIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faDownload} {...props} />
+);
+
+export const HomeworkArrowUpRightFromSquareIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faArrowUpRightFromSquare} {...props} />
 );
 
 export const HomeworkCloudArrowUpIcon: FC<HomeworkFaIconProps> = (props) => (

@@ -35,39 +35,6 @@
   gap: 10px;
 }
 
-.searchField {
-  min-width: 260px;
-}
-
-.searchField input {
-  width: 100%;
-  border: 1px solid var(--color-slate-200);
-  border-radius: 14px;
-  padding: 10px 12px;
-  background: var(--color-slate-50);
-  outline: none;
-}
-
-.bellButton {
-  position: relative;
-  border: 1px solid var(--color-slate-200);
-  border-radius: 12px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
-  padding: 10px 12px;
-  cursor: pointer;
-}
-
-.bellDot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-red-500);
-}
-
 .assignButton {
   border: 1px solid var(--color-gray-900);
   border-radius: 14px;
@@ -260,6 +227,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
@@ -453,6 +422,86 @@
   padding: 18px 0;
 }
 
+.rowSkeleton:hover {
+  background: transparent;
+}
+
+.rowSkeleton td {
+  pointer-events: none;
+}
+
+.skeletonPulse {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.skeletonPulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 52%, transparent 100%);
+  transform: translateX(-100%);
+  animation: skeletonShimmer 1.2s ease-in-out infinite;
+}
+
+.skeletonCheck {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.skeletonLine {
+  height: 10px;
+  border-radius: 999px;
+}
+
+.skeletonLineTitle {
+  width: 186px;
+  max-width: 84%;
+}
+
+.skeletonLineMeta {
+  width: 248px;
+  max-width: 92%;
+}
+
+.skeletonBadge {
+  width: 108px;
+  height: 28px;
+  border-radius: 999px;
+}
+
+.skeletonLineDeadline {
+  width: 120px;
+}
+
+.skeletonLineDeadlineSub {
+  width: 92px;
+}
+
+.skeletonLineResponse {
+  width: 122px;
+}
+
+.skeletonAction {
+  width: 72px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.skeletonActionShort {
+  width: 62px;
+}
+
 .row:hover {
   background: var(--color-slate-50);
 }
@@ -615,6 +664,12 @@
 
 .statusBadge_review::before {
   animation: statusPulse 1.4s infinite ease-in-out;
+}
+
+.statusBadge_submitted {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .statusBadge_overdue {
@@ -788,13 +843,34 @@
   color: #4f46e5;
 }
 
-.responseScoreChip {
+.responseAutoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 8px;
-  background: #eef2ff;
-  color: #4f46e5;
-  font-size: 13px;
+  border: 1px solid transparent;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
   padding: 6px 9px;
+}
+
+.responseAutoBadge_success {
+  background: var(--color-green-200);
+  border-color: var(--color-green-200);
+  color: var(--color-green-700);
+}
+
+.responseAutoBadge_warning {
+  background: var(--color-orange-50);
+  border-color: var(--color-orange-200);
+  color: var(--color-orange-700);
+}
+
+.responseAutoBadge_danger {
+  background: var(--color-red-50);
+  border-color: var(--color-red-500);
+  color: var(--color-red-700);
 }
 
 .responseMetaHint {
@@ -911,6 +987,10 @@
   background: var(--color-white);
 }
 
+.mobileSkeletonCard {
+  border-color: var(--color-slate-200);
+}
+
 .mobileTop {
   display: flex;
   justify-content: space-between;
@@ -921,6 +1001,30 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.mobileSkeletonTitle {
+  width: 62%;
+}
+
+.mobileSkeletonBadge {
+  width: 96px;
+  height: 26px;
+  border-radius: 999px;
+}
+
+.mobileSkeletonMeta {
+  width: 56%;
+}
+
+.mobileSkeletonMetaShort {
+  width: 34%;
+}
+
+.mobileSkeletonAction {
+  width: 78px;
+  height: 32px;
+  border-radius: 10px;
 }
 
 .loadMoreRow {
@@ -1179,6 +1283,12 @@
   color: var(--color-slate-500);
 }
 
+@keyframes skeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (max-width: 1220px) {
   .kpiGrid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
@@ -1197,11 +1307,6 @@
 
   .headerActions {
     flex-wrap: wrap;
-  }
-
-  .searchField {
-    min-width: 0;
-    flex: 1;
   }
 
   .topActionsRow {

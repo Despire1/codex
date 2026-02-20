@@ -15,6 +15,8 @@ interface TopbarProps {
   title: string;
   subtitle: string;
   showCreateLesson: boolean;
+  createButtonLabel?: string;
+  createButtonIconAccent?: boolean;
   showTemplateCreateActions?: boolean;
   showTemplateSaveDraft?: boolean;
   showBackButton?: boolean;
@@ -35,6 +37,8 @@ export const Topbar: FC<TopbarProps> = ({
   title,
   subtitle,
   showCreateLesson,
+  createButtonLabel = 'Новое занятие',
+  createButtonIconAccent = false,
   showTemplateCreateActions = false,
   showTemplateSaveDraft = true,
   showBackButton = false,
@@ -120,8 +124,12 @@ export const Topbar: FC<TopbarProps> = ({
               tabIndex={showCreateLesson ? undefined : -1}
               aria-hidden={!showCreateLesson}
             >
-              <AddOutlinedIcon width={18} height={18} />
-              <span>Новое занятие</span>
+              <AddOutlinedIcon
+                width={18}
+                height={18}
+                className={createButtonIconAccent ? styles.createButtonIconAccent : undefined}
+              />
+              <span>{createButtonLabel}</span>
             </button>
           </div>
         )}

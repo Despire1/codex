@@ -20,6 +20,7 @@ export const ASSIGNMENT_STATUS_LABELS: Record<HomeworkAssignment['status'], stri
   SCHEDULED: 'Запланирована',
   SENT: 'Выдана',
   SUBMITTED: 'Сдана',
+  IN_REVIEW: 'На проверке',
   RETURNED: 'На доработке',
   REVIEWED: 'Проверена',
   OVERDUE: 'Просрочена',
@@ -48,9 +49,8 @@ export const assignmentBelongsToBucket = (
   const status = resolveAssignmentEffectiveStatus(assignment, now);
   if (bucket === 'draft') return status === 'DRAFT' || status === 'SCHEDULED';
   if (bucket === 'sent') return status === 'SENT' || status === 'RETURNED';
-  if (bucket === 'review') return status === 'SUBMITTED';
+  if (bucket === 'review') return status === 'SUBMITTED' || status === 'IN_REVIEW';
   if (bucket === 'reviewed') return status === 'REVIEWED';
   if (bucket === 'overdue') return status === 'OVERDUE';
   return false;
 };
-

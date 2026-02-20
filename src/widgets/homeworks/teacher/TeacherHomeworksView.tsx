@@ -21,12 +21,15 @@ import {
   HomeworkLinkIcon,
   HomeworkListCheckIcon,
   HomeworkMicrophoneIcon,
+  HomeworkRobotIcon,
   HomeworkRotateRightIcon,
   HomeworkStarIcon,
   HomeworkStarRegularIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
 import {
+  AutoCheckBadge,
   formatAssignmentStatus,
+  resolveAssignmentAutoCheckBadge,
   resolveAssignmentDeadlineMeta,
   resolveAssignmentProblemBadges,
   resolveAssignmentResponseMeta,
@@ -65,6 +68,8 @@ const BULK_ACTION_LABELS: Array<{ id: TeacherBulkAction; label: string }> = [
   { id: 'DELETE', label: 'Удалить' },
 ];
 
+const ASSIGNMENT_SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -87,13 +92,16 @@ const getStudentInitials = (name: string) => {
 
 const needsAssignmentReview = (assignment: HomeworkAssignment) =>
   assignment.status === 'SUBMITTED' ||
+  assignment.status === 'IN_REVIEW' ||
   assignment.status === 'RETURNED' ||
-  (assignment.problemFlags ?? []).includes('SUBMITTED');
+  (assignment.problemFlags ?? []).includes('SUBMITTED') ||
+  (assignment.problemFlags ?? []).includes('IN_REVIEW');
 
 const resolveStatusTone = (assignment: HomeworkAssignment) => {
   if (assignment.hasConfigError) return 'config';
   if (assignment.isOverdue || assignment.status === 'OVERDUE') return 'overdue';
-  if (assignment.status === 'SUBMITTED') return 'review';
+  if (assignment.status === 'SUBMITTED') return 'submitted';
+  if (assignment.status === 'IN_REVIEW') return 'review';
   if (assignment.status === 'RETURNED') return 'returned';
   if (assignment.status === 'REVIEWED') return 'reviewed';
   if (assignment.status === 'SCHEDULED') return 'scheduled';
@@ -101,34 +109,11 @@ const resolveStatusTone = (assignment: HomeworkAssignment) => {
   return 'normal';
 };
 
-const resolveResponseTags = (assignment: HomeworkAssignment) => {
-  const tags: string[] = [];
-  if (assignment.latestSubmissionStatus === 'SUBMITTED' || assignment.latestSubmissionStatus === 'REVIEWED') {
-    if (assignment.latestSubmissionAttemptNo) {
-      tags.push(`Попытка #${assignment.latestSubmissionAttemptNo}`);
-    }
-    tags.push(assignment.latestSubmissionStatus === 'REVIEWED' ? 'Проверено' : 'Есть ответ');
-    if (assignment.latestSubmissionSubmittedAt) {
-      tags.push(`Сдано ${formatDateTime(assignment.latestSubmissionSubmittedAt)}`);
-    }
-  } else if (assignment.latestSubmissionStatus === 'DRAFT') {
-    tags.push('Черновик ответа');
-  } else {
-    tags.push('Нет ответа');
-  }
-
-  if (assignment.templateTitle) {
-    tags.push('По шаблону');
-  }
-
-  return tags.slice(0, 3);
-};
-
 type ResponseVisual = {
   kind: 'empty' | 'icons';
   emptyText?: string;
   icons?: Array<{ id: string; kind: 'text' | 'file' | 'voice' | 'test'; tone: 'slate' | 'blue' | 'green' | 'indigo' }>;
-  scoreText?: string;
+  autoCheckBadge?: AutoCheckBadge | null;
 };
 
 const resolveResponseVisual = (assignment: HomeworkAssignment): ResponseVisual => {
@@ -139,23 +124,19 @@ const resolveResponseVisual = (assignment: HomeworkAssignment): ResponseVisual =
     return { kind: 'empty', emptyText: 'Нет ответа' };
   }
 
+  const autoCheckBadge = resolveAssignmentAutoCheckBadge(assignment);
+  if (autoCheckBadge) {
+    return {
+      kind: 'icons',
+      icons: [{ id: 'test', kind: 'test', tone: 'indigo' }],
+      autoCheckBadge,
+    };
+  }
+
   if (assignment.status === 'RETURNED') {
     return {
       kind: 'icons',
       icons: [{ id: 'voice', kind: 'voice', tone: 'green' }],
-      scoreText:
-        typeof assignment.latestSubmissionAttemptNo === 'number'
-          ? `Попытка #${assignment.latestSubmissionAttemptNo}`
-          : undefined,
-    };
-  }
-
-  const autoScore = assignment.score?.autoScore ?? assignment.score?.finalScore ?? assignment.score?.manualScore;
-  if (typeof autoScore === 'number') {
-    return {
-      kind: 'icons',
-      icons: [{ id: 'test', kind: 'test', tone: 'indigo' }],
-      scoreText: `${Math.round(autoScore)}/10 Auto`,
     };
   }
 
@@ -366,39 +347,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
   return (
     <section className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <h1 className={styles.title}>Домашние задания</h1>
-        </div>
-        <div className={styles.headerActions}>
-          <label className={styles.searchField}>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Поиск по ученикам, темам..."
-            />
-          </label>
-          <button
-            type="button"
-            className={styles.bellButton}
-            onClick={handleOpenActivity}
-            aria-label="События домашних заданий"
-          >
-            Уведомления
-            {homeworkActivityHasUnread ? <span className={styles.bellDot} aria-hidden /> : null}
-          </button>
-          <button
-            type="button"
-            className={styles.assignButton}
-            onClick={() => openAssignModal()}
-            disabled={!students.length}
-          >
-            Выдать ДЗ
-          </button>
-        </div>
-      </header>
-
       <section className={styles.kpiGrid}>
         <article className={`${styles.kpiCard} ${styles.kpiCardPrimary}`}>
           <div className={styles.kpiTopLine}>
@@ -450,26 +398,26 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           </div>
 
           <div className={styles.actionsRow}>
-              <button
-                type="button"
-                className={styles.toolIconButton}
-                title="Массовые действия"
-                onClick={() => setIsBulkPanelOpen((prev) => !prev)}
-              >
-                <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
-              </button>
-              <button
-                type="button"
-                className={styles.toolIconButton}
-                title="Фильтры"
-                onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
-              >
-                <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
-              </button>
-              <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
-                <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
-                <span>Проверять подряд</span>
-              </button>
+            <button
+              type="button"
+              className={styles.toolIconButton}
+              title="Массовые действия"
+              onClick={() => setIsBulkPanelOpen((prev) => !prev)}
+            >
+              <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
+            </button>
+            <button
+              type="button"
+              className={styles.toolIconButton}
+              title="Фильтры"
+              onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
+            >
+              <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
+            </button>
+            <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
+              <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
+              <span>Проверять подряд</span>
+            </button>
           </div>
         </div>
 
@@ -567,11 +515,40 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             </thead>
             <tbody>
               {loadingAssignments ? (
-                <tr>
-                  <td colSpan={6} className={styles.emptyRow}>
-                    Загрузка...
-                  </td>
-                </tr>
+                ASSIGNMENT_SKELETON_ROWS.map((index) => (
+                  <tr key={`skeleton_${index}`} className={styles.rowSkeleton} aria-hidden>
+                    <td>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonCheck}`} />
+                    </td>
+                    <td>
+                      <div className={styles.studentCell}>
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonAvatar}`} />
+                        <div className={styles.primaryCell}>
+                          <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineTitle}`} />
+                          <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineMeta}`} />
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonBadge}`} />
+                    </td>
+                    <td>
+                      <div className={styles.deadlineColumn}>
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineDeadline}`} />
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineDeadlineSub}`} />
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineResponse}`} />
+                    </td>
+                    <td className={styles.rightCell}>
+                      <div className={styles.rowActions}>
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonAction}`} />
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonAction} ${styles.skeletonActionShort}`} />
+                      </div>
+                    </td>
+                  </tr>
+                ))
               ) : assignments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={styles.emptyRow}>
@@ -587,8 +564,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const studentInitials = getStudentInitials(studentLabel);
                   const statusTone = resolveStatusTone(assignment);
                   const shouldReview = needsAssignmentReview(assignment);
-                  const responseTags = resolveResponseTags(assignment);
                   const responseVisual = resolveResponseVisual(assignment);
+                  const responseText = responseVisual.kind === 'empty' ? responseVisual.emptyText || responseMeta : '';
+                  const shouldShowEmptyResponse = responseText === 'Нет ответа';
                   const statusIcon = resolveStatusIcon(assignment);
                   const isOverdueRow = problemBadges.hasOverdue;
                   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
@@ -615,7 +593,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         <div className={styles.studentCell}>
                           <div className={styles.studentAvatarWrap}>
                             <div className={styles.studentAvatar}>{studentInitials}</div>
-                            {assignment.status === 'SUBMITTED' ? <span className={styles.studentOnlineDot} aria-hidden /> : null}
+                            {assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' ? (
+                              <span className={styles.studentOnlineDot} aria-hidden />
+                            ) : null}
                           </div>
                           <div className={styles.primaryCell}>
                             <div className={styles.assignmentTitle}>{assignment.title}</div>
@@ -655,45 +635,41 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       <td>
                         <div className={styles.deadlineColumn}>
                           <div>{deadlineMeta.primary}</div>
-                          <div
-                            className={`${styles.deadlineHint} ${
-                              deadlineMeta.tone === 'danger'
-                                ? styles.deadlineHintDanger
-                                : deadlineMeta.tone === 'today'
-                                  ? styles.deadlineHintToday
-                                  : ''
-                            }`}
-                          >
-                            {deadlineMeta.secondary}
-                          </div>
+                          {deadlineMeta.tone === 'danger' ? (
+                            <div className={`${styles.deadlineHint} ${styles.deadlineHintDanger}`}>
+                              {deadlineMeta.secondary}
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                       <td>
                         <div className={styles.responseColumn}>
                           {responseVisual.kind === 'empty' ? (
-                            <div className={styles.responseEmpty}>{responseVisual.emptyText || responseMeta}</div>
+                            shouldShowEmptyResponse ? <div className={styles.responseEmpty}>{responseText}</div> : null
                           ) : (
-                            <>
-                              <div className={styles.responseIcons}>
-                                {(responseVisual.icons ?? []).map((icon) => (
-                                  <span
-                                    key={`${assignment.id}_${icon.id}`}
-                                    className={`${styles.responseIconChip} ${styles[`responseIconChip_${icon.tone}`]}`}
-                                  >
-                                    {icon.kind === 'text' ? <HomeworkAlignLeftIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                    {icon.kind === 'file' ? <HomeworkFilePdfIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                    {icon.kind === 'voice' ? <HomeworkMicrophoneIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                    {icon.kind === 'test' ? <HomeworkListCheckIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  </span>
-                                ))}
-                                {responseVisual.scoreText ? (
-                                  <span className={styles.responseScoreChip}>{responseVisual.scoreText}</span>
-                                ) : null}
-                              </div>
-                              {responseTags.length > 0 ? (
-                                <div className={styles.responseMetaHint}>{responseTags[0]}</div>
+                            <div className={styles.responseIcons}>
+                              {(responseVisual.icons ?? []).map((icon) => (
+                                <span
+                                  key={`${assignment.id}_${icon.id}`}
+                                  className={`${styles.responseIconChip} ${styles[`responseIconChip_${icon.tone}`]}`}
+                                >
+                                  {icon.kind === 'text' ? <HomeworkAlignLeftIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'file' ? <HomeworkFilePdfIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'voice' ? <HomeworkMicrophoneIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'test' ? <HomeworkListCheckIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                </span>
+                              ))}
+                              {responseVisual.autoCheckBadge ? (
+                                <span
+                                  className={`${styles.responseAutoBadge} ${
+                                    styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
+                                  }`}
+                                >
+                                  <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
+                                  <span>{responseVisual.autoCheckBadge.label}</span>
+                                </span>
                               ) : null}
-                            </>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -763,52 +739,69 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         </div>
 
         <div className={styles.mobileList}>
-          {assignments.map((assignment) => {
-            const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
-            const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
-            const statusTone = resolveStatusTone(assignment);
-            const shouldReview = needsAssignmentReview(assignment);
-            return (
-              <article
-                key={`mobile_${assignment.id}`}
-                className={`${styles.mobileCard} ${assignment.isOverdue ? styles.rowOverdue : ''} ${
-                  assignment.hasConfigError ? styles.rowConfigError : ''
-                }`}
-              >
-                <div className={styles.mobileTop}>
-                  <div className={styles.assignmentTitle}>{assignment.title}</div>
-                  <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
-                    {formatAssignmentStatus(assignment)}
-                  </span>
-                </div>
-                <div className={styles.assignmentMeta}>
-                  <span>{studentLabel}</span>
-                  <span>{deadlineMeta.primary}</span>
-                </div>
-                <div className={styles.mobileActions}>
-                  <button type="button" className={controls.smallButton} onClick={() => onOpenDetail(assignment)}>
-                    Детали
-                  </button>
-                  {shouldReview ? (
-                    <button type="button" className={styles.mobileReviewButton} onClick={() => onOpenReview(assignment)}>
-                      Проверить
-                    </button>
-                  ) : null}
-                  {!shouldReview ? (
-                    <button
-                      type="button"
-                      className={controls.smallButton}
-                      onClick={() => {
-                        void onRemindAssignment(assignment);
-                      }}
-                    >
-                      Напомнить
-                    </button>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+          {loadingAssignments
+            ? ASSIGNMENT_SKELETON_ROWS.map((index) => (
+                <article key={`mobile_skeleton_${index}`} className={`${styles.mobileCard} ${styles.mobileSkeletonCard}`} aria-hidden>
+                  <div className={styles.mobileTop}>
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
+                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonBadge}`} />
+                  </div>
+                  <div className={styles.assignmentMeta}>
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
+                  </div>
+                  <div className={styles.mobileActions}>
+                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonAction}`} />
+                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonAction}`} />
+                  </div>
+                </article>
+              ))
+            : assignments.map((assignment) => {
+                const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
+                const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
+                const statusTone = resolveStatusTone(assignment);
+                const shouldReview = needsAssignmentReview(assignment);
+                return (
+                  <article
+                    key={`mobile_${assignment.id}`}
+                    className={`${styles.mobileCard} ${assignment.isOverdue ? styles.rowOverdue : ''} ${
+                      assignment.hasConfigError ? styles.rowConfigError : ''
+                    }`}
+                  >
+                    <div className={styles.mobileTop}>
+                      <div className={styles.assignmentTitle}>{assignment.title}</div>
+                      <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
+                        {formatAssignmentStatus(assignment)}
+                      </span>
+                    </div>
+                    <div className={styles.assignmentMeta}>
+                      <span>{studentLabel}</span>
+                      <span>{deadlineMeta.primary}</span>
+                    </div>
+                    <div className={styles.mobileActions}>
+                      <button type="button" className={controls.smallButton} onClick={() => onOpenDetail(assignment)}>
+                        Детали
+                      </button>
+                      {shouldReview ? (
+                        <button type="button" className={styles.mobileReviewButton} onClick={() => onOpenReview(assignment)}>
+                          Проверить
+                        </button>
+                      ) : null}
+                      {!shouldReview ? (
+                        <button
+                          type="button"
+                          className={controls.smallButton}
+                          onClick={() => {
+                            void onRemindAssignment(assignment);
+                          }}
+                        >
+                          Напомнить
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
         </div>
 
         {hasMoreAssignments ? (

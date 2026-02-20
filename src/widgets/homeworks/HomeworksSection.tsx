@@ -1,7 +1,15 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ActivityFeedItem, HomeworkAssignment, HomeworkSubmission, HomeworkTemplate } from '../../entities/types';
+import {
+  ActivityFeedItem,
+  HomeworkAssignment,
+  HomeworkReviewDraft,
+  HomeworkSubmission,
+  HomeworkTemplate,
+} from '../../entities/types';
+import { getLatestSubmission } from '../../entities/homework-submission/model/lib/submissionState';
 import { api, isApiRequestError } from '../../shared/api/client';
+import { useUnsavedChanges } from '../../shared/lib/unsavedChanges';
 import { useToast } from '../../shared/lib/toast';
 import { StudentHomeworkDetailView, StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 import {
@@ -13,6 +21,7 @@ import {
   HomeworkTemplateCreateScreen,
   HomeworkTemplateCreateSubmitResult,
 } from '../../features/homework-template-editor/ui/HomeworkTemplateCreateScreen';
+import { HomeworkReviewScreen } from '../../features/homework-review/ui/HomeworkReviewScreen';
 import { StudentHomeworksView } from './student/StudentHomeworksView';
 import { TeacherHomeworksView } from './teacher/TeacherHomeworksView';
 import {
@@ -42,6 +51,50 @@ type HomeworksNavigationState = {
 
 const TEACHER_PAGE_SIZE = 10;
 const STUDENT_PAGE_SIZE = 20;
+const REVIEW_UNSAVED_ENTRY_KEY = 'homeworks-review';
+const REVIEW_DRAFT_STORAGE_PREFIX = 'homework-review-draft-v1';
+
+const buildReviewDraftStorageKey = (assignmentId: number, submissionId: number) =>
+  `${REVIEW_DRAFT_STORAGE_PREFIX}:${assignmentId}:${submissionId}`;
+
+const saveReviewDraftToStorage = (assignmentId: number, draft: HomeworkReviewDraft) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(buildReviewDraftStorageKey(assignmentId, draft.submissionId), JSON.stringify(draft));
+};
+
+const readReviewDraftFromStorage = (
+  assignmentId: number,
+  submissionId: number,
+): HomeworkReviewDraft | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(buildReviewDraftStorageKey(assignmentId, submissionId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as HomeworkReviewDraft;
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      parsed.submissionId !== submissionId ||
+      !parsed.scoresById ||
+      !parsed.commentsById
+    ) {
+      return null;
+    }
+    return {
+      submissionId,
+      scoresById: typeof parsed.scoresById === 'object' ? parsed.scoresById : {},
+      commentsById: typeof parsed.commentsById === 'object' ? parsed.commentsById : {},
+      generalComment: typeof parsed.generalComment === 'string' ? parsed.generalComment : '',
+    };
+  } catch {
+    return null;
+  }
+};
+
+const clearReviewDraftInStorage = (assignmentId: number, submissionId: number) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(buildReviewDraftStorageKey(assignmentId, submissionId));
+};
 
 const mapStudentHomeworkFilterToApiFilter = (
   filter: StudentHomeworkFilter,
@@ -79,11 +132,17 @@ const emptyTeacherSummary: TeacherAssignmentsSummary = {
 
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const { showToast } = useToast();
+  const { setEntry, clearEntry } = useUnsavedChanges();
   const navigate = useNavigate();
   const location = useLocation();
   const { assignmentId: assignmentIdParam } = useParams<{ assignmentId?: string }>();
   const assignmentId = assignmentIdParam ? Number(assignmentIdParam) : Number.NaN;
   const hasStudentAssignmentId = mode === 'student' && Number.isFinite(assignmentId) && assignmentId > 0;
+  const hasTeacherReviewAssignmentId =
+    mode === 'teacher' &&
+    Number.isFinite(assignmentId) &&
+    assignmentId > 0 &&
+    /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateCreateRoute = mode === 'teacher' && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const teacherTemplateEditRouteMatch =
     mode === 'teacher' ? location.pathname.match(/^\/homeworks\/templates\/(\d+)\/edit\/?$/) : null;
@@ -117,7 +176,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const [assignModalRequest, setAssignModalRequest] = useState<TeacherAssignModalRequest | null>(null);
 
-  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [loadingAssignments, setLoadingAssignments] = useState(mode === 'teacher');
   const [loadingMoreAssignments, setLoadingMoreAssignments] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -137,8 +196,12 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [reviewAssignment, setReviewAssignment] = useState<HomeworkAssignment | null>(null);
   const [reviewSubmissions, setReviewSubmissions] = useState<HomeworkSubmission[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewQueueActive, setReviewQueueActive] = useState(false);
+  const [reviewInitialDraft, setReviewInitialDraft] = useState<HomeworkReviewDraft | null>(null);
+  const [reviewCurrentDraft, setReviewCurrentDraft] = useState<HomeworkReviewDraft | null>(null);
+  const [reviewHasUnsavedDraft, setReviewHasUnsavedDraft] = useState(false);
 
   const [detailAssignment, setDetailAssignment] = useState<HomeworkAssignment | null>(null);
   const [detailSubmissions, setDetailSubmissions] = useState<HomeworkSubmission[]>([]);
@@ -462,6 +525,36 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }
   }, [assignmentId, hasStudentAssignmentId]);
 
+  const loadTeacherReviewData = useCallback(async (targetAssignmentId: number) => {
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const response = await api.startHomeworkReviewSessionV2(targetAssignmentId);
+      const latestSubmission = getLatestSubmission(response.submissions);
+      const initialDraft = latestSubmission
+        ? latestSubmission.reviewDraft ??
+          readReviewDraftFromStorage(targetAssignmentId, latestSubmission.id)
+        : null;
+
+      setReviewAssignment(response.assignment);
+      setReviewSubmissions(response.submissions);
+      setReviewInitialDraft(initialDraft);
+      setReviewCurrentDraft(initialDraft);
+      setReviewHasUnsavedDraft(false);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load review data', error);
+      setReviewAssignment(null);
+      setReviewSubmissions([]);
+      setReviewInitialDraft(null);
+      setReviewCurrentDraft(null);
+      setReviewHasUnsavedDraft(false);
+      setReviewError('Не удалось загрузить данные для проверки');
+    } finally {
+      setReviewLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (mode !== 'teacher') {
       setTeacherInitialized(false);
@@ -517,6 +610,23 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   }, [isTeacherTemplateEditorRoute, loadTeacherSummary, mode, selectedStudentId, teacherInitialized]);
 
   useEffect(() => {
+    if (mode !== 'teacher' || !hasTeacherReviewAssignmentId) return;
+    void loadTeacherReviewData(assignmentId);
+  }, [assignmentId, hasTeacherReviewAssignmentId, loadTeacherReviewData, mode]);
+
+  useEffect(() => {
+    if (mode !== 'teacher' || hasTeacherReviewAssignmentId) return;
+    setReviewAssignment(null);
+    setReviewSubmissions([]);
+    setReviewInitialDraft(null);
+    setReviewCurrentDraft(null);
+    setReviewHasUnsavedDraft(false);
+    setReviewLoading(false);
+    setReviewError(null);
+    clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
+  }, [clearEntry, hasTeacherReviewAssignmentId, mode]);
+
+  useEffect(() => {
     if (mode === 'teacher') return;
     if (hasStudentAssignmentId) {
       void loadStudentDetail();
@@ -524,6 +634,74 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }
     void loadStudentList({ append: false });
   }, [hasStudentAssignmentId, loadStudentDetail, loadStudentList, mode, studentFilter]);
+
+  const saveReviewDraft = useCallback(async () => {
+    if (!reviewAssignment || !reviewCurrentDraft) return true;
+    try {
+      const response = await api.saveHomeworkReviewDraftV2(reviewAssignment.id, {
+        submissionId: reviewCurrentDraft.submissionId,
+        draft: reviewCurrentDraft,
+      });
+      setReviewAssignment(response.assignment);
+      if (response.submission) {
+        setReviewSubmissions((prev) => {
+          const withoutUpdated = prev.filter((item) => item.id !== response.submission?.id);
+          return [response.submission!, ...withoutUpdated].sort((left, right) => {
+            if (right.attemptNo !== left.attemptNo) return right.attemptNo - left.attemptNo;
+            return right.id - left.id;
+          });
+        });
+      }
+      saveReviewDraftToStorage(reviewAssignment.id, reviewCurrentDraft);
+      setReviewInitialDraft(reviewCurrentDraft);
+      setReviewHasUnsavedDraft(false);
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to persist homework review draft', error);
+      try {
+        saveReviewDraftToStorage(reviewAssignment.id, reviewCurrentDraft);
+        setReviewInitialDraft(reviewCurrentDraft);
+        setReviewHasUnsavedDraft(false);
+        showToast({
+          message: 'Черновик сохранён локально. Сервер недоступен, попробуйте позже.',
+          variant: 'error',
+        });
+        return true;
+      } catch {
+        showToast({ message: 'Не удалось сохранить проверку', variant: 'error' });
+        return false;
+      }
+    }
+  }, [reviewAssignment, reviewCurrentDraft, showToast]);
+
+  useEffect(() => {
+    if (mode !== 'teacher' || !hasTeacherReviewAssignmentId) {
+      clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
+      return;
+    }
+
+    setEntry(REVIEW_UNSAVED_ENTRY_KEY, {
+      isDirty: true,
+      title: 'Вы точно хотите выйти?',
+      message: 'Домашнее задание проверяется. Вы можете сохранить проверку и выйти.',
+      confirmText: 'Сохранить и выйти',
+      cancelText: 'Остаться на проверке',
+      cancelKeepsEditing: true,
+      onSave: saveReviewDraft,
+      onSaveErrorMessage: 'Не удалось сохранить проверку',
+    });
+
+    return () => {
+      clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
+    };
+  }, [
+    clearEntry,
+    hasTeacherReviewAssignmentId,
+    mode,
+    saveReviewDraft,
+    setEntry,
+  ]);
 
   const buildTemplateUpsertPayload = useCallback(
     (draftValue: HomeworkTemplateEditorDraft): TeacherTemplateUpsertPayload => ({
@@ -858,21 +1036,16 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       if (!options?.preserveQueue) {
         setReviewQueueActive(false);
       }
-      setReviewAssignment(assignment);
-      setReviewLoading(true);
-      try {
-        const response = await api.listHomeworkSubmissionsV2(assignment.id);
-        setReviewSubmissions(response.items);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load submissions for review', error);
-        showToast({ message: 'Не удалось загрузить попытки', variant: 'error' });
-        setReviewSubmissions([]);
-      } finally {
-        setReviewLoading(false);
-      }
+      setReviewError(null);
+      setReviewAssignment(null);
+      setReviewSubmissions([]);
+      setReviewInitialDraft(null);
+      setReviewCurrentDraft(null);
+      setReviewHasUnsavedDraft(false);
+      clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
+      navigate(`/homeworks/review/${assignment.id}`);
     },
-    [showToast],
+    [clearEntry, navigate],
   );
 
   const handleOpenDetail = useCallback(async (assignment: HomeworkAssignment) => {
@@ -902,8 +1075,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }) => {
       if (!reviewAssignment) return false;
       setReviewSubmitting(true);
+      setReviewError(null);
       try {
         await api.reviewHomeworkAssignmentV2(reviewAssignment.id, payload);
+        clearReviewDraftInStorage(reviewAssignment.id, payload.submissionId);
+        setReviewInitialDraft(null);
+        setReviewCurrentDraft(null);
+        setReviewHasUnsavedDraft(false);
+        clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
         showToast({
           message: payload.action === 'REVIEWED' ? 'Домашка проверена' : 'Домашка возвращена на доработку',
           variant: 'success',
@@ -923,16 +1102,20 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
             setReviewQueueActive(false);
             setReviewAssignment(null);
             setReviewSubmissions([]);
+            setReviewError(null);
+            navigate('/homeworks');
             showToast({ message: 'Очередь на проверку завершена', variant: 'success' });
           }
         } else {
           setReviewAssignment(null);
           setReviewSubmissions([]);
+          setReviewError(null);
           await Promise.all([
             fetchTeacherAssignments({ offset: 0, append: false }),
             loadTeacherSummary(),
             loadTeacherActivityUnread(),
           ]);
+          navigate('/homeworks');
         }
         return true;
       } catch (error) {
@@ -949,6 +1132,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleOpenReview,
       loadTeacherActivityUnread,
       loadTeacherSummary,
+      navigate,
+      clearEntry,
       reviewAssignment,
       reviewQueueActive,
       showToast,
@@ -973,13 +1158,26 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const handleStudentDetailSubmit = useCallback(
     async (payload: StudentHomeworkSubmitPayload) => {
-      if (!studentDetailAssignment) return false;
+      if (!studentDetailAssignment) {
+        setStudentDetailError('Домашка недоступна для отправки');
+        return false;
+      }
       setStudentDetailSubmitting(true);
       setStudentDetailError(null);
       try {
-        await api.createHomeworkSubmissionV2(studentDetailAssignment.id, payload);
-        await loadStudentDetail();
-        await loadStudentList({ append: false });
+        const response = await api.createHomeworkSubmissionV2(studentDetailAssignment.id, payload);
+
+        setStudentDetailAssignment(response.assignment);
+        setStudentDetailSubmissions((prev) => {
+          const withoutCurrent = prev.filter((item) => item.id !== response.submission.id);
+          return [response.submission, ...withoutCurrent].sort((left, right) => {
+            if (right.attemptNo !== left.attemptNo) return right.attemptNo - left.attemptNo;
+            return right.id - left.id;
+          });
+        });
+
+        void Promise.allSettled([loadStudentDetail(), loadStudentList({ append: false })]);
+
         showToast({
           message: payload.submit ? 'Домашка отправлена' : 'Черновик сохранён',
           variant: 'success',
@@ -988,7 +1186,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to submit homework payload', error);
-        setStudentDetailError(payload.submit ? 'Не удалось отправить домашку' : 'Не удалось сохранить черновик');
+        const fallbackMessage = payload.submit ? 'Не удалось отправить домашку' : 'Не удалось сохранить черновик';
+        const errorMessage = isApiRequestError(error) && error.message ? error.message : fallbackMessage;
+        setStudentDetailError(errorMessage);
         return false;
       } finally {
         setStudentDetailSubmitting(false);
@@ -996,6 +1196,29 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     },
     [loadStudentDetail, loadStudentList, showToast, studentDetailAssignment],
   );
+
+  const handleStudentDetailStartAttempt = useCallback(async () => {
+    if (!studentDetailAssignment) return false;
+    setStudentDetailSubmitting(true);
+    setStudentDetailError(null);
+    try {
+      await api.createHomeworkSubmissionV2(studentDetailAssignment.id, { submit: false });
+      await loadStudentDetail();
+      await loadStudentList({ append: false });
+      showToast({
+        message: 'Таймер запущен',
+        variant: 'success',
+      });
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to start timed homework attempt', error);
+      setStudentDetailError('Не удалось запустить таймер');
+      return false;
+    } finally {
+      setStudentDetailSubmitting(false);
+    }
+  }, [loadStudentDetail, loadStudentList, showToast, studentDetailAssignment]);
 
   const teacherView = useMemo(
     () => (
@@ -1065,6 +1288,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           setReviewQueueActive(false);
           setReviewAssignment(null);
           setReviewSubmissions([]);
+          setReviewInitialDraft(null);
+          setReviewCurrentDraft(null);
+          setReviewHasUnsavedDraft(false);
+          clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
         }}
         onStartReviewQueue={() => {
           void handleStartReviewQueue();
@@ -1102,6 +1329,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       assignmentsError,
       assignmentsNextOffset,
       assignModalRequest,
+      clearEntry,
       detailAssignment,
       detailLoading,
       detailSubmissions,
@@ -1155,6 +1383,31 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   );
 
   if (mode === 'teacher') {
+    if (hasTeacherReviewAssignmentId) {
+      return (
+        <HomeworkReviewScreen
+          assignment={reviewAssignment}
+          submissions={reviewSubmissions}
+          initialDraft={reviewInitialDraft}
+          loading={reviewLoading}
+          requestError={reviewError}
+          submitting={reviewSubmitting}
+          onBack={() => {
+            navigate('/homeworks');
+          }}
+          onDraftChange={(draft, meta) => {
+            setReviewCurrentDraft(draft);
+            setReviewHasUnsavedDraft(meta.isDirty);
+          }}
+          onRefresh={() => {
+            if (!Number.isFinite(assignmentId) || assignmentId <= 0) return;
+            void loadTeacherReviewData(assignmentId);
+          }}
+          onSubmitReview={handleSubmitReview}
+        />
+      );
+    }
+
     if (isTeacherTemplateEditorRoute) {
       if (isTeacherTemplateEditRoute && templateEditorLoading) {
         return <section>Загрузка шаблона...</section>;
@@ -1197,6 +1450,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         onRefresh={() => {
           void loadStudentDetail();
         }}
+        onStartAttempt={handleStudentDetailStartAttempt}
         onSubmitPayload={handleStudentDetailSubmit}
       />
     );

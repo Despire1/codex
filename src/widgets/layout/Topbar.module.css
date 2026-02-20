@@ -154,6 +154,10 @@
   background: var(--color-slate-800);
 }
 
+.createButtonIconAccent {
+  color: #a3e635;
+}
+
 .templateSecondaryButton {
   min-height: 40px;
   border: none;
@@ -209,16 +213,18 @@
 .createButtonSlot {
   display: inline-flex;
   justify-content: flex-end;
-  width: var(--create-slot-width);
-  flex: 0 0 var(--create-slot-width);
   overflow: hidden;
 }
 
 .createButtonSlotVisible {
+  width: auto;
+  flex: 0 0 auto;
   pointer-events: auto;
 }
 
 .createButtonSlotHidden {
+  width: var(--create-slot-width);
+  flex: 0 0 var(--create-slot-width);
   pointer-events: none;
 }
 

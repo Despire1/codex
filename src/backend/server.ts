@@ -9,6 +9,7 @@ import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
 import type { HomeworkBlock, HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
+import { resolveHomeworkAttemptTimerConfig } from '../entities/homework-template/model/lib/quizSettings';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
   isValidMeetingLink,
@@ -2206,6 +2207,7 @@ const normalizeHomeworkAssignmentStatus = (
   | 'SCHEDULED'
   | 'SENT'
   | 'SUBMITTED'
+  | 'IN_REVIEW'
   | 'RETURNED'
   | 'REVIEWED'
   | 'OVERDUE' => {
@@ -2215,6 +2217,7 @@ const normalizeHomeworkAssignmentStatus = (
     normalized === 'SCHEDULED' ||
     normalized === 'SENT' ||
     normalized === 'SUBMITTED' ||
+    normalized === 'IN_REVIEW' ||
     normalized === 'RETURNED' ||
     normalized === 'REVIEWED' ||
     normalized === 'OVERDUE'
@@ -2322,7 +2325,7 @@ const normalizeHomeworkAssignmentProblemFiltersV2 = (value: unknown): HomeworkAs
 const resolveAssignmentBucketWhereV2 = (bucket: HomeworkAssignmentBucketV2, now: Date): Record<string, unknown> => {
   if (bucket === 'draft') return { status: { in: ['DRAFT', 'SCHEDULED'] } };
   if (bucket === 'sent') return { status: { in: ['SENT', 'RETURNED'] } };
-  if (bucket === 'review') return { status: 'SUBMITTED' };
+  if (bucket === 'review') return { status: { in: ['SUBMITTED', 'IN_REVIEW'] } };
   if (bucket === 'reviewed') return { status: 'REVIEWED' };
   if (bucket === 'overdue') {
     return {
@@ -2336,7 +2339,7 @@ const resolveAssignmentTabWhereV2 = (tab: HomeworkAssignmentsTabV2, now: Date): 
   if (tab === 'draft') return { status: 'DRAFT' };
   if (tab === 'scheduled') return { status: 'SCHEDULED' };
   if (tab === 'in_progress') return { status: { in: ['SENT', 'RETURNED'] } };
-  if (tab === 'review') return { status: 'SUBMITTED' };
+  if (tab === 'review') return { status: { in: ['SUBMITTED', 'IN_REVIEW'] } };
   if (tab === 'closed') return { status: 'REVIEWED' };
   if (tab === 'overdue') {
     return {
@@ -2347,6 +2350,7 @@ const resolveAssignmentTabWhereV2 = (tab: HomeworkAssignmentsTabV2, now: Date): 
     return {
       OR: [
         { status: 'SUBMITTED' },
+        { status: 'IN_REVIEW' },
         { status: 'RETURNED' },
         { status: 'OVERDUE' },
         { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
@@ -2436,6 +2440,7 @@ const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[]
             resolvedStatus === 'RETURNED' ? 'RETURNED' : null,
             hasConfigError ? 'CONFIG_ERROR' : null,
             resolvedStatus === 'SUBMITTED' ? 'SUBMITTED' : null,
+            resolvedStatus === 'IN_REVIEW' ? 'IN_REVIEW' : null,
           ].filter(Boolean),
         ),
       ),
@@ -2492,7 +2497,7 @@ const sortHomeworkAssignmentsV2 = (items: any[], sort: HomeworkAssignmentsSortV2
   const priority = (item: any) => {
     if (item.hasConfigError) return 0;
     if (item.isOverdue) return 1;
-    if (item.status === 'SUBMITTED') return 2;
+    if (item.status === 'SUBMITTED' || item.status === 'IN_REVIEW') return 2;
     if (item.status === 'RETURNED') return 3;
     if (item.status === 'SCHEDULED') return 4;
     if (item.status === 'SENT') return 5;
@@ -2538,6 +2543,7 @@ const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
         status === 'RETURNED' ? 'RETURNED' : null,
         hasConfigError ? 'CONFIG_ERROR' : null,
         status === 'SUBMITTED' ? 'SUBMITTED' : null,
+        status === 'IN_REVIEW' ? 'IN_REVIEW' : null,
       ].filter(Boolean),
     ),
   );
@@ -2588,6 +2594,45 @@ const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
   };
 };
 
+type HomeworkReviewDraftV2 = {
+  submissionId: number;
+  scoresById: Record<string, number>;
+  commentsById: Record<string, string>;
+  generalComment: string;
+};
+
+const normalizeHomeworkReviewDraftV2 = (value: unknown): HomeworkReviewDraftV2 | null => {
+  const raw = parseObjectRecord(value);
+  if (!raw) return null;
+
+  const submissionId = Number(raw.submissionId);
+  if (!Number.isFinite(submissionId) || submissionId <= 0) return null;
+
+  const rawScores = parseObjectRecord(raw.scoresById) ?? {};
+  const scoresById = Object.entries(rawScores).reduce<Record<string, number>>((acc, [key, score]) => {
+    if (typeof key !== 'string' || !key.trim()) return acc;
+    const numeric = Number(score);
+    if (!Number.isFinite(numeric)) return acc;
+    acc[key] = clampNumber(numeric, 0, 1000);
+    return acc;
+  }, {});
+
+  const rawComments = parseObjectRecord(raw.commentsById) ?? {};
+  const commentsById = Object.entries(rawComments).reduce<Record<string, string>>((acc, [key, comment]) => {
+    if (typeof key !== 'string' || !key.trim()) return acc;
+    if (typeof comment !== 'string') return acc;
+    acc[key] = comment;
+    return acc;
+  }, {});
+
+  return {
+    submissionId,
+    scoresById,
+    commentsById,
+    generalComment: typeof raw.generalComment === 'string' ? raw.generalComment : '',
+  };
+};
+
 const serializeHomeworkSubmissionV2 = (submission: any) => ({
   id: submission.id,
   assignmentId: submission.assignmentId,
@@ -2600,6 +2645,7 @@ const serializeHomeworkSubmissionV2 = (submission: any) => ({
   voice: normalizeHomeworkAttachments(submission.voice),
   testAnswers: parseObjectRecord(submission.testAnswers),
   teacherComment: submission.teacherComment ?? null,
+  reviewDraft: normalizeHomeworkReviewDraftV2(submission.reviewDraft),
   submittedAt: submission.submittedAt ?? null,
   reviewedAt: submission.reviewedAt ?? null,
   createdAt: submission.createdAt,
@@ -2610,6 +2656,74 @@ const serializeHomeworkSubmissionV2 = (submission: any) => ({
     finalScore: clampHomeworkScore(submission.finalScore),
   },
 });
+
+const resolveTimedAttemptState = (assignmentContentSnapshot: unknown, startedAt: unknown, now = new Date()) => {
+  const blocks = normalizeHomeworkBlocks(assignmentContentSnapshot) as unknown as HomeworkBlock[];
+  const timerConfig = resolveHomeworkAttemptTimerConfig(blocks);
+  const startedAtDate = toValidDate(startedAt);
+  if (!timerConfig.enabled || timerConfig.durationMs === null || !startedAtDate) {
+    return {
+      enabled: false,
+      startedAt: startedAtDate,
+      expiresAt: null as Date | null,
+      isExpired: false,
+    };
+  }
+
+  const expiresAt = new Date(startedAtDate.getTime() + timerConfig.durationMs);
+  return {
+    enabled: true,
+    startedAt: startedAtDate,
+    expiresAt,
+    isExpired: expiresAt.getTime() <= now.getTime(),
+  };
+};
+
+const isAssignmentAcceptingStudentWork = (status: unknown) => {
+  const normalized = normalizeHomeworkAssignmentStatus(status);
+  return normalized === 'SENT' || normalized === 'RETURNED' || normalized === 'OVERDUE';
+};
+
+const finalizeTimedOutDraftSubmission = async (
+  assignment: any,
+  draftSubmission: any,
+  now = new Date(),
+): Promise<{ assignment: any; submission: any } | null> => {
+  if (!assignment || !draftSubmission) return null;
+  if (normalizeHomeworkSubmissionStatus(draftSubmission.status) !== 'DRAFT') return null;
+  if (!isAssignmentAcceptingStudentWork(assignment.status)) return null;
+
+  const timerState = resolveTimedAttemptState(assignment.contentSnapshot, draftSubmission.createdAt, now);
+  if (!timerState.enabled || !timerState.isExpired) return null;
+
+  const submittedAt = timerState.expiresAt ?? now;
+  const [updatedSubmission, updatedAssignment] = await Promise.all([
+    (prisma as any).homeworkSubmission.update({
+      where: { id: draftSubmission.id },
+      data: {
+        status: 'SUBMITTED',
+        submittedAt,
+        autoScore: 0,
+        manualScore: null,
+        finalScore: 0,
+      },
+    }),
+    (prisma as any).homeworkAssignment.update({
+      where: { id: assignment.id },
+      data: {
+        status: 'SUBMITTED',
+        autoScore: 0,
+        manualScore: null,
+        finalScore: 0,
+      },
+    }),
+  ]);
+
+  return {
+    assignment: updatedAssignment,
+    submission: updatedSubmission,
+  };
+};
 
 const normalizeAnswerString = (value: unknown, caseSensitive = false) => {
   if (typeof value !== 'string') return '';
@@ -2938,6 +3052,20 @@ const createNotificationLogEntry = async (payload: {
   type: string;
   dedupeKey?: string | null;
 }) => {
+  const normalizedDedupeKey =
+    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0
+      ? payload.dedupeKey.trim()
+      : null;
+
+  if (normalizedDedupeKey) {
+    const existing = await prisma.notificationLog.findUnique({
+      where: { dedupeKey: normalizedDedupeKey },
+    });
+    if (existing) {
+      return null;
+    }
+  }
+
   try {
     return await prisma.notificationLog.create({
       data: {
@@ -2949,12 +3077,20 @@ const createNotificationLogEntry = async (payload: {
         channel: 'TELEGRAM',
         scheduledFor: null,
         status: 'PENDING',
-        dedupeKey: payload.dedupeKey ?? null,
+        dedupeKey: normalizedDedupeKey,
       },
     });
   } catch (error) {
-    const prismaError = error as { code?: string } | null;
-    if (prismaError?.code === 'P2002' || prismaError?.code === 'P2003') {
+    const prismaError = error as { code?: string; message?: string; meta?: { target?: unknown } } | null;
+    const uniqueTarget = prismaError?.meta?.target;
+    const uniqueByDedupeKey =
+      prismaError?.code === 'P2002' &&
+      (Array.isArray(uniqueTarget)
+        ? uniqueTarget.includes('dedupeKey')
+        : typeof prismaError?.message === 'string' && prismaError.message.includes('dedupeKey'));
+    const isForeignKeyConflict = prismaError?.code === 'P2003';
+
+    if (uniqueByDedupeKey || isForeignKeyConflict) {
       return null;
     }
     throw error;
@@ -4974,6 +5110,7 @@ const getHomeworkAssignmentsSummaryV2 = async (
         ...baseWhere,
         OR: [
           { status: 'SUBMITTED' },
+          { status: 'IN_REVIEW' },
           { status: 'RETURNED' },
           { status: 'OVERDUE' },
           { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
@@ -5064,6 +5201,34 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
   }
 
   return { assignment: serializeHomeworkAssignmentV2(assignment) };
+};
+
+const getHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+    where: {
+      id: assignmentId,
+      teacherId: teacher.chatId,
+    },
+    include: {
+      student: {
+        select: { username: true },
+      },
+      lesson: {
+        select: { startAt: true },
+      },
+      template: {
+        select: { title: true },
+      },
+    },
+  });
+  if (!assignment) throw createHttpError('Домашка не найдена', 404);
+
+  const [withSubmissionMeta] = await attachLatestSubmissionMetaToAssignments([assignment]);
+  const [withDisplayMeta] = await attachAssignmentDisplayMeta(teacher.chatId, [withSubmissionMeta], new Date());
+  return {
+    assignment: serializeHomeworkAssignmentV2(withDisplayMeta),
+  };
 };
 
 const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body: Record<string, unknown>) => {
@@ -5304,6 +5469,149 @@ const listHomeworkSubmissionsV2 = async (user: User, assignmentId: number) => {
   return { items: items.map(serializeHomeworkSubmissionV2) };
 };
 
+const openHomeworkReviewSessionV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+
+  const loadAssignment = async () =>
+    (prisma as any).homeworkAssignment.findFirst({
+      where: { id: assignmentId, teacherId: teacher.chatId },
+      include: {
+        student: {
+          select: { username: true },
+        },
+        lesson: {
+          select: { startAt: true },
+        },
+        template: {
+          select: { title: true },
+        },
+      },
+    });
+
+  let assignment = await loadAssignment();
+  if (!assignment) throw new Error('Домашка не найдена');
+
+  if (normalizeHomeworkAssignmentStatus(assignment.status) === 'SUBMITTED') {
+    await (prisma as any).homeworkAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: 'IN_REVIEW',
+        updatedAt: new Date(),
+      },
+    });
+    assignment = await loadAssignment();
+    if (!assignment) throw new Error('Домашка не найдена');
+  }
+
+  const [assignmentWithSubmissionMeta] = await attachLatestSubmissionMetaToAssignments([assignment]);
+  const [assignmentWithDisplayMeta] = await attachAssignmentDisplayMeta(
+    teacher.chatId,
+    [assignmentWithSubmissionMeta],
+    new Date(),
+  );
+
+  const submissions = await (prisma as any).homeworkSubmission.findMany({
+    where: { assignmentId },
+    orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+  });
+
+  return {
+    assignment: serializeHomeworkAssignmentV2(assignmentWithDisplayMeta),
+    submissions: submissions.map(serializeHomeworkSubmissionV2),
+  };
+};
+
+const saveHomeworkReviewDraftV2 = async (user: User, assignmentId: number, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+    where: { id: assignmentId, teacherId: teacher.chatId },
+    include: {
+      student: {
+        select: { username: true },
+      },
+      lesson: {
+        select: { startAt: true },
+      },
+      template: {
+        select: { title: true },
+      },
+    },
+  });
+  if (!assignment) throw new Error('Домашка не найдена');
+
+  const submissionId = Number(body.submissionId);
+  const submission =
+    Number.isFinite(submissionId) && submissionId > 0
+      ? await (prisma as any).homeworkSubmission.findFirst({
+          where: { id: submissionId, assignmentId },
+          orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+        })
+      : await (prisma as any).homeworkSubmission.findFirst({
+          where: { assignmentId },
+          orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
+        });
+  if (!submission) throw new Error('Попытка не найдена');
+
+  const hasDraftField = Object.prototype.hasOwnProperty.call(body, 'draft');
+  const rawDraft = hasDraftField ? body.draft : null;
+  if (rawDraft !== null && rawDraft !== undefined && (typeof rawDraft !== 'object' || Array.isArray(rawDraft))) {
+    throw new Error('Некорректный формат черновика проверки');
+  }
+
+  const normalizedDraft = rawDraft ? normalizeHomeworkReviewDraftV2(rawDraft) : null;
+  if (rawDraft && !normalizedDraft) {
+    throw new Error('Некорректный формат черновика проверки');
+  }
+  const draftToStore = normalizedDraft
+    ? {
+        ...normalizedDraft,
+        submissionId: submission.id,
+      }
+    : null;
+
+  const updatedSubmission = await (prisma as any).homeworkSubmission.update({
+    where: { id: submission.id },
+    data: {
+      reviewDraft: draftToStore ? JSON.stringify(draftToStore) : null,
+    },
+  });
+
+  const currentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
+  const updatedAssignment =
+    currentStatus === 'SUBMITTED'
+      ? await (prisma as any).homeworkAssignment.update({
+          where: { id: assignmentId },
+          data: {
+            status: 'IN_REVIEW',
+            updatedAt: new Date(),
+          },
+          include: {
+            student: {
+              select: { username: true },
+            },
+            lesson: {
+              select: { startAt: true },
+            },
+            template: {
+              select: { title: true },
+            },
+          },
+        })
+      : assignment;
+
+  const [assignmentWithSubmissionMeta] = await attachLatestSubmissionMetaToAssignments([updatedAssignment]);
+  const [assignmentWithDisplayMeta] = await attachAssignmentDisplayMeta(
+    teacher.chatId,
+    [assignmentWithSubmissionMeta],
+    new Date(),
+  );
+
+  return {
+    assignment: serializeHomeworkAssignmentV2(assignmentWithDisplayMeta),
+    submission: serializeHomeworkSubmissionV2(updatedSubmission),
+  };
+};
+
 const createHomeworkSubmissionV2 = async (
   user: User,
   role: RequestRole,
@@ -5312,7 +5620,7 @@ const createHomeworkSubmissionV2 = async (
   requestedTeacherId?: number | null,
   requestedStudentId?: number | null,
 ) => {
-  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+  let assignment = await (prisma as any).homeworkAssignment.findUnique({
     where: { id: assignmentId },
   });
   if (!assignment) throw new Error('Домашка не найдена');
@@ -5333,12 +5641,26 @@ const createHomeworkSubmissionV2 = async (
     studentId = assignment.studentId;
   }
 
-  const latest = await (prisma as any).homeworkSubmission.findFirst({
+  let latest = await (prisma as any).homeworkSubmission.findFirst({
     where: { assignmentId },
     orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
   });
-  const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
   const shouldSubmit = Boolean(body.submit);
+  const latestStatus = latest ? normalizeHomeworkSubmissionStatus(latest.status) : null;
+
+  if (latest && latestStatus === 'DRAFT') {
+    const timedOutResult = await finalizeTimedOutDraftSubmission(assignment, latest, new Date());
+    if (timedOutResult) {
+      assignment = timedOutResult.assignment;
+      latest = timedOutResult.submission;
+      return {
+        submission: serializeHomeworkSubmissionV2(latest),
+        assignment: serializeHomeworkAssignmentV2(assignment),
+      };
+    }
+  }
+
+  const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
 
   let targetAttempt = latest?.attemptNo ?? 1;
   let mode: 'create' | 'update' = 'create';
@@ -5446,6 +5768,7 @@ const reviewHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
       status: 'REVIEWED',
       reviewerTeacherId: teacher.chatId,
       teacherComment: teacherComment || null,
+      reviewDraft: null,
       autoScore,
       manualScore,
       finalScore,
@@ -5500,11 +5823,11 @@ const listStudentHomeworkAssignmentsV2 = async (
     studentId: active.studentId,
   };
   if (filter === 'submitted') {
-    where.status = 'SUBMITTED';
+    where.status = { in: ['SUBMITTED', 'IN_REVIEW'] };
   } else if (filter === 'reviewed') {
     where.status = 'REVIEWED';
   } else if (filter === 'active') {
-    where.status = { in: ['SENT', 'RETURNED', 'OVERDUE', 'SUBMITTED'] };
+    where.status = { in: ['SENT', 'RETURNED', 'OVERDUE', 'SUBMITTED', 'IN_REVIEW'] };
   } else if (filter === 'overdue') {
     where.OR = [
       { status: 'OVERDUE' },
@@ -5535,7 +5858,7 @@ const getStudentHomeworkAssignmentDetailV2 = async (
   assignmentId: number,
 ) => {
   const { active } = await ensureStudentAccessLink(user, requestedTeacherId, requestedStudentId);
-  const assignment = await (prisma as any).homeworkAssignment.findFirst({
+  let assignment = await (prisma as any).homeworkAssignment.findFirst({
     where: {
       id: assignmentId,
       teacherId: active.teacherId,
@@ -5544,10 +5867,21 @@ const getStudentHomeworkAssignmentDetailV2 = async (
   });
   if (!assignment) throw new Error('Домашка не найдена');
 
-  const submissions = await (prisma as any).homeworkSubmission.findMany({
+  let submissions = await (prisma as any).homeworkSubmission.findMany({
     where: { assignmentId },
     orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
   });
+  const latestDraftSubmission = submissions.find((submission: any) => normalizeHomeworkSubmissionStatus(submission.status) === 'DRAFT') ?? null;
+  if (latestDraftSubmission) {
+    const timedOutResult = await finalizeTimedOutDraftSubmission(assignment, latestDraftSubmission, new Date());
+    if (timedOutResult) {
+      assignment = timedOutResult.assignment;
+      submissions = [
+        timedOutResult.submission,
+        ...submissions.filter((submission: any) => submission.id !== timedOutResult.submission.id),
+      ];
+    }
+  }
 
   return {
     assignment: serializeHomeworkAssignmentV2(assignment, new Date()),
@@ -5579,9 +5913,9 @@ const getStudentHomeworkSummaryV2 = async (
   assignments.forEach((item: any) => {
     const status = resolveAssignmentViewStatus(item, now);
     if (status === 'REVIEWED') reviewedCount += 1;
-    if (status === 'SUBMITTED') submittedCount += 1;
+    if (status === 'SUBMITTED' || status === 'IN_REVIEW') submittedCount += 1;
     if (status === 'OVERDUE') overdueCount += 1;
-    if (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE' || status === 'SUBMITTED') activeCount += 1;
+    if (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE' || status === 'SUBMITTED' || status === 'IN_REVIEW') activeCount += 1;
     if (item.deadlineAt) {
       const deadlineKey = formatInTimeZone(item.deadlineAt, 'yyyy-MM-dd', {
         timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
@@ -6634,6 +6968,10 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
       const assignmentId = Number(homeworkAssignmentUpdateMatch[1]);
       if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      if (req.method === 'GET') {
+        const data = await getHomeworkAssignmentV2(requireApiUser(), assignmentId);
+        return sendJson(res, 200, data);
+      }
       if (req.method === 'PATCH') {
         const body = await readBody(req);
         const data = await updateHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
@@ -6678,6 +7016,25 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     const homeworkReviewMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review$/);
+    const homeworkReviewSessionMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review-session$/);
+    if (req.method === 'POST' && homeworkReviewSessionMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(homeworkReviewSessionMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const data = await openHomeworkReviewSessionV2(requireApiUser(), assignmentId);
+      return sendJson(res, 200, data);
+    }
+
+    const homeworkReviewDraftMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review-draft$/);
+    if (req.method === 'POST' && homeworkReviewDraftMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const assignmentId = Number(homeworkReviewDraftMatch[1]);
+      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
+      const body = await readBody(req);
+      const data = await saveHomeworkReviewDraftV2(requireApiUser(), assignmentId, body);
+      return sendJson(res, 200, data);
+    }
+
     if (req.method === 'POST' && homeworkReviewMatch) {
       if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
       const assignmentId = Number(homeworkReviewMatch[1]);

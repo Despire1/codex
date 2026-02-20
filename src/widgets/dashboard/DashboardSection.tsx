@@ -1,7 +1,6 @@
-import { addDays, format, isSameDay } from 'date-fns';
-import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isSameDay } from 'date-fns';
+import { type FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { Lesson, LinkedStudent, Teacher } from '@/entities/types';
-import controls from '../../shared/styles/controls.module.css';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '@/shared/ui/Modal/Modal';
 import { Badge } from '@/shared/ui/Badge/Badge';
@@ -10,12 +9,12 @@ import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverCo
 import { ActivityFeedCard } from './components/ActivityFeedCard';
 import { ActivityFeedFullscreen } from './components/ActivityFeedFullscreen';
 import { ActivityFeedFiltersControl } from './components/ActivityFeedFiltersControl';
+import { DashboardQuickActionsReferenceCard } from './components/DashboardQuickActionsReferenceCard';
 import styles from './DashboardSection.module.css';
-import { WeeklyCalendar } from './components/WeeklyCalendar/WeeklyCalendar';
-import { getLessonColorVars } from '@/shared/lib/lessonColors';
+import { WeeklyCalendarReference } from './components/WeeklyCalendarReference/WeeklyCalendarReference';
 import { pluralizeRu } from '@/shared/lib/pluralizeRu';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
-import { formatInTimeZone, toUtcEndOfDay, toZonedDate } from '@/shared/lib/timezoneDates';
+import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useDashboardState } from './model/useDashboardState';
@@ -37,18 +36,6 @@ interface DashboardSectionProps {
   onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
   dashboardSummary: DashboardSummary | null;
 }
-
-const getStudentLabel = (lesson: Lesson, linkedStudents: LinkedStudent[]) => {
-  if (lesson.participants && lesson.participants.length > 1) {
-    const names = lesson.participants
-      .map((participant) =>
-        linkedStudents.find((student) => student.id === participant.studentId)?.link.customName,
-      )
-      .filter(Boolean);
-    return names.length > 0 ? names.join(', ') : 'Группа';
-  }
-  return linkedStudents.find((student) => student.id === lesson.studentId)?.link.customName || 'Ученик';
-};
 
 const getLinkedStudentName = (studentId: number, linkedStudents: LinkedStudent[]) =>
   linkedStudents.find((student) => student.id === studentId)?.link.customName || 'Ученик';
@@ -75,7 +62,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
     startEditLesson,
     requestDeleteLessonFromList,
   } = useLessonActions();
-  const { unpaidEntries, setWeekRange } = useDashboardState();
+  const { unpaidEntries, setWeekRange, isWeekLessonsLoading } = useDashboardState();
   const isDashboardMobile = useIsMobile(1023);
   const [isMobileActivityRequested, setIsMobileActivityRequested] = useState(false);
   const activityFeedEnabled = !isDashboardMobile || isMobileActivityRequested;
@@ -99,25 +86,10 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   } = useDashboardActivityUnread(isDashboardMobile);
   const now = new Date();
   const todayZoned = toZonedDate(now, timeZone);
-  const hasSyncedActivityForLessonsRef = useRef(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const showWeeklyCalendar = !isDashboardMobile;
-  const lessonsActivitySignature = useMemo(
-    () =>
-      lessons
-        .map((lesson) => {
-          const participantsSignature = (lesson.participants ?? [])
-            .map((participant) => `${participant.studentId}:${participant.isPaid ? 1 : 0}`)
-            .sort()
-            .join(',');
-          return `${lesson.id}:${lesson.status}:${lesson.startAt}:${lesson.durationMinutes}:${lesson.isPaid ? 1 : 0}:${participantsSignature}`;
-        })
-        .sort()
-        .join('|'),
-    [lessons],
-  );
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     return lessons.flatMap((lesson) => {
@@ -170,19 +142,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       .filter((lesson) => lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() >= now.getTime())
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
   }, [now, todayLessons]);
-
-  const upcomingLessons = useMemo(() => {
-    const windowEnd = toUtcEndOfDay(format(addDays(todayZoned, 2), 'yyyy-MM-dd'), timeZone);
-    return lessons
-      .filter((lesson) => {
-        if (lesson.status !== 'SCHEDULED') return false;
-        const startAt = new Date(lesson.startAt);
-        return startAt.getTime() >= now.getTime() && startAt.getTime() <= windowEnd.getTime();
-      })
-      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  }, [lessons, now, timeZone, todayZoned]);
-
-  const upcomingLessonCards = upcomingLessons.slice(0, 5);
 
   const unpaidSummary = useMemo(() => {
     const studentIds = new Set(unpaidEntries.map((entry) => entry.studentId));
@@ -256,15 +215,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       setIsAttentionOpen(false);
     }
   }, [attentionItems.length]);
-
-  useEffect(() => {
-    if (!hasSyncedActivityForLessonsRef.current) {
-      hasSyncedActivityForLessonsRef.current = true;
-      return;
-    }
-    void refreshActivity();
-    void refreshUnreadActivity();
-  }, [lessonsActivitySignature, refreshActivity, refreshUnreadActivity]);
 
   if (isDashboardMobile) {
     return (
@@ -344,56 +294,24 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
       )}
 
       {showWeeklyCalendar && (
-        <WeeklyCalendar
+        <WeeklyCalendarReference
           className={styles.calendarArea}
           lessons={lessons}
           linkedStudents={linkedStudents}
           timeZone={timeZone}
+          isLoading={isWeekLessonsLoading}
           onCreateLesson={(date) => onCreateLesson(date)}
           onOpenLessonDay={onOpenLessonDay}
           onWeekRangeChange={setWeekRange}
         />
       )}
 
-      <div className={`${styles.card} ${styles.upcomingCard} ${styles.upcomingArea}`}>
-        <div className={styles.cardHeader}>Ближайшие уроки</div>
-        {upcomingLessonCards.length === 0 ? (
-          <p className={styles.muted}>Нет ближайших занятий</p>
-        ) : (
-          <div className={styles.lessonList}>
-            {upcomingLessonCards.map((lesson) => {
-              const date = toZonedDate(lesson.startAt, timeZone);
-              const label = isSameDay(date, todayZoned)
-                ? 'Сегодня'
-                : isSameDay(date, addDays(todayZoned, 1))
-                  ? 'Завтра'
-                  : isSameDay(date, addDays(todayZoned, 2))
-                    ? 'Послезавтра'
-                    : 'Скоро';
-              return (
-                <button
-                  key={lesson.id}
-                  type="button"
-                  className={styles.lessonCard}
-                  onClick={() => onOpenLesson(lesson)}
-                  style={getLessonColorVars(lesson.color)}
-                >
-                  <div className={styles.lessonDay}>{label}</div>
-                  <div className={styles.lessonTimeRow}>
-                    {format(date, 'HH:mm')} · {lesson.durationMinutes} мин
-                  </div>
-                  <div className={styles.lessonStudent}>{getStudentLabel(lesson, linkedStudents)}</div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {upcomingLessons.length > 5 && (
-          <button className={styles.inlineAction} onClick={onOpenSchedule}>
-            Открыть расписание
-          </button>
-        )}
-      </div>
+      <DashboardQuickActionsReferenceCard
+        className={styles.quickActionsArea}
+        onCreateHomework={() => onOpenHomeworkAssign()}
+        onCreateLesson={() => onCreateLesson()}
+        onAddStudent={onAddStudent}
+      />
 
       <div className={`${styles.card} ${styles.activityCardShell} ${activityAreaClassName}`}>
         <ActivityFeedCard
@@ -441,18 +359,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           )}
         </div>
       )}
-
-      <div className={`${styles.card} ${styles.actionsCard} ${styles.actionsArea}`}>
-        <div className={styles.cardHeader}>Быстрые действия</div>
-        <div className={styles.actionsRow}>
-          <button className={controls.secondaryButton} onClick={onAddStudent}>
-            Добавить ученика
-          </button>
-          <button className={controls.secondaryButton} onClick={() => onCreateLesson()}>
-            Создать урок
-          </button>
-        </div>
-      </div>
 
       {!isDashboardMobile && (
         <Modal
