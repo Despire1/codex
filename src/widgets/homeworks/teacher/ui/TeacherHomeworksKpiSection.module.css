@@ -1,0 +1,334 @@
+.kpiGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 190px;
+  border-radius: 1.5rem;
+  border: 1px solid #f1f5f9;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: #e5e7eb;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+}
+
+.primaryCard,
+.successCard {
+  border-color: transparent;
+  color: #fff;
+}
+
+.primaryCard {
+  background: linear-gradient(140deg, #050505 0%, #1a1a1a 100%);
+  box-shadow: none;
+}
+
+.primaryCard:hover {
+  box-shadow: none;
+}
+
+.successCard {
+  background: linear-gradient(140deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 14px 30px rgba(22, 163, 74, 0.28);
+}
+
+.primaryGlow,
+.successGlow {
+  position: absolute;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.primaryGlow {
+  top: -34px;
+  right: -34px;
+  width: 128px;
+  height: 128px;
+  filter: blur(44px);
+}
+
+.successGlow {
+  right: -28px;
+  bottom: -28px;
+  width: 112px;
+  height: 112px;
+  filter: blur(34px);
+}
+
+.cardInner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.iconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.primaryIconWrap {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.infoIconWrap {
+  background: #eff6ff;
+  color: #2563eb;
+  transition: background-color 0.2s ease;
+}
+
+.card:hover .infoIconWrap {
+  background: #dbeafe;
+}
+
+.warningIconWrap {
+  background: #fffbeb;
+  color: #d97706;
+  transition: background-color 0.2s ease;
+}
+
+.card:hover .warningIconWrap {
+  background: #fef3c7;
+}
+
+.successIconWrap {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.gradeIconWrap {
+  background: #f3e8ff;
+  color: #9333ea;
+  transition: background-color 0.2s ease;
+}
+
+.card:hover .gradeIconWrap {
+  background: #e9d5ff;
+}
+
+.priorityBadge {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.successBadge {
+  border-radius: 10px;
+  padding: 4px 8px;
+  background: #ecfdf3;
+  color: #16a34a;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #f59e0b;
+  animation: kpiPulse 1.7s ease-in-out infinite;
+}
+
+.value {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 700;
+  color: #111827;
+}
+
+.valueOnAccent {
+  color: #fff;
+}
+
+.title {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.titleOnAccent {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.primaryMetaRow {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.primaryMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+
+.progressRow {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: 999px;
+  background: #3b82f6;
+  transition: width 0.25s ease;
+}
+
+.progressValue {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.deadlineHintRow {
+  margin-top: auto;
+  padding-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: #9ca3af;
+}
+
+.deltaIconWrap {
+  color: #fff;
+}
+
+.deltaIconWrapNegative {
+  transform: rotate(180deg);
+}
+
+.deltaText {
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.deltaTextNegative {
+  color: #fee2e2;
+}
+
+.starsRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.starFilled,
+.starOutline {
+  color: #facc15;
+}
+
+.note {
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 10px;
+  line-height: 1;
+  color: #9ca3af;
+}
+
+@keyframes kpiPulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+}
+
+@media (min-width: 768px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .kpiGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .card {
+    min-height: 176px;
+    padding: 18px;
+  }
+
+  .value {
+    font-size: 36px;
+  }
+
+  .primaryMetaRow {
+    flex-wrap: wrap;
+  }
+}

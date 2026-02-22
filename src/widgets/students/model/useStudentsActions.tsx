@@ -11,8 +11,18 @@ import {
 import { api } from '../../../shared/api/client';
 import { PaymentEvent, Student, TeacherStudent } from '../../../entities/types';
 import { type ToastOptions } from '../../../shared/lib/toast';
+import { isValidEmail, normalizeEmail } from '../../../shared/lib/email';
 
-type StudentDraft = { customName: string; username: string; pricePerLesson: string };
+type StudentDraft = {
+  customName: string;
+  username: string;
+  pricePerLesson: string;
+  email: string;
+  phone: string;
+  studentLevel: string;
+  learningGoal: string;
+  notes: string;
+};
 
 type OpenConfirmDialogOptions = {
   title: string;
@@ -49,6 +59,7 @@ export type StudentsActionsContextValue = {
   studentModalOpen: boolean;
   studentModalVariant: ModalVariant;
   newStudentDraft: StudentDraft;
+  studentEmailSuggestions: string[];
   isEditingStudent: boolean;
   priceEditState: { id: number | null; value: string };
 
@@ -93,6 +104,11 @@ const createEmptyDraft = (): StudentDraft => ({
   customName: '',
   username: '',
   pricePerLesson: '',
+  email: '',
+  phone: '',
+  studentLevel: '',
+  learningGoal: '',
+  notes: '',
 });
 
 const parseStudentPrice = (value: string) => {
@@ -100,6 +116,10 @@ const parseStudentPrice = (value: string) => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue) || numericValue < 0) return null;
   return Math.round(numericValue);
+};
+
+const normalizeOptionalDraftValue = (value: string) => {
+  return value.trim();
 };
 
 export const useStudentsActionsInternal = ({
@@ -126,6 +146,17 @@ export const useStudentsActionsInternal = ({
   const [newStudentDraft, setNewStudentDraft] = useState<StudentDraft>(() => createEmptyDraft());
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
+  const studentEmailSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          links
+            .map((link) => normalizeEmail(link.email))
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ),
+    [links],
+  );
 
   const resetStudentDraft = useCallback(() => {
     setNewStudentDraft(createEmptyDraft());
@@ -151,6 +182,11 @@ export const useStudentsActionsInternal = ({
       customName: link.customName,
       username: student.username ?? '',
       pricePerLesson: typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
+      email: link.email ?? '',
+      phone: link.phone ?? '',
+      studentLevel: link.studentLevel ?? '',
+      learningGoal: link.learningGoal ?? '',
+      notes: link.notes ?? '',
     });
     setEditingStudentId(selectedStudentId);
     setStudentModalSource('default');
@@ -183,14 +219,24 @@ export const useStudentsActionsInternal = ({
       showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
       return;
     }
+    const normalizedEmail = normalizeEmail(newStudentDraft.email);
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+      showInfoDialog('Некорректный email', 'Проверьте формат email ученика.');
+      return;
+    }
 
     const isOnboardingSource = studentModalSource.startsWith('onboarding');
     onStudentCreateStarted?.(studentModalSource);
     try {
       const data = await api.addStudent({
-        customName: newStudentDraft.customName,
-        username: newStudentDraft.username || undefined,
+        customName: newStudentDraft.customName.trim(),
+        username: normalizeOptionalDraftValue(newStudentDraft.username),
         pricePerLesson,
+        email: normalizedEmail ?? '',
+        phone: normalizeOptionalDraftValue(newStudentDraft.phone),
+        studentLevel: normalizeOptionalDraftValue(newStudentDraft.studentLevel),
+        learningGoal: normalizeOptionalDraftValue(newStudentDraft.learningGoal),
+        notes: normalizeOptionalDraftValue(newStudentDraft.notes),
       });
 
       const { student, link } = data;
@@ -228,7 +274,12 @@ export const useStudentsActionsInternal = ({
     closeStudentModal,
     navigateToStudents,
     newStudentDraft.customName,
+    newStudentDraft.email,
+    newStudentDraft.learningGoal,
+    newStudentDraft.notes,
+    newStudentDraft.phone,
     newStudentDraft.pricePerLesson,
+    newStudentDraft.studentLevel,
     newStudentDraft.username,
     onStudentCreateError,
     onStudentCreateStarted,
@@ -258,11 +309,21 @@ export const useStudentsActionsInternal = ({
       showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
       return;
     }
+    const normalizedEmail = normalizeEmail(newStudentDraft.email);
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+      showInfoDialog('Некорректный email', 'Проверьте формат email ученика.');
+      return;
+    }
     try {
       const data = await api.updateStudent(editingStudentId, {
-        customName: newStudentDraft.customName,
-        username: newStudentDraft.username || undefined,
+        customName: newStudentDraft.customName.trim(),
+        username: normalizeOptionalDraftValue(newStudentDraft.username),
         pricePerLesson,
+        email: normalizedEmail ?? '',
+        phone: normalizeOptionalDraftValue(newStudentDraft.phone),
+        studentLevel: normalizeOptionalDraftValue(newStudentDraft.studentLevel),
+        learningGoal: normalizeOptionalDraftValue(newStudentDraft.learningGoal),
+        notes: normalizeOptionalDraftValue(newStudentDraft.notes),
       });
 
       setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
@@ -282,7 +343,12 @@ export const useStudentsActionsInternal = ({
     closeStudentModal,
     editingStudentId,
     newStudentDraft.customName,
+    newStudentDraft.email,
+    newStudentDraft.learningGoal,
+    newStudentDraft.notes,
+    newStudentDraft.phone,
     newStudentDraft.pricePerLesson,
+    newStudentDraft.studentLevel,
     newStudentDraft.username,
     resetStudentDraft,
     setLinks,
@@ -438,6 +504,7 @@ export const useStudentsActionsInternal = ({
       studentModalOpen,
       studentModalVariant,
       newStudentDraft,
+      studentEmailSuggestions,
       isEditingStudent: Boolean(editingStudentId),
       priceEditState,
       openCreateStudentModal,
@@ -467,6 +534,7 @@ export const useStudentsActionsInternal = ({
       savePrice,
       setPriceValue,
       setStudentDraft,
+      studentEmailSuggestions,
       studentModalOpen,
       studentModalVariant,
       submitStudent,

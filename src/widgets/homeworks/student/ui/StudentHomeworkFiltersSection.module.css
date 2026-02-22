@@ -1,0 +1,99 @@
+.section {
+  margin-top: 2px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #eef1f5;
+  border-radius: 2rem;
+  padding: 24px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.label {
+  margin-right: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.filterChip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.filterChip:hover {
+  background: #f9fafb;
+}
+
+.filterChipActive {
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.2);
+}
+
+.totalBadge {
+  border-radius: 7px;
+  padding: 2px 6px;
+  background: #d7f65f;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sortWrap {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sortLabel {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.sortWrap select {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding-right: 16px;
+}
+
+@media (max-width: 860px) {
+  .panel {
+    border-radius: 1.5rem;
+    padding: 16px;
+  }
+
+  .sortWrap {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

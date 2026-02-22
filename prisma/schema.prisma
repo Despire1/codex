@@ -43,6 +43,7 @@ model Teacher {
   homeworks             Homework[]
   homeworkTemplates     HomeworkTemplate[]  @relation("HomeworkTemplateTeacher")
   homeworkTemplatesCreated HomeworkTemplate[] @relation("HomeworkTemplateCreator")
+  homeworkGroups        HomeworkGroup[]     @relation("HomeworkGroupTeacher")
   homeworkAssignments   HomeworkAssignment[] @relation("HomeworkAssignmentTeacher")
   homeworkSubmissionsReviewed HomeworkSubmission[] @relation("HomeworkSubmissionReviewer")
   lessons               Lesson[]
@@ -80,9 +81,15 @@ model TeacherStudent {
   teacherId          BigInt
   studentId          Int
   customName         String
+  email              String?
+  phone              String?
+  studentLevel       String?
+  learningGoal       String?
+  notes              String?
   autoRemindHomework Boolean @default(false)
   balanceLessons     Int     @default(0)
   pricePerLesson     Int     @default(0)
+  uiColor            String  @default("#5A8DFF")
   isArchived         Boolean @default(false)
   payments           Payment[]
 
@@ -134,12 +141,31 @@ model HomeworkTemplate {
   @@index([teacherId, isArchived, updatedAt])
 }
 
+model HomeworkGroup {
+  id          Int      @id @default(autoincrement())
+  teacherId   BigInt
+  title       String
+  description String?
+  iconKey     String   @default("layer-group")
+  bgColor     String   @default("#F3F4F6")
+  sortOrder   Int      @default(0)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  teacher     Teacher  @relation("HomeworkGroupTeacher", fields: [teacherId], references: [chatId])
+  assignments HomeworkAssignment[]
+
+  @@index([teacherId, isArchived, sortOrder, updatedAt])
+}
+
 model HomeworkAssignment {
   id                     Int      @id @default(autoincrement())
   teacherId              BigInt
   studentId              Int
   lessonId               Int?
   templateId             Int?
+  groupId                Int?
   legacyHomeworkId       Int?
   title                  String
   status                 String   @default("DRAFT")
@@ -164,10 +190,12 @@ model HomeworkAssignment {
   student                Student  @relation("HomeworkAssignmentStudent", fields: [studentId], references: [id])
   lesson                 Lesson?  @relation(fields: [lessonId], references: [id], onDelete: SetNull)
   template               HomeworkTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  group                  HomeworkGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   submissions            HomeworkSubmission[]
 
   @@index([teacherId, studentId, status])
   @@index([teacherId, lessonId])
+  @@index([teacherId, groupId])
   @@index([studentId, deadlineAt])
   @@index([teacherId, deadlineAt])
   @@unique([legacyHomeworkId])

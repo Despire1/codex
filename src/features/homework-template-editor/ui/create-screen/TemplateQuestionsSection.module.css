@@ -382,21 +382,9 @@
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.choiceControl input[type='checkbox'] + .choiceMarker {
-  border-radius: 6px;
-}
-
 .choiceControl input:checked + .choiceMarker {
   border-color: #a3e635;
   background: #a3e635;
-}
-
-.choiceControl input[type='checkbox']:checked + .choiceMarker::before {
-  content: '✓';
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  color: #111;
 }
 
 .choiceControl input[type='radio']:checked + .choiceMarker::before {

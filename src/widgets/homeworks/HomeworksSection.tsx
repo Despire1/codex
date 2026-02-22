@@ -1,8 +1,9 @@
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ActivityFeedItem,
   HomeworkAssignment,
+  HomeworkGroupListItem,
   HomeworkReviewDraft,
   HomeworkSubmission,
   HomeworkTemplate,
@@ -31,6 +32,7 @@ import {
   TeacherAssignmentCreatePayload,
   TeacherAssignmentsSummary,
   TeacherBulkAction,
+  TeacherHomeworkGroupKey,
   TeacherHomeworkProblemFilter,
   TeacherHomeworkSort,
   TeacherHomeworkStudentOption,
@@ -128,7 +130,13 @@ const emptyTeacherSummary: TeacherAssignmentsSummary = {
   returnedCount: 0,
   reviewedThisMonthCount: 0,
   sentTodayCount: 0,
+  dueTodayCount: 0,
+  reviewedWeekDeltaPercent: 0,
+  averageScore30d: null,
 };
+
+const toTeacherGroupKey = (groupId: number | null): TeacherHomeworkGroupKey =>
+  groupId === null ? 'ungrouped' : (`group_${groupId}` as const);
 
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const { showToast } = useToast();
@@ -155,12 +163,25 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
 
   const [templates, setTemplates] = useState<HomeworkTemplate[]>([]);
+  const [groups, setGroups] = useState<HomeworkGroupListItem[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
+  const [groupAssignmentsByKey, setGroupAssignmentsByKey] = useState<
+    Partial<Record<TeacherHomeworkGroupKey, HomeworkAssignment[]>>
+  >({});
+  const [groupAssignmentsLoadingByKey, setGroupAssignmentsLoadingByKey] = useState<
+    Partial<Record<TeacherHomeworkGroupKey, boolean>>
+  >({});
+  const [groupAssignmentsErrorByKey, setGroupAssignmentsErrorByKey] = useState<
+    Partial<Record<TeacherHomeworkGroupKey, string | null>>
+  >({});
+  const [groupAssignmentsNextOffsetByKey, setGroupAssignmentsNextOffsetByKey] = useState<
+    Partial<Record<TeacherHomeworkGroupKey, number | null>>
+  >({});
   const [students, setStudents] = useState<TeacherHomeworkStudentOption[]>([]);
   const [teacherSummary, setTeacherSummary] = useState<TeacherAssignmentsSummary>(emptyTeacherSummary);
   const [studentSummary, setStudentSummary] = useState<StudentHomeworkSummary>(emptySummary);
 
-  const [activeTab, setActiveTab] = useState<TeacherHomeworkTab>('inbox');
+  const [activeTab, setActiveTab] = useState<TeacherHomeworkTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<TeacherHomeworkSort>('urgency');
@@ -179,6 +200,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [loadingAssignments, setLoadingAssignments] = useState(mode === 'teacher');
   const [loadingMoreAssignments, setLoadingMoreAssignments] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
@@ -187,6 +209,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [studentsError, setStudentsError] = useState<string | null>(null);
 
@@ -224,6 +247,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
 
   const [teacherInitialized, setTeacherInitialized] = useState(false);
+  const teacherInitStartedRef = useRef(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -355,6 +379,29 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }
   }, []);
 
+  const loadTeacherGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    setGroupsError(null);
+    try {
+      const response = await api.listHomeworkGroupsV2();
+      setGroups(response.items);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load homework groups', error);
+      setGroups([]);
+      setGroupsError('Не удалось загрузить группы');
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, []);
+
+  const resetGroupAssignmentsState = useCallback(() => {
+    setGroupAssignmentsByKey({});
+    setGroupAssignmentsLoadingByKey({});
+    setGroupAssignmentsErrorByKey({});
+    setGroupAssignmentsNextOffsetByKey({});
+  }, []);
+
   const loadTeacherSummary = useCallback(async (studentId = selectedStudentId) => {
     setLoadingSummary(true);
     setSummaryError(null);
@@ -426,6 +473,47 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       }
     }
   }, [activeTab, debouncedSearchQuery, problemFilters, selectedStudentId, sortBy]);
+
+  const loadTeacherAssignmentsByGroup = useCallback(
+    async (groupKey: TeacherHomeworkGroupKey, options?: { append?: boolean }) => {
+      const append = Boolean(options?.append);
+      const nextOffset = groupAssignmentsNextOffsetByKey[groupKey] ?? null;
+      if (append && nextOffset === null) return;
+
+      const isUngrouped = groupKey === 'ungrouped';
+      const groupId = isUngrouped ? null : Number(groupKey.replace('group_', ''));
+      if (!isUngrouped && (!Number.isFinite(groupId) || groupId <= 0)) return;
+
+      setGroupAssignmentsLoadingByKey((prev) => ({ ...prev, [groupKey]: true }));
+      setGroupAssignmentsErrorByKey((prev) => ({ ...prev, [groupKey]: null }));
+      try {
+        const response = await api.listHomeworkAssignmentsV2({
+          tab: 'all',
+          sort: 'urgency',
+          limit: TEACHER_PAGE_SIZE,
+          offset: append ? nextOffset ?? 0 : 0,
+          groupId: isUngrouped ? undefined : groupId,
+          ungrouped: isUngrouped || undefined,
+        });
+        setGroupAssignmentsByKey((prev) => ({
+          ...prev,
+          [groupKey]: append ? [...(prev[groupKey] ?? []), ...response.items] : response.items,
+        }));
+        setGroupAssignmentsNextOffsetByKey((prev) => ({ ...prev, [groupKey]: response.nextOffset }));
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load homework assignments for group', error);
+        setGroupAssignmentsErrorByKey((prev) => ({ ...prev, [groupKey]: 'Не удалось загрузить задания группы' }));
+        if (!append) {
+          setGroupAssignmentsByKey((prev) => ({ ...prev, [groupKey]: [] }));
+          setGroupAssignmentsNextOffsetByKey((prev) => ({ ...prev, [groupKey]: null }));
+        }
+      } finally {
+        setGroupAssignmentsLoadingByKey((prev) => ({ ...prev, [groupKey]: false }));
+      }
+    },
+    [groupAssignmentsNextOffsetByKey],
+  );
 
   const loadTeacherActivityUnread = useCallback(async () => {
     try {
@@ -558,15 +646,18 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   useEffect(() => {
     if (mode !== 'teacher') {
       setTeacherInitialized(false);
+      teacherInitStartedRef.current = false;
       return;
     }
     if (isTeacherTemplateEditorRoute) return;
-    if (teacherInitialized) return;
+    if (teacherInitialized || teacherInitStartedRef.current) return;
 
     let isMounted = true;
+    teacherInitStartedRef.current = true;
     void Promise.allSettled([
       loadTeacherStudents(),
       loadTeacherTemplates(),
+      loadTeacherGroups(),
       loadTeacherSummary(),
       fetchTeacherAssignments({ offset: 0, append: false }),
       loadTeacherActivityUnread(),
@@ -582,6 +673,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     fetchTeacherAssignments,
     isTeacherTemplateEditorRoute,
     loadTeacherActivityUnread,
+    loadTeacherGroups,
     loadTeacherStudents,
     loadTeacherSummary,
     loadTeacherTemplates,
@@ -875,6 +967,119 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     }
   }, [loadTeacherTemplates, showToast]);
 
+  const handleCreateGroup = useCallback(
+    async (payload: {
+      title: string;
+      description?: string | null;
+      iconKey?: string;
+      bgColor?: string;
+      sortOrder?: number;
+    }) => {
+      try {
+        const response = await api.createHomeworkGroupV2(payload);
+        await loadTeacherGroups();
+        resetGroupAssignmentsState();
+        showToast({ message: 'Группа создана', variant: 'success' });
+        return response.group;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to create homework group', error);
+        showToast({ message: 'Не удалось создать группу', variant: 'error' });
+        return null;
+      }
+    },
+    [loadTeacherGroups, resetGroupAssignmentsState, showToast],
+  );
+
+  const handleUpdateGroup = useCallback(
+    async (
+      groupId: number,
+      payload: Partial<{
+        title: string;
+        description: string | null;
+        iconKey: string;
+        bgColor: string;
+        sortOrder: number;
+        isArchived: boolean;
+      }>,
+    ) => {
+      try {
+        await api.updateHomeworkGroupV2(groupId, payload);
+        await loadTeacherGroups();
+        resetGroupAssignmentsState();
+        showToast({ message: 'Группа обновлена', variant: 'success' });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to update homework group', error);
+        showToast({ message: 'Не удалось обновить группу', variant: 'error' });
+      }
+    },
+    [loadTeacherGroups, resetGroupAssignmentsState, showToast],
+  );
+
+  const handleDeleteGroup = useCallback(
+    async (groupId: number) => {
+      try {
+        await api.deleteHomeworkGroupV2(groupId);
+        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        resetGroupAssignmentsState();
+        showToast({ message: 'Группа удалена', variant: 'success' });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to delete homework group', error);
+        showToast({ message: 'Не удалось удалить группу', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+  );
+
+  const handleRebindAssignmentGroup = useCallback(
+    async (assignmentId: number, groupId: number | null) => {
+      try {
+        await api.updateHomeworkAssignmentV2(assignmentId, { groupId });
+        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        resetGroupAssignmentsState();
+        showToast({ message: 'Группа для домашки обновлена', variant: 'success' });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to rebind homework assignment group', error);
+        showToast({ message: 'Не удалось обновить группу домашки', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+  );
+
+  const handleRebindAssignmentsGroup = useCallback(
+    async (assignmentIds: number[], groupId: number | null) => {
+      const ids = Array.from(
+        new Set(
+          assignmentIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+        ),
+      );
+      if (!ids.length) return;
+
+      try {
+        await Promise.all(ids.map((assignmentId) => api.updateHomeworkAssignmentV2(assignmentId, { groupId })));
+        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        resetGroupAssignmentsState();
+        showToast({
+          message:
+            ids.length === 1
+              ? 'Группа для домашки обновлена'
+              : `Группа обновлена для ${ids.length} домашних заданий`,
+          variant: 'success',
+        });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to rebind homework assignment group in bulk', error);
+        showToast({ message: 'Не удалось обновить группу домашних заданий', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+  );
+
   const handleCreateAssignment = useCallback(
     async (payload: TeacherAssignmentCreatePayload) => {
       if (!payload.studentId) {
@@ -896,6 +1101,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           studentId: payload.studentId,
           lessonId: payload.lessonId ?? undefined,
           templateId: payload.templateId ?? undefined,
+          groupId: payload.groupId ?? undefined,
           title: payload.title?.trim() || undefined,
           sendMode: payload.sendMode,
           status,
@@ -917,7 +1123,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
             studentId: targetStudentId,
           }),
           loadTeacherSummary(targetStudentId),
+          loadTeacherGroups(),
         ]);
+        resetGroupAssignmentsState();
 
         return true;
       } catch (error) {
@@ -929,7 +1137,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         setSubmittingAssignment(false);
       }
     },
-    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
   );
 
   const handleSendAssignmentNow = useCallback(
@@ -974,14 +1182,19 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       try {
         await api.deleteHomeworkAssignmentV2(assignment.id);
         showToast({ message: 'Домашка удалена', variant: 'success' });
-        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        await Promise.all([
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+          loadTeacherGroups(),
+        ]);
+        resetGroupAssignmentsState();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to delete assignment', error);
         showToast({ message: 'Не удалось удалить домашку', variant: 'error' });
       }
     },
-    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
   );
 
   const handleFixConfigError = useCallback(
@@ -1020,15 +1233,24 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         await Promise.all([
           fetchTeacherAssignments({ offset: 0, append: false }),
           loadTeacherSummary(),
+          loadTeacherGroups(),
           loadTeacherActivityUnread(),
         ]);
+        resetGroupAssignmentsState();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to run bulk action', error);
         showToast({ message: 'Не удалось выполнить массовое действие', variant: 'error' });
       }
     },
-    [fetchTeacherAssignments, loadTeacherActivityUnread, loadTeacherSummary, showToast],
+    [
+      fetchTeacherAssignments,
+      loadTeacherActivityUnread,
+      loadTeacherGroups,
+      loadTeacherSummary,
+      resetGroupAssignmentsState,
+      showToast,
+    ],
   );
 
   const handleOpenReview = useCallback(
@@ -1225,6 +1447,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       <TeacherHomeworksView
         assignments={assignments}
         templates={templates}
+        groups={groups}
+        groupAssignmentsByKey={groupAssignmentsByKey}
+        groupAssignmentsLoadingByKey={groupAssignmentsLoadingByKey}
+        groupAssignmentsErrorByKey={groupAssignmentsErrorByKey}
+        groupAssignmentsNextOffsetByKey={groupAssignmentsNextOffsetByKey}
         students={students}
         summary={teacherSummary}
         activeTab={activeTab}
@@ -1236,10 +1463,12 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         loadingMoreAssignments={loadingMoreAssignments}
         hasMoreAssignments={hasMoreAssignments}
         loadingTemplates={loadingTemplates}
+        loadingGroups={loadingGroups}
         loadingSummary={loadingSummary}
         loadingStudents={loadingStudents}
         assignmentsError={assignmentsError}
         templatesError={templatesError}
+        groupsError={groupsError}
         summaryError={summaryError}
         studentsError={studentsError}
         submittingTemplate={submittingTemplate}
@@ -1271,6 +1500,12 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         onSelectedStudentIdChange={setSelectedStudentId}
         onOpenCreateTemplateScreen={() => navigate('/homeworks/templates/new')}
         onOpenEditTemplateScreen={(templateId) => navigate(`/homeworks/templates/${templateId}/edit`)}
+        onCreateGroup={handleCreateGroup}
+        onUpdateGroup={handleUpdateGroup}
+        onDeleteGroup={handleDeleteGroup}
+        onLoadGroupAssignments={(groupKey, options) => loadTeacherAssignmentsByGroup(groupKey, options)}
+        onRebindAssignmentGroup={handleRebindAssignmentGroup}
+        onRebindAssignmentsGroup={handleRebindAssignmentsGroup}
         onDuplicateTemplate={handleDuplicateTemplate}
         onArchiveTemplate={handleArchiveTemplate}
         onRestoreTemplate={handleRestoreTemplate}
@@ -1313,9 +1548,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           void Promise.all([
             fetchTeacherAssignments({ offset: 0, append: false }),
             loadTeacherSummary(),
+            loadTeacherGroups(),
             loadTeacherTemplates(),
             loadTeacherStudents(),
           ]);
+          resetGroupAssignmentsState();
         }}
         onLoadHomeworkActivity={() => {
           void loadTeacherActivityFeed();
@@ -1338,25 +1575,39 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleRestoreTemplate,
       handleBulkAction,
       handleCreateAssignment,
+      handleCreateGroup,
       handleDeleteAssignment,
+      handleDeleteGroup,
       handleDuplicateTemplate,
       handleFixConfigError,
       handleOpenDetail,
       handleOpenReview,
+      handleRebindAssignmentGroup,
+      handleRebindAssignmentsGroup,
       handleRemindAssignment,
       handleSendAssignmentNow,
       handleStartReviewQueue,
       handleSubmitReview,
       handleToggleTemplateFavorite,
+      handleUpdateGroup,
       hasMoreAssignments,
+      groupAssignmentsByKey,
+      groupAssignmentsErrorByKey,
+      groupAssignmentsLoadingByKey,
+      groupAssignmentsNextOffsetByKey,
+      groups,
+      groupsError,
       homeworkActivityHasUnread,
       homeworkActivityItems,
       homeworkActivityLoading,
+      loadTeacherAssignmentsByGroup,
       loadTeacherActivityFeed,
+      loadTeacherGroups,
       loadTeacherStudents,
       loadTeacherSummary,
       loadTeacherTemplates,
       loadingAssignments,
+      loadingGroups,
       loadingMoreAssignments,
       loadingStudents,
       loadingSummary,
@@ -1364,6 +1615,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       markTeacherActivitySeen,
       navigate,
       problemFilters,
+      resetGroupAssignmentsState,
       reviewAssignment,
       reviewLoading,
       reviewSubmissions,

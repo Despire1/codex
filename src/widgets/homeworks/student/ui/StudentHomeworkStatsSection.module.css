@@ -1,0 +1,329 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid #f0f2f5;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.cardPrimary {
+  border-color: transparent;
+  background: linear-gradient(145deg, #050505 0%, #1f2937 100%);
+  color: #ffffff;
+}
+
+.primaryGlow {
+  position: absolute;
+  right: -42px;
+  top: -42px;
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  background: #d7f65f;
+  filter: blur(54px);
+  opacity: 0.24;
+}
+
+.cardPerformance {
+  border-color: transparent;
+  background: linear-gradient(145deg, #d7f65f 0%, #a3e650 100%);
+}
+
+.cardContent {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  min-height: 242px;
+}
+
+.cardMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.iconWrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+
+.iconWrapPrimary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d7f65f;
+  backdrop-filter: blur(10px);
+}
+
+.iconWrapGreen {
+  background: #ecfdf3;
+  color: #16a34a;
+}
+
+.iconWrapDark {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+.value,
+.valueDark {
+  margin: 0 0 8px;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.value {
+  color: #ffffff;
+}
+
+.valueDark {
+  color: #0f172a;
+}
+
+.label,
+.labelDark,
+.labelBlack {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.label {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.labelDark {
+  color: #64748b;
+}
+
+.labelBlack {
+  color: rgba(15, 23, 42, 0.78);
+}
+
+.metaRow {
+  margin-top: auto;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.urgentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #e2e8f0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.urgentBadge svg {
+  color: #ef4444;
+  font-size: 7px;
+}
+
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #15803d;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cardAside,
+.cardAsideCompact {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.metricBox {
+  min-width: 76px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.metricValue,
+.metricValueAccent {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.metricValue {
+  color: #d7f65f;
+}
+
+.metricValueAccent {
+  color: #fbbf24;
+}
+
+.metricLabel {
+  margin-top: 5px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metricBlue {
+  background: #eff6ff;
+}
+
+.metricBlueValue {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.metricBlueLabel {
+  margin-top: 5px;
+  font-size: 10px;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.metricPurple {
+  background: #f5f3ff;
+}
+
+.metricPurpleValue {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.metricPurpleLabel {
+  margin-top: 5px;
+  font-size: 10px;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.awardsRow {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.awardsIcons {
+  display: flex;
+  align-items: center;
+}
+
+.awardsIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid #d7f65f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+  font-size: 10px;
+}
+
+.awardsIcon + .awardsIcon {
+  margin-left: -8px;
+}
+
+.awardsText {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.metricDarkBox {
+  min-width: 74px;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.metricDarkValue {
+  font-size: 15px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.metricDarkLabel {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.72);
+  font-weight: 700;
+}
+
+@media (max-width: 1280px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cardContent {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .cardContent {
+    flex-direction: column;
+    padding: 18px;
+    gap: 14px;
+  }
+
+  .cardAside,
+  .cardAsideCompact {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .metricBox,
+  .metricDarkBox {
+    min-width: 86px;
+  }
+
+  .value,
+  .valueDark {
+    font-size: 40px;
+  }
+}

@@ -94,6 +94,18 @@ export const CalendarMonthIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const CalendarWeekReferenceIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 448 512" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M128 0c17.7 0 32 14.3 32 32V64H288V32c0-17.7 14.3-32 32-32s32 14.3 32 32V64h48c26.5 0 48 21.5 48 48v48H0V112C0 85.5 21.5 64 48 64H96V32c0-17.7 14.3-32 32-32zM0 192H448V464c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V192zm80 64c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16H368c8.8 0 16-7.2 16-16V272c0-8.8-7.2-16-16-16H80z" />
+  </svg>
+);
+
+export const CalendarDayReferenceIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 448 512" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M128 0c17.7 0 32 14.3 32 32V64H288V32c0-17.7 14.3-32 32-32s32 14.3 32 32V64h48c26.5 0 48 21.5 48 48v48H0V112C0 85.5 21.5 64 48 64H96V32c0-17.7 14.3-32 32-32zM0 192H448V464c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V192zm80 64c-8.8 0-16 7.2-16 16v96c0 8.8 7.2 16 16 16h96c8.8 0 16-7.2 16-16V272c0-8.8-7.2-16-16-16H80z" />
+  </svg>
+);
+
 export const ChevronLeftIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="m15.41 7.41-1.41-1.41L8.59 12l5.41 6 1.41-1.41L11.41 12z" />

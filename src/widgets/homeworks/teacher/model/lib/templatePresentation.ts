@@ -1,6 +1,7 @@
 import { HomeworkBlock, HomeworkTemplate } from '../../../../../entities/types';
 
 export const HOMEWORK_TEMPLATE_FAVORITE_TAG = '__favorite';
+const CATEGORY_PURPLE_KEYWORDS = ['speaking', 'устн', 'говор', 'audio', 'voice'];
 
 export const isHomeworkTemplateFavorite = (template: HomeworkTemplate) =>
   template.tags.some((tag) => tag.trim().toLowerCase() === HOMEWORK_TEMPLATE_FAVORITE_TAG);
@@ -65,6 +66,28 @@ export const formatHomeworkTemplateDuration = (minutes: number) => {
   const restMinutes = minutes % 60;
   if (restMinutes === 0) return `${hours} ч`;
   return `${hours} ч ${restMinutes} мин`;
+};
+
+const hasAudioAnswerInTemplate = (template: HomeworkTemplate) =>
+  template.blocks.some(
+    (block) => block.type === 'STUDENT_RESPONSE' && (block.allowVoice || block.allowAudio),
+  );
+
+export const resolveHomeworkTemplateCardMeta = (template: HomeworkTemplate) => {
+  if (hasAudioAnswerInTemplate(template)) {
+    return { kind: 'audio' as const, label: 'Audio' };
+  }
+  return {
+    kind: 'duration' as const,
+    label: formatHomeworkTemplateDuration(estimateHomeworkTemplateDurationMinutes(template)),
+  };
+};
+
+export const resolveHomeworkTemplateCategoryTone = (template: HomeworkTemplate) => {
+  if (hasAudioAnswerInTemplate(template)) return 'purple' as const;
+  const category = resolveHomeworkTemplateCategory(template).toLowerCase();
+  if (CATEGORY_PURPLE_KEYWORDS.some((keyword) => category.includes(keyword))) return 'purple' as const;
+  return 'blue' as const;
 };
 
 export const resolveHomeworkTemplatePreview = (template: HomeworkTemplate) => {

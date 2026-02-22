@@ -9,7 +9,7 @@
   --app-vh-stable: 100vh;
   --app-safe-top-bg: transparent;
   --app-surface-radius: 24px;
-  --app-surface-bg: var(--color-sky-50);
+  --app-surface-bg: var(--color-slate-50);
 }
 
 html,

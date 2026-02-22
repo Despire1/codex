@@ -329,7 +329,17 @@ const AppPageContent = () => {
     const matchedTab = availableTabs.find(
       (tab) => location.pathname === tab.path || location.pathname.startsWith(`${tab.path}/`),
     );
-    return matchedTab?.id ?? 'dashboard';
+    if (matchedTab) return matchedTab.id;
+
+    if (location.pathname === '/') {
+      const storedPath = typeof window !== 'undefined' ? window.localStorage.getItem(LAST_VISITED_ROUTE_KEY) : null;
+      if (storedPath) {
+        const storedTab = availableTabs.find((tab) => tab.path === storedPath);
+        if (storedTab) return storedTab.id;
+      }
+    }
+
+    return 'dashboard';
   }, [availableTabs, location.pathname]);
 
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
@@ -632,18 +642,24 @@ const AppPageContent = () => {
                 : buildDayRange(dayViewDate)
             : activeTab === 'dashboard' && dashboardState.weekRange
               ? buildLessonRange(dashboardState.weekRange.start, dashboardState.weekRange.end)
-              : buildWeekRange(new Date());
+              : null;
         initialBootstrapDone.current = true;
-        const data = await api.bootstrap({
-          lessonsStart: initialRange.startAt.toISOString(),
-          lessonsEnd: initialRange.endAt.toISOString(),
-        });
+        const data = await api.bootstrap(
+          initialRange
+            ? {
+                lessonsStart: initialRange.startAt.toISOString(),
+                lessonsEnd: initialRange.endAt.toISOString(),
+              }
+            : undefined,
+        );
 
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
         setLinks(data.links ?? []);
         studentsHomework.replaceHomeworks(data.homeworks ?? []);
-        applyLessonsForRange(initialRange, data.lessons ?? []);
+        if (initialRange) {
+          applyLessonsForRange(initialRange, data.lessons ?? []);
+        }
 
         const firstStudentId = data.students?.[0]?.id ?? null;
         setSelectedStudentId((prev) => prev ?? firstStudentId);
@@ -753,8 +769,12 @@ const AppPageContent = () => {
       onDashboardOpenHomeworkAssign();
       return;
     }
+    if (activeTab === 'students') {
+      onDashboardAddStudent();
+      return;
+    }
     onTopbarCreateLesson();
-  }, [activeTab, onDashboardOpenHomeworkAssign, onTopbarCreateLesson]);
+  }, [activeTab, onDashboardAddStudent, onDashboardOpenHomeworkAssign, onTopbarCreateLesson]);
 
   const dashboardRouteProps = useMemo(
     () => ({
@@ -941,10 +961,23 @@ const AppPageContent = () => {
                             showCreateLesson={
                               hasTeacherAccess &&
                               !isTeacherTemplateEditorRoute &&
-                              (activeTab === 'dashboard' || activeTab === 'homeworks')
+                              (
+                                activeTab === 'dashboard' ||
+                                activeTab === 'homeworks' ||
+                                activeTab === 'students' ||
+                                activeTab === 'schedule'
+                              )
                             }
-                            createButtonLabel={activeTab === 'homeworks' ? 'Выдать ДЗ' : 'Новое занятие'}
-                            createButtonIconAccent={activeTab === 'homeworks'}
+                            createButtonLabel={
+                              activeTab === 'homeworks'
+                                ? 'Выдать ДЗ'
+                                : activeTab === 'students'
+                                  ? 'Добавить ученика'
+                                  : 'Новое занятие'
+                            }
+                            createButtonIconAccent={
+                              activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
+                            }
                             showTemplateCreateActions={isTeacherTemplateEditorRoute}
                             showTemplateSaveDraft={!isTeacherTemplateEditRoute}
                             showBackButton={isTeacherTemplateEditorRoute}
@@ -958,6 +991,9 @@ const AppPageContent = () => {
                             onOpenNotifications={onOpenNotifications}
                             onCreateLesson={onTopbarCreateAction}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                            showScheduleViewToggle={activeTab === 'schedule'}
+                            scheduleView={scheduleView}
+                            onScheduleViewChange={setScheduleView}
                           />
                         ) : null}
 

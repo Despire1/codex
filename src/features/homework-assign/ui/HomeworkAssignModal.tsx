@@ -1,6 +1,6 @@
 import { FC, FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { HomeworkTemplate, Lesson } from '../../../entities/types';
+import { HomeworkTemplate, HomeworkGroupListItem, Lesson } from '../../../entities/types';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { api } from '../../../shared/api/client';
 import { useFocusTrap } from '../../../shared/lib/useFocusTrap';
@@ -19,11 +19,13 @@ import styles from './HomeworkAssignModal.module.css';
 interface HomeworkAssignModalProps {
   open: boolean;
   templates: HomeworkTemplate[];
+  groups: HomeworkGroupListItem[];
   students: TeacherHomeworkStudentOption[];
   submitting: boolean;
   defaultStudentId: number | null;
   defaultLessonId?: number | null;
   defaultTemplateId?: number | null;
+  defaultGroupId?: number | null;
   onSubmit: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
   onClose: () => void;
 }
@@ -35,6 +37,7 @@ type AssignmentDraft = {
   studentId: number | null;
   templateMode: TemplateMode;
   templateId: number | null;
+  groupId: number | null;
   deadlineLocal: string;
   sendType: SendType;
   lessonId: number | null;
@@ -156,18 +159,24 @@ const resolveNextUpcomingLesson = (lessons: Lesson[]) => {
 const buildInitialDraft = (params: {
   students: TeacherHomeworkStudentOption[];
   templates: HomeworkTemplate[];
+  groups: HomeworkGroupListItem[];
   defaultStudentId: number | null;
   defaultLessonId: number | null;
   defaultTemplateId: number | null;
+  defaultGroupId: number | null;
 }): AssignmentDraft => {
   const initialStudentId = pickInitialStudentId(params.students, params.defaultStudentId);
   const initialTemplateId = pickInitialTemplateId(params.templates, params.defaultTemplateId);
   const hasTemplates = params.templates.length > 0;
+  const availableGroups = params.groups.filter((group) => !group.isSystem && !group.isArchived);
+  const hasDefaultGroup =
+    typeof params.defaultGroupId === 'number' && availableGroups.some((group) => group.id === params.defaultGroupId);
 
   return {
     studentId: initialStudentId,
     templateMode: hasTemplates ? 'FAVORITES' : 'NEW',
     templateId: hasTemplates ? initialTemplateId : null,
+    groupId: hasDefaultGroup ? params.defaultGroupId : null,
     deadlineLocal: '',
     sendType: 'NOW',
     lessonId: typeof params.defaultLessonId === 'number' ? params.defaultLessonId : null,
@@ -177,11 +186,13 @@ const buildInitialDraft = (params: {
 export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   open,
   templates,
+  groups,
   students,
   submitting,
   defaultStudentId,
   defaultLessonId = null,
   defaultTemplateId = null,
+  defaultGroupId = null,
   onSubmit,
   onClose,
 }) => {
@@ -191,6 +202,17 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   useFocusTrap(open, containerRef);
 
   const sortedTemplates = useMemo(() => sortTemplatesForModal(templates), [templates]);
+  const assignmentGroups = useMemo(
+    () =>
+      groups
+        .filter((group) => !group.isSystem && !group.isArchived)
+        .slice()
+        .sort((left, right) => {
+          if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+          return left.title.localeCompare(right.title, 'ru');
+        }),
+    [groups],
+  );
   const quickTemplates = useMemo(() => sortedTemplates.slice(0, 5), [sortedTemplates]);
   const templatesById = useMemo(() => new Map(sortedTemplates.map((template) => [template.id, template])), [sortedTemplates]);
 
@@ -198,9 +220,11 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     buildInitialDraft({
       students,
       templates: sortedTemplates,
+      groups: assignmentGroups,
       defaultStudentId,
       defaultLessonId,
       defaultTemplateId,
+      defaultGroupId,
     }),
   );
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
@@ -240,16 +264,18 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
       buildInitialDraft({
         students,
         templates: sortedTemplates,
+        groups: assignmentGroups,
         defaultStudentId,
         defaultLessonId,
         defaultTemplateId,
+        defaultGroupId,
       }),
     );
     setIsTemplatePickerOpen(false);
     setIsResolvingNextLesson(false);
     setNextLessonError(null);
     setNextLesson(null);
-  }, [defaultLessonId, defaultStudentId, defaultTemplateId, open]);
+  }, [assignmentGroups, defaultGroupId, defaultLessonId, defaultStudentId, defaultTemplateId, open, sortedTemplates, students]);
 
   useEffect(() => {
     if (!open) return;
@@ -342,6 +368,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
       studentId: draft.studentId,
       lessonId: draft.lessonId,
       templateId,
+      groupId: draft.groupId,
       sendMode: sendNow ? 'MANUAL' : 'AUTO_AFTER_LESSON_DONE',
       sendNow,
       deadlineAt,
@@ -518,6 +545,33 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
             </section>
 
             <section className={styles.settingsGrid}>
+              <div className={styles.section}>
+                <label className={styles.label} htmlFor="homework-assign-group">
+                  Группа
+                </label>
+                <div className={styles.selectWrap}>
+                  <select
+                    id="homework-assign-group"
+                    className={styles.selectField}
+                    value={draft.groupId ? String(draft.groupId) : ''}
+                    onChange={(event) =>
+                      setDraft((prev) => ({ ...prev, groupId: event.target.value ? Number(event.target.value) : null }))
+                    }
+                    disabled={submitting}
+                  >
+                    <option value="">Без группы</option>
+                    {assignmentGroups.map((group) => (
+                      <option key={group.id} value={group.id ?? ''}>
+                        {group.title}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={styles.selectIcon} aria-hidden>
+                    <HomeworkChevronDownIcon size={12} />
+                  </span>
+                </div>
+              </div>
+
               <div className={styles.section}>
                 <label className={styles.label} htmlFor="homework-assign-deadline">
                   Дедлайн

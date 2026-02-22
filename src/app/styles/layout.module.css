@@ -1,6 +1,6 @@
 .page {
   height: min(var(--app-vh, 100vh), 100vh);
-  background: linear-gradient(180deg, var(--color-sky-50) 0%, var(--color-sky-80) 100%);
+  background: var(--color-slate-50);
   color: var(--color-slate-900);
   display: flex;
   flex-direction: column;

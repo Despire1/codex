@@ -91,6 +91,47 @@
   contain: layout paint;
 }
 
+.viewToggleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-white);
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: 0 8px 16px var(--shadow-slate-900-06);
+}
+
+.viewToggleButton {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.viewToggleButton:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.toggleActive {
+  background: #05070b;
+  color: #b8fa4e;
+}
+
+.toggleActive:hover {
+  background: #05070b;
+  color: #b8fa4e;
+}
+
 .iconButton {
   width: 40px;
   height: 40px;
@@ -265,6 +306,14 @@
 @media (max-width: 1399px) {
   .templateSecondaryButton span {
     display: none;
+  }
+
+  .viewToggleButton span {
+    display: none;
+  }
+
+  .viewToggleButton {
+    padding: 0 10px;
   }
 }
 

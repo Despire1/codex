@@ -1,19 +1,32 @@
 import { FC } from 'react';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell as farBell, faBookmark as farBookmark, faStar as farStar } from '@fortawesome/free-regular-svg-icons';
+import {
+  faBell as farBell,
+  faBookmark as farBookmark,
+  faCalendarCheck as farCalendarCheck,
+  faStar as farStar,
+} from '@fortawesome/free-regular-svg-icons';
 import {
   faArrowDown19,
+  faArrowUp,
   faArrowUpRightFromSquare,
   faAlignLeft,
   faArrowsLeftRight,
   faBars,
+  faBook,
+  faBookOpen,
+  faBell as faBellSolid,
   faBolt,
+  faCalendarDay,
+  faChartLine,
   faCheck,
   faCircleCheck,
   faChevronDown,
   faCircleExclamation,
   faCircleInfo,
+  faClock,
+  faCheckDouble,
   faCloudArrowUp,
   faCopy,
   faDownload,
@@ -26,11 +39,15 @@ import {
   faFileVideo,
   faFileWord,
   faFilter,
+  faFolder,
   faGear,
   faGripVertical,
+  faHourglassHalf,
+  faInbox,
   faLayerGroup,
   faLink,
   faListCheck,
+  faMagnifyingGlass,
   faMicrophone,
   faPaperclip,
   faPaperPlane,
@@ -77,6 +94,18 @@ export const HomeworkLayerGroupIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faLayerGroup} {...props} />
 );
 
+export const HomeworkFolderIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faFolder} {...props} />
+);
+
+export const HomeworkBookIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faBook} {...props} />
+);
+
+export const HomeworkBookOpenIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faBookOpen} {...props} />
+);
+
 export const HomeworkBarsIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faBars} {...props} />
 );
@@ -85,12 +114,20 @@ export const HomeworkFilterIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faFilter} {...props} />
 );
 
+export const HomeworkMagnifyingGlassIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faMagnifyingGlass} {...props} />
+);
+
 export const HomeworkBoltIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faBolt} {...props} />
 );
 
 export const HomeworkBellRegularIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={farBell} {...props} />
+);
+
+export const HomeworkBellIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faBellSolid} {...props} />
 );
 
 export const HomeworkBookmarkRegularIcon: FC<HomeworkFaIconProps> = (props) => (
@@ -145,6 +182,10 @@ export const HomeworkCircleInfoIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faCircleInfo} {...props} />
 );
 
+export const HomeworkClockIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faClock} {...props} />
+);
+
 export const HomeworkRotateRightIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faRotateRight} {...props} />
 );
@@ -167,6 +208,10 @@ export const HomeworkArrowsLeftRightIcon: FC<HomeworkFaIconProps> = (props) => (
 
 export const HomeworkArrowDown19Icon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faArrowDown19} {...props} />
+);
+
+export const HomeworkArrowUpIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faArrowUp} {...props} />
 );
 
 export const HomeworkTableCellsIcon: FC<HomeworkFaIconProps> = (props) => (
@@ -239,6 +284,30 @@ export const HomeworkPaperclipIcon: FC<HomeworkFaIconProps> = (props) => (
 
 export const HomeworkPaperPlaneIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faPaperPlane} {...props} />
+);
+
+export const HomeworkInboxIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faInbox} {...props} />
+);
+
+export const HomeworkCalendarDayIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faCalendarDay} {...props} />
+);
+
+export const HomeworkCalendarCheckRegularIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={farCalendarCheck} {...props} />
+);
+
+export const HomeworkHourglassHalfIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faHourglassHalf} {...props} />
+);
+
+export const HomeworkCheckDoubleIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faCheckDouble} {...props} />
+);
+
+export const HomeworkChartLineIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faChartLine} {...props} />
 );
 
 export const HomeworkPlayIcon: FC<HomeworkFaIconProps> = (props) => (

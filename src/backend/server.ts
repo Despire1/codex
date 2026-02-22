@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import http, { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { URL } from 'node:url';
-import { addDays, addYears, endOfWeek, format } from 'date-fns';
+import { addDays, addYears, endOfWeek, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
@@ -25,6 +25,7 @@ import {
   toUtcEndOfDay,
   toZonedDate,
 } from '../shared/lib/timezoneDates';
+import { isStudentUiColor, normalizeStudentUiColor, pickNextStudentUiColor } from '../shared/lib/studentUiColors';
 import {
   STUDENT_LESSON_TEMPLATE_VARIABLES,
   STUDENT_PAYMENT_TEMPLATE_VARIABLES,
@@ -880,10 +881,14 @@ const isHomeworkOverdue = (homework: any, todayStart: Date) => {
 const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
   let pendingHomeworkCount = 0;
   let overdueHomeworkCount = 0;
+  let doneHomeworkCount = 0;
   const totalHomeworkCount = homeworks.length;
 
   homeworks.forEach((homework) => {
-    if (!isHomeworkDone(homework)) {
+    const homeworkDone = isHomeworkDone(homework);
+    if (homeworkDone) {
+      doneHomeworkCount += 1;
+    } else {
       pendingHomeworkCount += 1;
     }
     if (isHomeworkOverdue(homework, todayStart)) {
@@ -891,7 +896,19 @@ const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
     }
   });
 
-  return { pendingHomeworkCount, overdueHomeworkCount, totalHomeworkCount };
+  const homeworkCompletionRate =
+    totalHomeworkCount > 0 ? Math.round((doneHomeworkCount / totalHomeworkCount) * 100) : 0;
+  const averageScore =
+    totalHomeworkCount > 0 ? Number(((doneHomeworkCount / totalHomeworkCount) * 10).toFixed(1)) : 0;
+
+  return {
+    pendingHomeworkCount,
+    overdueHomeworkCount,
+    totalHomeworkCount,
+    doneHomeworkCount,
+    homeworkCompletionRate,
+    averageScore,
+  };
 };
 
 const normalizeTelegramUsername = (username?: string | null) => {
@@ -900,6 +917,82 @@ const normalizeTelegramUsername = (username?: string | null) => {
   if (!trimmed) return null;
   const withoutAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
   return withoutAt.trim().toLowerCase() || null;
+};
+
+type StudentProfileFields = {
+  email: string | null;
+  phone: string | null;
+  studentLevel: string | null;
+  learningGoal: string | null;
+  notes: string | null;
+};
+
+const normalizeOptionalStudentTextField = (
+  value: unknown,
+  options: { label: string; maxLength: number },
+): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    throw new Error(`${options.label} должен быть строкой`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > options.maxLength) {
+    throw new Error(`${options.label} слишком длинный`);
+  }
+  return trimmed;
+};
+
+const parseStudentProfileFields = (
+  body: Record<string, unknown> | null | undefined,
+  mode: 'create' | 'update',
+): Partial<StudentProfileFields> => {
+  const source = body ?? {};
+  const parsed: Partial<StudentProfileFields> = {};
+  const shouldApply = (fieldName: keyof StudentProfileFields) => mode === 'create' || fieldName in source;
+
+  if (shouldApply('email')) {
+    const rawEmail = source.email;
+    if (rawEmail === undefined || rawEmail === null) {
+      parsed.email = null;
+    } else {
+      if (typeof rawEmail !== 'string') {
+        throw new Error('Email должен быть строкой');
+      }
+      const normalized = normalizeEmail(rawEmail);
+      if (!normalized) {
+        parsed.email = null;
+      } else if (!isValidEmail(normalized)) {
+        throw new Error('Email указан некорректно');
+      } else {
+        parsed.email = normalized;
+      }
+    }
+  }
+
+  if (shouldApply('phone')) {
+    parsed.phone = normalizeOptionalStudentTextField(source.phone, { label: 'Телефон', maxLength: 64 });
+  }
+
+  if (shouldApply('studentLevel')) {
+    parsed.studentLevel = normalizeOptionalStudentTextField(source.studentLevel, {
+      label: 'Уровень ученика',
+      maxLength: 120,
+    });
+  }
+
+  if (shouldApply('learningGoal')) {
+    parsed.learningGoal = normalizeOptionalStudentTextField(source.learningGoal, {
+      label: 'Цель обучения',
+      maxLength: 2000,
+    });
+  }
+
+  if (shouldApply('notes')) {
+    parsed.notes = normalizeOptionalStudentTextField(source.notes, { label: 'Заметки', maxLength: 4000 });
+  }
+
+  return parsed;
 };
 
 const isOnboardingReminderTemplate = (value: unknown): value is OnboardingReminderTemplate =>
@@ -912,6 +1005,23 @@ const findUserByTelegramUsername = async (normalizedUsername: string) => {
   return candidates.find((user) => normalizeTelegramUsername(user.username) === normalizedUsername) ?? null;
 };
 
+const resolveNextTeacherStudentUiColor = async (
+  teacherId: bigint,
+  options?: { excludeStudentId?: number },
+) => {
+  const links = await prisma.teacherStudent.findMany({
+    where: {
+      teacherId,
+      isArchived: false,
+      ...(typeof options?.excludeStudentId === 'number'
+        ? { studentId: { not: options.excludeStudentId } }
+        : {}),
+    },
+    select: { uiColor: true },
+  });
+  return pickNextStudentUiColor(links.map((link) => link.uiColor));
+};
+
 const listStudents = async (
   user: User,
   query?: string,
@@ -920,6 +1030,7 @@ const listStudents = async (
   offset = 0,
 ) => {
   const teacher = await ensureTeacher(user);
+  const resolvedTimeZone = resolveTimeZone(teacher.timezone);
   const normalizedQuery = query?.trim();
   const normalizedQueryLower = normalizedQuery?.toLowerCase();
   const where: any = { teacherId: teacher.chatId, isArchived: false };
@@ -945,9 +1056,33 @@ const listStudents = async (
   }
 
   const studentIds = links.map((link) => link.studentId);
+  const studentIdsSet = new Set(studentIds);
   const homeworks = studentIds.length
     ? await prisma.homework.findMany({
         where: { teacherId: teacher.chatId, studentId: { in: studentIds } },
+      })
+    : [];
+
+  const lessons = studentIds.length
+    ? await prisma.lesson.findMany({
+        where: {
+          teacherId: teacher.chatId,
+          participants: {
+            some: {
+              studentId: { in: studentIds },
+            },
+          },
+        },
+        select: {
+          startAt: true,
+          status: true,
+          participants: {
+            select: {
+              studentId: true,
+              attended: true,
+            },
+          },
+        },
       })
     : [];
 
@@ -958,16 +1093,131 @@ const listStudents = async (
     homeworksByStudent.set(homework.studentId, existing);
   });
 
-  const todayStart = getTimeZoneStartOfDay(new Date(), teacher.timezone);
+  const now = new Date();
+  const todayStart = getTimeZoneStartOfDay(now, teacher.timezone);
+  const todayKey = format(toZonedDate(now, resolvedTimeZone), 'yyyy-MM-dd');
+  const todayEnd = toUtcEndOfDay(todayKey, resolvedTimeZone);
+  const weekStartKey = format(startOfWeek(toZonedDate(now, resolvedTimeZone), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const weekEndKey = format(endOfWeek(toZonedDate(now, resolvedTimeZone), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const weekStart = toUtcDateFromTimeZone(weekStartKey, '00:00', resolvedTimeZone);
+  const weekEnd = toUtcEndOfDay(weekEndKey, resolvedTimeZone);
 
-  const statsByStudent = new Map<number, ReturnType<typeof buildHomeworkStats>>();
-  links.forEach((link) => {
-    const stats = buildHomeworkStats(homeworksByStudent.get(link.studentId) ?? [], todayStart);
-    statsByStudent.set(link.studentId, stats);
+  const createEmptyLessonStats = () => ({
+    totalLessons: 0,
+    completedLessons: 0,
+    attendedLessons: 0,
+    attendanceTrackedLessons: 0,
+    weeklyLessonsCount: 0,
+    todayLessonsCount: 0,
+    nextLessonAt: null as Date | null,
+    lastLessonAt: null as Date | null,
   });
 
+  const lessonStatsByStudent = new Map<number, ReturnType<typeof createEmptyLessonStats>>();
+
+  lessons.forEach((lesson) => {
+    if (lesson.status === 'CANCELED') return;
+    const lessonDate = new Date(lesson.startAt);
+    const isPastOrCompleted = lesson.status === 'COMPLETED' || lessonDate.getTime() <= now.getTime();
+    const isUpcoming = lesson.status === 'SCHEDULED' && lessonDate.getTime() > now.getTime();
+    const isInCurrentWeek = lessonDate.getTime() >= weekStart.getTime() && lessonDate.getTime() <= weekEnd.getTime();
+    const isToday = lessonDate.getTime() >= todayStart.getTime() && lessonDate.getTime() <= todayEnd.getTime();
+
+    lesson.participants.forEach((participant) => {
+      if (!studentIdsSet.has(participant.studentId)) return;
+      const stats = lessonStatsByStudent.get(participant.studentId) ?? createEmptyLessonStats();
+
+      stats.totalLessons += 1;
+      if (isPastOrCompleted) {
+        stats.completedLessons += 1;
+      }
+      if (isInCurrentWeek) {
+        stats.weeklyLessonsCount += 1;
+      }
+      if (isToday) {
+        stats.todayLessonsCount += 1;
+      }
+      if (isUpcoming && (!stats.nextLessonAt || lessonDate.getTime() < stats.nextLessonAt.getTime())) {
+        stats.nextLessonAt = lessonDate;
+      }
+      if (isPastOrCompleted && (!stats.lastLessonAt || lessonDate.getTime() > stats.lastLessonAt.getTime())) {
+        stats.lastLessonAt = lessonDate;
+      }
+
+      if (participant.attended === true) {
+        stats.attendanceTrackedLessons += 1;
+        stats.attendedLessons += 1;
+      } else if (participant.attended === false) {
+        stats.attendanceTrackedLessons += 1;
+      } else if (lesson.status === 'COMPLETED') {
+        stats.attendanceTrackedLessons += 1;
+        stats.attendedLessons += 1;
+      }
+
+      lessonStatsByStudent.set(participant.studentId, stats);
+    });
+  });
+
+  const resolveLifecycleStatus = (stats: ReturnType<typeof createEmptyLessonStats>) => {
+    if (stats.nextLessonAt) return 'ACTIVE' as const;
+    if (!stats.lastLessonAt) return 'ACTIVE' as const;
+    const daysSinceLastLesson = (now.getTime() - stats.lastLessonAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceLastLesson <= 30) return 'PAUSED' as const;
+    return 'COMPLETED' as const;
+  };
+
+  type StudentListStats = ReturnType<typeof buildHomeworkStats> & {
+    totalLessons: number;
+    completedLessons: number;
+    attendanceRate: number | null;
+    weeklyLessonsCount: number;
+    todayLessonsCount: number;
+    nextLessonAt: string | null;
+    lastLessonAt: string | null;
+    lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+  };
+
+  const statsByStudent = new Map<number, StudentListStats>();
+  links.forEach((link) => {
+    const homeworkStats = buildHomeworkStats(homeworksByStudent.get(link.studentId) ?? [], todayStart);
+    const lessonStats = lessonStatsByStudent.get(link.studentId) ?? createEmptyLessonStats();
+    const attendanceRate =
+      lessonStats.attendanceTrackedLessons > 0
+        ? Math.round((lessonStats.attendedLessons / lessonStats.attendanceTrackedLessons) * 100)
+        : null;
+
+    statsByStudent.set(link.studentId, {
+      ...homeworkStats,
+      totalLessons: lessonStats.totalLessons,
+      completedLessons: lessonStats.completedLessons,
+      attendanceRate,
+      weeklyLessonsCount: lessonStats.weeklyLessonsCount,
+      todayLessonsCount: lessonStats.todayLessonsCount,
+      nextLessonAt: lessonStats.nextLessonAt?.toISOString() ?? null,
+      lastLessonAt: lessonStats.lastLessonAt?.toISOString() ?? null,
+      lifecycleStatus: resolveLifecycleStatus(lessonStats),
+    });
+  });
+
+  const emptyStudentStats: StudentListStats = {
+    pendingHomeworkCount: 0,
+    overdueHomeworkCount: 0,
+    totalHomeworkCount: 0,
+    doneHomeworkCount: 0,
+    homeworkCompletionRate: 0,
+    averageScore: 0,
+    totalLessons: 0,
+    completedLessons: 0,
+    attendanceRate: null,
+    weeklyLessonsCount: 0,
+    todayLessonsCount: 0,
+    nextLessonAt: null,
+    lastLessonAt: null,
+    lifecycleStatus: 'ACTIVE' as const,
+  };
+
   const filteredLinks = links.filter((link) => {
-    const stats = statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 };
+    const stats = statsByStudent.get(link.studentId) ?? emptyStudentStats;
     if (filter === 'debt') return link.balanceLessons < 0;
     if (filter === 'overdue') return stats.overdueHomeworkCount > 0;
     return true;
@@ -979,7 +1229,7 @@ const listStudents = async (
     return {
       student,
       link: linkData,
-      stats: statsByStudent.get(link.studentId) ?? { pendingHomeworkCount: 0, overdueHomeworkCount: 0, totalHomeworkCount: 0 },
+      stats: statsByStudent.get(link.studentId) ?? emptyStudentStats,
     };
   });
 
@@ -1042,12 +1292,53 @@ const listStudents = async (
   });
 
   const nextOffset = offset + limit < total ? offset + limit : null;
+  const allStatuses = links.map((link) => (statsByStudent.get(link.studentId) ?? emptyStudentStats).lifecycleStatus);
+  const summaryStudents = links.length || 1;
+  const summaryAttendanceValues = links
+    .map((link) => (statsByStudent.get(link.studentId) ?? emptyStudentStats).attendanceRate)
+    .filter((value): value is number => typeof value === 'number');
+  const averageAttendance =
+    summaryAttendanceValues.length > 0
+      ? Math.round(summaryAttendanceValues.reduce((sum, value) => sum + value, 0) / summaryAttendanceValues.length)
+      : null;
+  const averageScore = Number(
+    (
+      links.reduce((sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).averageScore ?? 0), 0) /
+      summaryStudents
+    ).toFixed(1),
+  );
+  const lessonsThisWeek = links.reduce(
+    (sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).weeklyLessonsCount ?? 0),
+    0,
+  );
+  const lessonsToday = links.reduce(
+    (sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).todayLessonsCount ?? 0),
+    0,
+  );
+
   const counts = {
     withDebt: links.filter((link) => link.balanceLessons < 0).length,
     overdue: links.filter((link) => (statsByStudent.get(link.studentId)?.overdueHomeworkCount ?? 0) > 0).length,
+    active: allStatuses.filter((status) => status === 'ACTIVE').length,
+    paused: allStatuses.filter((status) => status === 'PAUSED').length,
+    completed: allStatuses.filter((status) => status === 'COMPLETED').length,
   };
 
-  return { items, total, nextOffset, counts };
+  return {
+    items,
+    total,
+    nextOffset,
+    counts,
+    summary: {
+      active: counts.active,
+      paused: counts.paused,
+      completed: counts.completed,
+      lessonsThisWeek,
+      lessonsToday,
+      averageAttendance,
+      averageScore,
+    },
+  };
 };
 
 const listStudentHomeworks = async (
@@ -1358,22 +1649,22 @@ const bootstrap = async (user: User, filters?: { lessonsStart?: Date | null; les
     },
   });
   const homeworks = await prisma.homework.findMany({ where: { teacherId: teacher.chatId } });
-  const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId };
+  let lessons: any[] = [];
   if (filters?.lessonsStart || filters?.lessonsEnd) {
-    lessonsWhere.startAt = {};
+    const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId, startAt: {} };
     if (filters.lessonsStart) lessonsWhere.startAt.gte = filters.lessonsStart;
     if (filters.lessonsEnd) lessonsWhere.startAt.lte = filters.lessonsEnd;
-  }
-  const lessons = await prisma.lesson.findMany({
-    where: lessonsWhere,
-    include: {
-      participants: {
-        include: {
-          student: true,
+    lessons = await prisma.lesson.findMany({
+      where: lessonsWhere,
+      include: {
+        participants: {
+          include: {
+            student: true,
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   return { teacher, students, links, homeworks, lessons };
 };
@@ -1664,6 +1955,8 @@ const addStudent = async (user: User, body: any) => {
   const teacher = await ensureTeacher(user);
   const normalizedUsername = typeof username === 'string' ? normalizeTelegramUsername(username) : null;
   if (!normalizedUsername) throw new Error('Telegram username обязателен');
+  const normalizedCustomName = customName.trim();
+  const profileFields = parseStudentProfileFields(body as Record<string, unknown>, 'create');
   const existingStudent = normalizedUsername
     ? await prisma.student.findFirst({ where: { username: normalizedUsername } })
     : null;
@@ -1697,10 +1990,20 @@ const addStudent = async (user: User, body: any) => {
   });
 
   if (existingLink) {
+    const hasValidStoredColor = isStudentUiColor(existingLink.uiColor);
     if (existingLink.isArchived) {
+      const nextUiColor = hasValidStoredColor
+        ? normalizeStudentUiColor(existingLink.uiColor)
+        : await resolveNextTeacherStudentUiColor(teacher.chatId, { excludeStudentId: student.id });
       const restoredLink = await prisma.teacherStudent.update({
         where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
-        data: { isArchived: false, customName, pricePerLesson: normalizedPrice },
+        data: {
+          isArchived: false,
+          customName: normalizedCustomName,
+          pricePerLesson: normalizedPrice,
+          uiColor: nextUiColor,
+          ...profileFields,
+        },
       });
       await safeLogActivityEvent({
         teacherId: teacher.chatId,
@@ -1709,22 +2012,35 @@ const addStudent = async (user: User, body: any) => {
         action: 'RESTORE',
         status: 'SUCCESS',
         source: 'USER',
-        title: `Ученик восстановлен: ${customName.trim()}`,
+        title: `Ученик восстановлен: ${normalizedCustomName}`,
         details: 'Ссылка преподавателя с учеником восстановлена из архива.',
       });
       return { student, link: restoredLink };
     }
+
+    if (!hasValidStoredColor) {
+      const nextUiColor = await resolveNextTeacherStudentUiColor(teacher.chatId, { excludeStudentId: student.id });
+      const linkWithColor = await prisma.teacherStudent.update({
+        where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
+        data: { uiColor: nextUiColor },
+      });
+      return { student, link: linkWithColor };
+    }
+
     return { student, link: existingLink };
   }
 
+  const nextUiColor = await resolveNextTeacherStudentUiColor(teacher.chatId);
   const link = await prisma.teacherStudent.create({
     data: {
       teacherId: teacher.chatId,
       studentId: student.id,
-      customName,
+      customName: normalizedCustomName,
       autoRemindHomework: true,
       balanceLessons: 0,
       pricePerLesson: normalizedPrice,
+      uiColor: nextUiColor,
+      ...profileFields,
     },
   });
   await safeLogActivityEvent({
@@ -1734,7 +2050,7 @@ const addStudent = async (user: User, body: any) => {
     action: 'CREATE',
     status: 'SUCCESS',
     source: 'USER',
-    title: `Добавлен ученик: ${customName.trim()}`,
+    title: `Добавлен ученик: ${normalizedCustomName}`,
     details: normalizedUsername ? `username: @${normalizedUsername}` : null,
   });
   return { student, link };
@@ -1754,6 +2070,8 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
   }
 
   const teacher = await ensureTeacher(user);
+  const normalizedCustomName = customName.trim();
+  const profileFields = parseStudentProfileFields(body as Record<string, unknown>, 'update');
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
   });
@@ -1779,7 +2097,7 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
     }),
     prisma.teacherStudent.update({
       where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-      data: { customName: customName.trim(), pricePerLesson: Math.round(numericPrice) },
+      data: { customName: normalizedCustomName, pricePerLesson: Math.round(numericPrice), ...profileFields },
     }),
   ]);
 
@@ -1790,7 +2108,7 @@ const updateStudent = async (user: User, studentId: number, body: any) => {
     action: 'UPDATE',
     status: 'SUCCESS',
     source: 'USER',
-    title: `Обновлён ученик: ${customName.trim()}`,
+    title: `Обновлён ученик: ${normalizedCustomName}`,
     details: `username: @${normalizedUsername}; pricePerLesson: ${Math.round(numericPrice)}`,
   });
 
@@ -2031,6 +2349,14 @@ const parseOptionalNumberQueryParam = (value: string | null): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseOptionalBooleanQueryParam = (value: string | null): boolean | null => {
+  if (value === null) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true') return true;
+  if (normalized === '0' || normalized === 'false') return false;
+  return null;
+};
+
 const filterHomeworksForRole = (homeworks: any[], role: RequestRole, studentId?: number | null) => {
   if (role !== 'STUDENT') return homeworks;
 
@@ -2257,6 +2583,46 @@ type HomeworkAssignmentsTabV2 =
 type HomeworkAssignmentsSortV2 = 'urgency' | 'deadline' | 'student' | 'updated' | 'created';
 type HomeworkAssignmentProblemFilterV2 = 'overdue' | 'returned' | 'config_error';
 
+const DEFAULT_HOMEWORK_GROUP_ICON_KEY = 'layer-group';
+const DEFAULT_HOMEWORK_GROUP_BG_COLOR = '#F3F4F6';
+const HOMEWORK_GROUP_BG_COLOR_REGEX = /^#(?:[0-9a-f]{6}|[0-9a-f]{3})$/i;
+
+const normalizeHomeworkGroupTitle = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+const normalizeHomeworkGroupDescription = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const normalizeHomeworkGroupIconKey = (value: unknown) => {
+  if (typeof value !== 'string') return DEFAULT_HOMEWORK_GROUP_ICON_KEY;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : DEFAULT_HOMEWORK_GROUP_ICON_KEY;
+};
+
+const normalizeHomeworkGroupBgColor = (value: unknown) => {
+  if (typeof value !== 'string') return DEFAULT_HOMEWORK_GROUP_BG_COLOR;
+  const normalized = value.trim();
+  if (!HOMEWORK_GROUP_BG_COLOR_REGEX.test(normalized)) return DEFAULT_HOMEWORK_GROUP_BG_COLOR;
+  if (normalized.length === 4) {
+    const expanded = normalized
+      .slice(1)
+      .split('')
+      .map((char) => `${char}${char}`)
+      .join('');
+    return `#${expanded}`.toUpperCase();
+  }
+  return normalized.toUpperCase();
+};
+
+const normalizeHomeworkGroupSortOrder = (value: unknown, fallback = 0) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(-1_000_000, Math.min(1_000_000, Math.trunc(numeric)));
+};
+
 const normalizeHomeworkAssignmentBucketV2 = (value: unknown): HomeworkAssignmentBucketV2 => {
   const normalized = typeof value === 'string' ? value.toLowerCase() : '';
   if (
@@ -2409,10 +2775,10 @@ const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[]
   const links = studentIds.length
     ? await prisma.teacherStudent.findMany({
         where: { teacherId, studentId: { in: studentIds }, isArchived: false },
-        select: { studentId: true, customName: true },
+        select: { studentId: true, customName: true, uiColor: true },
       })
     : [];
-  const linkByStudentId = new Map<number, { studentId: number; customName: string }>(
+  const linkByStudentId = new Map<number, { studentId: number; customName: string; uiColor: string }>(
     links.map((link) => [link.studentId, link]),
   );
 
@@ -2429,8 +2795,10 @@ const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[]
       ...assignment,
       studentName,
       studentUsername: assignment.student?.username ?? null,
+      studentUiColor: studentLink?.uiColor ?? null,
       lessonStartAt: assignment.lesson?.startAt ?? null,
       templateTitle: assignment.template?.title ?? null,
+      groupTitle: assignment.group?.title ?? null,
       hasConfigError,
       isOverdue,
       problemFlags: Array.from(
@@ -2454,6 +2822,7 @@ const matchesAssignmentSearchQuery = (assignment: any, queryLower: string) => {
     assignment.studentName,
     assignment.studentUsername,
     assignment.templateTitle,
+    assignment.groupTitle,
   ]
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.toLowerCase());
@@ -2532,6 +2901,52 @@ const serializeHomeworkTemplateV2 = (template: any) => ({
   updatedAt: template.updatedAt,
 });
 
+const serializeHomeworkGroupV2 = (group: any) => ({
+  id: group.id,
+  teacherId: Number(group.teacherId),
+  title: group.title ?? '',
+  description: group.description ?? null,
+  iconKey: normalizeHomeworkGroupIconKey(group.iconKey),
+  bgColor: normalizeHomeworkGroupBgColor(group.bgColor),
+  sortOrder: normalizeHomeworkGroupSortOrder(group.sortOrder, 0),
+  isArchived: Boolean(group.isArchived),
+  createdAt: group.createdAt,
+  updatedAt: group.updatedAt,
+});
+
+const serializeHomeworkGroupListItemV2 = (
+  group: any,
+  assignmentsCount: number,
+  options?: { isSystem?: boolean; isUngrouped?: boolean },
+) => {
+  const isSystem = Boolean(options?.isSystem);
+  const isUngrouped = Boolean(options?.isUngrouped);
+  if (isSystem && isUngrouped) {
+    return {
+      id: null,
+      teacherId: Number(group.teacherId),
+      title: group.title ?? 'Без группы',
+      description: group.description ?? 'Задания без категории',
+      iconKey: normalizeHomeworkGroupIconKey(group.iconKey),
+      bgColor: normalizeHomeworkGroupBgColor(group.bgColor),
+      sortOrder: normalizeHomeworkGroupSortOrder(group.sortOrder, -1),
+      isArchived: false,
+      createdAt: null,
+      updatedAt: null,
+      assignmentsCount: Math.max(0, assignmentsCount),
+      isSystem: true,
+      isUngrouped: true,
+    };
+  }
+  const serialized = serializeHomeworkGroupV2(group);
+  return {
+    ...serialized,
+    assignmentsCount: Math.max(0, assignmentsCount),
+    isSystem: isSystem || false,
+    isUngrouped: isUngrouped || false,
+  };
+};
+
 const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
   const status = resolveAssignmentViewStatus(assignment, now);
   const isOverdue = status === 'OVERDUE';
@@ -2554,10 +2969,13 @@ const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
     studentId: assignment.studentId,
     studentName: assignment.studentName ?? null,
     studentUsername: assignment.studentUsername ?? assignment.student?.username ?? null,
+    studentUiColor: assignment.studentUiColor ?? null,
     lessonId: assignment.lessonId ?? null,
     lessonStartAt: assignment.lessonStartAt ?? assignment.lesson?.startAt ?? null,
     templateId: assignment.templateId ?? null,
     templateTitle: assignment.templateTitle ?? assignment.template?.title ?? null,
+    groupId: assignment.groupId ?? assignment.group?.id ?? null,
+    groupTitle: assignment.groupTitle ?? assignment.group?.title ?? null,
     legacyHomeworkId: assignment.legacyHomeworkId ?? null,
     title: assignment.title ?? '',
     status,
@@ -3022,6 +3440,31 @@ const ensureTeacherStudentLinkV2 = async (teacherId: bigint, studentId: number) 
   });
   if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
   return link;
+};
+
+const normalizeHomeworkGroupIdInput = (value: unknown): number | null | undefined => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error('Некорректный groupId');
+  return numeric;
+};
+
+const resolveHomeworkGroupForTeacherV2 = async (
+  teacherId: bigint,
+  groupId: number,
+  options?: { allowArchived?: boolean },
+) => {
+  const allowArchived = Boolean(options?.allowArchived);
+  const group = await (prisma as any).homeworkGroup.findFirst({
+    where: {
+      id: groupId,
+      teacherId,
+      ...(allowArchived ? {} : { isArchived: false }),
+    },
+  });
+  if (!group) throw createHttpError('Группа не найдена', 404);
+  return group;
 };
 
 const formatHomeworkDeadlineLabel = (deadlineAt: Date | null, timeZone?: string | null) => {
@@ -4839,6 +5282,122 @@ const listStudentContextV2 = async (user: User, requestedTeacherId?: number | nu
   };
 };
 
+const listHomeworkGroupsV2 = async (user: User, params: { includeArchived?: boolean }) => {
+  const teacher = await ensureTeacher(user);
+  const groups = await (prisma as any).homeworkGroup.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      ...(params.includeArchived ? {} : { isArchived: false }),
+    },
+    orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }, { id: 'desc' }],
+  });
+
+  const groupIds = groups
+    .map((group: any) => Number(group.id))
+    .filter((id: number) => Number.isFinite(id) && id > 0);
+  const countsRows = groupIds.length
+    ? await (prisma as any).homeworkAssignment.groupBy({
+        by: ['groupId'],
+        where: {
+          teacherId: teacher.chatId,
+          groupId: { in: groupIds },
+        },
+        _count: { _all: true },
+      })
+    : [];
+  const countsByGroupId = new Map<number, number>(
+    countsRows
+      .map((row: any) => [Number(row.groupId), Number(row._count?._all ?? 0)] as const)
+      .filter(([groupId]) => Number.isFinite(groupId) && groupId > 0),
+  );
+  const ungroupedCount = await (prisma as any).homeworkAssignment.count({
+    where: { teacherId: teacher.chatId, groupId: null },
+  });
+
+  const systemUngrouped = serializeHomeworkGroupListItemV2(
+    {
+      teacherId: teacher.chatId,
+      title: 'Без группы',
+      description: 'Задания без категории',
+      iconKey: DEFAULT_HOMEWORK_GROUP_ICON_KEY,
+      bgColor: DEFAULT_HOMEWORK_GROUP_BG_COLOR,
+      sortOrder: -1,
+    },
+    ungroupedCount,
+    { isSystem: true, isUngrouped: true },
+  );
+
+  return {
+    items: [
+      systemUngrouped,
+      ...groups.map((group: any) =>
+        serializeHomeworkGroupListItemV2(group, countsByGroupId.get(Number(group.id)) ?? 0),
+      ),
+    ],
+  };
+};
+
+const createHomeworkGroupV2 = async (user: User, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  const title = normalizeHomeworkGroupTitle(body.title);
+  if (!title) throw new Error('Название группы обязательно');
+  const description = normalizeHomeworkGroupDescription(body.description);
+  const iconKey = normalizeHomeworkGroupIconKey(body.iconKey);
+  const bgColor = normalizeHomeworkGroupBgColor(body.bgColor);
+
+  const maxSortResult = await (prisma as any).homeworkGroup.aggregate({
+    where: { teacherId: teacher.chatId },
+    _max: { sortOrder: true },
+  });
+  const fallbackSort = Number(maxSortResult?._max?.sortOrder ?? 0) + 100;
+  const sortOrder = normalizeHomeworkGroupSortOrder(body.sortOrder, fallbackSort);
+
+  const group = await (prisma as any).homeworkGroup.create({
+    data: {
+      teacherId: teacher.chatId,
+      title,
+      description,
+      iconKey,
+      bgColor,
+      sortOrder,
+      isArchived: false,
+    },
+  });
+  return { group: serializeHomeworkGroupV2(group) };
+};
+
+const updateHomeworkGroupV2 = async (user: User, groupId: number, body: Record<string, unknown>) => {
+  const teacher = await ensureTeacher(user);
+  await resolveHomeworkGroupForTeacherV2(teacher.chatId, groupId, { allowArchived: true });
+
+  const data: Record<string, unknown> = {};
+  if ('title' in body) {
+    const title = normalizeHomeworkGroupTitle(body.title);
+    if (!title) throw new Error('Название группы обязательно');
+    data.title = title;
+  }
+  if ('description' in body) data.description = normalizeHomeworkGroupDescription(body.description);
+  if ('iconKey' in body) data.iconKey = normalizeHomeworkGroupIconKey(body.iconKey);
+  if ('bgColor' in body) data.bgColor = normalizeHomeworkGroupBgColor(body.bgColor);
+  if ('sortOrder' in body) data.sortOrder = normalizeHomeworkGroupSortOrder(body.sortOrder, 0);
+  if ('isArchived' in body) data.isArchived = Boolean(body.isArchived);
+
+  const updated = await (prisma as any).homeworkGroup.update({
+    where: { id: groupId },
+    data,
+  });
+  return { group: serializeHomeworkGroupV2(updated) };
+};
+
+const deleteHomeworkGroupV2 = async (user: User, groupId: number) => {
+  const teacher = await ensureTeacher(user);
+  await resolveHomeworkGroupForTeacherV2(teacher.chatId, groupId, { allowArchived: true });
+  await (prisma as any).homeworkGroup.delete({
+    where: { id: groupId },
+  });
+  return { deletedId: groupId };
+};
+
 const listHomeworkTemplatesV2 = async (user: User, params: { query?: string | null; includeArchived?: boolean }) => {
   const teacher = await ensureTeacher(user);
   const query = params.query?.trim() ?? '';
@@ -4932,6 +5491,8 @@ const listHomeworkAssignmentsV2 = async (
   params: {
     studentId?: number | null;
     lessonId?: number | null;
+    groupId?: number | null;
+    ungrouped?: boolean | null;
     status?: string | null;
     bucket?: string | null;
     tab?: string | null;
@@ -4952,6 +5513,14 @@ const listHomeworkAssignmentsV2 = async (
   }
   if (params.lessonId !== null && params.lessonId !== undefined && Number.isFinite(Number(params.lessonId))) {
     where.lessonId = Number(params.lessonId);
+  }
+  const includeUngroupedOnly = params.ungrouped === true;
+  if (includeUngroupedOnly) {
+    where.groupId = null;
+  } else if (params.groupId !== null && params.groupId !== undefined && Number.isFinite(Number(params.groupId))) {
+    const resolvedGroupId = Number(params.groupId);
+    await resolveHomeworkGroupForTeacherV2(teacher.chatId, resolvedGroupId, { allowArchived: true });
+    where.groupId = resolvedGroupId;
   }
   const tab = normalizeHomeworkAssignmentsTabV2(params.tab);
   const sort = normalizeHomeworkAssignmentsSortV2(params.sort);
@@ -5001,6 +5570,7 @@ const listHomeworkAssignmentsV2 = async (
           { title: { contains: query, mode: 'insensitive' } },
           { student: { username: { contains: query, mode: 'insensitive' } } },
           { template: { title: { contains: query, mode: 'insensitive' } } },
+          { group: { title: { contains: query, mode: 'insensitive' } } },
           ...(matchedStudentIds.length ? [{ studentId: { in: matchedStudentIds } }] : []),
         ],
       },
@@ -5029,6 +5599,9 @@ const listHomeworkAssignmentsV2 = async (
       },
       template: {
         select: { title: true },
+      },
+      group: {
+        select: { id: true, title: true },
       },
     },
     orderBy,
@@ -5069,6 +5642,7 @@ const getHomeworkAssignmentsSummaryV2 = async (
     ...resolveAssignmentBucketWhereV2(bucket, now),
   });
 
+  const todayZoned = toZonedDate(now, resolvedTimeZone);
   const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
   const todayStart = toUtcDateFromTimeZone(todayKey, '00:00', resolvedTimeZone);
   const todayEnd = toUtcEndOfDay(todayKey, resolvedTimeZone);
@@ -5077,8 +5651,35 @@ const getHomeworkAssignmentsSummaryV2 = async (
   const nextMonthZoned = toZonedDate(monthStart, resolvedTimeZone);
   nextMonthZoned.setMonth(nextMonthZoned.getMonth() + 1);
   const nextMonthStart = toUtcDateFromTimeZone(format(nextMonthZoned, 'yyyy-MM-dd'), '00:00', resolvedTimeZone);
+  const scoreWindowStartKey = format(addDays(todayZoned, -29), 'yyyy-MM-dd');
+  const scoreWindowStart = toUtcDateFromTimeZone(scoreWindowStartKey, '00:00', resolvedTimeZone);
+  const currentWeekWindowStartKey = format(addDays(todayZoned, -6), 'yyyy-MM-dd');
+  const currentWeekWindowStart = toUtcDateFromTimeZone(currentWeekWindowStartKey, '00:00', resolvedTimeZone);
+  const previousWeekWindowStartKey = format(addDays(todayZoned, -13), 'yyyy-MM-dd');
+  const previousWeekWindowStart = toUtcDateFromTimeZone(previousWeekWindowStartKey, '00:00', resolvedTimeZone);
+  const previousWeekWindowEndKey = format(addDays(todayZoned, -7), 'yyyy-MM-dd');
+  const previousWeekWindowEnd = toUtcEndOfDay(previousWeekWindowEndKey, resolvedTimeZone);
 
-  const [totalCount, draftCount, sentCount, reviewCount, reviewedCount, overdueCount, scheduledCount, inProgressCount, closedCount, configErrorCount, returnedCount, reviewedThisMonthCount, sentTodayCount, inboxCount] = await Promise.all([
+  const [
+    totalCount,
+    draftCount,
+    sentCount,
+    reviewCount,
+    reviewedCount,
+    overdueCount,
+    scheduledCount,
+    inProgressCount,
+    closedCount,
+    configErrorCount,
+    returnedCount,
+    reviewedThisMonthCount,
+    sentTodayCount,
+    inboxCount,
+    dueTodayCount,
+    reviewedThisWeekCount,
+    reviewedPreviousWeekCount,
+    scoredReviewedAssignments30d,
+  ] = await Promise.all([
     (prisma as any).homeworkAssignment.count({ where: baseWhere }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('draft') }),
     (prisma as any).homeworkAssignment.count({ where: buildWhere('sent') }),
@@ -5118,7 +5719,57 @@ const getHomeworkAssignmentsSummaryV2 = async (
         ],
       },
     }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        status: { in: ['SENT', 'SUBMITTED', 'IN_REVIEW', 'RETURNED', 'OVERDUE'] },
+        deadlineAt: { gte: todayStart, lte: todayEnd },
+      },
+    }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        status: 'REVIEWED',
+        reviewedAt: { gte: currentWeekWindowStart, lte: now },
+      },
+    }),
+    (prisma as any).homeworkAssignment.count({
+      where: {
+        ...baseWhere,
+        status: 'REVIEWED',
+        reviewedAt: { gte: previousWeekWindowStart, lte: previousWeekWindowEnd },
+      },
+    }),
+    (prisma as any).homeworkAssignment.findMany({
+      where: {
+        ...baseWhere,
+        status: 'REVIEWED',
+        reviewedAt: { gte: scoreWindowStart, lte: todayEnd },
+        OR: [{ finalScore: { not: null } }, { manualScore: { not: null } }, { autoScore: { not: null } }],
+      },
+      select: { finalScore: true, manualScore: true, autoScore: true },
+    }),
   ]);
+
+  const normalizedScores = (scoredReviewedAssignments30d as Array<any>)
+    .map((item) => {
+      const raw = item.finalScore ?? item.manualScore ?? item.autoScore;
+      if (!Number.isFinite(raw)) return null;
+      const normalizedRaw = Number(raw);
+      const normalized = normalizedRaw > 10 ? normalizedRaw / 10 : normalizedRaw;
+      return Math.max(0, Math.min(10, normalized));
+    })
+    .filter((score): score is number => Number.isFinite(score));
+  const averageScore30d =
+    normalizedScores.length > 0
+      ? Number((normalizedScores.reduce((sum, score) => sum + score, 0) / normalizedScores.length).toFixed(1))
+      : null;
+  const reviewedWeekDeltaPercent =
+    reviewedPreviousWeekCount > 0
+      ? Math.round(((reviewedThisWeekCount - reviewedPreviousWeekCount) / reviewedPreviousWeekCount) * 100)
+      : reviewedThisWeekCount > 0
+        ? 100
+        : 0;
 
   return {
     totalCount,
@@ -5135,6 +5786,9 @@ const getHomeworkAssignmentsSummaryV2 = async (
     returnedCount,
     reviewedThisMonthCount,
     sentTodayCount,
+    dueTodayCount,
+    reviewedWeekDeltaPercent,
+    averageScore30d,
   };
 };
 
@@ -5159,6 +5813,12 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
   }
+  const normalizedGroupId = normalizeHomeworkGroupIdInput(body.groupId);
+  let groupId: number | null = null;
+  if (typeof normalizedGroupId === 'number') {
+    const group = await resolveHomeworkGroupForTeacherV2(teacher.chatId, normalizedGroupId);
+    groupId = group.id;
+  }
 
   const resolvedTitle =
     (typeof body.title === 'string' && body.title.trim()) ||
@@ -5180,6 +5840,7 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
       studentId,
       lessonId,
       templateId: template?.id ?? null,
+      groupId,
       legacyHomeworkId: Number.isFinite(Number(body.legacyHomeworkId)) ? Number(body.legacyHomeworkId) : null,
       title: resolvedTitle,
       status,
@@ -5219,6 +5880,9 @@ const getHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
       },
       template: {
         select: { title: true },
+      },
+      group: {
+        select: { id: true, title: true },
       },
     },
   });
@@ -5271,6 +5935,17 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
       data.templateId = templateIdRaw;
     } else {
       throw new Error('Некорректный templateId');
+    }
+  }
+  if ('groupId' in body) {
+    const resolvedGroupId = normalizeHomeworkGroupIdInput(body.groupId);
+    if (resolvedGroupId === null) {
+      data.groupId = null;
+    } else if (typeof resolvedGroupId === 'number') {
+      const group = await resolveHomeworkGroupForTeacherV2(teacher.chatId, resolvedGroupId);
+      data.groupId = group.id;
+    } else {
+      data.groupId = null;
     }
   }
   if ('deadlineAt' in body) data.deadlineAt = toValidDate(body.deadlineAt);
@@ -6897,6 +7572,37 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return sendJson(res, 200, data);
     }
 
+    if (req.method === 'GET' && pathname === '/api/v2/homework/groups') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const data = await listHomeworkGroupsV2(requireApiUser(), {
+        includeArchived: url.searchParams.get('includeArchived') === '1',
+      });
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/homework/groups') {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const body = await readBody(req);
+      const data = await createHomeworkGroupV2(requireApiUser(), body);
+      return sendJson(res, 201, data);
+    }
+
+    const homeworkGroupUpdateMatch = pathname.match(/^\/api\/v2\/homework\/groups\/(\d+)$/);
+    if (homeworkGroupUpdateMatch) {
+      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
+      const groupId = Number(homeworkGroupUpdateMatch[1]);
+      if (!Number.isFinite(groupId)) return badRequest(res, 'invalid_group_id');
+      if (req.method === 'PATCH') {
+        const body = await readBody(req);
+        const data = await updateHomeworkGroupV2(requireApiUser(), groupId, body);
+        return sendJson(res, 200, data);
+      }
+      if (req.method === 'DELETE') {
+        const data = await deleteHomeworkGroupV2(requireApiUser(), groupId);
+        return sendJson(res, 200, data);
+      }
+    }
+
     if (req.method === 'GET' && pathname === '/api/v2/homework/templates') {
       if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
       const data = await listHomeworkTemplatesV2(requireApiUser(), {
@@ -6928,6 +7634,8 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       const data = await listHomeworkAssignmentsV2(requireApiUser(), {
         studentId: parseOptionalNumberQueryParam(url.searchParams.get('studentId')),
         lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
+        groupId: parseOptionalNumberQueryParam(url.searchParams.get('groupId')),
+        ungrouped: parseOptionalBooleanQueryParam(url.searchParams.get('ungrouped')),
         status: url.searchParams.get('status'),
         bucket: url.searchParams.get('bucket'),
         tab: url.searchParams.get('tab'),

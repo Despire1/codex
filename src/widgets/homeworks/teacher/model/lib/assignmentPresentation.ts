@@ -1,6 +1,11 @@
 import { readHomeworkTemplateQuizSettingsFromBlocks } from '../../../../../entities/homework-template/model/lib/quizSettings';
 import { HomeworkAssignment, HomeworkBlockStudentResponse, HomeworkBlockTest, HomeworkTestQuestion } from '../../../../../entities/types';
 import { ASSIGNMENT_STATUS_LABELS } from '../../../../../entities/homework-assignment/model/lib/assignmentBuckets';
+import {
+  DEFAULT_STUDENT_UI_COLOR,
+  STUDENT_UI_COLOR_PALETTE,
+  normalizeStudentUiColor,
+} from '../../../../../shared/lib/studentUiColors';
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -33,6 +38,34 @@ const formatDuration = (deltaMs: number) => {
   if (totalHours > 0) return `${totalHours} ч ${totalMinutes} мин`;
   return `${totalMinutes} мин`;
 };
+
+const hexToRgb = (hexColor: string) => {
+  const normalized = normalizeStudentUiColor(hexColor);
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16),
+    g: Number.parseInt(normalized.slice(3, 5), 16),
+    b: Number.parseInt(normalized.slice(5, 7), 16),
+  };
+};
+
+const relativeLuminance = (hexColor: string) => {
+  const { r, g, b } = hexToRgb(hexColor);
+  const transform = (channel: number) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * transform(r) + 0.7152 * transform(g) + 0.0722 * transform(b);
+};
+
+export const resolveAssignmentStudentAvatarColor = (assignment: HomeworkAssignment) => {
+  const fallbackSeed = Number.isFinite(assignment.studentId) ? assignment.studentId : 0;
+  const fallbackIndex = Math.abs(Math.trunc(fallbackSeed)) % STUDENT_UI_COLOR_PALETTE.length;
+  const fallbackColor = STUDENT_UI_COLOR_PALETTE[fallbackIndex] ?? DEFAULT_STUDENT_UI_COLOR;
+  return normalizeStudentUiColor(assignment.studentUiColor, fallbackColor);
+};
+
+export const resolveAssignmentStudentAvatarTextColor = (avatarColor: string) =>
+  relativeLuminance(avatarColor) > 0.42 ? '#0F172A' : '#FFFFFF';
 
 export type AutoCheckBadgeTone = 'success' | 'warning' | 'danger';
 

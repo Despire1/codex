@@ -6,6 +6,8 @@ import {
   HomeworkAssignment,
   HomeworkAttachment,
   HomeworkBlock,
+  HomeworkGroup,
+  HomeworkGroupListItem,
   HomeworkReviewDraft,
   HomeworkSubmission,
   HomeworkStatus,
@@ -158,6 +160,9 @@ export type HomeworkAssignmentsSummary = {
   returnedCount: number;
   reviewedThisMonthCount: number;
   sentTodayCount: number;
+  dueTodayCount: number;
+  reviewedWeekDeltaPercent: number;
+  averageScore30d: number | null;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -353,12 +358,33 @@ export const api = {
     apiFetch<{ status: string; sessionId: number }>(`/api/sessions/${id}/revoke`, { method: 'POST' }),
   revokeOtherSessions: () =>
     apiFetch<{ status: string; revoked: number }>(`/api/sessions/revoke-others`, { method: 'POST' }),
-  addStudent: (payload: { customName: string; username?: string; pricePerLesson: number }) =>
+  addStudent: (payload: {
+    customName: string;
+    username?: string;
+    pricePerLesson: number;
+    email?: string;
+    phone?: string;
+    studentLevel?: string;
+    learningGoal?: string;
+    notes?: string;
+  }) =>
     apiFetch<{ student: Student; link: TeacherStudent }>('/api/students', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  updateStudent: (studentId: number, payload: { customName: string; username?: string; pricePerLesson: number }) =>
+  updateStudent: (
+    studentId: number,
+    payload: {
+      customName: string;
+      username?: string;
+      pricePerLesson: number;
+      email?: string;
+      phone?: string;
+      studentLevel?: string;
+      learningGoal?: string;
+      notes?: string;
+    },
+  ) =>
     apiFetch<{ student: Student; link: TeacherStudent }>(`/api/students/${studentId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
@@ -543,7 +569,22 @@ export const api = {
       items: StudentListItem[];
       total: number;
       nextOffset: number | null;
-      counts: { withDebt: number; overdue: number };
+      counts: {
+        withDebt: number;
+        overdue: number;
+        active?: number;
+        paused?: number;
+        completed?: number;
+      };
+      summary?: {
+        active: number;
+        paused: number;
+        completed: number;
+        lessonsThisWeek: number;
+        lessonsToday: number;
+        averageAttendance: number | null;
+        averageScore: number;
+      };
     }>(path);
   },
   listStudentHomeworks: (
@@ -592,6 +633,42 @@ export const api = {
     const suffix = search.toString();
     return apiFetch<{ items: HomeworkTemplate[] }>(`/api/v2/homework/templates${suffix ? `?${suffix}` : ''}`);
   },
+  listHomeworkGroupsV2: (params?: { includeArchived?: boolean }) => {
+    const search = new URLSearchParams();
+    if (params?.includeArchived) search.set('includeArchived', '1');
+    const suffix = search.toString();
+    return apiFetch<{ items: HomeworkGroupListItem[] }>(`/api/v2/homework/groups${suffix ? `?${suffix}` : ''}`);
+  },
+  createHomeworkGroupV2: (payload: {
+    title: string;
+    description?: string | null;
+    iconKey?: string;
+    bgColor?: string;
+    sortOrder?: number;
+  }) =>
+    apiFetch<{ group: HomeworkGroup }>('/api/v2/homework/groups', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateHomeworkGroupV2: (
+    groupId: number,
+    payload: Partial<{
+      title: string;
+      description: string | null;
+      iconKey: string;
+      bgColor: string;
+      sortOrder: number;
+      isArchived: boolean;
+    }>,
+  ) =>
+    apiFetch<{ group: HomeworkGroup }>(`/api/v2/homework/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteHomeworkGroupV2: (groupId: number) =>
+    apiFetch<{ deletedId: number }>(`/api/v2/homework/groups/${groupId}`, {
+      method: 'DELETE',
+    }),
   createHomeworkTemplateV2: (payload: {
     title: string;
     tags?: string[];
@@ -617,6 +694,8 @@ export const api = {
   listHomeworkAssignmentsV2: (params?: {
     studentId?: number;
     lessonId?: number;
+    groupId?: number;
+    ungrouped?: boolean;
     status?: string;
     bucket?: HomeworkAssignmentBucket;
     tab?: HomeworkAssignmentsTab;
@@ -629,6 +708,8 @@ export const api = {
     const search = new URLSearchParams();
     if (typeof params?.studentId === 'number') search.set('studentId', String(params.studentId));
     if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
+    if (typeof params?.groupId === 'number') search.set('groupId', String(params.groupId));
+    if (params?.ungrouped) search.set('ungrouped', '1');
     if (params?.status) search.set('status', params.status);
     if (params?.bucket) search.set('bucket', params.bucket);
     if (params?.tab) search.set('tab', params.tab);
@@ -657,6 +738,7 @@ export const api = {
     studentId: number;
     lessonId?: number | null;
     templateId?: number | null;
+    groupId?: number | null;
     title?: string;
     status?: HomeworkAssignment['status'];
     sendMode?: HomeworkAssignment['sendMode'];
@@ -678,6 +760,7 @@ export const api = {
       sendMode: HomeworkAssignment['sendMode'];
       lessonId: number | null;
       templateId: number | null;
+      groupId: number | null;
       deadlineAt: string | null;
       sentAt: string | null;
       contentSnapshot: HomeworkBlock[];

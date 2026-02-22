@@ -1,11 +1,12 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';
-import { TeacherBulkAction, TeacherHomeworksViewModel } from '../types';
+import { TeacherBulkAction, TeacherHomeworksViewModel, TeacherHomeworkGroupKey } from '../types';
 import { HomeworkAssignModal } from '../../../features/homework-assign/ui/HomeworkAssignModal';
-import { HomeworkAssignment, HomeworkTemplate } from '../../../entities/types';
+import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
 import { HomeworkReviewModal } from '../../../features/homework-review/ui/HomeworkReviewModal';
 import { Modal } from '../../../shared/ui/Modal/Modal';
+import { Checkbox } from '../../../shared/ui/Checkbox/Checkbox';
 import { loadStoredCreateTemplateDraftSummary } from '../../../features/homework-template-editor/model/lib/createTemplateDraftStorage';
 import {
   HomeworkAlignLeftIcon,
@@ -16,15 +17,17 @@ import {
   HomeworkCircleExclamationIcon,
   HomeworkFilePdfIcon,
   HomeworkFilterIcon,
+  HomeworkFileLinesIcon,
+  HomeworkFolderIcon,
   HomeworkGearIcon,
   HomeworkLayerGroupIcon,
   HomeworkLinkIcon,
   HomeworkListCheckIcon,
   HomeworkMicrophoneIcon,
+  HomeworkPenToSquareIcon,
+  HomeworkPlusIcon,
   HomeworkRobotIcon,
   HomeworkRotateRightIcon,
-  HomeworkStarIcon,
-  HomeworkStarRegularIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
 import {
   AutoCheckBadge,
@@ -33,6 +36,8 @@ import {
   resolveAssignmentDeadlineMeta,
   resolveAssignmentProblemBadges,
   resolveAssignmentResponseMeta,
+  resolveAssignmentStudentAvatarColor,
+  resolveAssignmentStudentAvatarTextColor,
 } from './model/lib/assignmentPresentation';
 import {
   estimateHomeworkTemplateDurationMinutes,
@@ -41,17 +46,33 @@ import {
   resolveHomeworkTemplateCategory,
   resolveHomeworkTemplatePreview,
 } from './model/lib/templatePresentation';
+import {
+  DEFAULT_GROUP_EDITOR_BG_COLOR,
+  DEFAULT_GROUP_EDITOR_ICON_KEY,
+  resolveGroupEditorBgColor,
+  resolveGroupEditorIconKey,
+} from './model/lib/groupEditorStyles';
+import { GroupIconView } from './model/lib/groupIconView';
+import { GroupEditorModal } from './ui/GroupEditorModal/GroupEditorModal';
+import { HomeworkTemplateCard } from './ui/HomeworkTemplateCard/HomeworkTemplateCard';
+import { TeacherHomeworksKpiSection } from './ui/TeacherHomeworksKpiSection';
 
-const TAB_LABELS: Record<TeacherHomeworksViewModel['activeTab'], string> = {
-  all: 'Все',
-  inbox: 'Inbox',
-  draft: 'Черновики',
-  scheduled: 'Запланировано',
-  in_progress: 'В работе',
-  review: 'На проверке',
-  closed: 'Закрыто',
-  overdue: 'Просрочено',
-};
+type WorkspaceMode = 'list' | 'groups' | 'templates';
+
+const MODE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
+  { id: 'list', label: 'Список домашек' },
+  { id: 'groups', label: 'Группы' },
+  { id: 'templates', label: 'Шаблоны' },
+];
+
+const STATUS_TABS: Array<{ id: TeacherHomeworksViewModel['activeTab']; label: string }> = [
+  { id: 'all', label: 'Все' },
+  { id: 'draft', label: 'Черновики' },
+  { id: 'scheduled', label: 'Запланировано' },
+  { id: 'in_progress', label: 'В работе' },
+  { id: 'review', label: 'На проверке' },
+  { id: 'closed', label: 'Закрыто' },
+];
 
 const SORT_LABELS: Array<{ id: TeacherHomeworksViewModel['sortBy']; label: string }> = [
   { id: 'urgency', label: 'По срочности' },
@@ -67,6 +88,23 @@ const BULK_ACTION_LABELS: Array<{ id: TeacherBulkAction; label: string }> = [
   { id: 'MOVE_TO_DRAFT', label: 'Перевести в черновики' },
   { id: 'DELETE', label: 'Удалить' },
 ];
+
+type GroupEditorDraft = {
+  title: string;
+  description: string;
+  iconKey: string;
+  bgColor: string;
+};
+
+const createEmptyGroupDraft = (): GroupEditorDraft => ({
+  title: '',
+  description: '',
+  iconKey: DEFAULT_GROUP_EDITOR_ICON_KEY,
+  bgColor: DEFAULT_GROUP_EDITOR_BG_COLOR,
+});
+
+const toGroupKey = (groupId: number | null): TeacherHomeworkGroupKey =>
+  groupId === null ? 'ungrouped' : (`group_${groupId}` as const);
 
 const ASSIGNMENT_SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
 
@@ -177,9 +215,21 @@ const resolveStatusIcon = (assignment: HomeworkAssignment) => {
   return null;
 };
 
+const toGroupEditorDraft = (group: HomeworkGroupListItem): GroupEditorDraft => ({
+  title: group.title,
+  description: group.description ?? '',
+  iconKey: resolveGroupEditorIconKey(group.iconKey),
+  bgColor: resolveGroupEditorBgColor(group.bgColor),
+});
+
 export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   assignments,
   templates,
+  groups,
+  groupAssignmentsByKey,
+  groupAssignmentsLoadingByKey,
+  groupAssignmentsErrorByKey,
+  groupAssignmentsNextOffsetByKey,
   students,
   summary,
   activeTab,
@@ -190,10 +240,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   loadingMoreAssignments,
   hasMoreAssignments,
   loadingTemplates,
+  loadingGroups,
   loadingSummary,
   loadingStudents,
   assignmentsError,
   templatesError,
+  groupsError,
   summaryError,
   studentsError,
   submittingTemplate,
@@ -215,9 +267,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onSelectedStudentIdChange,
   onOpenCreateTemplateScreen,
   onOpenEditTemplateScreen,
-  onDuplicateTemplate,
-  onArchiveTemplate,
+  onCreateGroup,
+  onUpdateGroup,
+  onDeleteGroup,
+  onLoadGroupAssignments,
   onRestoreTemplate,
+  onRebindAssignmentsGroup,
   onToggleTemplateFavorite,
   onCreateAssignment,
   onSendAssignmentNow,
@@ -242,10 +297,28 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isBulkPanelOpen, setIsBulkPanelOpen] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
-  const [assignDefaults, setAssignDefaults] = useState<{ studentId: number | null; lessonId: number | null; templateId: number | null }>({
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('list');
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Partial<Record<TeacherHomeworkGroupKey, boolean>>>({});
+  const [groupEditorOpen, setGroupEditorOpen] = useState(false);
+  const [groupEditorMode, setGroupEditorMode] = useState<'create' | 'edit'>('create');
+  const [editingGroup, setEditingGroup] = useState<HomeworkGroupListItem | null>(null);
+  const [groupEditorDraft, setGroupEditorDraft] = useState<GroupEditorDraft>(createEmptyGroupDraft());
+  const [groupEditorSelectedTemplateIds, setGroupEditorSelectedTemplateIds] = useState<number[]>([]);
+  const [groupEditorSelectedAssignmentIds, setGroupEditorSelectedAssignmentIds] = useState<number[]>([]);
+  const [groupEditorSubmitting, setGroupEditorSubmitting] = useState(false);
+  const [groupDeleteSubmitting, setGroupDeleteSubmitting] = useState(false);
+  const [assignDefaults, setAssignDefaults] = useState<{
+    studentId: number | null;
+    lessonId: number | null;
+    templateId: number | null;
+    groupId: number | null;
+  }>({
     studentId: selectedStudentId,
     lessonId: null,
     templateId: null,
+    groupId: null,
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState<TeacherBulkAction>('SEND_NOW');
@@ -253,20 +326,18 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const countsByTab = useMemo(
     () => ({
       all: summary.totalCount,
-      inbox: summary.inboxCount,
       draft: summary.draftCount,
       scheduled: summary.scheduledCount,
       in_progress: summary.inProgressCount,
       review: summary.reviewCount,
       closed: summary.closedCount,
-      overdue: summary.overdueCount,
     }),
     [summary],
   );
 
   const studentsById = useMemo(() => new Map(students.map((item) => [item.id, item.name])), [students]);
 
-  const quickTemplates = useMemo(() => {
+  const activeTemplates = useMemo(() => {
     const activeTemplates = templates.filter((template) => !template.isArchived);
     return activeTemplates
       .slice()
@@ -275,8 +346,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         const rightFavorite = isHomeworkTemplateFavorite(right) ? 1 : 0;
         if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
         return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-      })
-      .slice(0, 3);
+      });
   }, [templates]);
 
   const archivedTemplates = useMemo(
@@ -287,6 +357,31 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
     [templates],
   );
+
+  const filteredTemplates = useMemo(() => {
+    const query = templateSearchQuery.trim().toLowerCase();
+    if (!query) return activeTemplates;
+    return activeTemplates.filter((template) => {
+      const category = resolveHomeworkTemplateCategory(template).toLowerCase();
+      const tags = template.tags.map((tag) => tag.toLowerCase()).join(' ');
+      return (
+        template.title.toLowerCase().includes(query) ||
+        category.includes(query) ||
+        tags.includes(query) ||
+        resolveHomeworkTemplatePreview(template).toLowerCase().includes(query)
+      );
+    });
+  }, [activeTemplates, templateSearchQuery]);
+  const quickTemplates = filteredTemplates;
+
+  const filteredGroups = useMemo(() => {
+    const query = groupSearchQuery.trim().toLowerCase();
+    if (!query) return groups;
+    return groups.filter((group) => {
+      const description = (group.description ?? '').toLowerCase();
+      return group.title.toLowerCase().includes(query) || description.includes(query);
+    });
+  }, [groupSearchQuery, groups]);
 
   const savedCreateDraft = useMemo(() => loadStoredCreateTemplateDraftSummary(), []);
 
@@ -306,6 +401,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       studentId: assignModalRequest.studentId ?? selectedStudentId,
       lessonId: assignModalRequest.lessonId ?? null,
       templateId: null,
+      groupId: null,
     });
     if (assignModalRequest.open) {
       setIsAssignmentModalOpen(true);
@@ -313,11 +409,17 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     onConsumeAssignModalRequest();
   }, [assignModalRequest, onConsumeAssignModalRequest, selectedStudentId]);
 
-  const openAssignModal = (defaults?: { studentId?: number | null; lessonId?: number | null; templateId?: number | null }) => {
+  const openAssignModal = (defaults?: {
+    studentId?: number | null;
+    lessonId?: number | null;
+    templateId?: number | null;
+    groupId?: number | null;
+  }) => {
     setAssignDefaults({
       studentId: defaults?.studentId ?? selectedStudentId,
       lessonId: defaults?.lessonId ?? null,
       templateId: defaults?.templateId ?? null,
+      groupId: defaults?.groupId ?? null,
     });
     setIsAssignmentModalOpen(true);
   };
@@ -335,92 +437,182 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     void onMarkHomeworkActivitySeen(latestOccurredAt);
   };
 
-  const closedProgressPercent = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        (summary.reviewedThisMonthCount / Math.max(summary.reviewedThisMonthCount + summary.inProgressCount, 1)) * 100,
-      ),
-    ),
-  );
+  useEffect(() => {
+    Object.entries(expandedGroups).forEach(([key, expanded]) => {
+      if (!expanded) return;
+      const groupKey = key as TeacherHomeworkGroupKey;
+      if (groupAssignmentsByKey[groupKey] || groupAssignmentsLoadingByKey[groupKey]) return;
+      void onLoadGroupAssignments(groupKey);
+    });
+  }, [expandedGroups, groupAssignmentsByKey, groupAssignmentsLoadingByKey, onLoadGroupAssignments]);
+
+  const openCreateGroupEditor = () => {
+    setGroupEditorMode('create');
+    setEditingGroup(null);
+    setGroupEditorDraft(createEmptyGroupDraft());
+    setGroupEditorSelectedTemplateIds([]);
+    setGroupEditorSelectedAssignmentIds([]);
+    setGroupEditorOpen(true);
+  };
+
+  const openEditGroupEditor = (group: HomeworkGroupListItem) => {
+    if (group.isSystem || group.id === null) return;
+    setGroupEditorMode('edit');
+    setEditingGroup(group);
+    setGroupEditorDraft(toGroupEditorDraft(group));
+    setGroupEditorSelectedTemplateIds([]);
+    setGroupEditorSelectedAssignmentIds([]);
+    setGroupEditorOpen(true);
+  };
+
+  const closeGroupEditor = () => {
+    if (groupEditorSubmitting || groupDeleteSubmitting) return;
+    setGroupEditorOpen(false);
+    setEditingGroup(null);
+    setGroupEditorSelectedTemplateIds([]);
+    setGroupEditorSelectedAssignmentIds([]);
+  };
+
+  const submitGroupEditor = async () => {
+    if (groupEditorSubmitting) return;
+    const title = groupEditorDraft.title.trim();
+    if (!title) return;
+
+    const payload = {
+      title,
+      description: groupEditorDraft.description.trim() || null,
+      iconKey: groupEditorDraft.iconKey,
+      bgColor: groupEditorDraft.bgColor,
+    };
+    setGroupEditorSubmitting(true);
+    try {
+      let shouldCloseEditor = true;
+      if (groupEditorMode === 'create') {
+        const createdGroup = await onCreateGroup(payload);
+        if (!createdGroup?.id) {
+          shouldCloseEditor = false;
+        } else if (groupEditorSelectedAssignmentIds.length) {
+          await onRebindAssignmentsGroup(groupEditorSelectedAssignmentIds, createdGroup.id);
+        }
+      } else if (editingGroup?.id) {
+        await onUpdateGroup(editingGroup.id, payload);
+        if (groupEditorSelectedAssignmentIds.length) {
+          await onRebindAssignmentsGroup(groupEditorSelectedAssignmentIds, editingGroup.id);
+        }
+      }
+      if (shouldCloseEditor) {
+        setGroupEditorOpen(false);
+        setEditingGroup(null);
+        setGroupEditorSelectedTemplateIds([]);
+        setGroupEditorSelectedAssignmentIds([]);
+      }
+    } finally {
+      setGroupEditorSubmitting(false);
+    }
+  };
+
+  const removeGroupFromEditor = async () => {
+    if (groupDeleteSubmitting || !editingGroup?.id) return;
+    if (!window.confirm('Удалить группу? Домашки останутся и перейдут в "Без группы".')) return;
+    setGroupDeleteSubmitting(true);
+    try {
+      await onDeleteGroup(editingGroup.id);
+      setGroupEditorOpen(false);
+      setEditingGroup(null);
+      setGroupEditorSelectedTemplateIds([]);
+      setGroupEditorSelectedAssignmentIds([]);
+    } finally {
+      setGroupDeleteSubmitting(false);
+    }
+  };
+
+  const toggleGroupExpanded = (group: HomeworkGroupListItem) => {
+    const groupKey = toGroupKey(group.id);
+    setExpandedGroups((prev) => {
+      const nextValue = !prev[groupKey];
+      if (nextValue && !groupAssignmentsByKey[groupKey] && !groupAssignmentsLoadingByKey[groupKey]) {
+        void onLoadGroupAssignments(groupKey);
+      }
+      return { ...prev, [groupKey]: nextValue };
+    });
+  };
 
   return (
     <section className={styles.page}>
-      <section className={styles.kpiGrid}>
-        <article className={`${styles.kpiCard} ${styles.kpiCardPrimary}`}>
-          <div className={styles.kpiTopLine}>
-            <div className={styles.kpiLabel}>Требует внимания</div>
-            <span className={styles.kpiPriority}>High Priority</span>
-          </div>
-          <div className={styles.kpiValue}>{summary.inboxCount}</div>
-          <div className={styles.kpiHint}>Inbox</div>
-          <div className={styles.kpiMicroStats}>
-            <span>{summary.overdueCount} просрочено</span>
-            <span>{summary.reviewCount} на проверке</span>
-          </div>
-        </article>
-        <article className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>В работе</div>
-          <div className={styles.kpiValue}>{summary.inProgressCount}</div>
-          <div className={styles.kpiTrend}>+{summary.sentTodayCount} сегодня</div>
-        </article>
-        <article className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>Запланировано</div>
-          <div className={styles.kpiValue}>{summary.scheduledCount}</div>
-          <div className={styles.kpiHint}>На ближайшие дни</div>
-        </article>
-        <article className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>Закрыто в этом месяце</div>
-          <div className={styles.kpiValue}>{summary.reviewedThisMonthCount}</div>
-          <div className={styles.kpiProgressTrack}>
-            <div className={styles.kpiProgressBar} style={{ width: `${closedProgressPercent}%` }} />
-          </div>
-        </article>
-      </section>
+      <TeacherHomeworksKpiSection summary={summary} />
 
       <section className={styles.workspace}>
         <div className={styles.topActionsRow}>
-          <div className={styles.tabsRow}>
-            {(Object.keys(TAB_LABELS) as Array<keyof typeof TAB_LABELS>).map((tab) => (
+          <div className={styles.modeTabsRow}>
+            {MODE_TABS.map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                className={`${styles.tabButton} ${activeTab === tab ? styles.tabButtonActive : ''}`}
-                onClick={() => onTabChange(tab)}
+                className={`${styles.modeTabButton} ${workspaceMode === tab.id ? styles.modeTabButtonActive : ''}`}
+                onClick={() => setWorkspaceMode(tab.id)}
               >
-                {TAB_LABELS[tab]}
-                {tab === 'inbox' || activeTab === tab ? (
-                  <span className={styles.tabCounter}>{countsByTab[tab]}</span>
-                ) : null}
+                {tab.id === 'groups' ? <HomeworkFolderIcon size={13} className={styles.inlineFaIcon} /> : null}
+                {tab.id === 'templates' ? <HomeworkLayerGroupIcon size={13} className={styles.inlineFaIcon} /> : null}
+                {tab.label}
+                {tab.id === 'list' ? <span className={styles.tabCounter}>{summary.totalCount}</span> : null}
               </button>
             ))}
           </div>
 
-          <div className={styles.actionsRow}>
-            <button
-              type="button"
-              className={styles.toolIconButton}
-              title="Массовые действия"
-              onClick={() => setIsBulkPanelOpen((prev) => !prev)}
-            >
-              <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
-            </button>
-            <button
-              type="button"
-              className={styles.toolIconButton}
-              title="Фильтры"
-              onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
-            >
-              <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
-            </button>
-            <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
-              <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
-              <span>Проверять подряд</span>
-            </button>
-          </div>
+          {workspaceMode === 'list' ? (
+            <div className={styles.actionsRow}>
+              <button
+                type="button"
+                className={styles.toolIconButton}
+                title="События"
+                onClick={handleOpenActivity}
+              >
+                <HomeworkBellRegularIcon size={15} className={styles.toolbarIcon} />
+                {homeworkActivityHasUnread ? <span className={styles.unreadDot} /> : null}
+              </button>
+              <button
+                type="button"
+                className={styles.toolIconButton}
+                title="Массовые действия"
+                onClick={() => setIsBulkPanelOpen((prev) => !prev)}
+              >
+                <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
+              </button>
+              <button
+                type="button"
+                className={styles.toolIconButton}
+                title="Фильтры"
+                onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
+              >
+                <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
+              </button>
+              <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
+                <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
+                <span>Проверять подряд</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
+        {workspaceMode === 'list' ? (
+          <div className={styles.statusTabsRow}>
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`${styles.statusTabButton} ${activeTab === tab.id ? styles.statusTabButtonActive : ''}`}
+                onClick={() => onTabChange(tab.id)}
+              >
+                {tab.label}
+                {activeTab === tab.id ? <span className={styles.statusTabCounter}>{countsByTab[tab.id] ?? 0}</span> : null}
+              </button>
+            ))}
+            {loadingSummary ? <span className={styles.statusTabsMeta}>Обновляем сводку...</span> : null}
+          </div>
+        ) : null}
+
+        {workspaceMode === 'list' ? (
+          <>
         {isBulkPanelOpen ? (
           <div className={styles.bulkPanel}>
             <select
@@ -450,6 +642,17 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         {isAdvancedFiltersOpen ? (
           <div className={styles.advancedFiltersRow}>
             <div className={styles.advancedFiltersControls}>
+              <label className={styles.inlineFilterGroup}>
+                <span className={styles.inlineFilterLabel}>Поиск:</span>
+                <input
+                  type="search"
+                  className={styles.inlineSearchInput}
+                  value={searchQuery}
+                  placeholder="Название, ученик, шаблон..."
+                  onChange={(event) => onSearchChange(event.target.value)}
+                />
+              </label>
+
               <label className={styles.inlineFilterGroup}>
                 <span className={styles.inlineFilterLabel}>Ученик:</span>
                 <select
@@ -497,8 +700,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             <thead>
               <tr>
                 <th>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allSelected}
                     onChange={(event) =>
                       setSelectedIds(event.target.checked ? assignments.map((assignment) => assignment.id) : [])
@@ -562,6 +764,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const problemBadges = resolveAssignmentProblemBadges(assignment);
                   const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
                   const studentInitials = getStudentInitials(studentLabel);
+                  const studentAvatarColor = resolveAssignmentStudentAvatarColor(assignment);
+                  const studentAvatarTextColor = resolveAssignmentStudentAvatarTextColor(studentAvatarColor);
                   const statusTone = resolveStatusTone(assignment);
                   const shouldReview = needsAssignmentReview(assignment);
                   const responseVisual = resolveResponseVisual(assignment);
@@ -578,8 +782,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       } ${problemBadges.hasConfigError ? styles.rowConfigError : ''}`}
                     >
                       <td>
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedIds.includes(assignment.id)}
                           onChange={(event) =>
                             setSelectedIds((prev) =>
@@ -592,7 +795,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       <td>
                         <div className={styles.studentCell}>
                           <div className={styles.studentAvatarWrap}>
-                            <div className={styles.studentAvatar}>{studentInitials}</div>
+                            <div
+                              className={styles.studentAvatar}
+                              style={{ background: studentAvatarColor, color: studentAvatarTextColor }}
+                            >
+                              {studentInitials}
+                            </div>
                             {assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' ? (
                               <span className={styles.studentOnlineDot} aria-hidden />
                             ) : null}
@@ -817,20 +1025,197 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             </button>
           </div>
         ) : null}
-      </section>
+          </>
+        ) : null}
 
-      <section className={styles.templatesSection}>
-        <div className={styles.templatesHeader}>
-          <h2>Быстрые шаблоны</h2>
-          <div className={styles.templatesHeaderActions}>
-            <button type="button" className={controls.secondaryButton} onClick={() => setIsArchiveModalOpen(true)}>
-              Архив ({archivedTemplates.length})
-            </button>
-            <button type="button" className={controls.secondaryButton} onClick={onOpenCreateTemplateScreen}>
-              Создать шаблон
-            </button>
+        {workspaceMode === 'groups' ? (
+          <section className={styles.groupsSection}>
+            <div className={styles.groupsTopBar}>
+              <input
+                type="search"
+                className={styles.groupsSearchInput}
+                placeholder="Поиск по группам..."
+                value={groupSearchQuery}
+                onChange={(event) => setGroupSearchQuery(event.target.value)}
+              />
+              <button type="button" className={styles.groupsCreateButton} onClick={openCreateGroupEditor}>
+                <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
+                <span>Создать группу</span>
+              </button>
+            </div>
+
+            {groupsError ? <div className={styles.error}>{groupsError}</div> : null}
+            {loadingGroups ? <div className={styles.groupsEmptyState}>Загрузка групп...</div> : null}
+            {!loadingGroups && filteredGroups.length === 0 ? (
+              <div className={styles.groupsEmptyState}>Группы не найдены</div>
+            ) : null}
+
+            {!loadingGroups ? (
+              <div className={styles.groupsList}>
+                {filteredGroups.map((group) => {
+                  const groupKey = toGroupKey(group.id);
+                  const groupAssignments = groupAssignmentsByKey[groupKey] ?? [];
+                  const groupLoading = Boolean(groupAssignmentsLoadingByKey[groupKey]);
+                  const groupError = groupAssignmentsErrorByKey[groupKey];
+                  const groupNextOffset = groupAssignmentsNextOffsetByKey[groupKey] ?? null;
+                  const expanded = Boolean(expandedGroups[groupKey]);
+
+                  return (
+                    <article key={group.id ?? 'ungrouped'} className={styles.groupCard}>
+                      <button
+                        type="button"
+                        className={styles.groupCardHeader}
+                        style={{
+                          background: `linear-gradient(90deg, ${group.bgColor || '#F3F4F6'} 0%, rgba(255,255,255,0) 72%)`,
+                        }}
+                        onClick={() => toggleGroupExpanded(group)}
+                      >
+                        <span className={styles.groupCardMain}>
+                          <span
+                            className={styles.groupIconBadge}
+                            style={{
+                              backgroundColor: group.bgColor || '#F3F4F6',
+                            }}
+                          >
+                            <GroupIconView iconKey={group.iconKey} size={14} />
+                          </span>
+                          <span className={styles.groupTitleBlock}>
+                            <span className={styles.groupTitleRow}>
+                              <span className={styles.groupTitle}>{group.title}</span>
+                              <span className={styles.groupCountBadge}>{group.assignmentsCount} заданий</span>
+                            </span>
+                            <span className={styles.groupSubtitle}>{group.description || 'Задания внутри группы'}</span>
+                          </span>
+                        </span>
+                        <span className={styles.groupHeaderActions}>
+                          {!group.isSystem && group.id !== null ? (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className={styles.groupEditIconButton}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEditGroupEditor(group);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key !== 'Enter' && event.key !== ' ') return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                openEditGroupEditor(group);
+                              }}
+                            >
+                              <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
+                            </span>
+                          ) : null}
+                          <HomeworkChevronDownIcon
+                            size={12}
+                            className={`${styles.groupChevron} ${expanded ? styles.groupChevronExpanded : ''}`}
+                          />
+                        </span>
+                      </button>
+
+                      {expanded ? (
+                        <div className={styles.groupCardContent}>
+                          {groupError ? <div className={styles.groupErrorState}>{groupError}</div> : null}
+                          {groupLoading && groupAssignments.length === 0 ? (
+                            <div className={styles.groupLoadingState}>Загрузка заданий...</div>
+                          ) : null}
+                          {!groupLoading && groupAssignments.length === 0 ? (
+                            <div className={styles.groupLoadingState}>В этой группе пока нет домашних заданий</div>
+                          ) : null}
+                          {groupAssignments.length > 0 ? (
+                            <div className={styles.groupAssignmentsList}>
+                              {groupAssignments.map((assignment) => {
+                                const studentLabel =
+                                  assignment.studentName ||
+                                  studentsById.get(assignment.studentId) ||
+                                  `Ученик #${assignment.studentId}`;
+                                const tone = resolveStatusTone(assignment);
+                              return (
+                                <article key={assignment.id} className={styles.groupAssignmentItem}>
+                                  <div className={styles.groupAssignmentIcon}>
+                                    <HomeworkFileLinesIcon size={13} className={styles.inlineFaIcon} />
+                                  </div>
+
+                                    <div className={styles.groupAssignmentMain}>
+                                      <div className={styles.groupAssignmentTitleRow}>
+                                        <h4 className={styles.groupAssignmentTitle}>{assignment.title}</h4>
+                                        <span className={styles.groupAssignmentTypeBadge}>Домашка</span>
+                                      </div>
+                                      <div className={styles.groupAssignmentMeta}>
+                                        <span>Создано {formatDateTime(assignment.createdAt)}</span>
+                                        <span className={styles.metaDot} />
+                                        <span>{studentLabel}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className={styles.groupAssignmentActions}>
+                                      <span
+                                        className={`${styles.groupAssignmentStatus} ${
+                                          styles[`groupAssignmentStatus_${tone}`] || ''
+                                        }`}
+                                      >
+                                        {resolveStatusLabel(assignment)}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className={styles.groupAssignmentEditButton}
+                                        onClick={() => onOpenDetail(assignment)}
+                                        title="Редактировать"
+                                        aria-label="Редактировать"
+                                      >
+                                        <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
+                                      </button>
+                                    </div>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                          {groupNextOffset !== null ? (
+                            <div className={styles.groupLoadMoreRow}>
+                              <button
+                                type="button"
+                                className={styles.groupLoadMoreButton}
+                                onClick={() => {
+                                  void onLoadGroupAssignments(groupKey, { append: true });
+                                }}
+                                disabled={groupLoading}
+                              >
+                                {groupLoading ? 'Загрузка...' : 'Показать еще'}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+      {workspaceMode === 'templates' ? (
+        <section className={styles.templatesSection}>
+          <div className={styles.templatesTopBar}>
+            <input
+              type="search"
+              className={styles.templatesSearchInput}
+              placeholder="Поиск по шаблонам..."
+              value={templateSearchQuery}
+              onChange={(event) => setTemplateSearchQuery(event.target.value)}
+            />
+            <div className={styles.templatesTopActions}>
+              <button type="button" className={controls.secondaryButton} onClick={() => setIsArchiveModalOpen(true)}>
+                Архив ({archivedTemplates.length})
+              </button>
+              <button type="button" className={styles.templatesCreateButton} onClick={onOpenCreateTemplateScreen}>
+                <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
+                <span>Создать шаблон</span>
+              </button>
+            </div>
           </div>
-        </div>
 
         {templatesError ? <div className={styles.error}>{templatesError}</div> : null}
         {loadingTemplates ? <div className={styles.emptyTemplates}>Загрузка шаблонов...</div> : null}
@@ -860,78 +1245,67 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               </article>
             ) : null}
 
-            {quickTemplates.map((template) => {
-              const favorite = isHomeworkTemplateFavorite(template);
-              const category = resolveHomeworkTemplateCategory(template);
-              const estimated = formatHomeworkTemplateDuration(estimateHomeworkTemplateDurationMinutes(template));
-              return (
-                <article key={template.id} className={styles.templateCard}>
-                  <div className={styles.templateCardHead}>
-                    <span className={styles.templateCategory}>{category}</span>
-                    <button
-                      type="button"
-                      className={styles.starButton}
-                      onClick={() => {
-                        void onToggleTemplateFavorite(template);
-                      }}
-                      aria-label="Переключить избранное"
-                    >
-                      {favorite ? <HomeworkStarIcon size={16} /> : <HomeworkStarRegularIcon size={16} />}
-                    </button>
-                  </div>
-                  <h3 className={styles.templateTitle}>{template.title}</h3>
-                  <p className={styles.templatePreview}>{resolveHomeworkTemplatePreview(template)}</p>
-                  <div className={styles.templateFooter}>
-                    <span>{estimated}</span>
-                    <div className={styles.templateActions}>
-                      <button
-                        type="button"
-                        className={controls.smallButton}
-                        onClick={() => openAssignModal({ templateId: template.id })}
-                      >
-                        + Выдать
-                      </button>
-                      <button
-                        type="button"
-                        className={controls.smallButton}
-                        onClick={() => onOpenEditTemplateScreen(template.id)}
-                      >
-                        Редактировать
-                      </button>
-                      <button
-                        type="button"
-                        className={controls.smallButton}
-                        onClick={() => {
-                          void onDuplicateTemplate(template);
-                        }}
-                      >
-                        Дубль
-                      </button>
-                      {!template.isArchived ? (
-                        <button
-                          type="button"
-                          className={controls.smallButton}
-                          onClick={() => {
-                            void onArchiveTemplate(template);
-                          }}
-                        >
-                          Архив
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+            {quickTemplates.map((template) => (
+              <HomeworkTemplateCard
+                key={template.id}
+                template={template}
+                onToggleFavorite={(item) => {
+                  void onToggleTemplateFavorite(item);
+                }}
+                onUseTemplate={(item) => openAssignModal({ templateId: item.id })}
+                onEditTemplate={(item) => onOpenEditTemplateScreen(item.id)}
+              />
+            ))}
 
             <article className={`${styles.templateCard} ${styles.templateCreateCard}`}>
               <button type="button" className={styles.createTemplateButton} onClick={onOpenCreateTemplateScreen}>
-                Создать новый шаблон
+                <span className={styles.createTemplateIconWrap}>
+                  <HomeworkPlusIcon size={18} className={styles.createTemplatePlusIcon} />
+                </span>
+                <span className={styles.createTemplateTitle}>Создать шаблон</span>
+                <span className={styles.createTemplateHint}>Конструктор заданий</span>
               </button>
             </article>
           </div>
         ) : null}
       </section>
+      ) : null}
+
+      </section>
+
+      <GroupEditorModal
+        open={groupEditorOpen}
+        mode={groupEditorMode}
+        draft={groupEditorDraft}
+        templates={templates}
+        assignments={assignments}
+        selectedTemplateIds={groupEditorSelectedTemplateIds}
+        selectedAssignmentIds={groupEditorSelectedAssignmentIds}
+        submitting={groupEditorSubmitting}
+        deleteSubmitting={groupDeleteSubmitting}
+        canDelete={groupEditorMode === 'edit' && Boolean(editingGroup?.id)}
+        onChangeTitle={(value) => setGroupEditorDraft((prev) => ({ ...prev, title: value }))}
+        onChangeDescription={(value) => setGroupEditorDraft((prev) => ({ ...prev, description: value }))}
+        onChangeIconKey={(iconKey) => setGroupEditorDraft((prev) => ({ ...prev, iconKey }))}
+        onChangeBgColor={(bgColor) => setGroupEditorDraft((prev) => ({ ...prev, bgColor }))}
+        onToggleTemplate={(templateId) =>
+          setGroupEditorSelectedTemplateIds((prev) =>
+            prev.includes(templateId) ? prev.filter((id) => id !== templateId) : [...prev, templateId],
+          )
+        }
+        onToggleAssignment={(assignmentId) =>
+          setGroupEditorSelectedAssignmentIds((prev) =>
+            prev.includes(assignmentId) ? prev.filter((id) => id !== assignmentId) : [...prev, assignmentId],
+          )
+        }
+        onClose={closeGroupEditor}
+        onSubmit={() => {
+          void submitGroupEditor();
+        }}
+        onDelete={() => {
+          void removeGroupFromEditor();
+        }}
+      />
 
       <Modal open={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} title="Архив шаблонов">
         <div className={styles.archiveModalContent}>
@@ -975,11 +1349,13 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       <HomeworkAssignModal
         open={isAssignmentModalOpen}
         templates={templates.filter((item) => !item.isArchived)}
+        groups={groups}
         students={students}
         submitting={submittingAssignment}
         defaultStudentId={assignDefaults.studentId}
         defaultLessonId={assignDefaults.lessonId}
         defaultTemplateId={assignDefaults.templateId}
+        defaultGroupId={assignDefaults.groupId}
         onSubmit={onCreateAssignment}
         onClose={() => setIsAssignmentModalOpen(false)}
       />

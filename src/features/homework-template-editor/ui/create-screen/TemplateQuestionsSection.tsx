@@ -29,6 +29,7 @@ import {
   HomeworkTrashIcon,
   HomeworkXMarkIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
+import { Checkbox } from '../../../../shared/ui/Checkbox/Checkbox';
 import styles from './TemplateQuestionsSection.module.css';
 
 interface TemplateQuestionsSectionProps {
@@ -458,21 +459,32 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                 key={option.id}
                 className={`${styles.choiceOptionRow} ${canRemoveOptions ? '' : styles.choiceOptionRowLocked}`}
               >
-                <label className={styles.choiceControl}>
-                  <input
-                    type={isMultipleChoice ? 'checkbox' : 'radio'}
+                {isMultipleChoice ? (
+                  <Checkbox
                     checked={isCorrect}
-                    onChange={(event) =>
-                      {
+                    onChange={(event) => {
+                      onFieldEdit(resolveFieldPath(questionIndex, 'correctOptionIds'));
+                      updateQuestion(questionIndex, (previousQuestion) =>
+                        toggleCorrectOption(previousQuestion, option.id, event.target.checked),
+                      );
+                    }}
+                    aria-label={`Отметить вариант ${optionIndex + 1} как верный`}
+                  />
+                ) : (
+                  <label className={styles.choiceControl}>
+                    <input
+                      type="radio"
+                      checked={isCorrect}
+                      onChange={(event) => {
                         onFieldEdit(resolveFieldPath(questionIndex, 'correctOptionIds'));
                         updateQuestion(questionIndex, (previousQuestion) =>
                           toggleCorrectOption(previousQuestion, option.id, event.target.checked),
                         );
-                      }
-                    }
-                  />
-                  <span className={styles.choiceMarker} />
-                </label>
+                      }}
+                    />
+                    <span className={styles.choiceMarker} />
+                  </label>
+                )}
 
                 <input
                   type="text"

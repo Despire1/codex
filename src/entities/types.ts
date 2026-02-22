@@ -44,6 +44,7 @@ export interface Student {
   isActivated?: boolean;
   activatedAt?: string | null;
   paymentRemindersEnabled?: boolean;
+  createdAt?: string;
 }
 
 export interface TeacherStudent {
@@ -51,9 +52,15 @@ export interface TeacherStudent {
   teacherId: number;
   studentId: number;
   customName: string;
+  email?: string | null;
+  phone?: string | null;
+  studentLevel?: string | null;
+  learningGoal?: string | null;
+  notes?: string | null;
   autoRemindHomework: boolean;
   balanceLessons: number;
   pricePerLesson: number;
+  uiColor?: string | null;
   isArchived?: boolean;
 }
 
@@ -196,6 +203,35 @@ export interface HomeworkTemplate {
   updatedAt: string;
 }
 
+export interface HomeworkGroup {
+  id: number;
+  teacherId: number;
+  title: string;
+  description?: string | null;
+  iconKey: string;
+  bgColor: string;
+  sortOrder: number;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HomeworkGroupListItem {
+  id: number | null;
+  teacherId: number;
+  title: string;
+  description?: string | null;
+  iconKey: string;
+  bgColor: string;
+  sortOrder: number;
+  isArchived: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  assignmentsCount: number;
+  isSystem: boolean;
+  isUngrouped: boolean;
+}
+
 export type HomeworkAssignmentStatus =
   | 'DRAFT'
   | 'SCHEDULED'
@@ -221,10 +257,13 @@ export interface HomeworkAssignment {
   studentId: number;
   studentName?: string | null;
   studentUsername?: string | null;
+  studentUiColor?: string | null;
   lessonId?: number | null;
   lessonStartAt?: string | null;
   templateId?: number | null;
   templateTitle?: string | null;
+  groupId?: number | null;
+  groupTitle?: string | null;
   legacyHomeworkId?: number | null;
   title: string;
   status: HomeworkAssignmentStatus;
@@ -397,6 +436,17 @@ export interface StudentListItem {
     pendingHomeworkCount: number;
     overdueHomeworkCount: number;
     totalHomeworkCount: number;
+    doneHomeworkCount?: number;
+    homeworkCompletionRate?: number;
+    averageScore?: number;
+    totalLessons?: number;
+    completedLessons?: number;
+    attendanceRate?: number | null;
+    weeklyLessonsCount?: number;
+    todayLessonsCount?: number;
+    nextLessonAt?: string | null;
+    lastLessonAt?: string | null;
+    lifecycleStatus?: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
   };
 }
 

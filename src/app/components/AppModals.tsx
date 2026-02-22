@@ -72,6 +72,7 @@ export const AppModals: FC<AppModalsProps> = ({
     studentModalOpen,
     studentModalVariant,
     newStudentDraft,
+    studentEmailSuggestions,
     isEditingStudent,
     setStudentDraft,
     submitStudent,
@@ -107,6 +108,7 @@ export const AppModals: FC<AppModalsProps> = ({
         variant={studentModalVariant}
         onClose={closeStudentModal}
         draft={newStudentDraft}
+        emailSuggestions={studentEmailSuggestions}
         isEditing={isEditingStudent}
         onDraftChange={setStudentDraft}
         onSubmit={submitStudent}

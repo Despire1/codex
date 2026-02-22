@@ -11,10 +11,9 @@ import {
   type CSSProperties,
 } from 'react';
 import {
-  AddOutlinedIcon,
+  CalendarMonthIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  HistoryOutlinedIcon,
   MeetingLinkIcon,
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
@@ -24,16 +23,12 @@ import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
-import controls from '../../shared/styles/controls.module.css';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
-import { MonthDayLessonCard } from './components/MonthDayLessonCard';
-import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../entities/lesson/lib/lessonDetails';
+import { buildParticipants, getLessonLabel } from '../../entities/lesson/lib/lessonDetails';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useScheduleState } from './model/useScheduleState';
-import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
-import { LessonCancelDialog } from '../../features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
-import type { LessonCancelRefundMode, LessonSeriesScope } from '../../features/lessons/model/types';
+import { MonthSidebarLessonItem } from './components/MonthSidebarLessonItem';
 
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
@@ -45,6 +40,34 @@ const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
 const WEEK_LESSON_INSET = 8;
 const DAY_LESSON_INSET = 12;
+const MONTH_NOTE_PATTERN: Array<[day: number, count: number]> = [
+  [1, 1],
+  [4, 2],
+  [6, 1],
+  [11, 3],
+  [13, 1],
+  [15, 2],
+  [18, 1],
+  [20, 2],
+  [22, 1],
+  [25, 1],
+  [27, 2],
+];
+
+const resolveLessonsLabel = (count: number) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} занятие`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} занятия`;
+  }
+
+  return `${count} занятий`;
+};
 
 interface ScheduleSectionProps {
   lessons: Lesson[];
@@ -54,15 +77,7 @@ interface ScheduleSectionProps {
 
 export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
   const timeZone = useTimeZone();
-  const {
-    openLessonModal,
-    openRescheduleModal,
-    startEditLesson,
-    requestDeleteLessonFromList,
-    togglePaid,
-    cancelLesson,
-    restoreLesson,
-  } = useLessonActions();
+  const { openLessonModal, startEditLesson, togglePaid } = useLessonActions();
   const {
     scheduleView,
     setScheduleView,
@@ -90,52 +105,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
-  const [openLessonMenuId, setOpenLessonMenuId] = useState<number | null>(null);
-  const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
-  const [scopeDialog, setScopeDialog] = useState<
-    | { type: 'restore'; lesson: Lesson }
-    | { type: 'cancel'; lesson: Lesson; refundMode?: LessonCancelRefundMode }
-    | null
-  >(null);
   const drawerPointerStart = useRef<number | null>(null);
   const drawerModeAtDragStart = useRef<'half' | 'expanded'>('half');
   const drawerDragOffsetRef = useRef(0);
   const drawerDragRafRef = useRef<number | null>(null);
   const mobileWeekKeyRef = useRef<string | null>(null);
-
-  const handleCancelLesson = (lesson: Lesson) => {
-    setCancelDialogLesson(lesson);
-  };
-
-  const handleConfirmCancel = (refundMode?: LessonCancelRefundMode) => {
-    if (!cancelDialogLesson) return;
-    const target = cancelDialogLesson;
-    setCancelDialogLesson(null);
-    if (isLessonInSeries(target)) {
-      setScopeDialog({ type: 'cancel', lesson: target, refundMode });
-      return;
-    }
-    void cancelLesson(target, 'SINGLE', refundMode);
-  };
-
-  const handleRestoreLesson = (lesson: Lesson) => {
-    if (isLessonInSeries(lesson)) {
-      setScopeDialog({ type: 'restore', lesson });
-      return;
-    }
-    void restoreLesson(lesson, 'SINGLE');
-  };
-
-  const handleConfirmScope = (scope: LessonSeriesScope) => {
-    if (!scopeDialog) return;
-    const payload = scopeDialog;
-    setScopeDialog(null);
-    if (payload.type === 'cancel') {
-      void cancelLesson(payload.lesson, scope, payload.refundMode);
-      return;
-    }
-    void restoreLesson(payload.lesson, scope);
-  };
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -162,6 +136,21 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
+  const notesCountByDay = useMemo(() => {
+    const daysInMonth = endOfMonth(selectedMonth).getDate();
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth();
+
+    return MONTH_NOTE_PATTERN.reduce<Record<string, number>>((acc, [dayOfMonth, count]) => {
+      if (dayOfMonth > daysInMonth) {
+        return acc;
+      }
+
+      const iso = format(new Date(year, month, dayOfMonth), 'yyyy-MM-dd');
+      acc[iso] = count;
+      return acc;
+    }, {});
+  }, [selectedMonth]);
   const [internalSelectedMonthDay, setInternalSelectedMonthDay] = useState<string | null>(null);
   const effectiveSelectedMonthDay = selectedMonthDay ?? internalSelectedMonthDay;
 
@@ -169,7 +158,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     if (selectedMonthDay === undefined) return;
     setInternalSelectedMonthDay(selectedMonthDay);
   }, [selectedMonthDay]);
-  const [isMonthPanelDismissed, setIsMonthPanelDismissed] = useState(false);
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
   const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
 
@@ -183,11 +171,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
 
   const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
   const weekDayShortLabels = useMemo(() => ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'], []);
-
-  const currentMonthLabel = useMemo(
-    () => format(addMonths(monthAnchor, monthOffset), 'LLLL yyyy', { locale: ru }),
-    [monthAnchor, monthOffset],
-  );
 
   const defaultWeekDayIso = useMemo(() => {
     const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
@@ -234,7 +217,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   }, [scheduleView, dayViewDate, isMobileViewport]);
 
   useEffect(() => {
-    if (scheduleView !== 'month' || effectiveSelectedMonthDay || isMonthPanelDismissed) return;
+    if (scheduleView !== 'month' || effectiveSelectedMonthDay) return;
 
     const daysInMonth = buildMonthDays(selectedMonth).filter((day) => day.inMonth);
     const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
@@ -256,25 +239,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     scheduleView,
     selectedMonth,
     effectiveSelectedMonthDay,
-    isMonthPanelDismissed,
     lessonsByDay,
     setDayViewDate,
     isMobileViewport,
     timeZone,
     setSelectedMonthDay,
   ]);
-
-  useEffect(() => {
-    if (scheduleView !== 'month') {
-      setIsMonthPanelDismissed(false);
-      return;
-    }
-    setIsMonthPanelDismissed(false);
-  }, [scheduleView, selectedMonth]);
-
-  useEffect(() => {
-    setOpenLessonMenuId(null);
-  }, [effectiveSelectedMonthDay]);
 
   useEffect(() => {
     if (!isMobileWeekView) {
@@ -736,11 +706,18 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     const selectedDayLessons = effectiveSelectedMonthDay
       ? (lessonsByDay[effectiveSelectedMonthDay] ?? [])
           .slice()
-          .sort((a, b) => a.startAt.localeCompare(b.startAt))
+          .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
       : [];
     const selectedDayDate = effectiveSelectedMonthDay
       ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
       : null;
+    const selectedDayNotesCount = effectiveSelectedMonthDay ? (notesCountByDay[effectiveSelectedMonthDay] ?? 0) : 0;
+
+    const selectedDayTitle = selectedDayDate ? format(selectedDayDate, 'd MMMM', { locale: ru }) : 'Выберите день';
+    const selectedDayMeta = selectedDayDate
+      ? `${format(selectedDayDate, 'EEEE', { locale: ru })} • ${resolveLessonsLabel(selectedDayLessons.length)}`
+      : 'Выберите день в календаре';
+    const selectedDayMetaCapitalized = selectedDayMeta.charAt(0).toUpperCase() + selectedDayMeta.slice(1);
 
     const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!isMobileMonthView || !effectiveSelectedMonthDay) return;
@@ -800,60 +777,46 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
       window.addEventListener('pointercancel', handleEnd);
     };
 
-    const renderDayDetails = (closeHandler: () => void) => (
+    const renderDayDetails = () => (
       <div className={styles.dayPanelContent}>
         <div className={styles.dayPanelHeader}>
-          <div>
-            <div className={styles.dayPanelTitle}>
-              {selectedDayDate ? format(selectedDayDate, 'd MMMM, EEEE', { locale: ru }) : 'Выберите день'}
-            </div>
-            {selectedDayLessons.length > 0 && (
-              <div className={styles.dayPanelSubtitle}>
-                {selectedDayLessons.length} занят{selectedDayLessons.length === 1 ? 'ие' : 'ия'} за день
-              </div>
-            )}
-          </div>
-          <button className={styles.closeButton} onClick={closeHandler} aria-label="Закрыть панель">
-            ×
+          <h2 className={styles.dayPanelTitle}>{selectedDayTitle}</h2>
+          <p className={styles.dayPanelSubtitle}>{selectedDayMetaCapitalized}</p>
+        </div>
+
+        <div className={styles.dayPanelTabs}>
+          <button type="button" className={`${styles.dayPanelTab} ${styles.dayPanelTabActive}`}>
+            Занятия
+          </button>
+          <button
+            type="button"
+            className={`${styles.dayPanelTab} ${styles.dayPanelTabMuted}`}
+            onClick={(event) => event.preventDefault()}
+          >
+            Заметки
           </button>
         </div>
 
-        {selectedDayLessons.length === 0 && <div className={styles.emptyDayState}>Создайте первый урок</div>}
+        {selectedDayLessons.length === 0 && <div className={styles.emptyDayState}>На этот день занятий пока нет</div>}
 
         <div className={styles.dayPanelList}>
           {selectedDayLessons.map((lesson) => {
             return (
-              <MonthDayLessonCard
+              <MonthSidebarLessonItem
                 key={lesson.id}
                 lesson={lesson}
                 linkedStudentsById={linkedStudentsById}
                 timeZone={timeZone}
-                style={buildLessonColorStyle(lesson)}
-                isActionsOpen={openLessonMenuId === lesson.id}
-                onEdit={() => startEditLesson(lesson)}
-                onTogglePaid={(studentId) => togglePaid(lesson.id, studentId)}
-                onOpenActions={() =>
-                  setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))
-                }
-                onCloseActions={() => setOpenLessonMenuId(null)}
-                onDelete={() => requestDeleteLessonFromList(lesson)}
-                onReschedule={() => openRescheduleModal(lesson, { skipNavigation: true })}
-                onCancel={() => handleCancelLesson(lesson)}
-                onRestore={() => handleRestoreLesson(lesson)}
-                onOpenMeetingLink={handleOpenMeetingLink}
+                onClick={() => startEditLesson(lesson)}
               />
             );
           })}
         </div>
-
-        {effectiveSelectedMonthDay && (
-          <button
-            className={`${controls.primaryButton} ${styles.panelAction}`}
-            onClick={() => openLessonModal(effectiveSelectedMonthDay)}
-          >
-            Создать урок
-          </button>
-        )}
+        <div className={styles.notesStub}>
+          {selectedDayNotesCount > 0
+            ? `Заметки (${selectedDayNotesCount}) появятся в этом блоке в следующем обновлении.`
+            : 'Блок заметок пока в режиме заглушки.'}
+        </div>
       </div>
     );
 
@@ -864,27 +827,52 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
 
     return (
       <div className={styles.monthScroller}>
-        <div className={styles.monthSection}>
-          <div className={styles.monthHeader}>
-            <div>
-              <div key={monthLabelKey} className={styles.monthTitle}>
-                {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+        <div className={styles.monthLayout}>
+          <section className={styles.monthSection}>
+            <div className={styles.monthHeader}>
+              <div className={styles.monthHeaderNav}>
+                <button
+                  className={styles.monthNavButton}
+                  onClick={() => shiftMonth(-1)}
+                  aria-label="Предыдущий месяц"
+                  type="button"
+                >
+                  <ChevronLeftIcon className={styles.monthNavIcon} />
+                </button>
+                <div key={monthLabelKey} className={styles.monthTitle}>
+                  {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+                </div>
+                <button
+                  className={styles.monthNavButton}
+                  onClick={() => shiftMonth(1)}
+                  aria-label="Следующий месяц"
+                  type="button"
+                >
+                  <ChevronRightIcon className={styles.monthNavIcon} />
+                </button>
               </div>
+              <button type="button" className={styles.monthTodayButton} onClick={handleGoToToday}>
+                <span className={styles.monthTodayIcon}>
+                  <CalendarMonthIcon />
+                </span>
+                Сегодня
+              </button>
             </div>
-          </div>
 
-          <div className={`${styles.monthLayout} ${effectiveSelectedMonthDay ? styles.panelOpen : ''}`}>
             <div className={styles.monthCalendar}>
-              <div className={styles.monthGrid}>
+              <div className={styles.monthWeekdaysGrid}>
                 {monthWeekdays.map((weekday) => (
                   <div key={`${monthLabel}-${weekday}`} className={styles.monthWeekday}>
                     {weekday}
                   </div>
                 ))}
+              </div>
+              <div className={styles.monthDaysScroller}>
+                <div className={styles.monthDaysGrid}>
                 {days.map((day) => {
                   const dayLessons = lessonsByDay[day.iso] ?? [];
+                  const dayNotesCount = notesCountByDay[day.iso] ?? 0;
                   const handleDayClick = () => {
-                    setIsMonthPanelDismissed(false);
                     setInternalSelectedMonthDay(day.iso);
                     setSelectedMonthDay(day.iso);
                     setDayViewDate(day.date);
@@ -910,26 +898,24 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                         >
                           {day.date.getDate()}
                         </span>
+                      </div>
+                      <div className={styles.monthCounters}>
                         {dayLessons.length > 0 && (
-                          <span className={styles.lessonCountBadge}>{dayLessons.length}</span>
+                          <span className={`${styles.dayCounter} ${styles.lessonCounter}`}>{dayLessons.length}</span>
+                        )}
+                        {dayNotesCount > 0 && (
+                          <span className={`${styles.dayCounter} ${styles.noteCounter}`}>{dayNotesCount}</span>
                         )}
                       </div>
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
+          </section>
 
-            {!isMobileMonthView && (
-              <div className={`${styles.dayPanel} ${effectiveSelectedMonthDay ? styles.dayPanelOpen : ''}`}>
-                {renderDayDetails(() => {
-                  setInternalSelectedMonthDay(null);
-                  setSelectedMonthDay(null);
-                  setIsMonthPanelDismissed(true);
-                })}
-              </div>
-            )}
-          </div>
+          {!isMobileMonthView && <aside className={styles.dayPanel}>{renderDayDetails()}</aside>}
         </div>
 
         {isMobileMonthView && (
@@ -951,94 +937,21 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
               <div className={styles.drawerHandleArea} onPointerDown={startDrawerDrag}>
                 <span className={styles.drawerHandle} />
               </div>
-              {renderDayDetails(() => {
-                setInternalSelectedMonthDay(null);
-                setSelectedMonthDay(null);
-              })}
+              {renderDayDetails()}
             </div>
           </>
         )}
-        <LessonCancelDialog
-          open={Boolean(cancelDialogLesson)}
-          lesson={cancelDialogLesson}
-          linkedStudentsById={linkedStudentsById}
-          timeZone={timeZone}
-          onClose={() => setCancelDialogLesson(null)}
-          onConfirm={handleConfirmCancel}
-        />
-        <SeriesScopeDialog
-          open={Boolean(scopeDialog)}
-          onClose={() => setScopeDialog(null)}
-          onConfirm={handleConfirmScope}
-        />
       </div>
     );
   };
 
   return (
     <section className={styles.viewGrid}>
-      <div className={styles.sectionHeader}>
-        <div className={styles.calendarControlsWrapper}>
-          <div className={styles.viewToggleRow}>
-            <button
-              type="button"
-              className={`${styles.viewToggleButton} ${styles.todayButton}`}
-              onClick={handleGoToToday}
-              aria-label="Вернуться к сегодняшней дате"
-            >
-              <span className={styles.viewToggleIcon}>
-                <HistoryOutlinedIcon />
-              </span>
-            </button>
-            <div
-              className={styles.viewToggleGroup}
-              style={{
-                '--active-index':
-                  scheduleView === 'month' ? 0 : scheduleView === 'week' ? 1 : 2,
-              } as CSSProperties}
-            >
-              <span className={styles.viewToggleIndicator} aria-hidden />
-              <button
-                type="button"
-                className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
-                onClick={() => setScheduleView('month')}
-                aria-label="Перейти в вид месяца"
-                aria-pressed={scheduleView === 'month'}
-              >
-                <span className={styles.viewToggleText}>Месяц</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
-                onClick={() => setScheduleView('week')}
-                aria-label="Перейти в вид недели"
-                aria-pressed={scheduleView === 'week'}
-              >
-                <span className={styles.viewToggleText}>Неделя</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
-                onClick={() => setScheduleView('day')}
-                aria-label="Перейти в вид дня"
-                aria-pressed={scheduleView === 'day'}
-              >
-                <span className={styles.viewToggleText}>День</span>
-              </button>
-            </div>
-            <button
-              className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonMobile}`}
-              onClick={() => openLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
-              type="button"
-              aria-label="Создать урок"
-            >
-              <AddOutlinedIcon className={styles.headerActionIcon} />
-              <span className={styles.headerActionLabel}>Создать урок</span>
-            </button>
-          </div>
-
-          <div className={styles.periodSwitcher}>
-            {scheduleView === 'week' && (
+      {scheduleView !== 'month' && (
+        <div className={styles.sectionHeader}>
+          <div className={styles.calendarControlsWrapper}>
+            <div className={styles.periodSwitcher}>
+              {scheduleView === 'week' && (
                 <div className={styles.monthSwitcher}>
                   <button
                     className={styles.monthNavButton}
@@ -1060,129 +973,98 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                     <ChevronRightIcon className={styles.monthNavIcon} />
                   </button>
                 </div>
-            )}
-            {isMobileWeekView && (
-              <div className={styles.weekDayPicker}>
-                {weekDays.map((day, index) => {
-                  const isSelected = format(dayViewDate, 'yyyy-MM-dd') === day.iso;
-                  const isTodayCell = isSameDay(day.date, todayZoned);
+              )}
+              {isMobileWeekView && (
+                <div className={styles.weekDayPicker}>
+                  {weekDays.map((day, index) => {
+                    const isSelected = format(dayViewDate, 'yyyy-MM-dd') === day.iso;
+                    const isTodayCell = isSameDay(day.date, todayZoned);
 
-                  return (
+                    return (
+                      <button
+                        key={day.iso}
+                        type="button"
+                        className={`${styles.weekDayButton} ${
+                          isSelected ? styles.weekDayButtonActive : ''
+                        } ${isTodayCell ? styles.weekDayButtonToday : ''}`}
+                        onClick={() => setDayViewDate(day.date)}
+                      >
+                        <span className={styles.weekDayButtonName}>
+                          {weekDayShortLabels[index] ?? format(day.date, 'EE', { locale: ru })}
+                        </span>
+                        <span className={styles.weekDayButtonDate}>{format(day.date, 'd')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {scheduleView === 'day' && (
+                <div className={styles.daySwitcherWrapper} ref={dayPickerRef}>
+                  <div className={styles.monthSwitcher}>
                     <button
-                      key={day.iso}
+                      className={styles.monthNavButton}
+                      onClick={() => shiftDay(-1)}
+                      aria-label="Предыдущий день"
                       type="button"
-                      className={`${styles.weekDayButton} ${
-                        isSelected ? styles.weekDayButtonActive : ''
-                      } ${isTodayCell ? styles.weekDayButtonToday : ''}`}
-                      onClick={() => setDayViewDate(day.date)}
                     >
-                      <span className={styles.weekDayButtonName}>
-                        {weekDayShortLabels[index] ?? format(day.date, 'EE', { locale: ru })}
-                      </span>
-                      <span className={styles.weekDayButtonDate}>{format(day.date, 'd')}</span>
+                      <ChevronLeftIcon className={styles.monthNavIcon} />
                     </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {scheduleView === 'day' && (
-              <div className={styles.daySwitcherWrapper} ref={dayPickerRef}>
-                <div className={styles.monthSwitcher}>
-                  <button
-                    className={styles.monthNavButton}
-                    onClick={() => shiftDay(-1)}
-                    aria-label="Предыдущий день"
-                    type="button"
-                  >
-                    <ChevronLeftIcon className={styles.monthNavIcon} />
-                  </button>
-                  <button
-                    key={dayLabelKey}
-                    className={`${styles.monthName} ${styles.dayLabelButton}`}
-                    onClick={() => setDayPickerOpen((open) => !open)}
-                    type="button"
-                  >
-                    {daySwitchLabel}
-                  </button>
-                  <button
-                    className={styles.monthNavButton}
-                    onClick={() => shiftDay(1)}
-                    aria-label="Следующий день"
-                    type="button"
-                  >
-                    <ChevronRightIcon className={styles.monthNavIcon} />
-                  </button>
-                </div>
-                {dayPickerOpen && (
-                  <div className={styles.dayPickerPopover}>
-                    <div className={styles.dayPickerCard}>
-                      <DayPicker
-                        mode="single"
-                        selected={dayViewDate}
-                        weekStartsOn={WEEK_STARTS_ON as 0 | 1}
-                        locale={ru}
-                        onSelect={(date) => {
-                          if (date) {
-                            setDayViewDate(date);
-                            setScheduleView('day');
-                          }
-                          setDayPickerOpen(false);
-                        }}
-                        classNames={{
-                          root: styles.dayPickerSurface,
-                          nav: styles.dayPickerNav,
-                          nav_button: styles.dayPickerNavButton,
-                          caption_label: styles.dayPickerCaption,
-                          weekdays: styles.dayPickerWeekdays,
-                          weekday: styles.dayPickerWeekday,
-                          grid: styles.dayPickerGrid,
-                          day: styles.dayPickerDay,
-                          day_selected: styles.dayPickerSelected,
-                          day_outside: styles.dayPickerOutside,
-                          day_today: styles.dayPickerToday,
-                        }}
-                      />
+                    <button
+                      key={dayLabelKey}
+                      className={`${styles.monthName} ${styles.dayLabelButton}`}
+                      onClick={() => setDayPickerOpen((open) => !open)}
+                      type="button"
+                    >
+                      {daySwitchLabel}
+                    </button>
+                    <button
+                      className={styles.monthNavButton}
+                      onClick={() => shiftDay(1)}
+                      aria-label="Следующий день"
+                      type="button"
+                    >
+                      <ChevronRightIcon className={styles.monthNavIcon} />
+                    </button>
+                  </div>
+                  {dayPickerOpen && (
+                    <div className={styles.dayPickerPopover}>
+                      <div className={styles.dayPickerCard}>
+                        <DayPicker
+                          mode="single"
+                          selected={dayViewDate}
+                          weekStartsOn={WEEK_STARTS_ON as 0 | 1}
+                          locale={ru}
+                          onSelect={(date) => {
+                            if (date) {
+                              setDayViewDate(date);
+                              setScheduleView('day');
+                            }
+                            setDayPickerOpen(false);
+                          }}
+                          classNames={{
+                            root: styles.dayPickerSurface,
+                            nav: styles.dayPickerNav,
+                            nav_button: styles.dayPickerNavButton,
+                            caption_label: styles.dayPickerCaption,
+                            weekdays: styles.dayPickerWeekdays,
+                            weekday: styles.dayPickerWeekday,
+                            grid: styles.dayPickerGrid,
+                            day: styles.dayPickerDay,
+                            day_selected: styles.dayPickerSelected,
+                            day_outside: styles.dayPickerOutside,
+                            day_today: styles.dayPickerToday,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {scheduleView === 'month' && (
-                <div className={styles.monthSwitcher}>
-                  <button
-                      className={styles.monthNavButton}
-                      onClick={() => shiftMonth(-1)}
-                      aria-label="Предыдущий месяц"
-                      type="button"
-                  >
-                    <ChevronLeftIcon className={styles.monthNavIcon} />
-                  </button>
-                  <div key={monthLabelKey} className={styles.monthName}>
-                    {currentMonthLabel.charAt(0).toUpperCase() + currentMonthLabel.slice(1)}
-                  </div>
-                  <button
-                      className={styles.monthNavButton}
-                      onClick={() => shiftMonth(1)}
-                      aria-label="Следующий месяц"
-                      type="button"
-                  >
-                    <ChevronRightIcon className={styles.monthNavIcon} />
-                  </button>
+                  )}
                 </div>
-            )}
-            <button
-                className={`${controls.primaryButton} ${styles.headerAction} ${styles.addLessonComputer}`}
-                onClick={() => openLessonModal(format(dayViewDate, 'yyyy-MM-dd'))}
-                type="button"
-            >
-              <AddOutlinedIcon className={styles.headerActionIcon}/>
-              <span className={styles.headerActionLabel}>Создать урок</span>
-            </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}

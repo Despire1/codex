@@ -2,6 +2,9 @@ import { type FC } from 'react';
 import { Teacher } from '../../entities/types';
 import {
   AddOutlinedIcon,
+  CalendarMonthIcon,
+  CalendarDayReferenceIcon,
+  CalendarWeekReferenceIcon,
   ChevronLeftIcon,
   DoneOutlinedIcon,
   NotificationsNoneOutlinedIcon,
@@ -30,6 +33,9 @@ interface TopbarProps {
   onOpenNotifications: () => void;
   onCreateLesson: () => void;
   profilePhotoUrl?: string | null;
+  showScheduleViewToggle?: boolean;
+  scheduleView?: 'month' | 'week' | 'day';
+  onScheduleViewChange?: (view: 'month' | 'week' | 'day') => void;
 }
 
 export const Topbar: FC<TopbarProps> = ({
@@ -52,6 +58,9 @@ export const Topbar: FC<TopbarProps> = ({
   onOpenNotifications,
   onCreateLesson,
   profilePhotoUrl,
+  showScheduleViewToggle = false,
+  scheduleView = 'month',
+  onScheduleViewChange,
 }) => {
   const fallbackText = teacher.name || teacher.username || 'П';
   const teacherDisplayName = teacher.name ?? teacher.username ?? 'Преподаватель';
@@ -90,6 +99,41 @@ export const Topbar: FC<TopbarProps> = ({
             <SaveOutlinedIcon width={16} height={16} />
             <span>Сохранить черновик</span>
           </button>
+        ) : null}
+
+        {showScheduleViewToggle ? (
+          <div className={styles.viewToggleGroup} role="tablist" aria-label="Вид календаря">
+            <button
+              type="button"
+              className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange?.('month')}
+              aria-pressed={scheduleView === 'month'}
+              role="tab"
+            >
+              <CalendarMonthIcon width={14} height={14} />
+              <span>Месяц</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewToggleButton} ${scheduleView === 'week' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange?.('week')}
+              aria-pressed={scheduleView === 'week'}
+              role="tab"
+            >
+              <CalendarWeekReferenceIcon width={14} height={14} />
+              <span>Неделя</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewToggleButton} ${scheduleView === 'day' ? styles.toggleActive : ''}`}
+              onClick={() => onScheduleViewChange?.('day')}
+              aria-pressed={scheduleView === 'day'}
+              role="tab"
+            >
+              <CalendarDayReferenceIcon width={14} height={14} />
+              <span>День</span>
+            </button>
+          </div>
         ) : null}
 
         <button

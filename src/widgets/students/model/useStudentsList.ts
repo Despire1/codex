@@ -2,7 +2,22 @@ import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } 
 import { api } from '../../../shared/api/client';
 import { StudentListItem } from '../../../entities/types';
 
-type StudentListCounts = { withDebt: number; overdue: number };
+type StudentListCounts = {
+  withDebt: number;
+  overdue: number;
+  active: number;
+  paused: number;
+  completed: number;
+};
+type StudentListSummary = {
+  active: number;
+  paused: number;
+  completed: number;
+  lessonsThisWeek: number;
+  lessonsToday: number;
+  averageAttendance: number | null;
+  averageScore: number;
+};
 type LoadOptions = { offset?: number; append?: boolean };
 
 interface UseStudentsListOptions {
@@ -22,14 +37,38 @@ export const useStudentsList = ({
   reloadKey,
 }: UseStudentsListOptions) => {
   const [items, setItems] = useState<StudentListItem[]>([]);
-  const [counts, setCounts] = useState<StudentListCounts>({ withDebt: 0, overdue: 0 });
+  const [counts, setCounts] = useState<StudentListCounts>({
+    withDebt: 0,
+    overdue: 0,
+    active: 0,
+    paused: 0,
+    completed: 0,
+  });
+  const [summary, setSummary] = useState<StudentListSummary>({
+    active: 0,
+    paused: 0,
+    completed: 0,
+    lessonsThisWeek: 0,
+    lessonsToday: 0,
+    averageAttendance: null,
+    averageScore: 0,
+  });
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const resetList = useCallback(() => {
     setItems([]);
-    setCounts({ withDebt: 0, overdue: 0 });
+    setCounts({ withDebt: 0, overdue: 0, active: 0, paused: 0, completed: 0 });
+    setSummary({
+      active: 0,
+      paused: 0,
+      completed: 0,
+      lessonsThisWeek: 0,
+      lessonsToday: 0,
+      averageAttendance: null,
+      averageScore: 0,
+    });
     setTotal(0);
     setHasMore(false);
     setIsLoading(false);
@@ -51,7 +90,24 @@ export const useStudentsList = ({
           limit: 15,
           offset,
         });
-        setCounts(data.counts);
+        setCounts({
+          withDebt: data.counts.withDebt,
+          overdue: data.counts.overdue,
+          active: data.counts.active ?? 0,
+          paused: data.counts.paused ?? 0,
+          completed: data.counts.completed ?? 0,
+        });
+        setSummary(
+          data.summary ?? {
+            active: data.counts.active ?? 0,
+            paused: data.counts.paused ?? 0,
+            completed: data.counts.completed ?? 0,
+            lessonsThisWeek: 0,
+            lessonsToday: 0,
+            averageAttendance: null,
+            averageScore: 0,
+          },
+        );
         setTotal(data.total);
         setHasMore(data.nextOffset !== null);
         setItems((prev) => (append ? [...prev, ...data.items] : data.items));
@@ -108,6 +164,7 @@ export const useStudentsList = ({
   return {
     items,
     counts,
+    summary,
     total,
     hasMore,
     isLoading,
