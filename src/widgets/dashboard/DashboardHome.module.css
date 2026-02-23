@@ -10,5 +10,5 @@
   padding: 18px;
   color: var(--color-slate-500);
   font-size: 14px;
-  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+  box-shadow: none;
 }

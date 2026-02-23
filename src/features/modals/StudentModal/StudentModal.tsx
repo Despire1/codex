@@ -84,8 +84,6 @@ export const StudentModal: FC<StudentModalProps> = ({
 }) => {
   const emailSuggestionsId = useId();
 
-  if (!open) return null;
-
   const modalContent = (
     <div
       className={`${styles.modalContent} ${variant === 'sheet' ? styles.sheetModalContent : ''}`}
@@ -305,6 +303,8 @@ export const StudentModal: FC<StudentModalProps> = ({
       </BottomSheet>
     );
   }
+
+  if (!open) return null;
 
   return (
     <div className={modalStyles.modalOverlay} onClick={onClose}>

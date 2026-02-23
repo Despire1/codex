@@ -1,0 +1,83 @@
+.root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-gray-100);
+  padding: 8px 14px calc(8px + var(--app-safe-bottom));
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: repeat(var(--tabs-count, 4), minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  min-height: 52px;
+  border-radius: 12px;
+  color: var(--color-gray-500);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+}
+
+.tabActive {
+  color: #05070b;
+}
+
+.iconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.tabActive .iconWrap {
+  background: #b8fa4e;
+}
+
+.label {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-red-500);
+  color: var(--color-white);
+  border: 1px solid var(--color-white);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-red-500);
+  border: 1px solid var(--color-white);
+}

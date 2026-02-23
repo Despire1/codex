@@ -51,6 +51,7 @@ import {
   faMicrophone,
   faPaperclip,
   faPaperPlane,
+  faPen,
   faPenToSquare,
   faPlay,
   faPlus,
@@ -244,6 +245,10 @@ export const HomeworkFileLinesIcon: FC<HomeworkFaIconProps> = (props) => (
 
 export const HomeworkPenToSquareIcon: FC<HomeworkFaIconProps> = (props) => (
   <HomeworkFaIcon icon={faPenToSquare} {...props} />
+);
+
+export const HomeworkPenIcon: FC<HomeworkFaIconProps> = (props) => (
+  <HomeworkFaIcon icon={faPen} {...props} />
 );
 
 export const HomeworkPuzzlePieceIcon: FC<HomeworkFaIconProps> = (props) => (

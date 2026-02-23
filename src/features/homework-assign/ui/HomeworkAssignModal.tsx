@@ -13,6 +13,7 @@ import {
   HomeworkPaperPlaneIcon,
   HomeworkXMarkIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
+import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { TeacherAssignmentCreatePayload, TeacherHomeworkStudentOption } from '../../../widgets/homeworks/types';
 import styles from './HomeworkAssignModal.module.css';
 
@@ -21,6 +22,7 @@ interface HomeworkAssignModalProps {
   templates: HomeworkTemplate[];
   groups: HomeworkGroupListItem[];
   students: TeacherHomeworkStudentOption[];
+  loading?: boolean;
   submitting: boolean;
   defaultStudentId: number | null;
   defaultLessonId?: number | null;
@@ -28,6 +30,7 @@ interface HomeworkAssignModalProps {
   defaultGroupId?: number | null;
   onSubmit: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
   onClose: () => void;
+  variant?: 'modal' | 'sheet';
 }
 
 type TemplateMode = 'FAVORITES' | 'NEW';
@@ -188,6 +191,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   templates,
   groups,
   students,
+  loading = false,
   submitting,
   defaultStudentId,
   defaultLessonId = null,
@@ -195,6 +199,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   defaultGroupId = null,
   onSubmit,
   onClose,
+  variant = 'modal',
 }) => {
   const timeZone = useTimeZone();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -242,8 +247,8 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   const hasValidTemplate = !requiresTemplate || Boolean(draft.templateId && templatesById.has(draft.templateId));
   const requiresLesson = draft.sendType === 'AUTO_AFTER_LESSON';
   const hasValidLesson = !requiresLesson || Boolean(draft.lessonId);
-
-  const canSubmit = hasStudents && Boolean(draft.studentId) && hasValidTemplate && hasValidLesson && !submitting;
+  const isFormDisabled = submitting || loading;
+  const canSubmit = hasStudents && Boolean(draft.studentId) && hasValidTemplate && hasValidLesson && !isFormDisabled;
 
   const selectedLessonLabel = useMemo(() => {
     if (!draft.lessonId) return null;
@@ -379,11 +384,14 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     }
   };
 
-  if (!open) return null;
-
-  return (
-    <div className={styles.overlay} onMouseDown={handleBackdropMouseDown}>
-      <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Выдать домашнее задание" ref={containerRef}>
+  const content = (
+    <div
+      className={`${styles.modal} ${variant === 'sheet' ? styles.sheetModal : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Выдать домашнее задание"
+      ref={containerRef}
+    >
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.header}>
             <h2 className={styles.title}>Выдать домашнее задание</h2>
@@ -414,7 +422,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     setNextLesson(null);
                     setNextLessonError(null);
                   }}
-                  disabled={!hasStudents || submitting}
+                  disabled={!hasStudents || isFormDisabled}
                 >
                   <option value="" disabled>
                     Выберите ученика...
@@ -429,7 +437,9 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                   <HomeworkChevronDownIcon size={12} />
                 </span>
               </div>
-              {!hasStudents ? <p className={styles.inlineWarning}>Нет учеников. Добавьте ученика в разделе «Ученики».</p> : null}
+              {!hasStudents && !loading ? (
+                <p className={styles.inlineWarning}>Нет учеников. Добавьте ученика в разделе «Ученики».</p>
+              ) : null}
             </section>
 
             <section className={styles.section}>
@@ -446,7 +456,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                       templateId: fallbackTemplateId,
                     }));
                   }}
-                  disabled={!sortedTemplates.length || submitting}
+                  disabled={!sortedTemplates.length || isFormDisabled}
                 >
                   {draft.templateMode === 'FAVORITES' ? (
                     <span className={styles.templateModeIcon} aria-hidden>
@@ -468,7 +478,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     }));
                     setIsTemplatePickerOpen(false);
                   }}
-                  disabled={submitting}
+                  disabled={isFormDisabled}
                 >
                   {draft.templateMode === 'NEW' ? (
                     <span className={styles.templateModeIcon} aria-hidden>
@@ -500,7 +510,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                       type="button"
                       className={styles.templateChangeButton}
                       onClick={() => setIsTemplatePickerOpen((prev) => !prev)}
-                      disabled={!sortedTemplates.length || submitting}
+                      disabled={!sortedTemplates.length || isFormDisabled}
                     >
                       Изменить
                     </button>
@@ -557,7 +567,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     onChange={(event) =>
                       setDraft((prev) => ({ ...prev, groupId: event.target.value ? Number(event.target.value) : null }))
                     }
-                    disabled={submitting}
+                    disabled={isFormDisabled}
                   >
                     <option value="">Без группы</option>
                     {assignmentGroups.map((group) => (
@@ -583,7 +593,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     type="datetime-local"
                     value={draft.deadlineLocal}
                     onChange={(event) => setDraft((prev) => ({ ...prev, deadlineLocal: event.target.value }))}
-                    disabled={submitting}
+                    disabled={isFormDisabled}
                   />
                   <span className={styles.datetimeIcon} aria-hidden>
                     <CalendarMonthIcon width={16} height={16} />
@@ -595,7 +605,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     type="button"
                     className={styles.quickButton}
                     onClick={() => setDraft((prev) => ({ ...prev, deadlineLocal: createQuickDeadlineValue(2, timeZone) }))}
-                    disabled={submitting}
+                    disabled={isFormDisabled}
                   >
                     +2 дня
                   </button>
@@ -605,7 +615,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     onClick={() => {
                       void applyNextLesson();
                     }}
-                    disabled={submitting || !draft.studentId || isResolvingNextLesson}
+                    disabled={isFormDisabled || !draft.studentId || isResolvingNextLesson}
                   >
                     {isResolvingNextLesson ? 'Ищем...' : 'След. урок'}
                   </button>
@@ -625,7 +635,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                       value="NOW"
                       checked={draft.sendType === 'NOW'}
                       onChange={() => setDraft((prev) => ({ ...prev, sendType: 'NOW' }))}
-                      disabled={submitting}
+                      disabled={isFormDisabled}
                     />
                     <span>Отправить сейчас</span>
                   </label>
@@ -641,7 +651,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                           void applyNextLesson();
                         }
                       }}
-                      disabled={submitting || !draft.studentId}
+                      disabled={isFormDisabled || !draft.studentId}
                     />
                     <span>Авто после урока</span>
                   </label>
@@ -659,12 +669,27 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
               Отмена
             </button>
             <button type="submit" className={styles.submitButton} disabled={!canSubmit}>
-              <span>{submitting ? 'Выдаю…' : 'Выдать'}</span>
+              <span>{submitting ? 'Выдаю…' : loading ? 'Загружаю…' : 'Выдать'}</span>
               <HomeworkPaperPlaneIcon size={12} className={styles.submitIcon} />
             </button>
           </div>
         </form>
-      </div>
+    </div>
+  );
+
+  if (variant === 'sheet') {
+    return (
+      <BottomSheet isOpen={open} onClose={closeRequest} contentScrollable={false}>
+        {content}
+      </BottomSheet>
+    );
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className={styles.overlay} onMouseDown={handleBackdropMouseDown}>
+      {content}
     </div>
   );
 };

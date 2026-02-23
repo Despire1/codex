@@ -19,8 +19,6 @@ export const ConnectTelegramSheet: FC<ConnectTelegramSheetProps> = ({
   studentUsername,
   variant = 'modal',
 }) => {
-  if (!open) return null;
-
   const handleOpenChat = () => {
     const username = studentUsername?.trim();
     if (!username) return;
@@ -57,6 +55,8 @@ export const ConnectTelegramSheet: FC<ConnectTelegramSheetProps> = ({
       </BottomSheet>
     );
   }
+
+  if (!open) return null;
 
   return (
     <Modal open={open} title="Подключение Telegram" onClose={onClose}>

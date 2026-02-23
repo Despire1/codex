@@ -3,7 +3,7 @@
   border: 1px solid var(--color-slate-200);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 12px 30px var(--shadow-slate-900-06);
+  box-shadow: none;
 }
 
 .header {
@@ -92,7 +92,7 @@
 }
 
 .dayCardInteractive:hover {
-  box-shadow: 0 8px 18px var(--shadow-slate-900-08);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 

@@ -16,7 +16,7 @@
 
 .card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px var(--lesson-shadow, var(--shadow-slate-900-16));
+  box-shadow: none;
 }
 
 .card:focus-visible {

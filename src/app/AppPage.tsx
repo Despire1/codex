@@ -1,7 +1,7 @@
 import { startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlockNavigation, useLocation, useNavigate } from 'react-router-dom';
-import { Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
+import { HomeworkGroupListItem, HomeworkTemplate, Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
 import { api, type StudentContextLink } from '../shared/api/client';
 import { useToast } from '../shared/lib/toast';
@@ -12,15 +12,20 @@ import { useIsDesktop } from '../shared/lib/useIsDesktop';
 import { trackEvent } from '../shared/lib/analytics';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar } from '../widgets/layout/Topbar';
-import { Tabbar } from '../widgets/layout/Tabbar';
 import { Sidebar } from '../widgets/layout/Sidebar';
 import { buildSidebarNavItems, type SidebarNavItem } from '../widgets/layout/model/navigation';
+import { MobileBottomTabs } from '../widgets/layout/mobile/MobileBottomTabs';
+import { MobileSidebarDrawer } from '../widgets/layout/mobile/MobileSidebarDrawer';
+import { MobileTopbar } from '../widgets/layout/mobile/MobileTopbar';
+import { buildMobileNavigation, type MobileNavItem } from '../widgets/layout/mobile/model/mobileNavigation';
 import { getTabsByRole, tabPathById, type TabId } from './tabs';
 import { AppRoutes } from './components/AppRoutes';
 import { AppModals } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
+import { HomeworkAssignModal } from '../features/homework-assign/ui/HomeworkAssignModal';
+import { type TeacherAssignmentCreatePayload, type TeacherHomeworkStudentOption } from '../widgets/homeworks/types';
 import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
@@ -101,6 +106,30 @@ type NavigationBlockTx = {
   retry: () => void;
 };
 
+const mapStudentListItemsToHomeworkStudents = (
+  items: Awaited<ReturnType<typeof api.listStudents>>['items'],
+): TeacherHomeworkStudentOption[] =>
+  items.map((item) => ({
+    id: item.student.id,
+    name: item.link.customName || item.student.username || `Ученик #${item.student.id}`,
+  }));
+
+const loadHomeworkAssignStudents = async (): Promise<TeacherHomeworkStudentOption[]> => {
+  const result: TeacherHomeworkStudentOption[] = [];
+  const visitedOffsets = new Set<number>();
+  let offset = 0;
+
+  while (!visitedOffsets.has(offset)) {
+    visitedOffsets.add(offset);
+    const response = await api.listStudents({ filter: 'all', limit: 100, offset });
+    result.push(...mapStudentListItemsToHomeworkStudents(response.items));
+    if (response.nextOffset === null) break;
+    offset = response.nextOffset;
+  }
+
+  return result;
+};
+
 const AppPageContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -129,12 +158,23 @@ const AppPageContent = () => {
   const [activeStudentContext, setActiveStudentContext] = useState<StudentContextLink | null>(null);
   const [studentContextLoading, setStudentContextLoading] = useState(false);
   const [studentContextRevision, setStudentContextRevision] = useState(0);
+  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile(767);
   const isDesktop = useIsDesktop();
   const [templateCreateTopbarState, setTemplateCreateTopbarState] = useState<HomeworkTemplateCreateTopbarState>({
     submitting: false,
     hasValidationErrors: false,
     draftSavedAtLabel: null,
+  });
+  const [homeworkAssignModalOpen, setHomeworkAssignModalOpen] = useState(false);
+  const [homeworkAssignSubmitting, setHomeworkAssignSubmitting] = useState(false);
+  const [homeworkAssignLoading, setHomeworkAssignLoading] = useState(false);
+  const [homeworkAssignTemplates, setHomeworkAssignTemplates] = useState<HomeworkTemplate[]>([]);
+  const [homeworkAssignGroups, setHomeworkAssignGroups] = useState<HomeworkGroupListItem[]>([]);
+  const [homeworkAssignStudents, setHomeworkAssignStudents] = useState<TeacherHomeworkStudentOption[]>([]);
+  const [homeworkAssignDefaults, setHomeworkAssignDefaults] = useState<{ studentId: number | null; lessonId: number | null }>({
+    studentId: null,
+    lessonId: null,
   });
   const device = isMobile ? 'mobile' : 'desktop';
   const {
@@ -349,6 +389,11 @@ const AppPageContent = () => {
 
     return 'dashboard';
   }, [activeTabByPath, availableTabs, location.pathname]);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   const activeTabNeedsRoster =
     activeTabByPath === 'dashboard' || activeTabByPath === 'schedule' || activeTabByPath === 'students';
   const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
@@ -430,6 +475,98 @@ const AppPageContent = () => {
     if (activeTabByPath !== 'dashboard') return;
     dashboardSummary.refresh();
   }, [activeTabByPath, dashboardSummary.refresh]);
+
+  const openDashboardHomeworkAssignModal = useCallback(
+    (studentId?: number | null, lessonId?: number | null) => {
+      setHomeworkAssignDefaults({
+        studentId: typeof studentId === 'number' && Number.isFinite(studentId) ? studentId : null,
+        lessonId: typeof lessonId === 'number' && Number.isFinite(lessonId) ? lessonId : null,
+      });
+      setHomeworkAssignModalOpen(true);
+    },
+    [],
+  );
+
+  const closeDashboardHomeworkAssignModal = useCallback(() => {
+    if (homeworkAssignSubmitting) return;
+    setHomeworkAssignModalOpen(false);
+  }, [homeworkAssignSubmitting]);
+
+  const handleDashboardHomeworkAssignSubmit = useCallback(
+    async (payload: TeacherAssignmentCreatePayload) => {
+      if (!payload.studentId) {
+        showToast({ message: 'Выберите ученика', variant: 'error' });
+        return false;
+      }
+
+      const status = payload.sendNow
+        ? 'SENT'
+        : payload.sendMode === 'AUTO_AFTER_LESSON_DONE'
+          ? 'SCHEDULED'
+          : 'DRAFT';
+
+      setHomeworkAssignSubmitting(true);
+      try {
+        await api.createHomeworkAssignmentV2({
+          studentId: payload.studentId,
+          lessonId: payload.lessonId ?? undefined,
+          templateId: payload.templateId ?? undefined,
+          groupId: payload.groupId ?? undefined,
+          title: payload.title?.trim() || undefined,
+          sendMode: payload.sendMode,
+          status,
+          deadlineAt: payload.deadlineAt,
+        });
+        showToast({
+          message: payload.sendNow ? 'Домашка выдана ученику' : 'Домашка сохранена',
+          variant: 'success',
+        });
+        refreshDashboardSummaryIfActive();
+        return true;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to create homework assignment from dashboard', error);
+        showToast({ message: 'Не удалось создать домашку', variant: 'error' });
+        return false;
+      } finally {
+        setHomeworkAssignSubmitting(false);
+      }
+    },
+    [refreshDashboardSummaryIfActive, showToast],
+  );
+
+  useEffect(() => {
+    if (!homeworkAssignModalOpen || !hasTeacherAccess) return undefined;
+
+    let isCancelled = false;
+    setHomeworkAssignLoading(true);
+
+    void Promise.all([
+      api.listHomeworkTemplatesV2({ includeArchived: false }),
+      api.listHomeworkGroupsV2(),
+      loadHomeworkAssignStudents(),
+    ])
+      .then(([templatesResponse, groupsResponse, studentsResponse]) => {
+        if (isCancelled) return;
+        setHomeworkAssignTemplates(templatesResponse.items);
+        setHomeworkAssignGroups(groupsResponse.items);
+        setHomeworkAssignStudents(studentsResponse);
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to preload homework assign modal data', error);
+        if (isCancelled) return;
+        showToast({ message: 'Не удалось загрузить данные для домашки', variant: 'error' });
+      })
+      .finally(() => {
+        if (isCancelled) return;
+        setHomeworkAssignLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [hasTeacherAccess, homeworkAssignModalOpen, showToast]);
 
   const studentsActions = useStudentsActionsInternal({
     students,
@@ -579,11 +716,11 @@ const AppPageContent = () => {
         lessonIso,
         date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
         undefined,
-        { skipNavigation: true, variant: isMobile ? 'sheet' : 'modal' },
+        { skipNavigation: true, variant: isDesktop ? 'modal' : 'sheet' },
       );
     },
     [
-      isMobile,
+      isDesktop,
       openLessonModal,
       resolvedTimeZone,
       setDayViewDate,
@@ -602,14 +739,6 @@ const AppPageContent = () => {
     [guardedNavigate, track],
   );
 
-  const onTabbarNavigate = useCallback(
-    (tab: TabId) => {
-      track('nav_click', { item: tab, placement: 'top_tabs' });
-      guardedNavigate(tabPathById[tab]);
-    },
-    [guardedNavigate, track],
-  );
-
   const onSidebarToggle = useCallback(
     (collapsed: boolean) => {
       track('sidebar_toggle', { collapsed });
@@ -622,6 +751,45 @@ const AppPageContent = () => {
   }, [guardedNavigate]);
 
   const sidebarItems = useMemo(() => buildSidebarNavItems(availableTabs), [availableTabs]);
+  const homeworksBadgeCount = useMemo(() => {
+    if (!hasTeacherAccess) return undefined;
+    if (homeworks.length === 0) return undefined;
+    const count = homeworks.filter((homework) => homework.status !== 'DONE' && !homework.isDone).length;
+    return count > 0 ? count : undefined;
+  }, [hasTeacherAccess, homeworks]);
+  const mobileNavItems = useMemo(
+    () =>
+      buildMobileNavigation({
+        tabs: availableTabs,
+        isStudentRole,
+        homeworksBadgeCount,
+      }),
+    [availableTabs, homeworksBadgeCount, isStudentRole],
+  );
+  const mobileDrawerItems = useMemo(
+    () => mobileNavItems.filter((item) => item.placement === 'drawer'),
+    [mobileNavItems],
+  );
+  const mobileTabbarItems = useMemo(
+    () => mobileNavItems.filter((item) => item.placement === 'tabbar'),
+    [mobileNavItems],
+  );
+  const onMobileNavigate = useCallback(
+    (item: MobileNavItem) => {
+      track('nav_click', {
+        item: item.id,
+        placement: item.placement === 'tabbar' ? 'bottom_tabs' : 'mobile_sidebar',
+      });
+      guardedNavigate(item.href);
+      setMobileSidebarOpen(false);
+    },
+    [guardedNavigate, track],
+  );
+  const mobileProfileName = useMemo(() => {
+    if (activeStudentContext?.teacherName) return activeStudentContext.teacherName;
+    return teacher.name ?? teacher.username ?? 'TeacherBot';
+  }, [activeStudentContext?.teacherName, teacher.name, teacher.username]);
+  const mobilePlanLabel = hasSubscription ? 'Pro Plan' : 'Free Plan';
 
   const applyStudentContext = useCallback((context: StudentContextLink | null) => {
     if (!context) {
@@ -839,8 +1007,8 @@ const AppPageContent = () => {
   }, [openCreateLesson]);
 
   const onDashboardAddStudent = useCallback(() => {
-    openCreateStudentModal({ variant: isMobile ? 'sheet' : 'modal' });
-  }, [isMobile, openCreateStudentModal]);
+    openCreateStudentModal({ variant: isDesktop ? 'modal' : 'sheet' });
+  }, [isDesktop, openCreateStudentModal]);
 
   const onDashboardOpenSchedule = useCallback(() => {
     guardedNavigate(tabPathById.schedule);
@@ -884,6 +1052,11 @@ const AppPageContent = () => {
 
   const onDashboardOpenHomeworkAssign = useCallback(
     (studentId?: number | null, lessonId?: number | null) => {
+      if (!isDesktop) {
+        openDashboardHomeworkAssignModal(studentId, lessonId);
+        return;
+      }
+
       guardedNavigate(tabPathById.homeworks, {
         state: {
           openAssignModal: true,
@@ -892,7 +1065,7 @@ const AppPageContent = () => {
         },
       });
     },
-    [guardedNavigate],
+    [guardedNavigate, isDesktop, openDashboardHomeworkAssignModal],
   );
 
   const onTopbarCreateAction = useCallback(() => {
@@ -1072,8 +1245,23 @@ const AppPageContent = () => {
                 <div id="app" className={`${layoutStyles.page} app-content`}>
                   <div className="app-surface">
                     <div
-                      className={`${layoutStyles.pageInner} ${isDesktop ? layoutStyles.pageInnerDesktop : ''}`}
+                      className={`${layoutStyles.pageInner} ${
+                        isDesktop ? layoutStyles.pageInnerDesktop : layoutStyles.pageInnerMobile
+                      }`}
                     >
+                      {!isDesktop ? (
+                        <MobileSidebarDrawer
+                          isOpen={isMobileSidebarOpen}
+                          activeTab={activeTab}
+                          items={mobileDrawerItems}
+                          profileName={mobileProfileName}
+                          profilePlanLabel={mobilePlanLabel}
+                          profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                          onClose={() => setMobileSidebarOpen(false)}
+                          onNavigate={onMobileNavigate}
+                        />
+                      ) : null}
+
                       {isDesktop ? (
                         <Sidebar
                           pathname={location.pathname}
@@ -1083,7 +1271,16 @@ const AppPageContent = () => {
                         />
                       ) : null}
 
-                      <div className={layoutStyles.mainColumn}>
+                      <div className={`${layoutStyles.mainColumn} ${!isDesktop ? layoutStyles.mainColumnMobile : ''}`}>
+                        {!isDesktop ? (
+                          <MobileTopbar
+                            profileName={mobileProfileName}
+                            profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                            onOpenSidebar={() => setMobileSidebarOpen(true)}
+                            onOpenNotifications={onOpenNotifications}
+                          />
+                        ) : null}
+
                         {isDesktop && !isStudentRole && !isTeacherHomeworkReviewRoute ? (
                           <Topbar
                             teacher={teacher}
@@ -1129,7 +1326,9 @@ const AppPageContent = () => {
                         ) : null}
 
                         <main
-                          className={`${layoutStyles.content} ${isTeacherTemplateEditorRoute ? layoutStyles.contentNoScroll : ''}`}
+                          className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
+                            isTeacherTemplateEditorRoute ? layoutStyles.contentNoScroll : ''
+                          }`}
                         >
                           <AppRoutes
                             key={isStudentRole ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}` : 'teacher'}
@@ -1147,19 +1346,39 @@ const AppPageContent = () => {
                         </main>
 
                         {!isDesktop ? (
-                          <Tabbar activeTab={activeTab} onTabChange={onTabbarNavigate} tabsList={availableTabs} />
+                          <MobileBottomTabs
+                            activeTab={activeTab}
+                            items={mobileTabbarItems}
+                            onNavigate={onMobileNavigate}
+                          />
                         ) : null}
                       </div>
                     </div>
                   </div>
 
                   {!isStudentRole ? (
-                    <AppModals
-                      linkedStudents={linkedStudents}
-                      dialogState={dialogState}
-                      onCloseDialog={closeDialog}
-                      onDialogStateChange={setDialogState}
-                    />
+                    <>
+                      <HomeworkAssignModal
+                        open={homeworkAssignModalOpen}
+                        variant={isDesktop ? 'modal' : 'sheet'}
+                        templates={homeworkAssignTemplates}
+                        groups={homeworkAssignGroups}
+                        students={homeworkAssignStudents}
+                        loading={homeworkAssignLoading}
+                        submitting={homeworkAssignSubmitting}
+                        defaultStudentId={homeworkAssignDefaults.studentId}
+                        defaultLessonId={homeworkAssignDefaults.lessonId}
+                        onSubmit={handleDashboardHomeworkAssignSubmit}
+                        onClose={closeDashboardHomeworkAssignModal}
+                      />
+
+                      <AppModals
+                        linkedStudents={linkedStudents}
+                        dialogState={dialogState}
+                        onCloseDialog={closeDialog}
+                        onDialogStateChange={setDialogState}
+                      />
+                    </>
                   ) : null}
                 </div>
                 {showSubscriptionGate ? <SubscriptionGate /> : null}

@@ -3,7 +3,7 @@
   border: 1px solid var(--color-slate-200);
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 10px 24px var(--shadow-slate-900-08);
+  box-shadow: none;
   display: grid;
   gap: 10px;
 }
@@ -85,7 +85,7 @@
   height: 8px;
   border-radius: 999px;
   background: var(--color-blue-600);
-  box-shadow: 0 0 0 4px var(--color-blue-50);
+  box-shadow: none;
 }
 
 .info {

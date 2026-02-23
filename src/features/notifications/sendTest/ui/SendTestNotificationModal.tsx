@@ -689,8 +689,6 @@ export const SendTestNotificationModal: FC<SendTestNotificationModalProps> = ({
     </div>
   );
 
-  if (!open) return null;
-
   if (variant === 'sheet') {
     return (
       <BottomSheet isOpen={open} onClose={closeRequest}>
@@ -698,6 +696,8 @@ export const SendTestNotificationModal: FC<SendTestNotificationModalProps> = ({
       </BottomSheet>
     );
   }
+
+  if (!open) return null;
 
   return (
     <div className={modalStyles.modalOverlay} onClick={closeRequest}>

@@ -56,7 +56,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
           <FontAwesomeIcon icon={faArrowRight} className={`${styles.actionArrow} ${styles.actionArrowPrimary}`} />
         </button>
 
-        <button type="button" className={styles.actionButton} onClick={onCreateLesson}>
+        <button type="button" className={styles.actionButton} onClick={() => onCreateLesson()}>
           <div className={styles.actionMain}>
             <div className={`${styles.actionIconWrap} ${styles.actionIconBlue}`}>
               <FontAwesomeIcon icon={faCalendarPlus} />
@@ -76,6 +76,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>
 
+        {/*
         <button type="button" className={styles.actionButton} onClick={() => handleStubClick('Выставление счета')}>
           <div className={styles.actionMain}>
             <div className={`${styles.actionIconWrap} ${styles.actionIconGreen}`}>
@@ -85,7 +86,9 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>
+        */}
 
+        {/*
         <button type="button" className={styles.actionButton} onClick={() => handleStubClick('Загрузка материалов')}>
           <div className={styles.actionMain}>
             <div className={`${styles.actionIconWrap} ${styles.actionIconOrange}`}>
@@ -95,8 +98,10 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>
+        */}
       </div>
 
+      {/*
       <div className={styles.tipSection}>
         <div className={styles.tipCard}>
           <div className={styles.tipContent}>
@@ -110,6 +115,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
           </div>
         </div>
       </div>
+      */}
     </section>
   );
 };

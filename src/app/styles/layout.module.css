@@ -24,6 +24,13 @@
   padding: 16px;
 }
 
+.pageInnerMobile {
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  position: relative;
+}
+
 .mainColumn {
   display: flex;
   flex-direction: column;
@@ -31,6 +38,10 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+
+.mainColumnMobile {
+  gap: 0;
 }
 
 .content {
@@ -47,8 +58,21 @@
   overflow: hidden;
 }
 
+.contentMobile {
+  gap: 16px;
+  padding: 16px 16px calc(92px + var(--app-safe-bottom));
+}
+
 @media (max-width: 859px) {
   .pageInner {
     padding: 8px 8px 8px 8px;
+  }
+
+  .pageInnerMobile {
+    padding: 0;
+  }
+
+  .contentMobile {
+    padding: 14px 14px calc(73px + var(--app-safe-bottom));
   }
 }

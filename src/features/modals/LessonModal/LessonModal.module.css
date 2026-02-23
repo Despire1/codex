@@ -1,6 +1,55 @@
 .sheetModal {
   max-width: 100%;
   width: 100%;
-  border-radius: 18px;
+  border-radius: 24px;
   box-shadow: none;
+  padding: 0;
+  max-height: calc(85vh - 12px);
+  overflow-x: hidden;
+}
+
+.sheetHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 16px;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.sheetBody {
+  padding: 12px 16px 0;
+  overflow-x: hidden;
+}
+
+.sheetTimeRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sheetTimeDivider {
+  display: none;
+}
+
+.sheetActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-white);
+  border-top: 1px solid var(--color-gray-100);
+}
+
+@media (max-width: 720px) {
+  .sheetModal {
+    border-radius: 20px;
+    max-height: calc(84vh - 8px);
+  }
+
+  .sheetTimeRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
 }

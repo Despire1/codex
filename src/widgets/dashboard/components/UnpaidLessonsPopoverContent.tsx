@@ -24,6 +24,7 @@ interface UnpaidLessonsPopoverContentProps {
   showAll?: boolean;
   stickyHeader?: boolean;
   fitContainer?: boolean;
+  hideHeader?: boolean;
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -40,6 +41,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   showAll = false,
   stickyHeader = false,
   fitContainer = false,
+  hideHeader = false,
 }) => {
   const timeZone = useTimeZone();
   const now = new Date();
@@ -116,9 +118,11 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
 
   return (
       <div className={`${styles.root} ${fitContainer ? styles.rootFill : ''}`.trim()}>
-        <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
-          <div className={styles.title}>Неоплаченные ({entries.length})</div>
-        </div>
+        {hideHeader ? null : (
+          <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
+            <div className={styles.title}>Неоплаченные ({entries.length})</div>
+          </div>
+        )}
 
         {entries.length === 0 ? (
             <div className={styles.empty}>Нет неоплаченных занятий</div>

@@ -719,6 +719,21 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
       : 'Выберите день в календаре';
     const selectedDayMetaCapitalized = selectedDayMeta.charAt(0).toUpperCase() + selectedDayMeta.slice(1);
 
+    const handleCreateLessonFromDrawer = () => {
+      if (!effectiveSelectedMonthDay) return;
+
+      const targetDate = toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone);
+      setDayViewDate(targetDate);
+      setDrawerMode('half');
+      setDrawerDragOffset(0);
+      setInternalSelectedMonthDay(null);
+      setSelectedMonthDay(null);
+      openLessonModal(effectiveSelectedMonthDay, undefined, undefined, {
+        skipNavigation: true,
+        variant: 'sheet',
+      });
+    };
+
     const startDrawerDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!isMobileMonthView || !effectiveSelectedMonthDay) return;
 
@@ -817,6 +832,17 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
             ? `Заметки (${selectedDayNotesCount}) появятся в этом блоке в следующем обновлении.`
             : 'Блок заметок пока в режиме заглушки.'}
         </div>
+        {isMobileMonthView ? (
+          <div className={styles.dayDrawerActions}>
+            <button
+              type="button"
+              className={styles.dayDrawerCreateButton}
+              onClick={handleCreateLessonFromDrawer}
+            >
+              Создать урок
+            </button>
+          </div>
+        ) : null}
       </div>
     );
 

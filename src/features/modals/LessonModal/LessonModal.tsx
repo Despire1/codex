@@ -86,9 +86,8 @@ export const LessonModal: FC<LessonModalProps> = ({
   variant = 'modal',
   focusTarget = 'full',
 }) => {
-  if (!open) return null;
-
   const timeZone = useTimeZone();
+  const isSheet = variant === 'sheet';
   const isEditing = Boolean(editingLessonId);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
@@ -253,10 +252,10 @@ export const LessonModal: FC<LessonModalProps> = ({
 
   const modalContent = (
     <div
-      className={`${modalStyles.modal} ${variant === 'sheet' ? sheetStyles.sheetModal : ''}`}
+      className={`${modalStyles.modal} ${isSheet ? sheetStyles.sheetModal : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className={modalStyles.modalHeader}>
+      <div className={`${modalStyles.modalHeader} ${isSheet ? sheetStyles.sheetHeader : ''}`}>
         <div>
           <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
           <div className={modalStyles.modalSubtitle}>
@@ -267,7 +266,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           ×
         </button>
       </div>
-      <div className={modalStyles.modalBody}>
+      <div className={`${modalStyles.modalBody} ${isSheet ? sheetStyles.sheetBody : ''}`}>
           <div className={controls.formRow} style={{ gridTemplateColumns: '1fr' }}>
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Ученики</span>
@@ -286,7 +285,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               />
             </div>
           </div>
-          <div className={modalStyles.timeRow}>
+          <div className={`${modalStyles.timeRow} ${isSheet ? sheetStyles.sheetTimeRow : ''}`}>
             <DatePickerField
               label="Дата"
               value={draft.date}
@@ -307,7 +306,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                 inputProps={{ step: 60 }}
               />
             </div>
-            <span className={modalStyles.timeDivider}>—</span>
+            <span className={`${modalStyles.timeDivider} ${isSheet ? sheetStyles.sheetTimeDivider : ''}`}>—</span>
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Конец</span>
               <TextField
@@ -474,7 +473,7 @@ export const LessonModal: FC<LessonModalProps> = ({
             </AccordionDetails>
           </Accordion>
         </div>
-        <div className={modalStyles.modalActions}>
+        <div className={`${modalStyles.modalActions} ${isSheet ? sheetStyles.sheetActions : ''}`}>
           {isEditing && onDelete && (
             <button className={controls.dangerButton} onClick={onDelete}>
               Удалить урок
@@ -497,6 +496,8 @@ export const LessonModal: FC<LessonModalProps> = ({
       </BottomSheet>
     );
   }
+
+  if (!open) return null;
 
   return (
     <div className={modalStyles.modalOverlay} onClick={onClose}>

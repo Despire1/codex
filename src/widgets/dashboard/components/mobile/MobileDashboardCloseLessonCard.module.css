@@ -3,7 +3,7 @@
   border-left: 4px solid var(--color-orange-200);
   border-radius: 16px;
   padding: 14px;
-  box-shadow: 0 10px 24px var(--shadow-slate-900-08);
+  box-shadow: none;
   display: grid;
   gap: 10px;
 }

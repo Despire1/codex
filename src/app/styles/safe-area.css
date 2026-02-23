@@ -56,6 +56,13 @@ body {
   overflow: hidden;
 }
 
+@media (max-width: 1023px) {
+  :root {
+    --app-surface-radius: 24px;
+    --app-surface-bg: var(--color-white);
+  }
+}
+
 :root.tg-desktop {
   --app-safe-top: 0px !important;
   --app-safe-top-extra: 0px !important;

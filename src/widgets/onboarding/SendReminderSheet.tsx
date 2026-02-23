@@ -29,8 +29,6 @@ export const SendReminderSheet: FC<SendReminderSheetProps> = ({
   isSending,
   variant = 'modal',
 }) => {
-  if (!open) return null;
-
   const content = (
     <div className={styles.content}>
       <div className={styles.templateList}>
@@ -69,6 +67,8 @@ export const SendReminderSheet: FC<SendReminderSheetProps> = ({
       </BottomSheet>
     );
   }
+
+  if (!open) return null;
 
   return (
     <Modal open={open} title="Напоминание" onClose={onClose}>

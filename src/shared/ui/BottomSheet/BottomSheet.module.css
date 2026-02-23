@@ -39,6 +39,7 @@
   pointer-events: auto;
   overscroll-behavior: contain;
   will-change: transform;
+  overflow-x: hidden;
 }
 
 .sheetOpen {
@@ -63,10 +64,14 @@
 }
 
 .content {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
 }
 
 .contentNoScroll {

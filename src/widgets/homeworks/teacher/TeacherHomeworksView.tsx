@@ -24,6 +24,7 @@ import {
   HomeworkLinkIcon,
   HomeworkListCheckIcon,
   HomeworkMicrophoneIcon,
+  HomeworkPenIcon,
   HomeworkPenToSquareIcon,
   HomeworkPlusIcon,
   HomeworkRobotIcon,
@@ -49,6 +50,7 @@ import {
 import {
   DEFAULT_GROUP_EDITOR_BG_COLOR,
   DEFAULT_GROUP_EDITOR_ICON_KEY,
+  resolveGroupCardPalette,
   resolveGroupEditorBgColor,
   resolveGroupEditorIconKey,
 } from './model/lib/groupEditorStyles';
@@ -1059,22 +1061,29 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const groupError = groupAssignmentsErrorByKey[groupKey];
                   const groupNextOffset = groupAssignmentsNextOffsetByKey[groupKey] ?? null;
                   const expanded = Boolean(expandedGroups[groupKey]);
+                  const palette = resolveGroupCardPalette(group.bgColor);
 
                   return (
                     <article key={group.id ?? 'ungrouped'} className={styles.groupCard}>
-                      <button
-                        type="button"
+                      <div
+                        role="button"
+                        tabIndex={0}
                         className={styles.groupCardHeader}
-                        style={{
-                          background: `linear-gradient(90deg, ${group.bgColor || '#F3F4F6'} 0%, rgba(255,255,255,0) 72%)`,
-                        }}
+                        style={{ background: palette.headerBackground }}
                         onClick={() => toggleGroupExpanded(group)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                          event.preventDefault();
+                          toggleGroupExpanded(group);
+                        }}
                       >
                         <span className={styles.groupCardMain}>
                           <span
                             className={styles.groupIconBadge}
                             style={{
-                              backgroundColor: group.bgColor || '#F3F4F6',
+                              backgroundColor: palette.iconBackground,
+                              color: palette.iconColor,
                             }}
                           >
                             <GroupIconView iconKey={group.iconKey} size={14} />
@@ -1082,37 +1091,40 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                           <span className={styles.groupTitleBlock}>
                             <span className={styles.groupTitleRow}>
                               <span className={styles.groupTitle}>{group.title}</span>
-                              <span className={styles.groupCountBadge}>{group.assignmentsCount} заданий</span>
+                              <span
+                                className={styles.groupCountBadge}
+                                style={{
+                                  backgroundColor: palette.countBadgeBackground,
+                                  color: palette.countBadgeColor,
+                                }}
+                              >
+                                {group.assignmentsCount} заданий
+                              </span>
                             </span>
                             <span className={styles.groupSubtitle}>{group.description || 'Задания внутри группы'}</span>
                           </span>
                         </span>
                         <span className={styles.groupHeaderActions}>
                           {!group.isSystem && group.id !== null ? (
-                            <span
-                              role="button"
-                              tabIndex={0}
+                            <button
+                              type="button"
                               className={styles.groupEditIconButton}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 openEditGroupEditor(group);
                               }}
-                              onKeyDown={(event) => {
-                                if (event.key !== 'Enter' && event.key !== ' ') return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                openEditGroupEditor(group);
-                              }}
+                              aria-label="Редактировать группу"
+                              title="Редактировать группу"
                             >
-                              <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
-                            </span>
+                              <HomeworkPenIcon size={11} className={styles.inlineFaIcon} />
+                            </button>
                           ) : null}
                           <HomeworkChevronDownIcon
                             size={12}
                             className={`${styles.groupChevron} ${expanded ? styles.groupChevronExpanded : ''}`}
                           />
                         </span>
-                      </button>
+                      </div>
 
                       {expanded ? (
                         <div className={styles.groupCardContent}>
