@@ -25,7 +25,6 @@ import {
   toUtcEndOfDay,
   toZonedDate,
 } from '../shared/lib/timezoneDates';
-import { isStudentUiColor, normalizeStudentUiColor, pickNextStudentUiColor } from '../shared/lib/studentUiColors';
 import {
   STUDENT_LESSON_TEMPLATE_VARIABLES,
   STUDENT_PAYMENT_TEMPLATE_VARIABLES,
@@ -45,7 +44,7 @@ import {
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
 import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
-import { listActivityFeedForTeacher, logActivityEvent } from './activityFeedService';
+import { logActivityEvent } from './activityFeedService';
 import {
   badRequest,
   notFound,
@@ -53,11 +52,25 @@ import {
   sendJson,
 } from './server/lib/http';
 import { createAuthService } from './server/modules/auth';
+import { createSessionService } from './server/modules/sessions';
+import {
+  createActivityFeedService,
+  parseActivityCategories,
+  parseQueryDate,
+} from './server/modules/activityFeed';
+import { createStudentsService, normalizeTelegramUsername } from './server/modules/students';
 import { clampNumber, isValidTimeString } from './server/lib/runtimeLimits';
 import { createAuthTransferHandlers } from './server/routes/authTransfer';
 import { createAuthSessionHandlers } from './server/routes/authSession';
 import { tryHandleAuthRoutes } from './server/routes/authRoutes';
 import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
+import { tryHandleHomeworkRoutesV2 } from './server/routes/homeworkRoutesV2';
+import { tryHandleNotificationRoutes } from './server/routes/notificationRoutes';
+import { tryHandleSessionRoutes } from './server/routes/sessionRoutes';
+import { tryHandleActivityFeedRoutes } from './server/routes/activityFeedRoutes';
+import { tryHandleStudentRoutes } from './server/routes/studentRoutes';
+import { tryHandleHomeworkRoutes } from './server/routes/homeworkRoutes';
+import { tryHandleLessonRoutes } from './server/routes/lessonRoutes';
 import { RequestValidationError } from './server/lib/requestValidationError';
 import { validateHomeworkTemplatePayload } from './server/modules/homeworkTemplateValidation';
 
@@ -114,6 +127,8 @@ const authService = createAuthService({
   },
 });
 const { createSession, getSessionTokenHash, getSessionUser, resolveSessionUser } = authService;
+const sessionService = createSessionService({ getSessionTokenHash });
+const { listSessions, revokeSession, revokeOtherSessions } = sessionService;
 const authTransferHandlers = createAuthTransferHandlers({
   createSession,
   getSessionUser,
@@ -355,6 +370,8 @@ const ensureTeacher = async (user: User) =>
       username: user.username ?? null,
     },
   });
+const activityFeedService = createActivityFeedService({ ensureTeacher });
+const { listActivityFeed, getActivityFeedUnreadStatus, markActivityFeedSeen } = activityFeedService;
 
 const pickTeacherSettings = (teacher: any) => ({
   timezone: teacher.timezone ?? null,
@@ -734,293 +751,13 @@ const sendNotificationTest = async (user: User, body: any) => {
   };
 };
 
-const listSessions = async (user: User, req: IncomingMessage) => {
-  const tokenHash = getSessionTokenHash(req);
-  const now = new Date();
-  const sessions = await prisma.session.findMany({
-    where: { userId: user.id, revokedAt: null, expiresAt: { gt: now } },
-    orderBy: { createdAt: 'desc' },
-  });
+const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pendingHomework' | 'noReminder') =>
+  studentsService.searchStudents(user, query, filter);
 
-  return {
-    sessions: sessions.map((session) => ({
-      id: session.id,
-      createdAt: session.createdAt,
-      ip: session.ip,
-      userAgent: session.userAgent,
-      isCurrent: tokenHash ? session.tokenHash === tokenHash : false,
-    })),
-  };
-};
-
-const revokeSession = async (user: User, sessionId: number) => {
-  const session = await prisma.session.findUnique({ where: { id: sessionId } });
-  if (!session || session.userId !== user.id) {
-    throw new Error('Сессия не найдена');
-  }
-  const updated = await prisma.session.update({
-    where: { id: sessionId },
-    data: { revokedAt: new Date() },
-  });
-  return { status: 'ok', sessionId: updated.id };
-};
-
-const revokeOtherSessions = async (user: User, req: IncomingMessage) => {
-  const tokenHash = getSessionTokenHash(req);
-  const result = await prisma.session.updateMany({
-    where: {
-      userId: user.id,
-      revokedAt: null,
-      ...(tokenHash ? { tokenHash: { not: tokenHash } } : {}),
-    },
-    data: { revokedAt: new Date() },
-  });
-  return { status: 'ok', revoked: result.count };
-};
-
-const searchStudents = async (user: User, query?: string, filter?: 'all' | 'pendingHomework' | 'noReminder') => {
-  const teacher = await ensureTeacher(user);
-  const normalizedQuery = query?.trim().toLowerCase();
-
-  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } });
-  const students = await prisma.student.findMany({
-    where: {
-      teacherLinks: {
-        some: {
-          teacherId: teacher.chatId,
-          isArchived: false,
-        },
-      },
-    },
-  });
-
-  const filteredLinks = links.filter((link) => {
-    const student = students.find((s) => s.id === link.studentId);
-    if (!student) return false;
-
-    const matchesQuery = !normalizedQuery
-      ? true
-      : link.customName.toLowerCase().includes(normalizedQuery) ||
-        (student.username ?? '').toLowerCase().includes(normalizedQuery);
-
-    if (!matchesQuery) return false;
-
-    if (filter === 'noReminder') return !link.autoRemindHomework;
-
-    if (filter === 'pendingHomework') {
-      // Homeworks will be filtered below; preliminary include all to evaluate after fetch.
-      return true;
-    }
-
-    return true;
-  });
-
-  const studentIds = filteredLinks.map((link) => link.studentId);
-
-  const homeworks = await prisma.homework.findMany({
-    where: {
-      teacherId: teacher.chatId,
-      studentId: studentIds.length ? { in: studentIds } : { in: [-1] },
-    },
-  });
-
-  const withPending = filteredLinks.filter((link) => {
-    if (filter !== 'pendingHomework') return true;
-    return homeworks.some((hw) => hw.studentId === link.studentId && !hw.isDone);
-  });
-
-  return {
-    students: students
-      .filter((student) => withPending.some((link) => link.studentId === student.id))
-      .map((student) => student),
-    links: withPending,
-    homeworks,
-  };
-};
-
-const resolvePageParams = (url: URL) => {
-  const limitRaw = Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE);
-  const offsetRaw = Number(url.searchParams.get('offset') ?? 0);
-  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
-  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
-  return { limit, offset };
-};
-
-const parseActivityCategories = (value?: string | null) => {
-  if (!value) return undefined;
-  const categories = value
-    .split(',')
-    .map((item) => item.trim().toUpperCase())
-    .filter(Boolean)
-    .filter(
-      (item): item is 'LESSON' | 'STUDENT' | 'HOMEWORK' | 'SETTINGS' | 'PAYMENT' | 'NOTIFICATION' =>
-        item === 'LESSON' ||
-        item === 'STUDENT' ||
-        item === 'HOMEWORK' ||
-        item === 'SETTINGS' ||
-        item === 'PAYMENT' ||
-        item === 'NOTIFICATION',
-    );
-  return categories.length > 0 ? categories : undefined;
-};
-
-const parseQueryDate = (value?: string | null) => {
-  if (!value) return undefined;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-};
-
-const isHomeworkDone = (homework: any) => normalizeTeacherStatus(homework.status) === 'DONE' || homework.isDone;
-
-const isHomeworkOverdue = (homework: any, todayStart: Date) => {
-  if (!homework.deadline) return false;
-  if (isHomeworkDone(homework)) return false;
-  return new Date(homework.deadline).getTime() < todayStart.getTime();
-};
-
-const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
-  let pendingHomeworkCount = 0;
-  let overdueHomeworkCount = 0;
-  let doneHomeworkCount = 0;
-  const totalHomeworkCount = homeworks.length;
-
-  homeworks.forEach((homework) => {
-    const homeworkDone = isHomeworkDone(homework);
-    if (homeworkDone) {
-      doneHomeworkCount += 1;
-    } else {
-      pendingHomeworkCount += 1;
-    }
-    if (isHomeworkOverdue(homework, todayStart)) {
-      overdueHomeworkCount += 1;
-    }
-  });
-
-  const homeworkCompletionRate =
-    totalHomeworkCount > 0 ? Math.round((doneHomeworkCount / totalHomeworkCount) * 100) : 0;
-  const averageScore =
-    totalHomeworkCount > 0 ? Number(((doneHomeworkCount / totalHomeworkCount) * 10).toFixed(1)) : 0;
-
-  return {
-    pendingHomeworkCount,
-    overdueHomeworkCount,
-    totalHomeworkCount,
-    doneHomeworkCount,
-    homeworkCompletionRate,
-    averageScore,
-  };
-};
-
-const normalizeTelegramUsername = (username?: string | null) => {
-  if (!username) return null;
-  const trimmed = username.trim();
-  if (!trimmed) return null;
-  const withoutAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
-  return withoutAt.trim().toLowerCase() || null;
-};
-
-type StudentProfileFields = {
-  email: string | null;
-  phone: string | null;
-  studentLevel: string | null;
-  learningGoal: string | null;
-  notes: string | null;
-};
-
-const normalizeOptionalStudentTextField = (
-  value: unknown,
-  options: { label: string; maxLength: number },
-): string | null => {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') {
-    throw new Error(`${options.label} должен быть строкой`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.length > options.maxLength) {
-    throw new Error(`${options.label} слишком длинный`);
-  }
-  return trimmed;
-};
-
-const parseStudentProfileFields = (
-  body: Record<string, unknown> | null | undefined,
-  mode: 'create' | 'update',
-): Partial<StudentProfileFields> => {
-  const source = body ?? {};
-  const parsed: Partial<StudentProfileFields> = {};
-  const shouldApply = (fieldName: keyof StudentProfileFields) => mode === 'create' || fieldName in source;
-
-  if (shouldApply('email')) {
-    const rawEmail = source.email;
-    if (rawEmail === undefined || rawEmail === null) {
-      parsed.email = null;
-    } else {
-      if (typeof rawEmail !== 'string') {
-        throw new Error('Email должен быть строкой');
-      }
-      const normalized = normalizeEmail(rawEmail);
-      if (!normalized) {
-        parsed.email = null;
-      } else if (!isValidEmail(normalized)) {
-        throw new Error('Email указан некорректно');
-      } else {
-        parsed.email = normalized;
-      }
-    }
-  }
-
-  if (shouldApply('phone')) {
-    parsed.phone = normalizeOptionalStudentTextField(source.phone, { label: 'Телефон', maxLength: 64 });
-  }
-
-  if (shouldApply('studentLevel')) {
-    parsed.studentLevel = normalizeOptionalStudentTextField(source.studentLevel, {
-      label: 'Уровень ученика',
-      maxLength: 120,
-    });
-  }
-
-  if (shouldApply('learningGoal')) {
-    parsed.learningGoal = normalizeOptionalStudentTextField(source.learningGoal, {
-      label: 'Цель обучения',
-      maxLength: 2000,
-    });
-  }
-
-  if (shouldApply('notes')) {
-    parsed.notes = normalizeOptionalStudentTextField(source.notes, { label: 'Заметки', maxLength: 4000 });
-  }
-
-  return parsed;
-};
+const resolvePageParams = (url: URL) => studentsService.resolvePageParams(url);
 
 const isOnboardingReminderTemplate = (value: unknown): value is OnboardingReminderTemplate =>
   value === 'TODAY' || value === 'IN_1_HOUR' || value === 'TOMORROW_MORNING';
-
-const findUserByTelegramUsername = async (normalizedUsername: string) => {
-  const candidates = await prisma.user.findMany({
-    where: { username: { contains: normalizedUsername } },
-  });
-  return candidates.find((user) => normalizeTelegramUsername(user.username) === normalizedUsername) ?? null;
-};
-
-const resolveNextTeacherStudentUiColor = async (
-  teacherId: bigint,
-  options?: { excludeStudentId?: number },
-) => {
-  const links = await prisma.teacherStudent.findMany({
-    where: {
-      teacherId,
-      isArchived: false,
-      ...(typeof options?.excludeStudentId === 'number'
-        ? { studentId: { not: options.excludeStudentId } }
-        : {}),
-    },
-    select: { uiColor: true },
-  });
-  return pickNextStudentUiColor(links.map((link) => link.uiColor));
-};
 
 const listStudents = async (
   user: User,
@@ -1028,318 +765,7 @@ const listStudents = async (
   filter?: 'all' | 'debt' | 'overdue',
   limit = DEFAULT_PAGE_SIZE,
   offset = 0,
-) => {
-  const teacher = await ensureTeacher(user);
-  const resolvedTimeZone = resolveTimeZone(teacher.timezone);
-  const normalizedQuery = query?.trim();
-  const normalizedQueryLower = normalizedQuery?.toLowerCase();
-  const where: any = { teacherId: teacher.chatId, isArchived: false };
-
-  if (normalizedQuery) {
-    where.OR = [
-      { customName: { contains: normalizedQuery } },
-      { student: { username: { contains: normalizedQuery } } },
-    ];
-  }
-
-  let links = await prisma.teacherStudent.findMany({
-    where,
-    include: { student: true },
-    orderBy: { customName: 'asc' },
-  });
-  if (normalizedQueryLower) {
-    links = links.filter((link) => {
-      const customName = link.customName?.toLowerCase() ?? '';
-      const username = link.student?.username?.toLowerCase() ?? '';
-      return customName.includes(normalizedQueryLower) || username.includes(normalizedQueryLower);
-    });
-  }
-
-  const studentIds = links.map((link) => link.studentId);
-  const studentIdsSet = new Set(studentIds);
-  const homeworks = studentIds.length
-    ? await prisma.homework.findMany({
-        where: { teacherId: teacher.chatId, studentId: { in: studentIds } },
-      })
-    : [];
-
-  const lessons = studentIds.length
-    ? await prisma.lesson.findMany({
-        where: {
-          teacherId: teacher.chatId,
-          participants: {
-            some: {
-              studentId: { in: studentIds },
-            },
-          },
-        },
-        select: {
-          startAt: true,
-          status: true,
-          participants: {
-            select: {
-              studentId: true,
-              attended: true,
-            },
-          },
-        },
-      })
-    : [];
-
-  const homeworksByStudent = new Map<number, any[]>();
-  homeworks.forEach((homework) => {
-    const existing = homeworksByStudent.get(homework.studentId) ?? [];
-    existing.push(homework);
-    homeworksByStudent.set(homework.studentId, existing);
-  });
-
-  const now = new Date();
-  const todayStart = getTimeZoneStartOfDay(now, teacher.timezone);
-  const todayKey = format(toZonedDate(now, resolvedTimeZone), 'yyyy-MM-dd');
-  const todayEnd = toUtcEndOfDay(todayKey, resolvedTimeZone);
-  const weekStartKey = format(startOfWeek(toZonedDate(now, resolvedTimeZone), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-  const weekEndKey = format(endOfWeek(toZonedDate(now, resolvedTimeZone), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-  const weekStart = toUtcDateFromTimeZone(weekStartKey, '00:00', resolvedTimeZone);
-  const weekEnd = toUtcEndOfDay(weekEndKey, resolvedTimeZone);
-
-  const createEmptyLessonStats = () => ({
-    totalLessons: 0,
-    completedLessons: 0,
-    attendedLessons: 0,
-    attendanceTrackedLessons: 0,
-    weeklyLessonsCount: 0,
-    todayLessonsCount: 0,
-    nextLessonAt: null as Date | null,
-    lastLessonAt: null as Date | null,
-  });
-
-  const lessonStatsByStudent = new Map<number, ReturnType<typeof createEmptyLessonStats>>();
-
-  lessons.forEach((lesson) => {
-    if (lesson.status === 'CANCELED') return;
-    const lessonDate = new Date(lesson.startAt);
-    const isPastOrCompleted = lesson.status === 'COMPLETED' || lessonDate.getTime() <= now.getTime();
-    const isUpcoming = lesson.status === 'SCHEDULED' && lessonDate.getTime() > now.getTime();
-    const isInCurrentWeek = lessonDate.getTime() >= weekStart.getTime() && lessonDate.getTime() <= weekEnd.getTime();
-    const isToday = lessonDate.getTime() >= todayStart.getTime() && lessonDate.getTime() <= todayEnd.getTime();
-
-    lesson.participants.forEach((participant) => {
-      if (!studentIdsSet.has(participant.studentId)) return;
-      const stats = lessonStatsByStudent.get(participant.studentId) ?? createEmptyLessonStats();
-
-      stats.totalLessons += 1;
-      if (isPastOrCompleted) {
-        stats.completedLessons += 1;
-      }
-      if (isInCurrentWeek) {
-        stats.weeklyLessonsCount += 1;
-      }
-      if (isToday) {
-        stats.todayLessonsCount += 1;
-      }
-      if (isUpcoming && (!stats.nextLessonAt || lessonDate.getTime() < stats.nextLessonAt.getTime())) {
-        stats.nextLessonAt = lessonDate;
-      }
-      if (isPastOrCompleted && (!stats.lastLessonAt || lessonDate.getTime() > stats.lastLessonAt.getTime())) {
-        stats.lastLessonAt = lessonDate;
-      }
-
-      if (participant.attended === true) {
-        stats.attendanceTrackedLessons += 1;
-        stats.attendedLessons += 1;
-      } else if (participant.attended === false) {
-        stats.attendanceTrackedLessons += 1;
-      } else if (lesson.status === 'COMPLETED') {
-        stats.attendanceTrackedLessons += 1;
-        stats.attendedLessons += 1;
-      }
-
-      lessonStatsByStudent.set(participant.studentId, stats);
-    });
-  });
-
-  const resolveLifecycleStatus = (stats: ReturnType<typeof createEmptyLessonStats>) => {
-    if (stats.nextLessonAt) return 'ACTIVE' as const;
-    if (!stats.lastLessonAt) return 'ACTIVE' as const;
-    const daysSinceLastLesson = (now.getTime() - stats.lastLessonAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceLastLesson <= 30) return 'PAUSED' as const;
-    return 'COMPLETED' as const;
-  };
-
-  type StudentListStats = ReturnType<typeof buildHomeworkStats> & {
-    totalLessons: number;
-    completedLessons: number;
-    attendanceRate: number | null;
-    weeklyLessonsCount: number;
-    todayLessonsCount: number;
-    nextLessonAt: string | null;
-    lastLessonAt: string | null;
-    lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
-  };
-
-  const statsByStudent = new Map<number, StudentListStats>();
-  links.forEach((link) => {
-    const homeworkStats = buildHomeworkStats(homeworksByStudent.get(link.studentId) ?? [], todayStart);
-    const lessonStats = lessonStatsByStudent.get(link.studentId) ?? createEmptyLessonStats();
-    const attendanceRate =
-      lessonStats.attendanceTrackedLessons > 0
-        ? Math.round((lessonStats.attendedLessons / lessonStats.attendanceTrackedLessons) * 100)
-        : null;
-
-    statsByStudent.set(link.studentId, {
-      ...homeworkStats,
-      totalLessons: lessonStats.totalLessons,
-      completedLessons: lessonStats.completedLessons,
-      attendanceRate,
-      weeklyLessonsCount: lessonStats.weeklyLessonsCount,
-      todayLessonsCount: lessonStats.todayLessonsCount,
-      nextLessonAt: lessonStats.nextLessonAt?.toISOString() ?? null,
-      lastLessonAt: lessonStats.lastLessonAt?.toISOString() ?? null,
-      lifecycleStatus: resolveLifecycleStatus(lessonStats),
-    });
-  });
-
-  const emptyStudentStats: StudentListStats = {
-    pendingHomeworkCount: 0,
-    overdueHomeworkCount: 0,
-    totalHomeworkCount: 0,
-    doneHomeworkCount: 0,
-    homeworkCompletionRate: 0,
-    averageScore: 0,
-    totalLessons: 0,
-    completedLessons: 0,
-    attendanceRate: null,
-    weeklyLessonsCount: 0,
-    todayLessonsCount: 0,
-    nextLessonAt: null,
-    lastLessonAt: null,
-    lifecycleStatus: 'ACTIVE' as const,
-  };
-
-  const filteredLinks = links.filter((link) => {
-    const stats = statsByStudent.get(link.studentId) ?? emptyStudentStats;
-    if (filter === 'debt') return link.balanceLessons < 0;
-    if (filter === 'overdue') return stats.overdueHomeworkCount > 0;
-    return true;
-  });
-
-  const total = filteredLinks.length;
-  const pageItems = filteredLinks.slice(offset, offset + limit).map((link) => {
-    const { student, ...linkData } = link;
-    return {
-      student,
-      link: linkData,
-      stats: statsByStudent.get(link.studentId) ?? emptyStudentStats,
-    };
-  });
-
-  const debtSummariesByStudent = new Map<number, { total: number; count: number }>();
-  const reminderCountsByStudent = new Map<number, number>();
-  if (pageItems.length) {
-    const debtResults = await Promise.all(
-      pageItems.map(async (item) => {
-        try {
-          const summary = await resolveStudentDebtSummary(teacher.chatId, item.student.id);
-          return { studentId: item.student.id, total: summary.total, count: summary.items.length };
-        } catch {
-          return { studentId: item.student.id, total: 0, count: 0 };
-        }
-      }),
-    );
-
-    debtResults.forEach((result) => {
-      if (result.total > 0 || result.count > 0) {
-        debtSummariesByStudent.set(result.studentId, { total: result.total, count: result.count });
-      }
-    });
-  }
-
-  if (pageItems.length) {
-    const reminderCounts = await prisma.notificationLog.findMany({
-      where: {
-        teacherId: teacher.chatId,
-        lessonId: { not: null },
-        type: 'PAYMENT_REMINDER_STUDENT',
-        studentId: { in: pageItems.map((item) => item.student.id) },
-      },
-      select: { studentId: true },
-    });
-
-    reminderCounts.forEach((reminder) => {
-      if (!reminder.studentId) return;
-      reminderCountsByStudent.set(
-        reminder.studentId,
-        (reminderCountsByStudent.get(reminder.studentId) ?? 0) + 1,
-      );
-    });
-  }
-
-  const items = pageItems.map((item) => {
-    const debtSummary = debtSummariesByStudent.get(item.student.id);
-    const paymentRemindersCount = reminderCountsByStudent.get(item.student.id) ?? null;
-    if (!debtSummary) {
-      return {
-        ...item,
-        paymentRemindersCount,
-      };
-    }
-    return {
-      ...item,
-      debtRub: debtSummary.total > 0 ? debtSummary.total : null,
-      debtLessonCount: debtSummary.count > 0 ? debtSummary.count : null,
-      paymentRemindersCount,
-    };
-  });
-
-  const nextOffset = offset + limit < total ? offset + limit : null;
-  const allStatuses = links.map((link) => (statsByStudent.get(link.studentId) ?? emptyStudentStats).lifecycleStatus);
-  const summaryStudents = links.length || 1;
-  const summaryAttendanceValues = links
-    .map((link) => (statsByStudent.get(link.studentId) ?? emptyStudentStats).attendanceRate)
-    .filter((value): value is number => typeof value === 'number');
-  const averageAttendance =
-    summaryAttendanceValues.length > 0
-      ? Math.round(summaryAttendanceValues.reduce((sum, value) => sum + value, 0) / summaryAttendanceValues.length)
-      : null;
-  const averageScore = Number(
-    (
-      links.reduce((sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).averageScore ?? 0), 0) /
-      summaryStudents
-    ).toFixed(1),
-  );
-  const lessonsThisWeek = links.reduce(
-    (sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).weeklyLessonsCount ?? 0),
-    0,
-  );
-  const lessonsToday = links.reduce(
-    (sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).todayLessonsCount ?? 0),
-    0,
-  );
-
-  const counts = {
-    withDebt: links.filter((link) => link.balanceLessons < 0).length,
-    overdue: links.filter((link) => (statsByStudent.get(link.studentId)?.overdueHomeworkCount ?? 0) > 0).length,
-    active: allStatuses.filter((status) => status === 'ACTIVE').length,
-    paused: allStatuses.filter((status) => status === 'PAUSED').length,
-    completed: allStatuses.filter((status) => status === 'COMPLETED').length,
-  };
-
-  return {
-    items,
-    total,
-    nextOffset,
-    counts,
-    summary: {
-      active: counts.active,
-      paused: counts.paused,
-      completed: counts.completed,
-      lessonsThisWeek,
-      lessonsToday,
-      averageAttendance,
-      averageScore,
-    },
-  };
-};
+) => studentsService.listStudents(user, query, filter, limit, offset);
 
 const listStudentHomeworks = async (
   user: User,
@@ -1347,33 +773,7 @@ const listStudentHomeworks = async (
   filter: 'all' | HomeworkStatus | 'overdue' = 'all',
   limit = DEFAULT_PAGE_SIZE,
   offset = 0,
-) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const where: any = { teacherId: teacher.chatId, studentId };
-  if (filter === 'overdue') {
-    const todayStart = getTimeZoneStartOfDay(new Date(), teacher.timezone);
-    where.deadline = { lt: todayStart };
-    where.isDone = false;
-    where.NOT = { status: 'DONE' };
-  } else if (filter && filter !== 'all') {
-    where.status = filter;
-  }
-
-  const total = await prisma.homework.count({ where });
-  const items = await prisma.homework.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    skip: offset,
-    take: limit,
-  });
-  const nextOffset = offset + limit < total ? offset + limit : null;
-  return { items, total, nextOffset };
-};
+) => studentsService.listStudentHomeworks(user, studentId, filter, limit, offset);
 
 const parseDateFilter = (value?: string | null) => {
   if (!value) return null;
@@ -1381,194 +781,14 @@ const parseDateFilter = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const resolveStudentDebtSummary = async (teacherId: number, studentId: number) => {
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId, studentId } },
-  });
-  const now = new Date();
-  const lessons = await prisma.lesson.findMany({
-    where: {
-      teacherId,
-      status: { not: 'CANCELED' },
-      OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
-      participants: {
-        some: {
-          studentId,
-          isPaid: false,
-        },
-      },
-    },
-    include: {
-      participants: true,
-    },
-    orderBy: { startAt: 'asc' },
-  });
-
-  const items = lessons.map((lesson) => {
-    const participant = lesson.participants.find((item) => item.studentId === studentId);
-    const participantPrice =
-      typeof participant?.price === 'number' && participant.price > 0 ? participant.price : null;
-    const fallbackPrice =
-      typeof link?.pricePerLesson === 'number' && link.pricePerLesson > 0
-        ? link.pricePerLesson
-        : typeof lesson.price === 'number' && lesson.price > 0
-          ? lesson.price
-          : null;
-    const price = participantPrice ?? fallbackPrice;
-    return {
-      id: lesson.id,
-      startAt: lesson.startAt,
-      status: lesson.status,
-      price,
-      lastPaymentReminderAt: lesson.lastPaymentReminderAt,
-    };
-  });
-
-  const total = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
-
-  return { items, total };
-};
-
-const listStudentUnpaidLessons = async (user: User, studentId: number) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  return resolveStudentDebtSummary(teacher.chatId, studentId);
-};
+const listStudentUnpaidLessons = async (user: User, studentId: number) =>
+  studentsService.listStudentUnpaidLessons(user, studentId);
 
 const listStudentPaymentReminders = async (
   user: User,
   studentId: number,
   options: { limit?: number; offset?: number } = {},
-) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const safeLimit = clampNumber(options.limit ?? 10, 1, 50);
-  const safeOffset = clampNumber(options.offset ?? 0, 0, 10_000);
-  const reminders = await prisma.notificationLog.findMany({
-    where: {
-      teacherId: teacher.chatId,
-      studentId,
-      lessonId: { not: null },
-      type: 'PAYMENT_REMINDER_STUDENT',
-    },
-    orderBy: { createdAt: 'desc' },
-    take: safeLimit + 1,
-    skip: safeOffset,
-  });
-  const hasMore = reminders.length > safeLimit;
-  const slicedReminders = hasMore ? reminders.slice(0, safeLimit) : reminders;
-
-  return {
-    reminders: slicedReminders.map((reminder) => ({
-      id: reminder.id,
-      lessonId: reminder.lessonId!,
-      createdAt: reminder.createdAt,
-      status: reminder.status,
-      source: reminder.source ?? 'AUTO',
-    })),
-    nextOffset: hasMore ? safeOffset + safeLimit : null,
-  };
-};
-
-const listActivityFeed = async (
-  user: User,
-  filters: {
-    limit?: number;
-    cursor?: string | null;
-    categories?: ('LESSON' | 'STUDENT' | 'HOMEWORK' | 'SETTINGS' | 'PAYMENT' | 'NOTIFICATION')[];
-    studentId?: number | null;
-    from?: Date;
-    to?: Date;
-  },
-) => {
-  const teacher = await ensureTeacher(user);
-  return listActivityFeedForTeacher(teacher.chatId, filters);
-};
-
-const resolveLatestActivityFeedOccurredAt = async (teacherId: bigint) => {
-  const [activityEvent, paymentEvent, notificationLog] = await Promise.all([
-    prisma.activityEvent.findFirst({
-      where: { teacherId },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      select: { occurredAt: true },
-    }),
-    prisma.paymentEvent.findFirst({
-      where: {
-        OR: [{ teacherId }, { teacherId: null, lesson: { teacherId } }],
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { createdAt: true },
-    }),
-    prisma.notificationLog.findFirst({
-      where: { teacherId },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { createdAt: true },
-    }),
-  ]);
-
-  const timestamps = [activityEvent?.occurredAt, paymentEvent?.createdAt, notificationLog?.createdAt].filter(
-    (value): value is Date => Boolean(value),
-  );
-  if (timestamps.length === 0) return null;
-
-  return timestamps.reduce((latest, item) => (item.getTime() > latest.getTime() ? item : latest), timestamps[0]);
-};
-
-const buildActivityFeedUnreadStatus = (latestOccurredAt: Date | null, seenAt: Date | null) => ({
-  hasUnread: Boolean(latestOccurredAt && (!seenAt || latestOccurredAt.getTime() > seenAt.getTime())),
-  latestOccurredAt,
-  seenAt,
-});
-
-const getActivityFeedUnreadStatus = async (user: User) => {
-  const teacher = await ensureTeacher(user);
-  const latestOccurredAt = await resolveLatestActivityFeedOccurredAt(teacher.chatId);
-
-  return buildActivityFeedUnreadStatus(latestOccurredAt, teacher.activityFeedSeenAt ?? null);
-};
-
-const markActivityFeedSeen = async (user: User, body: Record<string, unknown>) => {
-  const teacher = await ensureTeacher(user);
-  const latestOccurredAt = await resolveLatestActivityFeedOccurredAt(teacher.chatId);
-  const rawSeenThrough = body.seenThrough;
-  let seenThrough: Date | null = null;
-
-  if (rawSeenThrough !== undefined) {
-    if (typeof rawSeenThrough !== 'string') throw new Error('invalid_seen_through');
-    seenThrough = toValidDate(rawSeenThrough);
-    if (!seenThrough) throw new Error('invalid_seen_through');
-  }
-
-  let nextSeenAt = teacher.activityFeedSeenAt ?? null;
-  const boundedSeenThrough =
-    seenThrough && latestOccurredAt && seenThrough.getTime() > latestOccurredAt.getTime()
-      ? latestOccurredAt
-      : seenThrough;
-  const targetSeenAt = boundedSeenThrough ?? latestOccurredAt;
-
-  if (targetSeenAt && (!nextSeenAt || targetSeenAt.getTime() > nextSeenAt.getTime())) {
-    const updatedTeacher = await prisma.teacher.update({
-      where: { chatId: teacher.chatId },
-      data: {
-        activityFeedSeenAt: targetSeenAt,
-      },
-      select: {
-        activityFeedSeenAt: true,
-      },
-    });
-    nextSeenAt = updatedTeacher.activityFeedSeenAt;
-  }
-
-  return buildActivityFeedUnreadStatus(latestOccurredAt, nextSeenAt);
-};
+) => studentsService.listStudentPaymentReminders(user, studentId, options);
 
 const listStudentLessons = async (
   user: User,
@@ -1580,75 +800,38 @@ const listStudentLessons = async (
     startTo?: string;
     sort?: 'asc' | 'desc';
   },
+) => studentsService.listStudentLessons(user, studentId, filters);
+
+const bootstrap = async (
+  user: User,
+  filters?: {
+    lessonsStart?: Date | null;
+    lessonsEnd?: Date | null;
+    includeHomeworks?: boolean;
+    includeStudents?: boolean;
+    includeLinks?: boolean;
+  },
 ) => {
   const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const participantWhere: Record<string, any> = { studentId };
-  if (filters.payment === 'paid') {
-    participantWhere.isPaid = true;
-  }
-  if (filters.payment === 'unpaid') {
-    participantWhere.isPaid = false;
-  }
-
-  const where: Record<string, any> = {
-    teacherId: teacher.chatId,
-    participants: {
-      some: participantWhere,
-    },
-  };
-
-  if (filters.status === 'completed') {
-    where.status = 'COMPLETED';
-  }
-
-  if (filters.status === 'not_completed') {
-    where.status = { not: 'COMPLETED' };
-  }
-
-  const startFrom = parseDateFilter(filters.startFrom);
-  const startTo = parseDateFilter(filters.startTo);
-  if (startFrom || startTo) {
-    where.startAt = {};
-    if (startFrom) where.startAt.gte = startFrom;
-    if (startTo) where.startAt.lte = startTo;
-  }
-
-  const items = await prisma.lesson.findMany({
-    where,
-    include: {
-      participants: {
-        include: {
-          student: true,
+  const includeLinks = filters?.includeLinks !== false;
+  const includeStudents = filters?.includeStudents !== false;
+  const links = includeLinks
+    ? await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } })
+    : [];
+  const students = includeStudents
+    ? await prisma.student.findMany({
+        where: {
+          teacherLinks: {
+            some: {
+              teacherId: teacher.chatId,
+              isArchived: false,
+            },
+          },
         },
-      },
-    },
-    orderBy: { startAt: filters.sort === 'asc' ? 'asc' : 'desc' },
-  });
-
-  const debt = await resolveStudentDebtSummary(teacher.chatId, studentId);
-
-  return { items, debt };
-};
-
-const bootstrap = async (user: User, filters?: { lessonsStart?: Date | null; lessonsEnd?: Date | null }) => {
-  const teacher = await ensureTeacher(user);
-  const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId, isArchived: false } });
-  const students = await prisma.student.findMany({
-    where: {
-      teacherLinks: {
-        some: {
-          teacherId: teacher.chatId,
-          isArchived: false,
-        },
-      },
-    },
-  });
-  const homeworks = await prisma.homework.findMany({ where: { teacherId: teacher.chatId } });
+      })
+    : [];
+  const includeHomeworks = filters?.includeHomeworks !== false;
+  const homeworks = includeHomeworks ? await prisma.homework.findMany({ where: { teacherId: teacher.chatId } }) : [];
   let lessons: any[] = [];
   if (filters?.lessonsStart || filters?.lessonsEnd) {
     const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId, startAt: {} };
@@ -1940,387 +1123,34 @@ const listUnpaidLessons = async (user: User) => {
   return { entries };
 };
 
-const addStudent = async (user: User, body: any) => {
-  const { customName, username, pricePerLesson } = body ?? {};
-  if (!customName || typeof customName !== 'string' || !customName.trim()) {
-    throw new Error('Имя ученика обязательно');
-  }
-  if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
-    throw new Error('Telegram username обязателен');
-  }
-  if (!Number.isFinite(Number(pricePerLesson)) || Number(pricePerLesson) < 0) {
-    throw new Error('Цена занятия обязательна и должна быть неотрицательной');
-  }
+const addStudent = async (user: User, body: any) => studentsService.addStudent(user, body);
 
-  const teacher = await ensureTeacher(user);
-  const normalizedUsername = typeof username === 'string' ? normalizeTelegramUsername(username) : null;
-  if (!normalizedUsername) throw new Error('Telegram username обязателен');
-  const normalizedCustomName = customName.trim();
-  const profileFields = parseStudentProfileFields(body as Record<string, unknown>, 'create');
-  const existingStudent = normalizedUsername
-    ? await prisma.student.findFirst({ where: { username: normalizedUsername } })
-    : null;
+const updateStudent = async (user: User, studentId: number, body: any) =>
+  studentsService.updateStudent(user, studentId, body);
 
-  const normalizedPrice = Math.round(Number(pricePerLesson));
-  let student =
-    existingStudent ||
-    (await prisma.student.create({
-      data: {
-        username: normalizedUsername,
-        pricePerLesson: normalizedPrice,
-      },
-    }));
+const archiveStudentLink = async (user: User, studentId: number) =>
+  studentsService.archiveStudentLink(user, studentId);
 
-  if (normalizedUsername && (!student.telegramId || !student.isActivated)) {
-    const matchedUser = await findUserByTelegramUsername(normalizedUsername);
-    if (matchedUser) {
-      student = await prisma.student.update({
-        where: { id: student.id },
-        data: {
-          telegramId: matchedUser.telegramUserId,
-          isActivated: true,
-          activatedAt: new Date(),
-        },
-      });
-    }
-  }
+const toggleAutoReminder = async (user: User, studentId: number, value: boolean) =>
+  studentsService.toggleAutoReminder(user, studentId, value);
 
-  const existingLink = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
-  });
+const updateStudentPaymentReminders = async (user: User, studentId: number, enabled: boolean) =>
+  studentsService.updateStudentPaymentReminders(user, studentId, enabled);
 
-  if (existingLink) {
-    const hasValidStoredColor = isStudentUiColor(existingLink.uiColor);
-    if (existingLink.isArchived) {
-      const nextUiColor = hasValidStoredColor
-        ? normalizeStudentUiColor(existingLink.uiColor)
-        : await resolveNextTeacherStudentUiColor(teacher.chatId, { excludeStudentId: student.id });
-      const restoredLink = await prisma.teacherStudent.update({
-        where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
-        data: {
-          isArchived: false,
-          customName: normalizedCustomName,
-          pricePerLesson: normalizedPrice,
-          uiColor: nextUiColor,
-          ...profileFields,
-        },
-      });
-      await safeLogActivityEvent({
-        teacherId: teacher.chatId,
-        studentId: student.id,
-        category: 'STUDENT',
-        action: 'RESTORE',
-        status: 'SUCCESS',
-        source: 'USER',
-        title: `Ученик восстановлен: ${normalizedCustomName}`,
-        details: 'Ссылка преподавателя с учеником восстановлена из архива.',
-      });
-      return { student, link: restoredLink };
-    }
-
-    if (!hasValidStoredColor) {
-      const nextUiColor = await resolveNextTeacherStudentUiColor(teacher.chatId, { excludeStudentId: student.id });
-      const linkWithColor = await prisma.teacherStudent.update({
-        where: { teacherId_studentId: { teacherId: teacher.chatId, studentId: student.id } },
-        data: { uiColor: nextUiColor },
-      });
-      return { student, link: linkWithColor };
-    }
-
-    return { student, link: existingLink };
-  }
-
-  const nextUiColor = await resolveNextTeacherStudentUiColor(teacher.chatId);
-  const link = await prisma.teacherStudent.create({
-    data: {
-      teacherId: teacher.chatId,
-      studentId: student.id,
-      customName: normalizedCustomName,
-      autoRemindHomework: true,
-      balanceLessons: 0,
-      pricePerLesson: normalizedPrice,
-      uiColor: nextUiColor,
-      ...profileFields,
-    },
-  });
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId: student.id,
-    category: 'STUDENT',
-    action: 'CREATE',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Добавлен ученик: ${normalizedCustomName}`,
-    details: normalizedUsername ? `username: @${normalizedUsername}` : null,
-  });
-  return { student, link };
-};
-
-const updateStudent = async (user: User, studentId: number, body: any) => {
-  const { customName, username, pricePerLesson } = body ?? {};
-  if (!customName || typeof customName !== 'string' || !customName.trim()) {
-    throw new Error('Имя ученика обязательно');
-  }
-  if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
-    throw new Error('Telegram username обязателен');
-  }
-  const numericPrice = Number(pricePerLesson);
-  if (!Number.isFinite(numericPrice) || numericPrice < 0) {
-    throw new Error('Цена занятия обязательна и должна быть неотрицательной');
-  }
-
-  const teacher = await ensureTeacher(user);
-  const normalizedCustomName = customName.trim();
-  const profileFields = parseStudentProfileFields(body as Record<string, unknown>, 'update');
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const normalizedUsername = normalizeTelegramUsername(typeof username === 'string' ? username : null);
-  if (!normalizedUsername) throw new Error('Telegram username обязателен');
-  const matchedUser = await findUserByTelegramUsername(normalizedUsername);
-
-  const [student, updatedLink] = await prisma.$transaction([
-    prisma.student.update({
-      where: { id: studentId },
-      data: {
-        username: normalizedUsername,
-        ...(matchedUser
-          ? {
-              telegramId: matchedUser.telegramUserId,
-              isActivated: true,
-              activatedAt: new Date(),
-            }
-          : {}),
-      },
-    }),
-    prisma.teacherStudent.update({
-      where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-      data: { customName: normalizedCustomName, pricePerLesson: Math.round(numericPrice), ...profileFields },
-    }),
-  ]);
-
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId,
-    category: 'STUDENT',
-    action: 'UPDATE',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Обновлён ученик: ${normalizedCustomName}`,
-    details: `username: @${normalizedUsername}; pricePerLesson: ${Math.round(numericPrice)}`,
-  });
-
-  return { student, link: updatedLink };
-};
-
-const archiveStudentLink = async (user: User, studentId: number) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const updatedLink = await prisma.teacherStudent.update({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    data: { isArchived: true },
-  });
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId,
-    category: 'STUDENT',
-    action: 'ARCHIVE',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Ученик отправлен в архив: ${link.customName}`,
-  });
-  return updatedLink;
-};
-
-const toggleAutoReminder = async (user: User, studentId: number, value: boolean) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Student link not found');
-  const updatedLink = await prisma.teacherStudent.update({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    data: { autoRemindHomework: value },
-  });
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId,
-    category: 'STUDENT',
-    action: 'TOGGLE_HOMEWORK_REMINDER',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Авто-напоминания по ДЗ ${value ? 'включены' : 'выключены'}`,
-    details: `Ученик: ${link.customName}`,
-  });
-  return updatedLink;
-};
-
-const updateStudentPaymentReminders = async (user: User, studentId: number, enabled: boolean) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-  const student = await prisma.student.update({
-    where: { id: studentId },
-    data: { paymentRemindersEnabled: enabled },
-  });
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId,
-    category: 'STUDENT',
-    action: 'TOGGLE_PAYMENT_REMINDER',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Напоминания об оплате ${enabled ? 'включены' : 'выключены'}`,
-    details: `Ученик: ${link.customName}`,
-  });
-  return { student };
-};
-
-const updatePricePerLesson = async (user: User, studentId: number, value: number) => {
-  if (Number.isNaN(value) || value < 0) {
-    throw new Error('Цена должна быть неотрицательным числом');
-  }
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-  const nextPrice = Math.round(value);
-  const updatedLink = await prisma.teacherStudent.update({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    data: { pricePerLesson: nextPrice },
-  });
-  await safeLogActivityEvent({
-    teacherId: teacher.chatId,
-    studentId,
-    category: 'STUDENT',
-    action: 'UPDATE_PRICE',
-    status: 'SUCCESS',
-    source: 'USER',
-    title: `Изменена цена занятия: ${nextPrice} ₽`,
-    details: `Ученик: ${link.customName}`,
-  });
-  return updatedLink;
-};
+const updatePricePerLesson = async (user: User, studentId: number, value: number) =>
+  studentsService.updatePricePerLesson(user, studentId, value);
 
 const adjustBalance = async (
   user: User,
   studentId: number,
   payload: { delta: number; type?: string; comment?: string; createdAt?: string },
-) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    include: { student: true },
-  });
-  if (!link || link.isArchived) throw new Error('Student link not found');
-  const delta = Number(payload.delta ?? 0);
-  if (!Number.isFinite(delta)) {
-    throw new Error('Некорректное значение баланса');
-  }
-  const nextBalance = link.balanceLessons + delta;
-  const updatedLink = await prisma.teacherStudent.update({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-    data: { balanceLessons: nextBalance },
-  });
-  if (delta !== 0) {
-    const type = payload.type?.toString().trim() || (delta > 0 ? 'TOP_UP' : 'ADJUSTMENT');
-    const createdAt = payload.createdAt ? new Date(payload.createdAt) : new Date();
-    const resolvedDate = Number.isNaN(createdAt.getTime()) ? new Date() : createdAt;
-    const comment = typeof payload.comment === 'string' && payload.comment.trim() ? payload.comment.trim() : null;
-    await prisma.paymentEvent.create({
-      data: {
-        studentId,
-        teacherId: teacher.chatId,
-        lessonId: null,
-        type,
-        lessonsDelta: delta,
-        priceSnapshot: link.pricePerLesson ?? 0,
-        moneyAmount: null,
-        createdAt: resolvedDate,
-        createdBy: 'TEACHER',
-        reason: 'BALANCE_ADJUSTMENT',
-        comment,
-      },
-    });
-  }
-  return updatedLink;
-};
+) => studentsService.adjustBalance(user, studentId, payload);
 
 const listPaymentEventsForStudent = async (
   user: User,
   studentId: number,
   options?: { filter?: string; date?: string },
-) => {
-  const teacher = await ensureTeacher(user);
-  const link = await prisma.teacherStudent.findUnique({
-    where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-  });
-
-  if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
-
-  const filter = options?.filter ?? 'all';
-  const where: Record<string, any> = {
-    studentId,
-    OR: [
-      { teacherId: teacher.chatId },
-      { teacherId: null, lesson: { teacherId: teacher.chatId } },
-    ],
-  };
-
-  if (filter === 'topup') {
-    where.AND = [
-      {
-        OR: [
-          { type: { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] } },
-          { type: 'ADJUSTMENT', lessonsDelta: { gt: 0 } },
-        ],
-      },
-    ];
-  } else if (filter === 'manual') {
-    where.AND = [
-      {
-        OR: [{ type: 'MANUAL_PAID' }, { reason: 'BALANCE_ADJUSTMENT' }],
-      },
-    ];
-  } else if (filter === 'charges') {
-    where.AND = [
-      {
-        OR: [
-          { type: 'AUTO_CHARGE' },
-          { type: 'ADJUSTMENT', lessonsDelta: { lt: 0 } },
-          { type: 'MANUAL_PAID', lessonsDelta: { lt: 0 } },
-        ],
-      },
-    ];
-  }
-
-  if (options?.date) {
-    const parsed = new Date(`${options.date}T00:00:00`);
-    if (!Number.isNaN(parsed.getTime())) {
-      const start = new Date(parsed);
-      const end = new Date(parsed);
-      end.setDate(end.getDate() + 1);
-      where.createdAt = { gte: start, lt: end };
-    }
-  }
-
-  const events = await prisma.paymentEvent.findMany({
-    where,
-    include: { lesson: true },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  });
-
-  return events;
-};
+) => studentsService.listPaymentEventsForStudent(user, studentId, options);
 
 type RequestRole = 'TEACHER' | 'STUDENT';
 
@@ -2376,6 +1206,15 @@ const normalizeStatus = (status: any) => {
 };
 
 const normalizeTeacherStatus = (status: any) => normalizeStatus(status);
+
+const studentsService = createStudentsService({
+  defaultPageSize: DEFAULT_PAGE_SIZE,
+  maxPageSize: MAX_PAGE_SIZE,
+  ensureTeacher,
+  safeLogActivityEvent,
+  normalizeTeacherStatus,
+  parseDateFilter,
+});
 
 const normalizeLessonStatus = (status: any): 'SCHEDULED' | 'COMPLETED' | 'CANCELED' => {
   if (status === 'COMPLETED') return 'COMPLETED';
@@ -7500,7 +6339,16 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
       const lessonsStart = parseDateFilter(url.searchParams.get('lessonsStart'));
       const lessonsEnd = parseDateFilter(url.searchParams.get('lessonsEnd'));
-      const data = await bootstrap(requireApiUser(), { lessonsStart, lessonsEnd });
+      const includeHomeworks = url.searchParams.get('includeHomeworks') !== '0';
+      const includeStudents = url.searchParams.get('includeStudents') !== '0';
+      const includeLinks = url.searchParams.get('includeLinks') !== '0';
+      const data = await bootstrap(requireApiUser(), {
+        lessonsStart,
+        lessonsEnd,
+        includeHomeworks,
+        includeStudents,
+        includeLinks,
+      });
       const filteredStudents =
         role === 'STUDENT' && requestedStudentId
           ? data.students.filter((student) => student.id === requestedStudentId)
@@ -7566,572 +6414,185 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
-    if (req.method === 'POST' && pathname === '/api/v2/files/presign-upload') {
-      const body = await readBody(req);
-      const data = createFilePresignUploadV2(req, body);
-      return sendJson(res, 200, data);
+    if (
+      await tryHandleHomeworkRoutesV2({
+        req,
+        res,
+        pathname,
+        url,
+        role,
+        requestedTeacherId,
+        requestedStudentId,
+        defaultPageSize: DEFAULT_PAGE_SIZE,
+        requireApiUser,
+        parsers: {
+          parseOptionalNumberQueryParam,
+          parseOptionalBooleanQueryParam,
+        },
+        handlers: {
+          createFilePresignUploadV2,
+          listHomeworkGroupsV2,
+          createHomeworkGroupV2,
+          updateHomeworkGroupV2,
+          deleteHomeworkGroupV2,
+          listHomeworkTemplatesV2,
+          createHomeworkTemplateV2,
+          updateHomeworkTemplateV2,
+          listHomeworkAssignmentsV2,
+          getHomeworkAssignmentsSummaryV2,
+          createHomeworkAssignmentV2,
+          bulkHomeworkAssignmentsV2,
+          getHomeworkAssignmentV2,
+          updateHomeworkAssignmentV2,
+          deleteHomeworkAssignmentV2,
+          remindHomeworkAssignmentV2,
+          listHomeworkSubmissionsV2,
+          createHomeworkSubmissionV2,
+          openHomeworkReviewSessionV2,
+          saveHomeworkReviewDraftV2,
+          reviewHomeworkAssignmentV2,
+        },
+      })
+    ) {
+      return;
     }
 
-    if (req.method === 'GET' && pathname === '/api/v2/homework/groups') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await listHomeworkGroupsV2(requireApiUser(), {
-        includeArchived: url.searchParams.get('includeArchived') === '1',
-      });
-      return sendJson(res, 200, data);
+    if (
+      await tryHandleNotificationRoutes({
+        req,
+        res,
+        pathname,
+        url,
+        requireApiUser,
+        isNotificationTestType,
+        handlers: {
+          getNotificationChannelStatus,
+          listNotificationTestRecipients,
+          sendNotificationTest,
+        },
+      })
+    ) {
+      return;
     }
 
-    if (req.method === 'POST' && pathname === '/api/v2/homework/groups') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const body = await readBody(req);
-      const data = await createHomeworkGroupV2(requireApiUser(), body);
-      return sendJson(res, 201, data);
+    if (
+      await tryHandleSessionRoutes({
+        req,
+        res,
+        pathname,
+        requireApiUser,
+        handlers: {
+          listSessions,
+          revokeOtherSessions,
+          revokeSession,
+        },
+      })
+    ) {
+      return;
     }
 
-    const homeworkGroupUpdateMatch = pathname.match(/^\/api\/v2\/homework\/groups\/(\d+)$/);
-    if (homeworkGroupUpdateMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const groupId = Number(homeworkGroupUpdateMatch[1]);
-      if (!Number.isFinite(groupId)) return badRequest(res, 'invalid_group_id');
-      if (req.method === 'PATCH') {
-        const body = await readBody(req);
-        const data = await updateHomeworkGroupV2(requireApiUser(), groupId, body);
-        return sendJson(res, 200, data);
-      }
-      if (req.method === 'DELETE') {
-        const data = await deleteHomeworkGroupV2(requireApiUser(), groupId);
-        return sendJson(res, 200, data);
-      }
+    if (
+      await tryHandleLessonRoutes({
+        req,
+        res,
+        pathname,
+        url,
+        role,
+        requestedStudentId,
+        requireApiUser,
+        normalizeCancelBehavior,
+        isOnboardingReminderTemplate,
+        handlers: {
+          listUnpaidLessons,
+          listLessonsForRange,
+          createRecurringLessons,
+          createLesson,
+          updateLessonStatus,
+          updateLesson,
+          deleteLesson,
+          markLessonCompleted,
+          toggleLessonPaid,
+          remindLessonPayment,
+          toggleParticipantPaid,
+          sendLessonReminder,
+        },
+      })
+    ) {
+      return;
     }
 
-    if (req.method === 'GET' && pathname === '/api/v2/homework/templates') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await listHomeworkTemplatesV2(requireApiUser(), {
-        query: url.searchParams.get('query'),
-        includeArchived: url.searchParams.get('includeArchived') === '1',
-      });
-      return sendJson(res, 200, data);
+    if (
+      await tryHandleActivityFeedRoutes({
+        req,
+        res,
+        pathname,
+        url,
+        role,
+        defaultPageSize: DEFAULT_PAGE_SIZE,
+        requireApiUser,
+        handlers: {
+          parseActivityCategories,
+          parseQueryDate,
+          getActivityFeedUnreadStatus,
+          markActivityFeedSeen,
+          listActivityFeed,
+        },
+      })
+    ) {
+      return;
     }
 
-    if (req.method === 'POST' && pathname === '/api/v2/homework/templates') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const body = await readBody(req);
-      const data = await createHomeworkTemplateV2(requireApiUser(), body);
-      return sendJson(res, 201, data);
+    if (
+      await tryHandleStudentRoutes({
+        req,
+        res,
+        pathname,
+        url,
+        role,
+        requestedStudentId,
+        requireApiUser,
+        handlers: {
+          resolvePageParams,
+          filterHomeworksForRole,
+          listStudents,
+          searchStudents,
+          addStudent,
+          updateStudent,
+          archiveStudentLink,
+          listStudentHomeworks,
+          listStudentLessons,
+          listStudentUnpaidLessons,
+          listStudentPaymentReminders,
+          updateStudentPaymentReminders,
+          toggleAutoReminder,
+          updatePricePerLesson,
+          adjustBalance,
+          listPaymentEventsForStudent,
+        },
+      })
+    ) {
+      return;
     }
 
-    const homeworkTemplateUpdateMatch = pathname.match(/^\/api\/v2\/homework\/templates\/(\d+)$/);
-    if (req.method === 'PATCH' && homeworkTemplateUpdateMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const templateId = Number(homeworkTemplateUpdateMatch[1]);
-      if (!Number.isFinite(templateId)) return badRequest(res, 'invalid_template_id');
-      const body = await readBody(req);
-      const data = await updateHomeworkTemplateV2(requireApiUser(), templateId, body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/v2/homework/assignments') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await listHomeworkAssignmentsV2(requireApiUser(), {
-        studentId: parseOptionalNumberQueryParam(url.searchParams.get('studentId')),
-        lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
-        groupId: parseOptionalNumberQueryParam(url.searchParams.get('groupId')),
-        ungrouped: parseOptionalBooleanQueryParam(url.searchParams.get('ungrouped')),
-        status: url.searchParams.get('status'),
-        bucket: url.searchParams.get('bucket'),
-        tab: url.searchParams.get('tab'),
-        q: url.searchParams.get('q'),
-        sort: url.searchParams.get('sort'),
-        problemFilters: url.searchParams.get('problemFilters'),
-        limit: Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE),
-        offset: Number(url.searchParams.get('offset') ?? 0),
-      });
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/v2/homework/assignments/summary') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const data = await getHomeworkAssignmentsSummaryV2(requireApiUser(), {
-        studentId: parseOptionalNumberQueryParam(url.searchParams.get('studentId')),
-        lessonId: parseOptionalNumberQueryParam(url.searchParams.get('lessonId')),
-      });
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/v2/homework/assignments') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const body = await readBody(req);
-      const data = await createHomeworkAssignmentV2(requireApiUser(), body);
-      return sendJson(res, 201, data);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/v2/homework/assignments/bulk') {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const body = await readBody(req);
-      const data = await bulkHomeworkAssignmentsV2(requireApiUser(), body);
-      return sendJson(res, 200, data);
-    }
-
-    const homeworkAssignmentUpdateMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)$/);
-    if (homeworkAssignmentUpdateMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(homeworkAssignmentUpdateMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      if (req.method === 'GET') {
-        const data = await getHomeworkAssignmentV2(requireApiUser(), assignmentId);
-        return sendJson(res, 200, data);
-      }
-      if (req.method === 'PATCH') {
-        const body = await readBody(req);
-        const data = await updateHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
-        return sendJson(res, 200, data);
-      }
-      if (req.method === 'DELETE') {
-        const data = await deleteHomeworkAssignmentV2(requireApiUser(), assignmentId);
-        return sendJson(res, 200, data);
-      }
-    }
-
-    const homeworkAssignmentRemindMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/remind$/);
-    if (req.method === 'POST' && homeworkAssignmentRemindMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(homeworkAssignmentRemindMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const data = await remindHomeworkAssignmentV2(requireApiUser(), assignmentId);
-      return sendJson(res, 200, data);
-    }
-
-    const homeworkSubmissionsMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/submissions$/);
-    if (homeworkSubmissionsMatch) {
-      const assignmentId = Number(homeworkSubmissionsMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      if (req.method === 'GET') {
-        if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-        const data = await listHomeworkSubmissionsV2(requireApiUser(), assignmentId);
-        return sendJson(res, 200, data);
-      }
-      if (req.method === 'POST') {
-        const body = await readBody(req);
-        const data = await createHomeworkSubmissionV2(
-          requireApiUser(),
-          role,
-          assignmentId,
-          body,
-          requestedTeacherId,
-          requestedStudentId,
-        );
-        return sendJson(res, 201, data);
-      }
-    }
-
-    const homeworkReviewMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review$/);
-    const homeworkReviewSessionMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review-session$/);
-    if (req.method === 'POST' && homeworkReviewSessionMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(homeworkReviewSessionMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const data = await openHomeworkReviewSessionV2(requireApiUser(), assignmentId);
-      return sendJson(res, 200, data);
-    }
-
-    const homeworkReviewDraftMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/review-draft$/);
-    if (req.method === 'POST' && homeworkReviewDraftMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(homeworkReviewDraftMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const body = await readBody(req);
-      const data = await saveHomeworkReviewDraftV2(requireApiUser(), assignmentId, body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'POST' && homeworkReviewMatch) {
-      if (role === 'STUDENT') return sendJson(res, 403, { message: 'forbidden' });
-      const assignmentId = Number(homeworkReviewMatch[1]);
-      if (!Number.isFinite(assignmentId)) return badRequest(res, 'invalid_assignment_id');
-      const body = await readBody(req);
-      const data = await reviewHomeworkAssignmentV2(requireApiUser(), assignmentId, body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/notifications/channel-status') {
-      return sendJson(res, 200, getNotificationChannelStatus());
-    }
-
-    if (req.method === 'GET' && pathname === '/api/notifications/test-recipients') {
-      const type = url.searchParams.get('type');
-      if (!isNotificationTestType(type)) return badRequest(res, 'invalid_type');
-      const data = await listNotificationTestRecipients(requireApiUser(), type);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/notifications/send-test') {
-      const body = await readBody(req);
-      const data = await sendNotificationTest(requireApiUser(), body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/sessions') {
-      const data = await listSessions(requireApiUser(), req);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/sessions/revoke-others') {
-      const data = await revokeOtherSessions(requireApiUser(), req);
-      return sendJson(res, 200, data);
-    }
-
-    const sessionRevokeMatch = pathname.match(/^\/api\/sessions\/(\d+)\/revoke$/);
-    if (req.method === 'POST' && sessionRevokeMatch) {
-      const sessionId = Number(sessionRevokeMatch[1]);
-      if (!Number.isFinite(sessionId)) return badRequest(res, 'invalid_session_id');
-      const data = await revokeSession(requireApiUser(), sessionId);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/lessons/unpaid') {
-      const data = await listUnpaidLessons(requireApiUser());
-      const filteredEntries =
-        role === 'STUDENT' && requestedStudentId
-          ? data.entries.filter((entry) => entry.studentId === requestedStudentId)
-          : data.entries;
-      return sendJson(res, 200, { entries: filteredEntries });
-    }
-
-    if (req.method === 'GET' && pathname === '/api/activity-feed/unread-status') {
-      if (role === 'STUDENT') {
-        return sendJson(res, 403, { message: 'forbidden' });
-      }
-      const data = await getActivityFeedUnreadStatus(requireApiUser());
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/activity-feed/mark-seen') {
-      if (role === 'STUDENT') {
-        return sendJson(res, 403, { message: 'forbidden' });
-      }
-      const body = await readBody(req);
-      const data = await markActivityFeedSeen(requireApiUser(), body);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/activity-feed') {
-      if (role === 'STUDENT') {
-        return sendJson(res, 403, { message: 'forbidden' });
-      }
-      const limit = Number(url.searchParams.get('limit') ?? DEFAULT_PAGE_SIZE);
-      const cursor = url.searchParams.get('cursor');
-      const categories = parseActivityCategories(url.searchParams.get('categories'));
-      const studentIdParam = url.searchParams.get('studentId');
-      const studentIdRaw = studentIdParam === null ? Number.NaN : Number(studentIdParam);
-      const studentId = Number.isFinite(studentIdRaw) && studentIdRaw > 0 ? studentIdRaw : null;
-      const from = parseQueryDate(url.searchParams.get('from'));
-      const to = parseQueryDate(url.searchParams.get('to'));
-      const data = await listActivityFeed(requireApiUser(), {
-        limit,
-        cursor,
-        categories,
-        studentId,
-        from,
-        to,
-      });
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/lessons') {
-      const data = await listLessonsForRange(requireApiUser(), {
-        start: url.searchParams.get('start'),
-        end: url.searchParams.get('end'),
-      });
-      const filteredLessons =
-        role === 'STUDENT' && requestedStudentId
-          ? data.lessons.filter(
-              (lesson) =>
-                lesson.studentId === requestedStudentId ||
-                lesson.participants?.some((participant) => participant.studentId === requestedStudentId),
-            )
-          : data.lessons;
-      return sendJson(res, 200, { lessons: filteredLessons });
-    }
-
-    if (req.method === 'GET' && pathname === '/api/students') {
-      const { searchParams } = url;
-      const query = searchParams.get('query') ?? undefined;
-      const filter = (searchParams.get('filter') as 'all' | 'debt' | 'overdue' | null) ?? 'all';
-      const { limit, offset } = resolvePageParams(url);
-      const data = await listStudents(requireApiUser(), query, filter, limit, offset);
-      return sendJson(res, 200, data);
-    }
-
-    if (req.method === 'GET' && pathname === '/api/students/search') {
-      const { searchParams } = url;
-      const query = searchParams.get('query') ?? undefined;
-      const filter = (searchParams.get('filter') as 'all' | 'pendingHomework' | 'noReminder' | null) ?? 'all';
-      const data = await searchStudents(requireApiUser(), query, filter);
-      const filteredHomeworks = filterHomeworksForRole(data.homeworks, role, requestedStudentId);
-      const filteredLinks =
-        role === 'STUDENT' && requestedStudentId
-          ? data.links.filter((link) => link.studentId === requestedStudentId)
-          : data.links;
-      const filteredStudents =
-        role === 'STUDENT' && requestedStudentId
-          ? data.students.filter((student) => student.id === requestedStudentId)
-          : data.students;
-      return sendJson(res, 200, { ...data, homeworks: filteredHomeworks, links: filteredLinks, students: filteredStudents });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/students') {
-      const body = await readBody(req);
-      const data = await addStudent(requireApiUser(), body);
-      return sendJson(res, 201, data);
-    }
-
-    const studentUpdateMatch = pathname.match(/^\/api\/students\/(\d+)$/);
-    if ((req.method === 'PATCH' || req.method === 'PUT') && studentUpdateMatch) {
-      const studentId = Number(studentUpdateMatch[1]);
-      const body = await readBody(req);
-      const data = await updateStudent(requireApiUser(), studentId, body);
-      return sendJson(res, 200, data);
-    }
-
-    const studentDeleteMatch = pathname.match(/^\/api\/students\/(\d+)$/);
-    if (req.method === 'DELETE' && studentDeleteMatch) {
-      const studentId = Number(studentDeleteMatch[1]);
-      const link = await archiveStudentLink(requireApiUser(), studentId);
-      return sendJson(res, 200, { link });
-    }
-
-    const studentHomeworkListMatch = pathname.match(/^\/api\/students\/(\d+)\/homeworks$/);
-    if (req.method === 'GET' && studentHomeworkListMatch) {
-      const studentId = Number(studentHomeworkListMatch[1]);
-      const { searchParams } = url;
-      const filter = (searchParams.get('filter') as HomeworkStatus | 'all' | 'overdue' | null) ?? 'all';
-      const { limit, offset } = resolvePageParams(url);
-      const data = await listStudentHomeworks(requireApiUser(), studentId, filter, limit, offset);
-      const filteredHomeworks = filterHomeworksForRole(data.items, role, requestedStudentId);
-      return sendJson(res, 200, { ...data, items: filteredHomeworks });
-    }
-
-    const studentLessonsMatch = pathname.match(/^\/api\/students\/(\d+)\/lessons$/);
-    if (req.method === 'GET' && studentLessonsMatch) {
-      const studentId = Number(studentLessonsMatch[1]);
-      const { searchParams } = url;
-      const payment = (searchParams.get('payment') as 'all' | 'paid' | 'unpaid' | null) ?? 'all';
-      const status = (searchParams.get('status') as 'all' | 'completed' | 'not_completed' | null) ?? 'all';
-      const startFrom = searchParams.get('startFrom') ?? undefined;
-      const startTo = searchParams.get('startTo') ?? undefined;
-      const sort = (searchParams.get('sort') as 'asc' | 'desc' | null) ?? 'desc';
-      const data = await listStudentLessons(requireApiUser(), studentId, { payment, status, startFrom, startTo, sort });
-      return sendJson(res, 200, data);
-    }
-
-    const studentUnpaidMatch = pathname.match(/^\/api\/students\/(\d+)\/unpaid-lessons$/);
-    if (req.method === 'GET' && studentUnpaidMatch) {
-      const studentId = Number(studentUnpaidMatch[1]);
-      const data = await listStudentUnpaidLessons(requireApiUser(), studentId);
-      return sendJson(res, 200, data);
-    }
-
-    const studentRemindersMatch = pathname.match(/^\/api\/students\/(\d+)\/payment-reminders$/);
-    if (studentRemindersMatch) {
-      const studentId = Number(studentRemindersMatch[1]);
-      if (req.method === 'GET') {
-        const limit = Number(url.searchParams.get('limit') ?? 10);
-        const offset = Number(url.searchParams.get('offset') ?? 0);
-        const data = await listStudentPaymentReminders(requireApiUser(), studentId, { limit, offset });
-        return sendJson(res, 200, data);
-      }
-      if (req.method === 'POST') {
-        const body = await readBody(req);
-        const enabled = Boolean((body as any)?.enabled);
-        const data = await updateStudentPaymentReminders(requireApiUser(), studentId, enabled);
-        return sendJson(res, 200, data);
-      }
-    }
-
-    const autoRemindMatch = pathname.match(/^\/api\/students\/(\d+)\/auto-remind$/);
-    if (req.method === 'POST' && autoRemindMatch) {
-      const studentId = Number(autoRemindMatch[1]);
-      const body = await readBody(req);
-      const link = await toggleAutoReminder(requireApiUser(), studentId, Boolean(body.value));
-      return sendJson(res, 200, { link });
-    }
-
-    const priceMatch = pathname.match(/^\/api\/students\/(\d+)\/price$/);
-    if ((req.method === 'POST' || req.method === 'PATCH') && priceMatch) {
-      const studentId = Number(priceMatch[1]);
-      const body = await readBody(req);
-      const link = await updatePricePerLesson(requireApiUser(), studentId, Number(body.value));
-      return sendJson(res, 200, { link });
-    }
-
-    const balanceMatch = pathname.match(/^\/api\/students\/(\d+)\/balance$/);
-    if (req.method === 'POST' && balanceMatch) {
-      const studentId = Number(balanceMatch[1]);
-      const body = await readBody(req);
-      const link = await adjustBalance(requireApiUser(), studentId, {
-        delta: Number(body.delta || 0),
-        type: body.type,
-        comment: body.comment,
-        createdAt: body.createdAt,
-      });
-      return sendJson(res, 200, { link });
-    }
-
-    const paymentsMatch = pathname.match(/^\/api\/students\/(\d+)\/payments$/);
-    if (req.method === 'GET' && paymentsMatch) {
-      const studentId = Number(paymentsMatch[1]);
-      const filter = url.searchParams.get('filter') ?? undefined;
-      const date = url.searchParams.get('date') ?? undefined;
-      const events = await listPaymentEventsForStudent(requireApiUser(), studentId, { filter, date });
-      return sendJson(res, 200, { events });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/homeworks') {
-      const body = await readBody(req);
-      const homework = await createHomework(requireApiUser(), body);
-      return sendJson(res, 201, { homework });
-    }
-
-    const homeworkUpdateMatch = pathname.match(/^\/api\/homeworks\/(\d+)$/);
-    if (req.method === 'PATCH' && homeworkUpdateMatch) {
-      const homeworkId = Number(homeworkUpdateMatch[1]);
-      const body = await readBody(req);
-      const homework = await updateHomework(requireApiUser(), homeworkId, body);
-      return sendJson(res, 200, { homework });
-    }
-
-    const takeInWorkMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/take-in-work$/);
-    if (req.method === 'POST' && takeInWorkMatch) {
-      const homeworkId = Number(takeInWorkMatch[1]);
-      const homework = await takeHomeworkInWork(homeworkId, req);
-      return sendJson(res, 200, { homework });
-    }
-
-    const homeworkSendMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/send$/);
-    if (req.method === 'POST' && homeworkSendMatch) {
-      const homeworkId = Number(homeworkSendMatch[1]);
-      const result = await sendHomeworkToStudent(requireApiUser(), homeworkId);
-      return sendJson(res, 200, result);
-    }
-
-    if (req.method === 'DELETE' && homeworkUpdateMatch) {
-      const homeworkId = Number(homeworkUpdateMatch[1]);
-      const result = await deleteHomework(requireApiUser(), homeworkId);
-      return sendJson(res, 200, result);
-    }
-
-    const homeworkToggleMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/toggle$/);
-    if (req.method === 'PATCH' && homeworkToggleMatch) {
-      const homeworkId = Number(homeworkToggleMatch[1]);
-      const homework = await toggleHomework(requireApiUser(), homeworkId);
-      return sendJson(res, 200, { homework });
-    }
-
-    const homeworkRemindMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/remind$/);
-    if (req.method === 'POST' && homeworkRemindMatch) {
-      const homeworkId = Number(homeworkRemindMatch[1]);
-      const result = await remindHomeworkById(requireApiUser(), homeworkId);
-      return sendJson(res, 200, result);
-    }
-
-    if (req.method === 'POST' && pathname === '/api/lessons/recurring') {
-      const body = await readBody(req);
-      const lessons = await createRecurringLessons(requireApiUser(), body);
-      return sendJson(res, 201, { lessons });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/lessons') {
-      const body = await readBody(req);
-      const lesson = await createLesson(requireApiUser(), body);
-      return sendJson(res, 201, { lesson });
-    }
-
-    const lessonStatusMatch = pathname.match(/^\/api\/lessons\/(\d+)\/status$/);
-    if (req.method === 'PATCH' && lessonStatusMatch) {
-      const lessonId = Number(lessonStatusMatch[1]);
-      const body = await readBody(req);
-      const result = await updateLessonStatus(requireApiUser(), lessonId, body.status);
-      return sendJson(res, 200, { lesson: result.lesson, links: result.links });
-    }
-
-    const lessonUpdateMatch = pathname.match(/^\/api\/lessons\/(\d+)$/);
-    if (req.method === 'PATCH' && lessonUpdateMatch) {
-      const lessonId = Number(lessonUpdateMatch[1]);
-      const body = await readBody(req);
-      const result = await updateLesson(requireApiUser(), lessonId, body);
-      if (result && typeof result === 'object' && 'lessons' in result) {
-        return sendJson(res, 200, { lessons: (result as any).lessons });
-      }
-      return sendJson(res, 200, { lesson: result });
-    }
-
-    if (req.method === 'DELETE' && lessonUpdateMatch) {
-      const lessonId = Number(lessonUpdateMatch[1]);
-      const body = await readBody(req);
-      const result = await deleteLesson(requireApiUser(), lessonId, Boolean(body.applyToSeries));
-      return sendJson(res, 200, result);
-    }
-
-    const lessonCompleteMatch = pathname.match(/^\/api\/lessons\/(\d+)\/complete$/);
-    if (req.method === 'POST' && lessonCompleteMatch) {
-      const lessonId = Number(lessonCompleteMatch[1]);
-      const result = await markLessonCompleted(requireApiUser(), lessonId);
-      return sendJson(res, 200, result);
-    }
-
-    const lessonPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/toggle-paid$/);
-    if (req.method === 'POST' && lessonPaidMatch) {
-      const lessonId = Number(lessonPaidMatch[1]);
-      const body = await readBody(req);
-      const result = await toggleLessonPaid(
-        requireApiUser(),
-        lessonId,
-        normalizeCancelBehavior((body as any)?.cancelBehavior),
-        Boolean((body as any)?.writeOffBalance),
-      );
-      return sendJson(res, 200, { lesson: result.lesson, link: result.link });
-    }
-
-    const remindPaymentMatch = pathname.match(/^\/api\/lessons\/(\d+)\/remind-payment$/);
-    if (req.method === 'POST' && remindPaymentMatch) {
-      const lessonId = Number(remindPaymentMatch[1]);
-      const body = await readBody(req);
-      const studentId = Number((body as any)?.studentId);
-      const resolvedStudentId = Number.isFinite(studentId) ? studentId : null;
-      const force = Boolean((body as any)?.force);
-      const result = await remindLessonPayment(requireApiUser(), lessonId, resolvedStudentId, { force });
-      return sendJson(res, 200, result);
-    }
-
-    const participantPaidMatch = pathname.match(/^\/api\/lessons\/(\d+)\/participants\/(\d+)\/toggle-paid$/);
-    if (req.method === 'POST' && participantPaidMatch) {
-      const lessonId = Number(participantPaidMatch[1]);
-      const studentId = Number(participantPaidMatch[2]);
-      const body = await readBody(req);
-      const result = await toggleParticipantPaid(
-        requireApiUser(),
-        lessonId,
-        studentId,
-        normalizeCancelBehavior((body as any)?.cancelBehavior),
-        Boolean((body as any)?.writeOffBalance),
-      );
-      return sendJson(res, 200, { participant: result.participant, lesson: result.lesson, link: result.link });
-    }
-
-    if (req.method === 'POST' && pathname === '/api/reminders/lesson') {
-      const body = await readBody(req);
-      const lessonId = Number((body as any)?.lessonId);
-      const template = (body as any)?.template;
-      if (!Number.isFinite(lessonId)) return badRequest(res, 'invalid_lesson_id');
-      if (!isOnboardingReminderTemplate(template)) return badRequest(res, 'invalid_template');
-      const result = await sendLessonReminder(requireApiUser(), { lessonId, template });
-      return sendJson(res, 200, result);
-    }
-
-    const remindMatch = pathname.match(/^\/api\/reminders\/homework$/);
-    if (req.method === 'POST' && remindMatch) {
-      const body = await readBody(req);
-      const result = await remindHomework(requireApiUser(), Number(body.studentId));
-      return sendJson(res, 200, result);
+    if (
+      await tryHandleHomeworkRoutes({
+        req,
+        res,
+        pathname,
+        requireApiUser,
+        handlers: {
+          createHomework,
+          updateHomework,
+          takeHomeworkInWork,
+          sendHomeworkToStudent,
+          deleteHomework,
+          toggleHomework,
+          remindHomeworkById,
+          remindHomework,
+        },
+      })
+    ) {
+      return;
     }
 
     return notFound(res);

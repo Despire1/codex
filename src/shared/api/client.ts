@@ -286,10 +286,19 @@ export const api = {
     apiFetch<{ status: string }>('/auth/logout', {
       method: 'POST',
     }),
-  bootstrap: (params?: { lessonsStart?: string; lessonsEnd?: string }) => {
+  bootstrap: (params?: {
+    lessonsStart?: string;
+    lessonsEnd?: string;
+    includeHomeworks?: boolean;
+    includeStudents?: boolean;
+    includeLinks?: boolean;
+  }) => {
     const search = new URLSearchParams();
     if (params?.lessonsStart) search.set('lessonsStart', params.lessonsStart);
     if (params?.lessonsEnd) search.set('lessonsEnd', params.lessonsEnd);
+    if (params?.includeHomeworks === false) search.set('includeHomeworks', '0');
+    if (params?.includeStudents === false) search.set('includeStudents', '0');
+    if (params?.includeLinks === false) search.set('includeLinks', '0');
     const suffix = search.toString();
     const path = suffix ? `/api/bootstrap?${suffix}` : '/api/bootstrap';
     return apiFetch<{

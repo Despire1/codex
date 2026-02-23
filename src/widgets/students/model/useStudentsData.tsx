@@ -368,20 +368,9 @@ export const useStudentsDataInternal = ({
 
   useEffect(() => {
     if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    loadStudentUnpaidLessons({ studentIdOverride: selectedStudentId });
-  }, [hasAccess, loadStudentUnpaidLessons, selectedStudentId]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
     if (studentActiveTab !== 'lessons') return;
     loadStudentLessons();
   }, [loadStudentLessons, hasAccess, studentActiveTab]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    loadStudentLessonsSummary();
-  }, [loadStudentLessonsSummary, hasAccess]);
 
   useEffect(() => {
     if (!hasAccess) return;

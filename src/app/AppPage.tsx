@@ -118,6 +118,10 @@ const AppPageContent = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [links, setLinks] = useState<TeacherStudent[]>([]);
   const initialBootstrapDone = useRef(false);
+  const rosterLoadedRef = useRef(false);
+  const rosterBootstrapInFlightRef = useRef(false);
+  const dashboardHomeworksBootstrapInFlightRef = useRef(false);
+  const dashboardHomeworksLoadedRef = useRef(false);
   const [studentListReloadKey, setStudentListReloadKey] = useState(0);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
   const [studentActiveTab, setStudentActiveTab] = useState<StudentTabId>('overview');
@@ -325,11 +329,15 @@ const AppPageContent = () => {
     [isStudentRole],
   );
 
-  const activeTab = useMemo<TabId>(() => {
+  const activeTabByPath = useMemo<TabId | null>(() => {
     const matchedTab = availableTabs.find(
       (tab) => location.pathname === tab.path || location.pathname.startsWith(`${tab.path}/`),
     );
-    if (matchedTab) return matchedTab.id;
+    return matchedTab?.id ?? null;
+  }, [availableTabs, location.pathname]);
+
+  const activeTab = useMemo<TabId>(() => {
+    if (activeTabByPath) return activeTabByPath;
 
     if (location.pathname === '/') {
       const storedPath = typeof window !== 'undefined' ? window.localStorage.getItem(LAST_VISITED_ROUTE_KEY) : null;
@@ -340,7 +348,10 @@ const AppPageContent = () => {
     }
 
     return 'dashboard';
-  }, [availableTabs, location.pathname]);
+  }, [activeTabByPath, availableTabs, location.pathname]);
+  const activeTabNeedsRoster =
+    activeTabByPath === 'dashboard' || activeTabByPath === 'schedule' || activeTabByPath === 'students';
+  const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
 
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
@@ -382,14 +393,14 @@ const AppPageContent = () => {
   const dashboardState = useDashboardStateInternal({
     hasAccess: hasTeacherAccess,
     timeZone: resolvedTimeZone,
-    isActive: activeTab === 'dashboard',
+    isActive: hasTeacherAccess && activeTabByPath === 'dashboard',
     buildLessonRange,
     loadLessonsForRange,
   });
 
   const dashboardSummary = useDashboardSummaryInternal({
     hasAccess: hasTeacherAccess,
-    isActive: hasTeacherAccess && activeTab === 'dashboard',
+    isActive: hasTeacherAccess && activeTabByPath === 'dashboard',
   });
   const { summary: dashboardSummaryData } = dashboardSummary;
   const isZeroSummary =
@@ -415,6 +426,11 @@ const AppPageContent = () => {
     [device, onboardingState.teacherId],
   );
 
+  const refreshDashboardSummaryIfActive = useCallback(() => {
+    if (activeTabByPath !== 'dashboard') return;
+    dashboardSummary.refresh();
+  }, [activeTabByPath, dashboardSummary.refresh]);
+
   const studentsActions = useStudentsActionsInternal({
     students,
     links,
@@ -436,7 +452,7 @@ const AppPageContent = () => {
       if (source.startsWith('onboarding')) {
         onboardingState.setCreatedStudent({ student, link });
       }
-      dashboardSummary.refresh();
+      refreshDashboardSummaryIfActive();
       track('student_create_success', { source: resolveAnalyticsSource(source) });
     },
     onStudentCreateError: (error, source) => {
@@ -449,7 +465,7 @@ const AppPageContent = () => {
 
   useScheduleLessonsLoaderInternal({
     hasAccess: hasTeacherAccess,
-    isActive: hasTeacherAccess && activeTab === 'schedule',
+    isActive: hasTeacherAccess && activeTabByPath === 'schedule',
     scheduleView,
     dayViewDate,
     buildDayRange,
@@ -457,6 +473,45 @@ const AppPageContent = () => {
     buildMonthRange,
     loadLessonsForRange,
   });
+
+  const loadStudentLessonsIfStudentsTab = useCallback(async () => {
+    if (activeTabByPath !== 'students') return;
+    await loadStudentLessons();
+  }, [activeTabByPath, loadStudentLessons]);
+
+  const loadStudentLessonsSummaryIfStudentsTab = useCallback(async () => {
+    if (activeTabByPath !== 'students') return;
+    await loadStudentLessonsSummary();
+  }, [activeTabByPath, loadStudentLessonsSummary]);
+
+  const loadStudentUnpaidLessonsIfStudentsTab = useCallback(
+    async (options?: { studentIdOverride?: number | null; force?: boolean }) => {
+      if (activeTabByPath !== 'students') return;
+      await loadStudentUnpaidLessons(options);
+    },
+    [activeTabByPath, loadStudentUnpaidLessons],
+  );
+
+  const loadDashboardUnpaidLessonsIfDashboardTab = useCallback(async () => {
+    if (activeTabByPath !== 'dashboard') return;
+    await dashboardState.loadUnpaidLessons();
+  }, [activeTabByPath, dashboardState.loadUnpaidLessons]);
+
+  const refreshPaymentsIfStudentsTab = useCallback(
+    async (studentId: number) => {
+      if (activeTabByPath !== 'students') return;
+      await refreshPayments(studentId);
+    },
+    [activeTabByPath, refreshPayments],
+  );
+
+  const refreshPaymentRemindersIfStudentsTab = useCallback(
+    async (studentId: number) => {
+      if (activeTabByPath !== 'students') return;
+      await refreshPaymentReminders(studentId);
+    },
+    [activeTabByPath, refreshPaymentReminders],
+  );
 
   const lessonActions = useLessonActionsInternal({
     timeZone: resolvedTimeZone,
@@ -477,12 +532,12 @@ const AppPageContent = () => {
     filterLessonsForCurrentRange,
     syncLessonsInRanges,
     removeLessonsFromRanges,
-    loadStudentLessons,
-    loadStudentLessonsSummary,
-    loadStudentUnpaidLessons,
-    loadDashboardUnpaidLessons: dashboardState.loadUnpaidLessons,
-    refreshPayments,
-    refreshPaymentReminders,
+    loadStudentLessons: loadStudentLessonsIfStudentsTab,
+    loadStudentLessonsSummary: loadStudentLessonsSummaryIfStudentsTab,
+    loadStudentUnpaidLessons: loadStudentUnpaidLessonsIfStudentsTab,
+    loadDashboardUnpaidLessons: loadDashboardUnpaidLessonsIfDashboardTab,
+    refreshPayments: refreshPaymentsIfStudentsTab,
+    refreshPaymentReminders: refreshPaymentRemindersIfStudentsTab,
     triggerStudentsListReload,
     studentDebtItems,
     onLessonCreateStarted: (source) => {
@@ -492,7 +547,7 @@ const AppPageContent = () => {
       if (source.startsWith('onboarding')) {
         onboardingState.setCreatedLesson(lesson);
       }
-      dashboardSummary.refresh();
+      refreshDashboardSummaryIfActive();
       track('lesson_create_success', { source: resolveAnalyticsSource(source) });
     },
     onLessonCreateError: (error, source) => {
@@ -631,16 +686,17 @@ const AppPageContent = () => {
   useEffect(() => {
     if (!hasTeacherAccess) return;
     if (initialBootstrapDone.current) return;
+    if (!activeTabByPath) return;
     const loadInitial = async () => {
       try {
         const initialRange =
-          activeTab === 'schedule'
+          activeTabByPath === 'schedule'
             ? scheduleView === 'month'
               ? buildMonthRange()
               : scheduleView === 'week'
                 ? buildWeekRange(dayViewDate)
                 : buildDayRange(dayViewDate)
-            : activeTab === 'dashboard' && dashboardState.weekRange
+            : activeTabByPath === 'dashboard' && dashboardState.weekRange
               ? buildLessonRange(dashboardState.weekRange.start, dashboardState.weekRange.end)
               : null;
         initialBootstrapDone.current = true;
@@ -649,20 +705,29 @@ const AppPageContent = () => {
             ? {
                 lessonsStart: initialRange.startAt.toISOString(),
                 lessonsEnd: initialRange.endAt.toISOString(),
+                includeHomeworks: activeTabNeedsDashboardHomeworks,
+                includeStudents: activeTabNeedsRoster,
+                includeLinks: activeTabNeedsRoster,
               }
-            : undefined,
+            : {
+                includeHomeworks: activeTabNeedsDashboardHomeworks,
+                includeStudents: activeTabNeedsRoster,
+                includeLinks: activeTabNeedsRoster,
+              },
         );
 
         setTeacher(data.teacher ?? initialTeacher);
         setStudents(data.students ?? []);
         setLinks(data.links ?? []);
-        studentsHomework.replaceHomeworks(data.homeworks ?? []);
+        rosterLoadedRef.current = activeTabNeedsRoster;
+        if (activeTabNeedsDashboardHomeworks) {
+          dashboardHomeworksLoadedRef.current = true;
+          studentsHomework.replaceHomeworks(data.homeworks ?? []);
+        }
         if (initialRange) {
           applyLessonsForRange(initialRange, data.lessons ?? []);
         }
 
-        const firstStudentId = data.students?.[0]?.id ?? null;
-        setSelectedStudentId((prev) => prev ?? firstStudentId);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to bootstrap app', error);
@@ -671,7 +736,9 @@ const AppPageContent = () => {
 
     loadInitial();
   }, [
-    activeTab,
+    activeTabByPath,
+    activeTabNeedsDashboardHomeworks,
+    activeTabNeedsRoster,
     applyLessonsForRange,
     buildDayRange,
     buildLessonRange,
@@ -684,7 +751,71 @@ const AppPageContent = () => {
     studentsHomework.replaceHomeworks,
   ]);
 
+  useEffect(() => {
+    if (!hasTeacherAccess) return;
+    if (!initialBootstrapDone.current) return;
+    if (!activeTabNeedsRoster) return;
+    if (!activeTabByPath) return;
+    if (rosterLoadedRef.current) return;
+    if (rosterBootstrapInFlightRef.current) return;
 
+    rosterBootstrapInFlightRef.current = true;
+    void api
+      .bootstrap({
+        includeStudents: true,
+        includeLinks: true,
+        includeHomeworks: activeTabNeedsDashboardHomeworks,
+      })
+      .then((data) => {
+        setStudents(data.students ?? []);
+        setLinks(data.links ?? []);
+        rosterLoadedRef.current = true;
+        if (activeTabNeedsDashboardHomeworks) {
+          dashboardHomeworksLoadedRef.current = true;
+          studentsHomework.replaceHomeworks(data.homeworks ?? []);
+        }
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to bootstrap roster', error);
+      })
+      .finally(() => {
+        rosterBootstrapInFlightRef.current = false;
+      });
+  }, [
+    activeTabByPath,
+    activeTabNeedsDashboardHomeworks,
+    activeTabNeedsRoster,
+    hasTeacherAccess,
+    studentsHomework.replaceHomeworks,
+  ]);
+
+  useEffect(() => {
+    if (!hasTeacherAccess) return;
+    if (!initialBootstrapDone.current) return;
+    if (!activeTabNeedsDashboardHomeworks) return;
+    if (dashboardHomeworksLoadedRef.current) return;
+    if (dashboardHomeworksBootstrapInFlightRef.current) return;
+
+    dashboardHomeworksBootstrapInFlightRef.current = true;
+    void api
+      .bootstrap({
+        includeHomeworks: true,
+        includeStudents: false,
+        includeLinks: false,
+      })
+      .then((data) => {
+        dashboardHomeworksLoadedRef.current = true;
+        studentsHomework.replaceHomeworks(data.homeworks ?? []);
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to bootstrap dashboard homeworks', error);
+      })
+      .finally(() => {
+        dashboardHomeworksBootstrapInFlightRef.current = false;
+      });
+  }, [activeTabNeedsDashboardHomeworks, hasTeacherAccess, studentsHomework.replaceHomeworks]);
 
   const resolveLastVisitedPath = useCallback(() => {
     const stored = localStorage.getItem(LAST_VISITED_ROUTE_KEY);
