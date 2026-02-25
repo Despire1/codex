@@ -94,6 +94,7 @@ cp .env.example .env
 - `TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL="https://your-domain.com/assets/onboarding-fullscreen.png"`
 - `APP_BASE_URL="https://your-domain.com"`
 - `API_PORT=4000`
+- `CORS_ALLOWED_ORIGINS="https://your-domain.com"` (если фронт и API на разных origin, перечислите все через запятую)
 
 Если API будет на другом домене/поддомене, выставьте `VITE_API_BASE` (например, `https://api.your-domain.com`).
 
@@ -167,6 +168,13 @@ server {
 ### 10. Telegram Webhook (опционально)
 Сейчас бот работает через polling. Для webhook нужно добавить отдельный HTTP endpoint в API и вызывать `setWebhook`.
 Если хотите — скажите, я добавлю поддержку webhook в код.
+
+### Безопасность (рекомендуется)
+- Держите `YOOKASSA_WEBHOOK_REQUIRE_AUTH=true`, чтобы `/api/yookassa/webhook` принимал только запросы с корректным Basic auth.
+- Для production используйте `SECURITY_ENFORCE_ORIGIN_CHECK=true` и `SECURITY_ALLOW_MISSING_ORIGIN=false`.
+- Ограничьте CORS только доверенными доменами через `CORS_ALLOWED_ORIGINS`.
+- Не увеличивайте `API_JSON_BODY_LIMIT_BYTES` без необходимости: это защита от DoS по памяти.
+- Оставляйте API за HTTPS и прокидывайте `X-Forwarded-Proto` в reverse-proxy (для Secure cookies и HSTS).
 
 ## Запуск Telegram Mini App
 Ниже — полный сценарий, чтобы открыть приложение внутри Telegram Mini App.

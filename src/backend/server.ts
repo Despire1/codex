@@ -49,8 +49,16 @@ import {
   badRequest,
   notFound,
   readBody,
+  readRawBody,
   sendJson,
 } from './server/lib/http';
+import {
+  applyCorsHeaders,
+  applySecurityHeaders,
+  createSecurityConfig,
+  isMutationOriginValid,
+  isYookassaWebhookAuthorized,
+} from './server/lib/security';
 import { createAuthService } from './server/modules/auth';
 import { createSessionService } from './server/modules/sessions';
 import {
@@ -77,6 +85,19 @@ import { validateHomeworkTemplatePayload } from './server/modules/homeworkTempla
 const PORT = Number(process.env.API_PORT ?? 4000);
 const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 50;
+const parseServerTimeout = (value: string | undefined, fallback: number, min: number, max: number) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(Math.trunc(parsed), min), max);
+};
+const API_REQUEST_TIMEOUT_MS = parseServerTimeout(process.env.API_REQUEST_TIMEOUT_MS, 60_000, 1_000, 300_000);
+const API_HEADERS_TIMEOUT_MS = parseServerTimeout(process.env.API_HEADERS_TIMEOUT_MS, 65_000, 1_000, 300_000);
+const API_KEEP_ALIVE_TIMEOUT_MS = parseServerTimeout(
+  process.env.API_KEEP_ALIVE_TIMEOUT_MS,
+  5_000,
+  1_000,
+  120_000,
+);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
@@ -115,6 +136,7 @@ const ONBOARDING_NUDGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const NOTIFICATION_LOG_RETENTION_DAYS = Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS ?? 0);
 const MIN_NOTIFICATION_LOG_RETENTION_DAYS = 7;
 const MAX_NOTIFICATION_LOG_RETENTION_DAYS = 30;
+const securityConfig = createSecurityConfig();
 const authService = createAuthService({
   sessionCookieName: SESSION_COOKIE_NAME,
   sessionTtlMinutes: SESSION_TTL_MINUTES,
@@ -5606,14 +5628,6 @@ const pendingHomeworkUploads = new Map<
   { objectKey: string; contentType: string; maxSize: number; expiresAt: number }
 >();
 
-const readRawBuffer = async (req: IncomingMessage) => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-};
-
 const cleanupPendingHomeworkUploads = () => {
   const nowTs = Date.now();
   for (const [token, value] of pendingHomeworkUploads.entries()) {
@@ -5668,10 +5682,20 @@ const handlePresignedUploadPutV2 = async (req: IncomingMessage, res: ServerRespo
     res.statusCode = 410;
     return res.end('upload_token_expired');
   }
-  const data = await readRawBuffer(req);
-  if (data.length > pending.maxSize) {
-    res.statusCode = 413;
-    return res.end('payload_too_large');
+  let data: Buffer;
+  try {
+    data = await readRawBody(req, { maxBytes: pending.maxSize });
+  } catch (error) {
+    const statusCodeRaw = (error as { statusCode?: unknown } | null)?.statusCode;
+    const statusCode =
+      typeof statusCodeRaw === 'number' && Number.isFinite(statusCodeRaw)
+        ? Math.trunc(statusCodeRaw)
+        : null;
+    if (statusCode === 413) {
+      res.statusCode = 413;
+      return res.end('payload_too_large');
+    }
+    throw error;
   }
 
   const fullPath = path.join(HOMEWORK_UPLOAD_DIR, pending.objectKey);
@@ -6211,15 +6235,21 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
   const requestedStudentId = getRequestedStudentId(req);
   const requestedTeacherId = getRequestedTeacherId(req);
 
+  applySecurityHeaders(req, res, securityConfig);
+
+  const corsResult = applyCorsHeaders(req, res, securityConfig);
+  if (!corsResult.allowed) {
+    return sendJson(res, 403, { message: 'origin_not_allowed' });
+  }
+
   if (req.method === 'OPTIONS') {
-    res.statusCode = 200;
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Role, X-Student-Id, X-Teacher-Id');
+    res.statusCode = 204;
     return res.end();
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!isMutationOriginValid(req, pathname, securityConfig)) {
+    return sendJson(res, 403, { message: 'invalid_origin' });
+  }
 
   try {
     const fileUploadMatch = pathname.match(/^\/api\/v2\/files\/upload\/([a-zA-Z0-9-]+)$/);
@@ -6233,6 +6263,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (req.method === 'POST' && pathname === '/api/yookassa/webhook') {
+      if (!isYookassaWebhookAuthorized(req, securityConfig)) {
+        console.warn('[yookassa] Unauthorized webhook request rejected');
+        return sendJson(res, 401, { message: 'unauthorized' });
+      }
+
       let payload: any;
       try {
         payload = await readBody(req);
@@ -6649,6 +6684,10 @@ scheduleDailySessionCleanup();
 const server = http.createServer((req, res) => {
   handle(req, res);
 });
+server.requestTimeout = API_REQUEST_TIMEOUT_MS;
+server.headersTimeout = API_HEADERS_TIMEOUT_MS;
+server.keepAliveTimeout = API_KEEP_ALIVE_TIMEOUT_MS;
+server.maxHeadersCount = 100;
 
 server.listen(PORT, () => {
   // eslint-disable-next-line no-console
