@@ -14,7 +14,10 @@ import {
   HomeworkTemplate,
   Lesson,
   LessonPaymentFilter,
+  LessonMutationAction,
+  LessonMutationPreview,
   LessonSortOrder,
+  LessonSeriesScope,
   LessonStatusFilter,
   LessonColor,
   PaymentCancelBehavior,
@@ -444,6 +447,17 @@ export const api = {
     repeatUntil?: string;
     meetingLink?: string | null;
   }) => apiFetch<{ lessons: Lesson[] }>('/api/lessons/recurring', { method: 'POST', body: JSON.stringify(payload) }),
+  previewLessonMutation: (
+    id: number,
+    payload: {
+      action: LessonMutationAction;
+      scope: LessonSeriesScope;
+      startAt?: string;
+      durationMinutes?: number;
+      repeatWeekdays?: number[];
+      repeatUntil?: string | null;
+    },
+  ) => apiFetch<{ preview: LessonMutationPreview }>(`/api/lessons/${id}/preview`, { method: 'POST', body: JSON.stringify(payload) }),
   updateLesson: (
     id: number,
     payload: {
@@ -453,10 +467,9 @@ export const api = {
       durationMinutes: number;
       color?: LessonColor;
       meetingLink?: string | null;
-      applyToSeries?: boolean;
-      detachFromSeries?: boolean;
+      scope?: LessonSeriesScope;
       repeatWeekdays?: number[];
-      repeatUntil?: string;
+      repeatUntil?: string | null;
     },
   ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[] }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   updateLessonStatus: (id: number, status: Lesson['status']) =>
@@ -466,18 +479,18 @@ export const api = {
     }),
   cancelLesson: (
     id: number,
-    payload: { scope: 'SINGLE' | 'SERIES'; refundMode?: 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID' },
+    payload: { scope: LessonSeriesScope; refundMode?: 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID' },
   ) =>
     apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}/cancel`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  restoreLesson: (id: number, payload: { scope: 'SINGLE' | 'SERIES' }) =>
+  restoreLesson: (id: number, payload: { scope: LessonSeriesScope }) =>
     apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}/restore`, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  deleteLesson: (id: number, payload?: { applyToSeries?: boolean }) =>
+  deleteLesson: (id: number, payload?: { scope?: LessonSeriesScope }) =>
     apiFetch<{ deletedIds?: number[] }>(`/api/lessons/${id}`, { method: 'DELETE', body: JSON.stringify(payload ?? {}) }),
   markLessonCompleted: (lessonId: number) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {

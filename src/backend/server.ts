@@ -8,7 +8,13 @@ import { addDays, addYears, endOfWeek, format, startOfWeek } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
-import type { HomeworkBlock, HomeworkStatus, PaymentCancelBehavior } from '../entities/types';
+import type {
+  HomeworkBlock,
+  HomeworkStatus,
+  LessonMutationAction,
+  LessonSeriesScope,
+  PaymentCancelBehavior,
+} from '../entities/types';
 import { resolveHomeworkAttemptTimerConfig } from '../entities/homework-template/model/lib/quizSettings';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
@@ -869,6 +875,7 @@ const bootstrap = async (
         },
       },
     });
+    lessons = await filterSuppressedLessons(prisma, lessons);
   }
 
   return { teacher, students, links, homeworks, lessons };
@@ -891,7 +898,7 @@ const listLessonsForRange = async (
     if (startTo) where.startAt.lte = startTo;
   }
 
-  const lessons = await prisma.lesson.findMany({
+  let lessons = await prisma.lesson.findMany({
     where,
     include: {
       participants: {
@@ -901,6 +908,8 @@ const listLessonsForRange = async (
       },
     },
   });
+
+  lessons = await filterSuppressedLessons(prisma, lessons);
 
   return { lessons };
 };
@@ -2976,6 +2985,510 @@ const parseWeekdays = (repeatWeekdays: any): number[] => {
   );
 };
 
+const normalizeLessonScope = (value: unknown): LessonSeriesScope => {
+  if (value === 'FOLLOWING') return 'FOLLOWING';
+  if (value === 'SERIES') return 'FOLLOWING';
+  return 'SINGLE';
+};
+
+const normalizeLessonMutationAction = (value: unknown): LessonMutationAction => {
+  if (value === 'RESCHEDULE') return 'RESCHEDULE';
+  if (value === 'CANCEL') return 'CANCEL';
+  if (value === 'RESTORE') return 'RESTORE';
+  if (value === 'DELETE') return 'DELETE';
+  return 'EDIT';
+};
+
+const getLessonOriginalStartAt = (lesson: { startAt: Date | string; seriesOriginalStartAt?: Date | string | null }) =>
+  new Date(lesson.seriesOriginalStartAt ?? lesson.startAt);
+
+const isLessonFullyPaid = (lesson: { isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> }) => {
+  if (lesson.participants && lesson.participants.length > 0) {
+    return lesson.participants.every((participant) => Boolean(participant?.isPaid));
+  }
+  return Boolean(lesson.isPaid);
+};
+
+const isImmutableLessonForRecurringMutation = (
+  lesson: { status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+) => lesson.status === 'COMPLETED' || isLessonFullyPaid(lesson);
+
+const shiftWeekdays = (weekdays: number[], deltaDays: number) =>
+  Array.from(new Set(weekdays.map((day) => ((day + deltaDays) % 7 + 7) % 7))).sort((left, right) => left - right);
+
+const buildLessonMutationPreview = (
+  action: LessonMutationAction,
+  scope: LessonSeriesScope,
+  lessons: Array<{ startAt: Date; status: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> }>,
+  options?: { historyUntouched?: boolean; isBlocked?: boolean; blockReason?: string | null },
+) => {
+  const sortedLessons = [...lessons].sort((left, right) => left.startAt.getTime() - right.startAt.getTime());
+  return {
+    preview: {
+      action,
+      scope,
+      affectedCount: sortedLessons.length,
+      scheduledCount: sortedLessons.filter((lesson) => lesson.status === 'SCHEDULED').length,
+      canceledCount: sortedLessons.filter((lesson) => lesson.status === 'CANCELED').length,
+      completedCount: sortedLessons.filter((lesson) => lesson.status === 'COMPLETED').length,
+      paidCount: sortedLessons.filter((lesson) => isLessonFullyPaid(lesson)).length,
+      historyUntouched: options?.historyUntouched ?? true,
+      isBlocked: options?.isBlocked ?? false,
+      blockReason: options?.blockReason ?? null,
+      dateFrom: sortedLessons[0]?.startAt?.toISOString() ?? null,
+      dateTo: sortedLessons[sortedLessons.length - 1]?.startAt?.toISOString() ?? null,
+    },
+  };
+};
+
+const buildRecurringOccurrences = (params: {
+  rangeStartAt: Date;
+  anchorStartAt: Date;
+  repeatWeekdays: number[];
+  repeatUntil?: Date | null;
+  timeZone?: string | null;
+}) => {
+  const resolvedTimeZone = resolveTimeZone(params.timeZone);
+  const anchorZoned = toZonedDate(params.anchorStartAt, resolvedTimeZone);
+  const rangeStartZoned = toZonedDate(params.rangeStartAt, resolvedTimeZone);
+  const startCursor =
+    rangeStartZoned.getTime() > anchorZoned.getTime()
+      ? new Date(rangeStartZoned.getFullYear(), rangeStartZoned.getMonth(), rangeStartZoned.getDate(), 0, 0, 0, 0)
+      : new Date(anchorZoned.getFullYear(), anchorZoned.getMonth(), anchorZoned.getDate(), 0, 0, 0, 0);
+  const endZonedBase = params.repeatUntil ? toZonedDate(params.repeatUntil, resolvedTimeZone) : addYears(anchorZoned, 1);
+  const endCursor = new Date(endZonedBase.getFullYear(), endZonedBase.getMonth(), endZonedBase.getDate(), 0, 0, 0, 0);
+  const timeLabel = format(anchorZoned, 'HH:mm');
+  const occurrences: Date[] = [];
+
+  for (let cursor = startCursor; cursor <= endCursor; cursor = addDays(cursor, 1)) {
+    if (!params.repeatWeekdays.includes(cursor.getDay())) continue;
+    const dateLabel = format(cursor, 'yyyy-MM-dd');
+    const occurrence = toUtcDateFromTimeZone(dateLabel, timeLabel, resolvedTimeZone);
+    if (Number.isNaN(occurrence.getTime())) continue;
+    if (occurrence.getTime() < params.rangeStartAt.getTime()) continue;
+    occurrences.push(occurrence);
+    if (occurrences.length >= 500) break;
+  }
+
+  return occurrences;
+};
+
+const syncLessonParticipants = async (tx: any, lessonId: number, studentIds: number[]) => {
+  const existingParticipants = await tx.lessonParticipant.findMany({
+    where: { lessonId },
+  });
+  const nextIds = new Set(studentIds);
+  const existingIds = new Set(existingParticipants.map((participant: any) => Number(participant.studentId)));
+
+  const idsToDelete = existingParticipants
+    .filter((participant: any) => !nextIds.has(Number(participant.studentId)))
+    .map((participant: any) => Number(participant.studentId));
+  const idsToCreate = studentIds.filter((studentId) => !existingIds.has(studentId));
+
+  if (idsToDelete.length > 0) {
+    await tx.lessonParticipant.deleteMany({
+      where: {
+        lessonId,
+        studentId: { in: idsToDelete },
+      },
+    });
+  }
+
+  if (idsToCreate.length === 0) return;
+
+  await tx.lessonParticipant.createMany({
+    data: idsToCreate.map((studentId) => ({
+      lessonId,
+      studentId,
+      price: 0,
+      isPaid: false,
+    })),
+    skipDuplicates: true,
+  });
+};
+
+const syncSeriesParticipants = async (tx: any, seriesId: number, studentIds: number[]) => {
+  await tx.lessonSeriesParticipant.deleteMany({
+    where: { seriesId },
+  });
+  if (studentIds.length === 0) return;
+  await tx.lessonSeriesParticipant.createMany({
+    data: studentIds.map((studentId) => ({
+      seriesId,
+      studentId,
+      price: 0,
+    })),
+    skipDuplicates: true,
+  });
+};
+
+const upsertLessonSeriesException = async (
+  tx: any,
+  params: {
+    seriesId: number;
+    lessonId?: number | null;
+    originalStartAt: Date;
+    kind: string;
+    status?: string | null;
+    overrideStartAt?: Date | null;
+    overrideDurationMinutes?: number | null;
+    color?: string | null;
+    meetingLink?: string | null;
+    participantStudentIds?: number[] | null;
+  },
+) =>
+  tx.lessonSeriesException.upsert({
+    where: {
+      seriesId_originalStartAt: {
+        seriesId: params.seriesId,
+        originalStartAt: params.originalStartAt,
+      },
+    },
+    update: {
+      lessonId: params.lessonId ?? null,
+      kind: params.kind,
+      status: params.status ?? null,
+      overrideStartAt: params.overrideStartAt ?? null,
+      overrideDurationMinutes: params.overrideDurationMinutes ?? null,
+      color: params.color ?? null,
+      meetingLink: params.meetingLink ?? null,
+      participantStudentIds: params.participantStudentIds ? JSON.stringify(params.participantStudentIds) : null,
+    },
+    create: {
+      seriesId: params.seriesId,
+      lessonId: params.lessonId ?? null,
+      originalStartAt: params.originalStartAt,
+      kind: params.kind,
+      status: params.status ?? null,
+      overrideStartAt: params.overrideStartAt ?? null,
+      overrideDurationMinutes: params.overrideDurationMinutes ?? null,
+      color: params.color ?? null,
+      meetingLink: params.meetingLink ?? null,
+      participantStudentIds: params.participantStudentIds ? JSON.stringify(params.participantStudentIds) : null,
+    },
+  });
+
+const lessonHasProtectedDependents = async (tx: any, lessonId: number) => {
+  const [paymentsCount, paymentEventsCount, homeworkAssignmentsCount, notificationCount] = await Promise.all([
+    tx.payment.count({ where: { lessonId } }),
+    tx.paymentEvent.count({ where: { lessonId } }),
+    tx.homeworkAssignment.count({ where: { lessonId } }),
+    tx.notificationLog.count({ where: { lessonId } }),
+  ]);
+  return paymentsCount > 0 || paymentEventsCount > 0 || homeworkAssignmentsCount > 0 || notificationCount > 0;
+};
+
+const suppressLessonInstance = async (
+  tx: any,
+  lesson: {
+    id: number;
+    seriesId?: number | null;
+    startAt: Date;
+    seriesOriginalStartAt?: Date | null;
+  },
+) => {
+  const originalStartAt = getLessonOriginalStartAt(lesson);
+  if (lesson.seriesId) {
+    await upsertLessonSeriesException(tx, {
+      seriesId: lesson.seriesId,
+      lessonId: lesson.id,
+      originalStartAt,
+      kind: 'DELETE',
+    });
+  }
+  if (await lessonHasProtectedDependents(tx, lesson.id)) {
+    await tx.lesson.update({
+      where: { id: lesson.id },
+      data: { status: 'CANCELED' },
+    });
+    return;
+  }
+  await tx.lesson.delete({
+    where: { id: lesson.id },
+  });
+};
+
+const ensureLessonSeriesMetadata = async (
+  tx: any,
+  teacher: { chatId: bigint; timezone?: string | null },
+  lesson: any,
+) => {
+  if (!lesson?.isRecurring || !lesson?.recurrenceGroupId) return null;
+
+  let series = lesson.seriesId
+    ? await tx.lessonSeries.findUnique({
+        where: { id: lesson.seriesId },
+      })
+    : null;
+
+  if (!series) {
+    series = await tx.lessonSeries.findUnique({
+      where: { groupKey: lesson.recurrenceGroupId },
+    });
+  }
+
+  const recurringLessons = await tx.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      recurrenceGroupId: lesson.recurrenceGroupId,
+    },
+    include: {
+      participants: true,
+    },
+    orderBy: {
+      startAt: 'asc',
+    },
+  });
+
+  const anchorLesson = recurringLessons[0] ?? lesson;
+  const participantIds = anchorLesson.participants?.map((participant: any) => Number(participant.studentId)) ?? [lesson.studentId];
+
+  if (!series) {
+    series = await tx.lessonSeries.upsert({
+      where: {
+        groupKey: lesson.recurrenceGroupId,
+      },
+      update: {},
+      create: {
+        teacherId: teacher.chatId,
+        groupKey: lesson.recurrenceGroupId,
+        timeZone: resolveTimeZone(teacher.timezone),
+        anchorStartAt: anchorLesson.startAt,
+        durationMinutes: anchorLesson.durationMinutes,
+        recurrenceWeekdays:
+          typeof anchorLesson.recurrenceWeekdays === 'string'
+            ? anchorLesson.recurrenceWeekdays
+            : JSON.stringify(parseWeekdays(anchorLesson.recurrenceWeekdays)),
+        recurrenceUntil: anchorLesson.recurrenceUntil ?? null,
+        color: anchorLesson.color ?? 'blue',
+        meetingLink: anchorLesson.meetingLink ?? null,
+        status: 'ACTIVE',
+      },
+    });
+    await syncSeriesParticipants(tx, series.id, participantIds);
+  } else {
+    const existingParticipants = await tx.lessonSeriesParticipant.findMany({
+      where: { seriesId: series.id },
+    });
+    if (existingParticipants.length === 0) {
+      await syncSeriesParticipants(tx, series.id, participantIds);
+    }
+  }
+
+  for (const recurringLesson of recurringLessons) {
+    const nextOriginalStartAt = getLessonOriginalStartAt(recurringLesson);
+    if (recurringLesson.seriesId === series.id && recurringLesson.seriesOriginalStartAt) continue;
+    await tx.lesson.update({
+      where: { id: recurringLesson.id },
+      data: {
+        seriesId: series.id,
+        seriesOriginalStartAt: nextOriginalStartAt,
+      },
+    });
+  }
+
+  return series;
+};
+
+const loadScopedLessonTargets = async (
+  tx: any,
+  teacher: { chatId: bigint; timezone?: string | null },
+  lessonId: number,
+  scope: LessonSeriesScope,
+) => {
+  const lesson = await tx.lesson.findUnique({
+    where: { id: lessonId },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
+  if (!lesson || lesson.teacherId !== teacher.chatId) {
+    throw new Error('Урок не найден');
+  }
+
+  const series = await ensureLessonSeriesMetadata(tx, teacher, lesson);
+  if (!series) {
+    return { lesson, series: null, lessons: [lesson] };
+  }
+
+  const thresholdTime = getLessonOriginalStartAt(lesson).getTime();
+  const lessons = await tx.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      OR: [{ seriesId: series.id }, { recurrenceGroupId: series.groupKey }],
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+    orderBy: {
+      startAt: 'asc',
+    },
+  });
+
+  const filtered =
+    scope === 'SINGLE'
+      ? lessons.filter((item: any) => item.id === lesson.id)
+      : lessons.filter(
+          (item: any) => item.status !== 'COMPLETED' && getLessonOriginalStartAt(item).getTime() >= thresholdTime,
+        );
+
+  return { lesson, series, lessons: filtered };
+};
+
+const createLessonSeriesRecord = async (
+  tx: any,
+  params: {
+    teacherId: bigint;
+    timeZone?: string | null;
+    groupKey?: string;
+    anchorStartAt: Date;
+    durationMinutes: number;
+    recurrenceWeekdays: number[];
+    recurrenceUntil?: Date | null;
+    color?: string | null;
+    meetingLink?: string | null;
+    studentIds: number[];
+  },
+) => {
+  const groupKey = params.groupKey ?? crypto.randomUUID();
+  const series = await tx.lessonSeries.create({
+    data: {
+      teacherId: params.teacherId,
+      groupKey,
+      timeZone: resolveTimeZone(params.timeZone),
+      anchorStartAt: params.anchorStartAt,
+      durationMinutes: params.durationMinutes,
+      recurrenceWeekdays: JSON.stringify(params.recurrenceWeekdays),
+      recurrenceUntil: params.recurrenceUntil ?? null,
+      color: params.color ?? 'blue',
+      meetingLink: params.meetingLink ?? null,
+      status: 'ACTIVE',
+    },
+  });
+  await syncSeriesParticipants(tx, series.id, params.studentIds);
+  return series;
+};
+
+const createSeriesLesson = async (
+  tx: any,
+  params: {
+    teacherId: bigint;
+    series: any;
+    startAt: Date;
+    durationMinutes: number;
+    studentIds: number[];
+    color?: string | null;
+    meetingLink?: string | null;
+    status?: string;
+  },
+) => {
+  const lesson = await tx.lesson.create({
+    data: {
+      teacherId: params.teacherId,
+      studentId: params.studentIds[0],
+      seriesId: params.series.id,
+      seriesOriginalStartAt: params.startAt,
+      price: 0,
+      color: params.color ?? params.series.color ?? 'blue',
+      meetingLink: params.meetingLink ?? params.series.meetingLink ?? null,
+      startAt: params.startAt,
+      durationMinutes: params.durationMinutes,
+      status: params.status ?? 'SCHEDULED',
+      isPaid: false,
+      isRecurring: true,
+      recurrenceUntil: params.series.recurrenceUntil ?? null,
+      recurrenceGroupId: params.series.groupKey,
+      recurrenceWeekdays: params.series.recurrenceWeekdays,
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
+  await syncLessonParticipants(tx, lesson.id, params.studentIds);
+  return tx.lesson.findUnique({
+    where: { id: lesson.id },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
+};
+
+const updateLessonWithParticipants = async (
+  tx: any,
+  params: {
+    lessonId: number;
+    seriesId?: number | null;
+    seriesOriginalStartAt?: Date | null;
+    studentIds: number[];
+    startAt: Date;
+    durationMinutes: number;
+    color?: string | null;
+    meetingLink?: string | null;
+    isRecurring?: boolean;
+    recurrenceUntil?: Date | null;
+    recurrenceGroupId?: string | null;
+    recurrenceWeekdays?: string | null;
+  },
+) => {
+  await syncLessonParticipants(tx, params.lessonId, params.studentIds);
+  return tx.lesson.update({
+    where: { id: params.lessonId },
+    data: {
+      studentId: params.studentIds[0],
+      seriesId: params.seriesId ?? null,
+      seriesOriginalStartAt: params.seriesOriginalStartAt ?? null,
+      color: params.color ?? 'blue',
+      meetingLink: params.meetingLink ?? null,
+      startAt: params.startAt,
+      durationMinutes: params.durationMinutes,
+      isRecurring: Boolean(params.isRecurring),
+      recurrenceUntil: params.recurrenceUntil ?? null,
+      recurrenceGroupId: params.recurrenceGroupId ?? null,
+      recurrenceWeekdays: params.recurrenceWeekdays ?? null,
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+  });
+};
+
+const filterSuppressedLessons = async (tx: any, lessons: any[]) => {
+  if (lessons.length === 0) return lessons;
+  const hidden = await tx.lessonSeriesException.findMany({
+    where: {
+      lessonId: {
+        in: lessons.map((lesson) => lesson.id),
+      },
+      kind: 'DELETE',
+    },
+    select: {
+      lessonId: true,
+    },
+  });
+  const hiddenIds = new Set(hidden.map((item: { lessonId: number | null }) => item.lessonId).filter(Boolean));
+  return lessons.filter((lesson) => !hiddenIds.has(lesson.id));
+};
+
 const createRecurringLessons = async (user: User, body: any) => {
   const { startAt, repeatWeekdays, repeatUntil } = body ?? {};
   if (!startAt) throw new Error('Заполните дату и время урока');
@@ -3011,17 +3524,13 @@ const createRecurringLessons = async (user: User, body: any) => {
   if (endDate < seriesStart) {
     throw new Error('Дата окончания повтора должна быть не раньше даты начала');
   }
-  const occurrences: Date[] = [];
-
-  for (let cursor = new Date(seriesStart); cursor <= endDate; cursor = addDays(cursor, 1)) {
-    if (weekdays.includes(cursor.getUTCDay())) {
-      const withTime = new Date(
-        Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), startDate.getUTCHours(), startDate.getUTCMinutes()),
-      );
-      occurrences.push(withTime);
-    }
-    if (occurrences.length > 500) break;
-  }
+  const occurrences = buildRecurringOccurrences({
+    rangeStartAt: seriesStart,
+    anchorStartAt: startDate,
+    repeatWeekdays: weekdays,
+    repeatUntil: endDate,
+    timeZone: teacher.timezone,
+  });
 
   if (occurrences.length === 0) throw new Error('Не найдено подходящих дат для создания повторов');
 
@@ -3042,88 +3551,82 @@ const createRecurringLessons = async (user: User, body: any) => {
     throw new Error('Все выбранные даты уже заняты или запланированы');
   }
 
-  const recurrenceGroupId = crypto.randomUUID();
-  const weekdaysPayload = JSON.stringify(weekdays);
-  const created: any[] = [];
-  for (const date of slotsToCreate) {
-    const lesson = await prisma.lesson.create({
-      data: {
+  const created = await prisma.$transaction(async (tx) => {
+    const series = await createLessonSeriesRecord(tx, {
+      teacherId: teacher.chatId,
+      timeZone: teacher.timezone,
+      anchorStartAt: startDate,
+      durationMinutes: durationValue,
+      recurrenceWeekdays: weekdays,
+      recurrenceUntil: endDate,
+      color: lessonColor,
+      meetingLink,
+      studentIds,
+    });
+    const createdLessons: any[] = [];
+
+    for (const date of slotsToCreate) {
+      const lesson = await createSeriesLesson(tx, {
         teacherId: teacher.chatId,
-        studentId: studentIds[0],
-        price: 0,
-        color: lessonColor,
-        meetingLink: meetingLink ?? null,
+        series,
         startAt: date,
         durationMinutes: durationValue,
-        status: 'SCHEDULED',
-        isPaid: false,
-        isRecurring: true,
-        recurrenceUntil: endDate,
-        recurrenceGroupId,
-        recurrenceWeekdays: weekdaysPayload,
-        participants: {
-          create: studentIds.map((id) => ({
-            studentId: id,
-            price: 0,
-            isPaid: false,
+        studentIds,
+        color: lessonColor,
+        meetingLink,
+      });
+
+      if (!lesson) continue;
+
+      if (markPaid) {
+        const confirmedPrice = basePrice;
+
+        await tx.lessonParticipant.updateMany({
+          where: { lessonId: lesson.id },
+          data: { isPaid: true, price: confirmedPrice },
+        });
+
+        await tx.payment.createMany({
+          data: lesson.participants.map((participant: any) => ({
+            lessonId: lesson.id,
+            studentId: participant.studentId,
+            amount: confirmedPrice,
+            teacherId: teacher.chatId,
+            paidAt: new Date(),
+            comment: null,
           })),
-        },
-      },
-      include: {
-        participants: {
+          skipDuplicates: true,
+        });
+        await tx.paymentEvent.createMany({
+          data: lesson.participants.map((participant: any) => ({
+            studentId: participant.studentId,
+            teacherId: teacher.chatId,
+            lessonId: lesson.id,
+            type: 'MANUAL_PAID',
+            lessonsDelta: 0,
+            priceSnapshot: confirmedPrice,
+            moneyAmount: confirmedPrice,
+            createdBy: 'TEACHER',
+            reason: null,
+          })),
+          skipDuplicates: true,
+        });
+
+        const updatedLesson = await tx.lesson.update({
+          where: { id: lesson.id },
+          data: { isPaid: true, price: confirmedPrice },
           include: {
-            student: true,
+            participants: { include: { student: true } },
           },
-        },
-      },
-    });
-    if (markPaid) {
-      const confirmedPrice = basePrice;
-
-      await prisma.lessonParticipant.updateMany({
-        where: { lessonId: lesson.id },
-        data: { isPaid: true, price: confirmedPrice },
-      });
-
-      await prisma.payment.createMany({
-        data: lesson.participants.map((participant: any) => ({
-          lessonId: lesson.id,
-          studentId: participant.studentId,
-          amount: confirmedPrice,
-          teacherId: teacher.chatId,
-          paidAt: new Date(),
-          comment: null,
-        })),
-        skipDuplicates: true,
-      });
-      await prisma.paymentEvent.createMany({
-        data: lesson.participants.map((participant: any) => ({
-          studentId: participant.studentId,
-          teacherId: teacher.chatId,
-          lessonId: lesson.id,
-          type: 'MANUAL_PAID',
-          lessonsDelta: 0,
-          priceSnapshot: confirmedPrice,
-          moneyAmount: confirmedPrice,
-          createdBy: 'TEACHER',
-          reason: null,
-        })),
-        skipDuplicates: true,
-      });
-
-      const updatedLesson = await prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { isPaid: true, price: confirmedPrice },
-        include: {
-          participants: { include: { student: true } },
-        },
-      });
-
-      created.push(updatedLesson);
-    } else {
-      created.push(lesson);
+        });
+        createdLessons.push(updatedLesson);
+      } else {
+        createdLessons.push(lesson);
+      }
     }
-  }
+
+    return { lessons: createdLessons, series };
+  });
 
   await safeLogActivityEvent({
     teacherId: teacher.chatId,
@@ -3134,9 +3637,10 @@ const createRecurringLessons = async (user: User, body: any) => {
     source: 'USER',
     title: 'Создана серия занятий',
     payload: {
-      recurrenceGroupId,
+      recurrenceGroupId: created.series.groupKey,
+      lessonSeriesId: created.series.id,
       lessonStartAt: seriesStart.toISOString(),
-      createdCount: created.length,
+      createdCount: created.lessons.length,
       repeatWeekdays: weekdays,
       repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
       repeatUntil: endDate.toISOString(),
@@ -3146,7 +3650,215 @@ const createRecurringLessons = async (user: User, body: any) => {
     },
   });
 
-  return created;
+  return created.lessons;
+};
+
+const mutateRecurringLessons = async (
+  tx: any,
+  params: {
+    teacher: { chatId: bigint; timezone?: string | null };
+    lessonId: number;
+    scope: LessonSeriesScope;
+    studentIds: number[];
+    startAt: Date;
+    durationMinutes: number;
+    color: string;
+    meetingLink: string | null;
+    repeatWeekdays?: number[] | null;
+    repeatUntil?: Date | null;
+  },
+) => {
+  const scoped = await loadScopedLessonTargets(tx, params.teacher, params.lessonId, params.scope);
+  const { lesson: selectedLesson, series, lessons: scopedLessons } = scoped;
+  if (!series) {
+    throw new Error('Серия занятий не найдена');
+  }
+
+  const oldWeekdays = parseWeekdays(series.recurrenceWeekdays);
+  const selectedOldStartZoned = toZonedDate(selectedLesson.startAt, series.timeZone);
+  const selectedNewStartZoned = toZonedDate(params.startAt, series.timeZone);
+  const weekdayDelta = selectedNewStartZoned.getDay() - selectedOldStartZoned.getDay();
+  const repeatChanged = Array.isArray(params.repeatWeekdays) || params.repeatUntil !== undefined;
+  const resolvedWeekdays =
+    Array.isArray(params.repeatWeekdays) && params.repeatWeekdays.length > 0
+      ? params.repeatWeekdays
+      : shiftWeekdays(oldWeekdays.length > 0 ? oldWeekdays : [selectedOldStartZoned.getDay()], weekdayDelta);
+  const resolvedUntil =
+    params.repeatUntil === undefined
+      ? series.recurrenceUntil ?? addYears(params.startAt, 1)
+      : params.repeatUntil ?? null;
+  const recurrenceWeekdaysValue = JSON.stringify(resolvedWeekdays);
+  const selectedDeltaMs = params.startAt.getTime() - selectedLesson.startAt.getTime();
+  const protectedLessons =
+    params.scope === 'SINGLE'
+      ? []
+      : scopedLessons.filter((lesson: any) => isImmutableLessonForRecurringMutation(lesson));
+  const targetLessons = scopedLessons;
+
+  if (params.scope !== 'SINGLE' && protectedLessons.length > 0) {
+    throw new Error(
+      'В выбранной части серии есть оплаченные или проведённые уроки. Чтобы не переписать историю, начните изменение с более позднего урока или редактируйте один урок отдельно.',
+    );
+  }
+
+  if (params.scope === 'SINGLE') {
+    if (repeatChanged) {
+      const updated = await updateLessonWithParticipants(tx, {
+        lessonId: selectedLesson.id,
+        studentIds: params.studentIds,
+        startAt: params.startAt,
+        durationMinutes: params.durationMinutes,
+        color: params.color,
+        meetingLink: params.meetingLink,
+        isRecurring: false,
+        recurrenceUntil: null,
+        recurrenceGroupId: null,
+        recurrenceWeekdays: null,
+      });
+      await upsertLessonSeriesException(tx, {
+        seriesId: series.id,
+        lessonId: selectedLesson.id,
+        originalStartAt: getLessonOriginalStartAt(selectedLesson),
+        kind: 'DETACH',
+        overrideStartAt: params.startAt,
+        overrideDurationMinutes: params.durationMinutes,
+        color: params.color,
+        meetingLink: params.meetingLink,
+        participantStudentIds: params.studentIds,
+      });
+      return updated;
+    }
+
+    const updated = await updateLessonWithParticipants(tx, {
+      lessonId: selectedLesson.id,
+      seriesId: series.id,
+      seriesOriginalStartAt: getLessonOriginalStartAt(selectedLesson),
+      studentIds: params.studentIds,
+      startAt: params.startAt,
+      durationMinutes: params.durationMinutes,
+      color: params.color,
+      meetingLink: params.meetingLink,
+      isRecurring: true,
+      recurrenceUntil: series.recurrenceUntil ?? null,
+      recurrenceGroupId: series.groupKey,
+      recurrenceWeekdays: series.recurrenceWeekdays,
+    });
+    await upsertLessonSeriesException(tx, {
+      seriesId: series.id,
+      lessonId: selectedLesson.id,
+      originalStartAt: getLessonOriginalStartAt(selectedLesson),
+      kind: 'EDIT',
+      status: updated.status,
+      overrideStartAt: params.startAt,
+      overrideDurationMinutes: params.durationMinutes,
+      color: params.color,
+      meetingLink: params.meetingLink,
+      participantStudentIds: params.studentIds,
+    });
+    return updated;
+  }
+
+  const scopeAnchorStartAt = params.startAt;
+
+  const targetSeries = await createLessonSeriesRecord(tx, {
+    teacherId: params.teacher.chatId,
+    timeZone: series.timeZone,
+    anchorStartAt: scopeAnchorStartAt,
+    durationMinutes: params.durationMinutes,
+    recurrenceWeekdays: resolvedWeekdays,
+    recurrenceUntil: resolvedUntil,
+    color: params.color,
+    meetingLink: params.meetingLink,
+    studentIds: params.studentIds,
+  });
+
+  await tx.lessonSeries.update({
+    where: { id: series.id },
+    data: {
+      recurrenceUntil: new Date(getLessonOriginalStartAt(selectedLesson).getTime() - 1),
+    },
+  });
+
+  await syncSeriesParticipants(tx, targetSeries.id, params.studentIds);
+
+  if (!repeatChanged) {
+    const updatedLessons: any[] = [];
+    for (const targetLesson of targetLessons) {
+      const nextStartAt = new Date(targetLesson.startAt.getTime() + selectedDeltaMs);
+      const updated = await updateLessonWithParticipants(tx, {
+        lessonId: targetLesson.id,
+        seriesId: targetSeries.id,
+        seriesOriginalStartAt: nextStartAt,
+        studentIds: params.studentIds,
+        startAt: nextStartAt,
+        durationMinutes: params.durationMinutes,
+        color: params.color,
+        meetingLink: params.meetingLink,
+        isRecurring: true,
+        recurrenceUntil: resolvedUntil,
+        recurrenceGroupId: targetSeries.groupKey,
+        recurrenceWeekdays: recurrenceWeekdaysValue,
+      });
+      updatedLessons.push(updated);
+    }
+    return { lessons: updatedLessons };
+  }
+
+  const desiredOccurrences = buildRecurringOccurrences({
+    rangeStartAt: scopeAnchorStartAt,
+    anchorStartAt: scopeAnchorStartAt,
+    repeatWeekdays: resolvedWeekdays,
+    repeatUntil: resolvedUntil,
+    timeZone: targetSeries.timeZone,
+  });
+
+  if (desiredOccurrences.length === 0) {
+    throw new Error('Не найдено дат для обновления серии');
+  }
+
+  const updatedLessons: any[] = [];
+  const commonCount = Math.min(targetLessons.length, desiredOccurrences.length);
+
+  for (let index = 0; index < commonCount; index += 1) {
+    const targetLesson = targetLessons[index];
+    const occurrence = desiredOccurrences[index];
+    const updated = await updateLessonWithParticipants(tx, {
+      lessonId: targetLesson.id,
+      seriesId: targetSeries.id,
+      seriesOriginalStartAt: occurrence,
+      studentIds: params.studentIds,
+      startAt: occurrence,
+      durationMinutes: params.durationMinutes,
+      color: params.color,
+      meetingLink: params.meetingLink,
+      isRecurring: true,
+      recurrenceUntil: resolvedUntil,
+      recurrenceGroupId: targetSeries.groupKey,
+      recurrenceWeekdays: recurrenceWeekdaysValue,
+    });
+    updatedLessons.push(updated);
+  }
+
+  for (let index = commonCount; index < targetLessons.length; index += 1) {
+    await suppressLessonInstance(tx, targetLessons[index]);
+  }
+
+  for (let index = commonCount; index < desiredOccurrences.length; index += 1) {
+    const created = await createSeriesLesson(tx, {
+      teacherId: params.teacher.chatId,
+      series: targetSeries,
+      startAt: desiredOccurrences[index],
+      durationMinutes: params.durationMinutes,
+      studentIds: params.studentIds,
+      color: params.color,
+      meetingLink: params.meetingLink,
+    });
+    if (created) {
+      updatedLessons.push(created);
+    }
+  }
+
+  return { lessons: updatedLessons.sort((left, right) => left.startAt.getTime() - right.startAt.getTime()) };
 };
 
 const updateLesson = async (user: User, lessonId: number, body: any) => {
@@ -3156,12 +3868,11 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
     startAt,
     durationMinutes,
     applyToSeries,
-    detachFromSeries,
+    scope: requestedScope,
     repeatWeekdays,
     repeatUntil,
   } = body ?? {};
   const teacher = await ensureTeacher(user);
-  const now = new Date();
   const existing = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: { participants: true },
@@ -3210,142 +3921,130 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   const previousParticipantNames = resolveLessonParticipantNames(previousParticipantIds, allLinks as any);
 
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
+  if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
   const existingLesson = existing as any;
   const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
-  const weekdays = parseWeekdays(repeatWeekdays ?? existingLesson.recurrenceWeekdays ?? []);
-  const recurrenceEndRaw = repeatUntil ?? existingLesson.recurrenceUntil;
+  const weekdays = repeatWeekdays !== undefined ? parseWeekdays(repeatWeekdays) : undefined;
+  const recurrenceEndRaw = repeatUntil !== undefined ? repeatUntil : undefined;
   const requestedMeetingLink = resolveMeetingLinkValue(body?.meetingLink);
   const resolvedSeriesMeetingLink =
     requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
+  const scope = normalizeLessonScope(requestedScope ?? (applyToSeries ? 'SERIES' : 'SINGLE'));
+  const recurrenceEnd =
+    recurrenceEndRaw === undefined
+      ? undefined
+      : recurrenceEndRaw
+        ? new Date(recurrenceEndRaw)
+        : null;
 
-  if (!applyToSeries && detachFromSeries && existingLesson.isRecurring) {
-    const detachedMeetingLink =
-      requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
-    await prisma.lessonParticipant.deleteMany({
-      where: { lessonId },
-    });
-
-    const detachedLesson = await prisma.lesson.update({
-      where: { id: lessonId },
-      data: {
-        studentId: ids[0],
-        price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
-        color: normalizedColor,
-        meetingLink: detachedMeetingLink,
+  if ((existingLesson.isRecurring && existingLesson.recurrenceGroupId) || existingLesson.seriesId) {
+    const result = await prisma.$transaction(async (tx) =>
+      mutateRecurringLessons(tx, {
+        teacher,
+        lessonId,
+        scope,
+        studentIds: ids,
         startAt: targetStart,
         durationMinutes: nextDuration,
-        isRecurring: false,
-        recurrenceUntil: null,
-        recurrenceGroupId: null,
-        recurrenceWeekdays: null,
-        participants: {
-          create: students.map((student) => ({
-            studentId: student.id,
-            price: 0,
-            isPaid: false,
-          })),
-        },
-      },
-      include: {
-        participants: {
-          include: {
-            student: true,
-          },
-        },
-      },
-    });
-    await safeLogActivityEvent({
-      teacherId: teacher.chatId,
-      studentId: detachedLesson.studentId,
-      lessonId: detachedLesson.id,
-      category: 'LESSON',
-      action: 'DETACH_FROM_SERIES',
-      status: 'SUCCESS',
-      source: 'USER',
-      title: 'Занятие отделено от серии',
-      payload: {
-        lessonStartAt: detachedLesson.startAt.toISOString(),
-        previousLessonStartAt: new Date(existingLesson.startAt).toISOString(),
-        durationMinutes: detachedLesson.durationMinutes,
-        studentIds: ids,
-        studentNames: nextParticipantNames,
-        previousStudentNames: previousParticipantNames,
-      },
-    });
-    return detachedLesson;
-  }
-
-  if (!existingLesson.isRecurring && weekdays.length > 0 && repeatWeekdays) {
-    if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
-
-    const seriesStart = targetStart;
-    const maxEnd = addYears(seriesStart, 1);
-    const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
-    const recurrenceEnd =
-      requestedEnd && !Number.isNaN(requestedEnd.getTime())
-        ? requestedEnd > maxEnd
-          ? maxEnd
-          : requestedEnd
-        : maxEnd;
-
-    if (recurrenceEnd < seriesStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
-
-    await (prisma.lesson as any).delete({ where: { id: lessonId } });
-
-    const recurrenceGroupId = crypto.randomUUID();
-    const seriesLessons: any[] = [];
-    const weekdaysPayload = JSON.stringify(weekdays);
-
-    for (let cursor = new Date(seriesStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
-      if (weekdays.includes(cursor.getUTCDay())) {
-        const start = new Date(
-          Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
-        );
-
-        const created = await prisma.lesson.create({
-          data: {
-            teacherId: teacher.chatId,
-            studentId: ids[0],
-            price: 0,
-            color: normalizedColor,
-            meetingLink: resolvedSeriesMeetingLink,
-            startAt: start,
-            durationMinutes: nextDuration,
-            status: 'SCHEDULED',
-            isPaid: false,
-            isRecurring: true,
-            recurrenceUntil: recurrenceEnd,
-            recurrenceGroupId,
-            recurrenceWeekdays: weekdaysPayload,
-            participants: {
-              create: students.map((student) => ({
-                studentId: student.id,
-                price: 0,
-                isPaid: false,
-              })),
-            },
-          },
-          include: {
-            participants: {
-              include: {
-                student: true,
-              },
-            },
-          },
-        });
-        seriesLessons.push(created);
-      }
-      if (seriesLessons.length > 500) break;
-    }
-
-    if (seriesLessons.length === 0) {
-      throw new Error('Не найдено дат для создания повторяющихся уроков');
-    }
+        color: normalizedColor,
+        meetingLink: resolvedSeriesMeetingLink,
+        repeatWeekdays: weekdays,
+        repeatUntil: recurrenceEnd,
+      }),
+    );
 
     await safeLogActivityEvent({
       teacherId: teacher.chatId,
       studentId: ids[0] ?? null,
-      lessonId: null,
+      lessonId,
+      category: 'LESSON',
+      action: scope === 'SINGLE' ? 'UPDATE' : 'UPDATE_FOLLOWING',
+      status: 'SUCCESS',
+      source: 'USER',
+      title:
+        scope === 'SINGLE'
+          ? 'Занятие обновлено'
+          : 'Обновлены выбранный и следующие уроки',
+      payload: {
+        lessonStartAt: targetStart.toISOString(),
+        durationMinutes: nextDuration,
+        studentIds: ids,
+        studentNames: nextParticipantNames,
+        previousStudentNames: previousParticipantNames,
+        scope,
+      },
+    });
+
+    return result;
+  }
+
+  if (weekdays && weekdays.length > 0) {
+    const maxEnd = addYears(targetStart, 1);
+    const normalizedRecurrenceEnd =
+      recurrenceEnd && !Number.isNaN(recurrenceEnd.getTime())
+        ? recurrenceEnd > maxEnd
+          ? maxEnd
+          : recurrenceEnd
+        : maxEnd;
+
+    if (normalizedRecurrenceEnd < targetStart) {
+      throw new Error('Дата окончания повтора должна быть не раньше даты начала');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const series = await createLessonSeriesRecord(tx, {
+        teacherId: teacher.chatId,
+        timeZone: teacher.timezone,
+        anchorStartAt: targetStart,
+        durationMinutes: nextDuration,
+        recurrenceWeekdays: weekdays,
+        recurrenceUntil: normalizedRecurrenceEnd,
+        color: normalizedColor,
+        meetingLink: resolvedSeriesMeetingLink,
+        studentIds: ids,
+      });
+      const updatedCurrent = await updateLessonWithParticipants(tx, {
+        lessonId,
+        seriesId: series.id,
+        seriesOriginalStartAt: targetStart,
+        studentIds: ids,
+        startAt: targetStart,
+        durationMinutes: nextDuration,
+        color: normalizedColor,
+        meetingLink: resolvedSeriesMeetingLink,
+        isRecurring: true,
+        recurrenceUntil: normalizedRecurrenceEnd,
+        recurrenceGroupId: series.groupKey,
+        recurrenceWeekdays: JSON.stringify(weekdays),
+      });
+      const occurrences = buildRecurringOccurrences({
+        rangeStartAt: targetStart,
+        anchorStartAt: targetStart,
+        repeatWeekdays: weekdays,
+        repeatUntil: normalizedRecurrenceEnd,
+        timeZone: teacher.timezone,
+      }).filter((date) => date.getTime() !== targetStart.getTime());
+
+      const createdLessons: any[] = [];
+      for (const occurrence of occurrences) {
+        const created = await createSeriesLesson(tx, {
+          teacherId: teacher.chatId,
+          series,
+          startAt: occurrence,
+          durationMinutes: nextDuration,
+          studentIds: ids,
+          color: normalizedColor,
+          meetingLink: resolvedSeriesMeetingLink,
+        });
+        if (created) createdLessons.push(created);
+      }
+      return { lesson: updatedCurrent, lessons: [updatedCurrent, ...createdLessons] };
+    });
+
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: ids[0] ?? null,
+      lessonId,
       category: 'LESSON',
       action: 'CONVERT_TO_SERIES',
       status: 'SUCCESS',
@@ -3353,156 +4052,30 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       title: 'Одиночное занятие преобразовано в серию',
       payload: {
         convertedFromLessonId: lessonId,
-        recurrenceGroupId,
-        lessonStartAt: seriesStart.toISOString(),
-        createdCount: seriesLessons.length,
-        repeatWeekdays: weekdays,
-        repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
-        repeatUntil: recurrenceEnd.toISOString(),
-        studentIds: ids,
-        studentNames: nextParticipantNames,
-        previousStudentNames: previousParticipantNames,
-      },
-    });
-
-    return { lessons: seriesLessons };
-  }
-
-  if (applyToSeries && existingLesson.isRecurring && existingLesson.recurrenceGroupId) {
-    if (weekdays.length === 0) throw new Error('Выберите дни недели для повтора');
-    if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
-
-    const seriesStart = now;
-    const maxEnd = addYears(seriesStart, 1);
-    const requestedEnd = recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
-    const recurrenceEnd =
-      requestedEnd && !Number.isNaN(requestedEnd.getTime())
-        ? requestedEnd > maxEnd
-          ? maxEnd
-          : requestedEnd
-        : maxEnd;
-
-    if (recurrenceEnd < seriesStart) throw new Error('Дата окончания повтора должна быть не раньше даты начала');
-
-    await (prisma.lesson as any).deleteMany({
-      where: {
-        recurrenceGroupId: existingLesson.recurrenceGroupId,
-        teacherId: teacher.chatId,
-        status: 'SCHEDULED',
-        startAt: {
-          gte: seriesStart,
-        },
-      },
-    });
-
-    const seriesLessons: any[] = [];
-    const weekdaysPayload = JSON.stringify(weekdays);
-    for (let cursor = new Date(seriesStart); cursor <= recurrenceEnd; cursor = addDays(cursor, 1)) {
-      if (weekdays.includes(cursor.getUTCDay())) {
-        const start = new Date(
-          Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), targetStart.getUTCHours(), targetStart.getUTCMinutes()),
-        );
-
-        if (start > now) {
-          const created = await prisma.lesson.create({
-            data: {
-              teacherId: teacher.chatId,
-              studentId: ids[0],
-              price: 0,
-              color: normalizedColor,
-              meetingLink: resolvedSeriesMeetingLink,
-              startAt: start,
-              durationMinutes: nextDuration,
-              status: 'SCHEDULED',
-              isPaid: false,
-              isRecurring: true,
-              recurrenceUntil: recurrenceEnd,
-              recurrenceGroupId: existingLesson.recurrenceGroupId,
-              recurrenceWeekdays: weekdaysPayload,
-              participants: {
-                create: students.map((student) => ({
-                  studentId: student.id,
-                  price: 0,
-                  isPaid: false,
-                })),
-              },
-            },
-            include: {
-              participants: {
-                include: {
-                  student: true,
-                },
-              },
-            },
-          });
-          seriesLessons.push(created);
-        }
-      }
-      if (seriesLessons.length > 500) break;
-    }
-
-    if (seriesLessons.length === 0) {
-      throw new Error('Не найдено дат для обновления серии');
-    }
-
-    await safeLogActivityEvent({
-      teacherId: teacher.chatId,
-      studentId: ids[0] ?? null,
-      lessonId,
-      category: 'LESSON',
-      action: 'UPDATE_SERIES',
-      status: 'SUCCESS',
-      source: 'USER',
-      title: 'Серия занятий обновлена',
-      payload: {
-        recurrenceGroupId: existingLesson.recurrenceGroupId,
         lessonStartAt: targetStart.toISOString(),
-        updatedCount: seriesLessons.length,
+        createdCount: result.lessons.length,
         repeatWeekdays: weekdays,
         repeatWeekdayLabels: resolveWeekdayLabels(weekdays),
-        repeatUntil: recurrenceEnd.toISOString(),
+        repeatUntil: normalizedRecurrenceEnd.toISOString(),
         studentIds: ids,
         studentNames: nextParticipantNames,
-        previousStudentNames: previousParticipantNames,
       },
     });
 
-    return { lessons: seriesLessons };
+    return { lessons: result.lessons };
   }
 
-  await prisma.lessonParticipant.deleteMany({
-    where: { lessonId },
-  });
-
-  const updatePayload: Record<string, unknown> = {
-    studentId: ids[0],
-    price: existingLesson.isPaid ? (existingLesson as any).price ?? 0 : 0,
-    color: normalizedColor,
+  const updatedLesson = await updateLessonWithParticipants(prisma, {
+    lessonId,
+    studentIds: ids,
     startAt: targetStart,
     durationMinutes: nextDuration,
-    participants: {
-      create: students.map((student) => ({
-        studentId: student.id,
-        price: 0,
-        isPaid: false,
-      })),
-    },
-  };
-
-  if (requestedMeetingLink !== undefined) {
-    updatePayload.meetingLink = requestedMeetingLink;
-  }
-
-  const updatedLesson = await prisma.lesson.update({
-    where: { id: lessonId },
-    data: updatePayload,
-    include: {
-      participants: {
-        include: {
-          student: true,
-        },
-      },
-    },
+    color: normalizedColor,
+    meetingLink: resolvedSeriesMeetingLink,
+    isRecurring: false,
+    recurrenceUntil: null,
+    recurrenceGroupId: null,
+    recurrenceWeekdays: null,
   });
 
   const nextStudentIds = updatedLesson.participants.map((participant: any) => participant.studentId);
@@ -3543,7 +4116,7 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
   return updatedLesson;
 };
 
-const deleteLesson = async (user: User, lessonId: number, applyToSeries?: boolean) => {
+const deleteLesson = async (user: User, lessonId: number, body: any) => {
   const teacher = await ensureTeacher(user);
   const lesson = (await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -3570,35 +4143,58 @@ const deleteLesson = async (user: User, lessonId: number, applyToSeries?: boolea
     include: { student: true },
   });
   const lessonStudentNames = resolveLessonParticipantNames(lessonStudentIds, lessonLinks as any);
+  const scope = normalizeLessonScope(body?.scope ?? (body?.applyToSeries ? 'SERIES' : 'SINGLE'));
 
-  if (applyToSeries && lesson.isRecurring && lesson.recurrenceGroupId) {
-    const deleted = await (prisma.lesson as any).deleteMany({
-      where: { teacherId: teacher.chatId, recurrenceGroupId: lesson.recurrenceGroupId },
+  if ((lesson.seriesId || lesson.recurrenceGroupId) && lesson.isRecurring) {
+    const result = await prisma.$transaction(async (tx) => {
+      const scoped = await loadScopedLessonTargets(tx, teacher, lessonId, scope);
+      const deletedIds: number[] = [];
+      for (const targetLesson of scoped.lessons) {
+        const hasProtected = await lessonHasProtectedDependents(tx, targetLesson.id);
+        await suppressLessonInstance(tx, targetLesson);
+        if (!hasProtected) {
+          deletedIds.push(targetLesson.id);
+        }
+      }
+      if (scoped.series && scope !== 'SINGLE') {
+        await tx.lessonSeries.update({
+          where: { id: scoped.series.id },
+          data: {
+            recurrenceUntil: new Date(getLessonOriginalStartAt(scoped.lesson).getTime() - 1),
+          },
+        });
+      }
+      return { deletedIds, deletedCount: scoped.lessons.length };
     });
+
     await safeLogActivityEvent({
       teacherId: teacher.chatId,
       studentId: lesson.studentId,
       lessonId: null,
       category: 'LESSON',
-      action: 'DELETE_SERIES',
+      action: scope === 'SINGLE' ? 'DELETE' : 'DELETE_FOLLOWING',
       status: 'SUCCESS',
       source: 'USER',
-      title: 'Серия занятий удалена',
+      title:
+        scope === 'SINGLE'
+          ? 'Удалён один урок серии'
+          : 'Удалены выбранный и следующие уроки серии',
       payload: {
         recurrenceGroupId: lesson.recurrenceGroupId,
         deletedFromLessonId: lessonId,
-        deletedCount: deleted?.count ?? 0,
+        deletedCount: result.deletedCount,
         lessonStartAt: new Date(lesson.startAt).toISOString(),
         studentIds: lessonStudentIds,
         studentNames: lessonStudentNames,
         repeatWeekdays: parseWeekdays(lesson.recurrenceWeekdays),
         repeatWeekdayLabels: resolveWeekdayLabels(parseWeekdays(lesson.recurrenceWeekdays)),
+        scope,
       },
     });
-    return { deletedIds: [], deletedCount: deleted?.count ?? 0 };
+    return result;
   }
 
-  await (prisma.lesson as any).delete({ where: { id: lessonId } });
+  await prisma.lesson.delete({ where: { id: lessonId } });
   await safeLogActivityEvent({
     teacherId: teacher.chatId,
     studentId: lesson.studentId,
@@ -3642,6 +4238,179 @@ const markLessonCompleted = async (user: User, lessonId: number) => {
     },
   });
   return { lesson, link: primaryLink };
+};
+
+const applyLessonCancelStatus = async (
+  tx: any,
+  teacher: { chatId: bigint },
+  lessonId: number,
+  refundMode: 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID' = 'RETURN_TO_BALANCE',
+) => {
+  const lesson = await tx.lesson.findUnique({
+    where: { id: lessonId },
+    include: { participants: { include: { student: true } } },
+  });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  const lessonParticipantIds = lesson.participants.map((participant: any) => participant.studentId);
+  const links = lessonParticipantIds.length
+    ? await tx.teacherStudent.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: lessonParticipantIds }, isArchived: false },
+        include: { student: true },
+      })
+    : [];
+
+  if (refundMode === 'RETURN_TO_BALANCE') {
+    const existingAdjustments = await tx.paymentEvent.findMany({
+      where: { lessonId, type: 'ADJUSTMENT', reason: 'LESSON_CANCELED' },
+    });
+    const adjustedStudentIds = new Set(existingAdjustments.map((event: any) => event.studentId));
+    const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
+    const paidParticipants = lesson.participants.filter((participant: any) => Boolean(participant.isPaid));
+
+    for (const participant of paidParticipants) {
+      if (adjustedStudentIds.has(participant.studentId)) continue;
+      const link = linksByStudentId.get(participant.studentId);
+      if (!link) continue;
+
+      await tx.teacherStudent.update({
+        where: { id: link.id },
+        data: { balanceLessons: link.balanceLessons + 1 },
+      });
+      await createPaymentEvent(tx, {
+        studentId: participant.studentId,
+        teacherId: teacher.chatId,
+        lessonId,
+        type: 'ADJUSTMENT',
+        lessonsDelta: 1,
+        priceSnapshot: participant.price ?? lesson.price ?? 0,
+        moneyAmount: null,
+        createdBy: 'SYSTEM',
+        reason: 'LESSON_CANCELED',
+      });
+    }
+
+    await tx.lessonParticipant.updateMany({
+      where: { lessonId, isPaid: true },
+      data: { isPaid: false, price: 0 },
+    });
+  }
+
+  const updatedLesson = await tx.lesson.update({
+    where: { id: lessonId },
+    data: {
+      status: 'CANCELED',
+      isPaid: refundMode === 'KEEP_AS_PAID' ? lesson.isPaid : false,
+      paymentStatus: refundMode === 'KEEP_AS_PAID' ? lesson.paymentStatus : 'UNPAID',
+      paidSource: refundMode === 'KEEP_AS_PAID' ? lesson.paidSource : 'NONE',
+    },
+    include: { participants: { include: { student: true } } },
+  });
+
+  const refreshedLinks = lessonParticipantIds.length
+    ? await tx.teacherStudent.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: lessonParticipantIds }, isArchived: false },
+        include: { student: true },
+      })
+    : [];
+
+  return { lesson: updatedLesson, links: refreshedLinks };
+};
+
+const applyLessonRestoreStatus = async (tx: any, teacher: { chatId: bigint }, lessonId: number) => {
+  const lesson = await tx.lesson.findUnique({
+    where: { id: lessonId },
+    include: { participants: { include: { student: true } } },
+  });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  const updatedLesson = await tx.lesson.update({
+    where: { id: lessonId },
+    data: { status: 'SCHEDULED' },
+    include: { participants: { include: { student: true } } },
+  });
+
+  return { lesson: updatedLesson, links: [] as any[] };
+};
+
+const previewLessonMutation = async (user: User, lessonId: number, body: any) => {
+  const teacher = await ensureTeacher(user);
+  const action = normalizeLessonMutationAction(body?.action);
+  const scope = normalizeLessonScope(body?.scope);
+  const lesson = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    include: { participants: true },
+  });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  if (!(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId))) {
+    return buildLessonMutationPreview(action, 'SINGLE', [lesson]);
+  }
+
+  const scoped = await prisma.$transaction((tx) => loadScopedLessonTargets(tx, teacher, lessonId, scope));
+  const isBlocked =
+    scope !== 'SINGLE' &&
+    (action === 'EDIT' || action === 'RESCHEDULE') &&
+    scoped.lessons.some((item: any) => isImmutableLessonForRecurringMutation(item));
+
+  return buildLessonMutationPreview(action, scope, scoped.lessons, {
+    historyUntouched: action === 'EDIT' || action === 'RESCHEDULE',
+    isBlocked,
+    blockReason: isBlocked
+      ? 'В этом диапазоне есть оплаченные или проведённые уроки. Чтобы не переписать историю, выберите "Только этот урок" или начните изменения позже.'
+      : null,
+  });
+};
+
+const cancelLesson = async (user: User, lessonId: number, body: any) => {
+  const teacher = await ensureTeacher(user);
+  const scope = normalizeLessonScope(body?.scope);
+  const refundMode = body?.refundMode === 'KEEP_AS_PAID' ? 'KEEP_AS_PAID' : 'RETURN_TO_BALANCE';
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  if (!(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId)) || scope === 'SINGLE') {
+    return prisma.$transaction((tx) => applyLessonCancelStatus(tx, teacher, lessonId, refundMode));
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const scoped = await loadScopedLessonTargets(tx, teacher, lessonId, scope);
+    const updatedLessons: any[] = [];
+    const linksMap = new Map<string, any>();
+
+    for (const targetLesson of scoped.lessons) {
+      const result = await applyLessonCancelStatus(tx, teacher, targetLesson.id, refundMode);
+      updatedLessons.push(result.lesson);
+      result.links.forEach((link: any) => {
+        linksMap.set(`${link.teacherId}_${link.studentId}`, link);
+      });
+    }
+
+    return { lessons: updatedLessons, links: Array.from(linksMap.values()) };
+  });
+};
+
+const restoreLesson = async (user: User, lessonId: number, body: any) => {
+  const teacher = await ensureTeacher(user);
+  const scope = normalizeLessonScope(body?.scope);
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+
+  if (!(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId)) || scope === 'SINGLE') {
+    return prisma.$transaction((tx) => applyLessonRestoreStatus(tx, teacher, lessonId));
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const scoped = await loadScopedLessonTargets(tx, teacher, lessonId, scope);
+    const updatedLessons: any[] = [];
+
+    for (const targetLesson of scoped.lessons) {
+      const result = await applyLessonRestoreStatus(tx, teacher, targetLesson.id);
+      updatedLessons.push(result.lesson);
+    }
+
+    return { lessons: updatedLessons, links: [] as any[] };
+  });
 };
 
 const togglePaymentForStudent = async (
@@ -6542,8 +7311,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           listLessonsForRange,
           createRecurringLessons,
           createLesson,
+          previewLessonMutation,
           updateLessonStatus,
           updateLesson,
+          cancelLesson,
+          restoreLesson,
           deleteLesson,
           markLessonCompleted,
           toggleLessonPaid,

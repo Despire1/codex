@@ -58,4 +58,5 @@ export const getLessonLabel = (
   return names.length > 0 ? names.join(', ') : 'Урок';
 };
 
-export const isLessonInSeries = (lesson: Lesson) => Boolean(lesson.isRecurring && lesson.recurrenceGroupId);
+export const isLessonInSeries = (lesson: Lesson) =>
+  Boolean(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId));

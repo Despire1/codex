@@ -10,9 +10,12 @@ type LessonRoutesHandlers = {
   listLessonsForRange: (user: unknown, params: { start?: string | null; end?: string | null }) => Promise<{ lessons: any[] }>;
   createRecurringLessons: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   createLesson: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
+  previewLessonMutation: (user: unknown, lessonId: number, body: Record<string, unknown>) => Promise<{ preview: unknown }>;
   updateLessonStatus: (user: unknown, lessonId: number, status: unknown) => Promise<{ lesson: unknown; links: unknown }>;
   updateLesson: (user: unknown, lessonId: number, body: Record<string, unknown>) => Promise<unknown>;
-  deleteLesson: (user: unknown, lessonId: number, applyToSeries: boolean) => Promise<unknown>;
+  cancelLesson: (user: unknown, lessonId: number, body: Record<string, unknown>) => Promise<unknown>;
+  restoreLesson: (user: unknown, lessonId: number, body: Record<string, unknown>) => Promise<unknown>;
+  deleteLesson: (user: unknown, lessonId: number, body: Record<string, unknown>) => Promise<unknown>;
   markLessonCompleted: (user: unknown, lessonId: number) => Promise<unknown>;
   toggleLessonPaid: (
     user: unknown,
@@ -112,6 +115,15 @@ export const tryHandleLessonRoutes = async ({
   }
 
   const lessonUpdateMatch = pathname.match(/^\/api\/lessons\/(\d+)$/);
+  const lessonPreviewMatch = pathname.match(/^\/api\/lessons\/(\d+)\/preview$/);
+  if (req.method === 'POST' && lessonPreviewMatch) {
+    const lessonId = Number(lessonPreviewMatch[1]);
+    const body = await readBody(req);
+    const result = await handlers.previewLessonMutation(requireApiUser(), lessonId, body);
+    sendJson(res, 200, result);
+    return true;
+  }
+
   if (req.method === 'PATCH' && lessonUpdateMatch) {
     const lessonId = Number(lessonUpdateMatch[1]);
     const body = await readBody(req);
@@ -127,8 +139,34 @@ export const tryHandleLessonRoutes = async ({
   if (req.method === 'DELETE' && lessonUpdateMatch) {
     const lessonId = Number(lessonUpdateMatch[1]);
     const body = await readBody(req);
-    const result = await handlers.deleteLesson(requireApiUser(), lessonId, Boolean(body.applyToSeries));
+    const result = await handlers.deleteLesson(requireApiUser(), lessonId, body);
     sendJson(res, 200, result);
+    return true;
+  }
+
+  const lessonCancelMatch = pathname.match(/^\/api\/lessons\/(\d+)\/cancel$/);
+  if (req.method === 'POST' && lessonCancelMatch) {
+    const lessonId = Number(lessonCancelMatch[1]);
+    const body = await readBody(req);
+    const result = await handlers.cancelLesson(requireApiUser(), lessonId, body);
+    if (result && typeof result === 'object' && 'lessons' in result) {
+      sendJson(res, 200, { lessons: (result as any).lessons, links: (result as any).links });
+      return true;
+    }
+    sendJson(res, 200, { lesson: (result as any).lesson, links: (result as any).links });
+    return true;
+  }
+
+  const lessonRestoreMatch = pathname.match(/^\/api\/lessons\/(\d+)\/restore$/);
+  if (req.method === 'POST' && lessonRestoreMatch) {
+    const lessonId = Number(lessonRestoreMatch[1]);
+    const body = await readBody(req);
+    const result = await handlers.restoreLesson(requireApiUser(), lessonId, body);
+    if (result && typeof result === 'object' && 'lessons' in result) {
+      sendJson(res, 200, { lessons: (result as any).lessons, links: (result as any).links });
+      return true;
+    }
+    sendJson(res, 200, { lesson: (result as any).lesson, links: (result as any).links });
     return true;
   }
 

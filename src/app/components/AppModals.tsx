@@ -96,9 +96,9 @@ export const AppModals: FC<AppModalsProps> = ({
     setRescheduleDraft,
     saveRescheduleLesson,
     closeRescheduleModal,
-    rescheduleScopePending,
-    confirmRescheduleScope,
-    cancelRescheduleScope,
+    seriesScopeDialogState,
+    confirmSeriesScope,
+    cancelSeriesScope,
   } = useLessonActions();
 
   return (
@@ -217,9 +217,13 @@ export const AppModals: FC<AppModalsProps> = ({
       )}
 
       <SeriesScopeDialog
-        open={Boolean(rescheduleScopePending)}
-        onClose={cancelRescheduleScope}
-        onConfirm={confirmRescheduleScope}
+        open={Boolean(seriesScopeDialogState)}
+        title={seriesScopeDialogState?.title}
+        confirmText={seriesScopeDialogState?.confirmText}
+        defaultScope={seriesScopeDialogState?.defaultScope}
+        previews={seriesScopeDialogState?.previews}
+        onClose={cancelSeriesScope}
+        onConfirm={confirmSeriesScope}
       />
     </>
   );

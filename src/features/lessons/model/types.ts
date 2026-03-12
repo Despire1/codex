@@ -1,4 +1,4 @@
-export type LessonSeriesScope = 'SINGLE' | 'SERIES';
+export type { LessonMutationAction, LessonMutationPreview, LessonSeriesScope } from '../../../entities/types';
 
 export type LessonCancelRefundMode = 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID';
 

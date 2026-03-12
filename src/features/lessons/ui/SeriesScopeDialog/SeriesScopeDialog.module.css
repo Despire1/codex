@@ -28,10 +28,228 @@
   background: rgba(99, 102, 241, 0.08);
 }
 
+.optionContent {
+  display: grid;
+  gap: 2px;
+}
+
+.optionTitle {
+  font-weight: 600;
+  color: var(--color-slate-900);
+}
+
+.optionDescription {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-slate-500);
+}
+
+.preview {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--color-blue-200);
+  background:
+    radial-gradient(circle at top right, rgba(191, 219, 254, 0.38), transparent 36%),
+    linear-gradient(180deg, var(--color-white) 0%, var(--color-slate-50) 100%);
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 10px 24px var(--shadow-slate-900-06);
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.previewHeaderText {
+  display: grid;
+  gap: 4px;
+}
+
+.previewEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-blue-700);
+}
+
+.previewTitle {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.previewDescription {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-slate-600);
+}
+
+.scopeBadge {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-blue-700);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metricCard {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-slate-200);
+  background: rgba(255, 255, 255, 0.86);
+  display: grid;
+  gap: 4px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-slate-500);
+}
+
+.metricValue {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.metricRange {
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--color-slate-900);
+}
+
+.metricHint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-slate-500);
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-slate-700);
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.statusCard {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-slate-200);
+  background: rgba(255, 255, 255, 0.9);
+  display: grid;
+  gap: 3px;
+}
+
+.statusCardMuted {
+  opacity: 0.62;
+}
+
+.statusValue {
+  font-size: 18px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.statusLabel {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-slate-600);
+}
+
+.noteBox {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-slate-200);
+  background: rgba(255, 255, 255, 0.88);
+  display: grid;
+  gap: 8px;
+}
+
+.noteBoxSafe {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: linear-gradient(180deg, var(--color-white) 0%, var(--color-emerald-50) 100%);
+}
+
+.noteBoxBlocked {
+  border-color: rgba(239, 68, 68, 0.24);
+  background: linear-gradient(180deg, var(--color-white) 0%, var(--color-red-50) 100%);
+}
+
+.noteBoxNeutral {
+  border-color: var(--color-slate-200);
+  background: linear-gradient(180deg, var(--color-white) 0%, var(--color-slate-50) 100%);
+}
+
+.noteTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-slate-900);
+}
+
+.noteList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.noteText {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-slate-700);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .previewHeader {
+    flex-direction: column;
+  }
+
+  .scopeBadge {
+    align-self: flex-start;
+  }
+
+  .metrics,
+  .statusGrid {
+    grid-template-columns: 1fr;
+  }
 }

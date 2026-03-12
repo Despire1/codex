@@ -5,6 +5,12 @@ import { formatInTimeZone, todayISO as todayISOWithTimeZone } from './timezoneDa
 export const normalizeLesson = (lesson: any): Lesson => ({
   ...lesson,
   price: typeof lesson.price === 'number' ? lesson.price : Number(lesson.price ?? 0),
+  seriesId: typeof lesson.seriesId === 'number' ? lesson.seriesId : lesson.seriesId ?? null,
+  seriesOriginalStartAt: lesson.seriesOriginalStartAt
+    ? typeof lesson.seriesOriginalStartAt === 'string'
+      ? lesson.seriesOriginalStartAt
+      : new Date(lesson.seriesOriginalStartAt).toISOString()
+    : lesson.seriesOriginalStartAt ?? null,
   startAt: typeof lesson.startAt === 'string' ? lesson.startAt : new Date(lesson.startAt).toISOString(),
   color: normalizeLessonColor(lesson.color),
   meetingLink: typeof lesson.meetingLink === 'string' ? lesson.meetingLink : lesson.meetingLink ?? null,

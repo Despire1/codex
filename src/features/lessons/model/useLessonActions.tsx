@@ -24,9 +24,17 @@ import {
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
 import { Lesson, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
-import type { LessonCancelRefundMode, LessonModalFocus, LessonSeriesScope, RescheduleDraft } from './types';
+import type {
+  LessonCancelRefundMode,
+  LessonModalFocus,
+  LessonMutationPreview,
+  LessonSeriesScope,
+  RescheduleDraft,
+} from './types';
 import { type LessonDraft } from '../../modals/LessonModal/LessonModal';
 import { type ToastOptions } from '../../../shared/lib/toast';
+
+const VISIBLE_LESSON_SERIES_SCOPES: LessonSeriesScope[] = ['SINGLE', 'FOLLOWING'];
 
 type OpenConfirmDialogOptions = {
   title: string;
@@ -47,6 +55,32 @@ type OpenRecurringDeleteDialogOptions = {
 
 export type LessonActionSource = 'default' | 'onboarding_hero' | 'onboarding_stepper' | 'onboarding_quick_action';
 export type ModalVariant = 'modal' | 'sheet';
+
+type SeriesScopeDialogState = {
+  action: 'EDIT' | 'RESCHEDULE' | 'DELETE';
+  title: string;
+  confirmText: string;
+  lesson: Lesson;
+  defaultScope: LessonSeriesScope;
+  reopenModal?: 'reschedule' | null;
+  previews: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+  request:
+    | {
+        kind: 'update';
+        payload: {
+          studentIds?: number[];
+          startAt: string;
+          durationMinutes: number;
+          color?: Lesson['color'];
+          meetingLink?: string | null;
+          repeatWeekdays?: number[];
+          repeatUntil?: string | null;
+        };
+      }
+    | {
+        kind: 'delete';
+      };
+};
 
 type LessonModalContext = {
   source: LessonActionSource;
@@ -150,15 +184,9 @@ export type LessonActionsContextValue = {
     options?: { skipToast?: boolean },
   ) => Promise<void>;
   restoreLesson: (lesson: Lesson, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => Promise<void>;
-  rescheduleScopePending: {
-    lesson: Lesson;
-    startAt: string;
-    durationMinutes: number;
-    previousStartAt: string;
-    previousDuration: number;
-  } | null;
-  confirmRescheduleScope: (scope: LessonSeriesScope) => void;
-  cancelRescheduleScope: () => void;
+  seriesScopeDialogState: SeriesScopeDialogState | null;
+  confirmSeriesScope: (scope: LessonSeriesScope) => void;
+  cancelSeriesScope: () => void;
 };
 
 const LessonActionsContext = createContext<LessonActionsContextValue | null>(null);
@@ -238,13 +266,7 @@ export const useLessonActionsInternal = ({
     time: '',
     endTime: '',
   });
-  const [rescheduleScopePending, setRescheduleScopePending] = useState<{
-    lesson: Lesson;
-    startAt: string;
-    durationMinutes: number;
-    previousStartAt: string;
-    previousDuration: number;
-  } | null>(null);
+  const [seriesScopeDialogState, setSeriesScopeDialogState] = useState<SeriesScopeDialogState | null>(null);
   const [lessonModalContext, setLessonModalContext] = useState<LessonModalContext>({
     source: 'default',
     variant: 'modal',
@@ -358,7 +380,7 @@ export const useLessonActionsInternal = ({
     setRescheduleModalOpen(false);
     setRescheduleLesson(null);
     setRescheduleDraft({ date: '', time: '', endTime: '' });
-    setRescheduleScopePending(null);
+    setSeriesScopeDialogState(null);
   }, []);
 
   const closeLessonModal = useCallback(() => {
@@ -374,16 +396,19 @@ export const useLessonActionsInternal = ({
   }, []);
 
   const applyLessonUpdateResult = useCallback(
-    (data: { lesson?: Lesson; lessons?: Lesson[] }, baseLesson?: Lesson | null) => {
+    (
+      data: { lesson?: Lesson; lessons?: Lesson[] },
+      baseLesson?: Lesson | null,
+      options?: { scope?: LessonSeriesScope },
+    ) => {
       if (data.lessons && data.lessons.length > 0) {
         const normalizedLessons = data.lessons.map(normalizeLesson);
-        const groupId = baseLesson?.recurrenceGroupId ?? normalizedLessons[0]?.recurrenceGroupId ?? null;
-        const idsToRemove = !baseLesson?.recurrenceGroupId && baseLesson?.id ? [baseLesson.id] : undefined;
-        removeLessonsFromRanges({
-          ids: idsToRemove,
-          recurrenceGroupId: groupId,
-          startFrom: baseLesson?.recurrenceGroupId ? new Date() : undefined,
-        });
+        if (options?.scope && baseLesson?.recurrenceGroupId) {
+          removeLessonsFromRanges({
+            recurrenceGroupId: baseLesson.recurrenceGroupId,
+            startFrom: new Date(baseLesson.startAt),
+          });
+        }
         syncLessonsInRanges(normalizedLessons);
         return normalizedLessons;
       }
@@ -414,16 +439,44 @@ export const useLessonActionsInternal = ({
     [setLinks, triggerStudentsListReload],
   );
 
+  const fetchSeriesScopePreviews = useCallback(
+    async (
+      lesson: Lesson,
+      action: 'EDIT' | 'RESCHEDULE' | 'DELETE',
+      payload?: {
+        startAt?: string;
+        durationMinutes?: number;
+        repeatWeekdays?: number[];
+        repeatUntil?: string | null;
+      },
+    ) => {
+      const results = await Promise.all(
+        VISIBLE_LESSON_SERIES_SCOPES.map(async (scope) => {
+          const data = await api.previewLessonMutation(lesson.id, {
+            action,
+            scope,
+            startAt: payload?.startAt,
+            durationMinutes: payload?.durationMinutes,
+            repeatWeekdays: payload?.repeatWeekdays,
+            repeatUntil: payload?.repeatUntil ?? null,
+          });
+          return [scope, data.preview] as const;
+        }),
+      );
+
+      return Object.fromEntries(results) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    },
+    [],
+  );
+
   const updateLessonTiming = useCallback(
     async (lesson: Lesson, startAt: string, durationMinutes: number, scope: LessonSeriesScope) => {
-      const applyToSeries = scope === 'SERIES';
       const data = await api.updateLesson(lesson.id, {
         startAt,
         durationMinutes,
-        applyToSeries,
-        detachFromSeries: !applyToSeries && Boolean(lesson.isRecurring),
+        scope,
       });
-      applyLessonUpdateResult(data, lesson);
+      applyLessonUpdateResult(data, lesson, { scope });
       await loadStudentLessons();
       await loadStudentLessonsSummary();
       await loadDashboardUnpaidLessons();
@@ -437,14 +490,17 @@ export const useLessonActionsInternal = ({
   );
 
   const performDeleteLesson = useCallback(
-    async (applyToSeries: boolean) => {
+    async (scope: LessonSeriesScope = 'SINGLE') => {
       if (!editingLessonId) return;
       const recurrenceGroupId = editingLessonOriginal?.recurrenceGroupId;
 
       try {
-        await api.deleteLesson(editingLessonId, { applyToSeries });
-        if (applyToSeries && recurrenceGroupId) {
-          removeLessonsFromRanges({ recurrenceGroupId });
+        await api.deleteLesson(editingLessonId, { scope });
+        if (scope !== 'SINGLE' && recurrenceGroupId) {
+          removeLessonsFromRanges({
+            recurrenceGroupId,
+            startFrom: scope === 'FOLLOWING' && editingLessonOriginal ? new Date(editingLessonOriginal.startAt) : new Date(),
+          });
         } else if (editingLessonId) {
           removeLessonsFromRanges({ ids: [editingLessonId] });
         }
@@ -461,6 +517,7 @@ export const useLessonActionsInternal = ({
     [
       closeLessonModal,
       editingLessonId,
+      editingLessonOriginal,
       editingLessonOriginal?.recurrenceGroupId,
       loadStudentLessons,
       loadStudentLessonsSummary,
@@ -473,15 +530,25 @@ export const useLessonActionsInternal = ({
     if (!editingLessonId) return;
     const original = editingLessonOriginal;
 
-    if (original?.isRecurring && original.recurrenceGroupId) {
-      openRecurringDeleteDialog({
-        title: 'Удалить урок?',
-        message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
-        applyToSeries: false,
-        onConfirm: (applyToSeries) => {
-          void performDeleteLesson(applyToSeries);
-        },
-      });
+    if (original?.isRecurring && (original.recurrenceGroupId || original.seriesId)) {
+      void fetchSeriesScopePreviews(original, 'DELETE')
+        .then((previews) => {
+          setSeriesScopeDialogState({
+            action: 'DELETE',
+            title: 'Удалить урок',
+            confirmText: 'Удалить',
+            lesson: original,
+            defaultScope: 'SINGLE',
+            previews,
+            request: {
+              kind: 'delete',
+            },
+          });
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : 'Не удалось подготовить удаление урока';
+          showInfoDialog('Ошибка', message);
+        });
       return;
     }
 
@@ -491,10 +558,10 @@ export const useLessonActionsInternal = ({
       confirmText: 'Удалить',
       cancelText: 'Отмена',
       onConfirm: () => {
-        void performDeleteLesson(false);
+        void performDeleteLesson('SINGLE');
       },
     });
-  }, [editingLessonId, editingLessonOriginal, openConfirmDialog, openRecurringDeleteDialog, performDeleteLesson]);
+  }, [editingLessonId, editingLessonOriginal, fetchSeriesScopePreviews, openConfirmDialog, performDeleteLesson, showInfoDialog]);
 
   const saveLesson = useCallback(
     async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
@@ -541,26 +608,40 @@ export const useLessonActionsInternal = ({
                 original.durationMinutes !== durationMinutes),
           );
 
-          if (original?.isRecurring && !repeatChanged && timeChanged && options?.applyToSeriesOverride === undefined) {
-            openConfirmDialog({
-              title: 'Изменить только этот урок или всю серию?',
-              message:
-                'Это повторяющийся урок. Вы можете отредактировать только выбранное занятие или сразу всю серию.',
-              confirmText: 'Изменить серию',
-              cancelText: 'Только этот урок',
-              onConfirm: () => {
-                saveLesson({ applyToSeriesOverride: true });
-              },
-              onCancel: () => {
-                saveLesson({ applyToSeriesOverride: false, detachFromSeries: true });
+          const repeatUntilPayload =
+            lessonDraft.isRecurring && lessonDraft.repeatUntil
+              ? toUtcEndOfDay(lessonDraft.repeatUntil, timeZone).toISOString()
+              : null;
+
+          if (original?.isRecurring && (original.recurrenceGroupId || original.seriesId) && options?.applyToSeriesOverride === undefined) {
+            const previews = await fetchSeriesScopePreviews(original, 'EDIT', {
+              startAt,
+              durationMinutes,
+              repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
+              repeatUntil: repeatUntilPayload,
+            });
+            setSeriesScopeDialogState({
+              action: 'EDIT',
+              title: 'Применить изменения к серии',
+              confirmText: 'Сохранить',
+              lesson: original,
+              defaultScope: repeatChanged ? 'FOLLOWING' : 'SINGLE',
+              previews,
+              request: {
+                kind: 'update',
+                payload: {
+                  studentIds: lessonDraft.studentIds,
+                  startAt,
+                  durationMinutes,
+                  color: lessonDraft.color,
+                  meetingLink,
+                  repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
+                  repeatUntil: repeatUntilPayload,
+                },
               },
             });
             return;
           }
-
-          const applyToSeries =
-            options?.applyToSeriesOverride ?? Boolean(original?.isRecurring && (repeatChanged || lessonDraft.isRecurring));
-          const shouldDetach = options?.detachFromSeries ?? (!applyToSeries && Boolean(original?.isRecurring));
 
           const data = await api.updateLesson(editingLessonId, {
             studentIds: lessonDraft.studentIds,
@@ -568,20 +649,14 @@ export const useLessonActionsInternal = ({
             durationMinutes,
             color: lessonDraft.color,
             meetingLink,
-            applyToSeries,
-            detachFromSeries: shouldDetach,
+            scope: options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
             repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
-            repeatUntil:
-              lessonDraft.isRecurring && lessonDraft.repeatUntil
-                ? toUtcEndOfDay(lessonDraft.repeatUntil, timeZone).toISOString()
-                : undefined,
+            repeatUntil: repeatUntilPayload,
           });
 
-          if (shouldDetach) {
-            setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-          }
-
-          applyLessonUpdateResult(data, editingLessonOriginal);
+          applyLessonUpdateResult(data, editingLessonOriginal, {
+            scope: options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
+          });
 
           if (
             timeChanged &&
@@ -589,7 +664,7 @@ export const useLessonActionsInternal = ({
             original
           ) {
             const message = lessonModalContext.focus === 'focus_date' ? 'Урок перенесён' : 'Время изменено';
-            const undoScope: LessonSeriesScope = applyToSeries ? 'SERIES' : 'SINGLE';
+            const undoScope: LessonSeriesScope = options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE';
             const undoStartAt = original.startAt;
             const undoDuration = original.durationMinutes;
             showToast({
@@ -717,15 +792,32 @@ export const useLessonActionsInternal = ({
       return;
     }
 
-    if (rescheduleLesson.isRecurring && rescheduleLesson.recurrenceGroupId) {
-      setRescheduleScopePending({
-        lesson: rescheduleLesson,
-        startAt,
-        durationMinutes,
-        previousStartAt: rescheduleLesson.startAt,
-        previousDuration: rescheduleLesson.durationMinutes,
-      });
-      setRescheduleModalOpen(false);
+    if (rescheduleLesson.isRecurring && (rescheduleLesson.recurrenceGroupId || rescheduleLesson.seriesId)) {
+      try {
+        const previews = await fetchSeriesScopePreviews(rescheduleLesson, 'RESCHEDULE', {
+          startAt,
+          durationMinutes,
+        });
+        setSeriesScopeDialogState({
+          action: 'RESCHEDULE',
+          title: 'Перенести урок',
+          confirmText: 'Перенести',
+          lesson: rescheduleLesson,
+          defaultScope: 'SINGLE',
+          reopenModal: 'reschedule',
+          previews,
+          request: {
+            kind: 'update',
+            payload: {
+              startAt,
+              durationMinutes,
+            },
+          },
+        });
+        setRescheduleModalOpen(false);
+      } catch (error) {
+        showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
+      }
       return;
     }
 
@@ -762,6 +854,7 @@ export const useLessonActionsInternal = ({
     showToast,
     timeZone,
     updateLessonTiming,
+    fetchSeriesScopePreviews,
   ]);
 
   const startEditLesson = useCallback(
@@ -790,11 +883,14 @@ export const useLessonActionsInternal = ({
   );
 
   const deleteLessonWithOptions = useCallback(
-    async (lesson: Lesson, applyToSeries: boolean) => {
+    async (lesson: Lesson, scope: LessonSeriesScope) => {
       try {
-        await api.deleteLesson(lesson.id, applyToSeries ? { applyToSeries } : undefined);
-        if (applyToSeries && lesson.recurrenceGroupId) {
-          removeLessonsFromRanges({ recurrenceGroupId: lesson.recurrenceGroupId });
+        await api.deleteLesson(lesson.id, { scope });
+        if (scope !== 'SINGLE' && lesson.recurrenceGroupId) {
+          removeLessonsFromRanges({
+            recurrenceGroupId: lesson.recurrenceGroupId,
+            startFrom: scope === 'FOLLOWING' ? new Date(lesson.startAt) : new Date(),
+          });
         } else {
           removeLessonsFromRanges({ ids: [lesson.id] });
         }
@@ -811,15 +907,25 @@ export const useLessonActionsInternal = ({
 
   const requestDeleteLessonFromList = useCallback(
     (lesson: Lesson) => {
-      if (lesson.isRecurring && lesson.recurrenceGroupId) {
-        openRecurringDeleteDialog({
-          title: 'Удалить урок?',
-          message: 'Это повторяющийся урок. Выберите, удалить только выбранное занятие или всю серию.',
-          applyToSeries: false,
-          onConfirm: (applyToSeries) => {
-            void deleteLessonWithOptions(lesson, applyToSeries);
-          },
-        });
+      if (lesson.isRecurring && (lesson.recurrenceGroupId || lesson.seriesId)) {
+        void fetchSeriesScopePreviews(lesson, 'DELETE')
+          .then((previews) => {
+            setSeriesScopeDialogState({
+              action: 'DELETE',
+              title: 'Удалить урок',
+              confirmText: 'Удалить',
+              lesson,
+              defaultScope: 'SINGLE',
+              previews,
+              request: {
+                kind: 'delete',
+              },
+            });
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : 'Не удалось подготовить удаление урока';
+            showInfoDialog('Ошибка', message);
+          });
         return;
       }
 
@@ -829,11 +935,11 @@ export const useLessonActionsInternal = ({
         confirmText: 'Удалить',
         cancelText: 'Отмена',
         onConfirm: () => {
-          void deleteLessonWithOptions(lesson, false);
+          void deleteLessonWithOptions(lesson, 'SINGLE');
         },
       });
     },
-    [deleteLessonWithOptions, openConfirmDialog, openRecurringDeleteDialog],
+    [deleteLessonWithOptions, fetchSeriesScopePreviews, openConfirmDialog, showInfoDialog],
   );
 
   const markLessonCompleted = useCallback(
@@ -975,8 +1081,12 @@ export const useLessonActionsInternal = ({
   const updateLessonStatusScoped = useCallback(
     async (lesson: Lesson, scope: LessonSeriesScope, status: Lesson['status']) => {
       const targets =
-        scope === 'SERIES' && lesson.recurrenceGroupId
-          ? lessons.filter((item) => item.recurrenceGroupId === lesson.recurrenceGroupId)
+        scope !== 'SINGLE' && lesson.recurrenceGroupId
+          ? lessons.filter(
+              (item) =>
+                item.recurrenceGroupId === lesson.recurrenceGroupId &&
+                new Date(item.startAt).getTime() >= new Date(lesson.startAt).getTime(),
+            )
           : [lesson];
 
       const results = await Promise.all(
@@ -1008,7 +1118,12 @@ export const useLessonActionsInternal = ({
   const restoreLesson = useCallback(
     async (lesson: Lesson, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => {
       try {
-        await updateLessonStatusScoped(lesson, scope, 'SCHEDULED');
+        const data = await api.restoreLesson(lesson.id, { scope });
+        applyLessonUpdateResult(data, lesson);
+        applyLinksUpdate(data.links);
+        await loadStudentLessons();
+        await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
 
         if (!options?.skipToast) {
           showToast({ message: 'Урок восстановлен', variant: 'success' });
@@ -1019,7 +1134,14 @@ export const useLessonActionsInternal = ({
         console.error('Failed to restore lesson', error);
       }
     },
-    [showToast, updateLessonStatusScoped],
+    [
+      applyLessonUpdateResult,
+      applyLinksUpdate,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      showToast,
+    ],
   );
 
   const cancelLesson = useCallback(
@@ -1030,7 +1152,12 @@ export const useLessonActionsInternal = ({
       options?: { skipToast?: boolean },
     ) => {
       try {
-        await updateLessonStatusScoped(lesson, scope, 'CANCELED');
+        const data = await api.cancelLesson(lesson.id, { scope, refundMode });
+        applyLessonUpdateResult(data, lesson);
+        applyLinksUpdate(data.links);
+        await loadStudentLessons();
+        await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
 
         if (!options?.skipToast) {
           showToast({
@@ -1050,48 +1177,101 @@ export const useLessonActionsInternal = ({
         console.error('Failed to cancel lesson', error);
       }
     },
-    [restoreLesson, showToast, updateLessonStatusScoped],
+    [
+      applyLessonUpdateResult,
+      applyLinksUpdate,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      restoreLesson,
+      showToast,
+    ],
   );
 
-  const confirmRescheduleScope = useCallback(
+  const confirmSeriesScope = useCallback(
     (scope: LessonSeriesScope) => {
-      if (!rescheduleScopePending) return;
-      const payload = rescheduleScopePending;
-      setRescheduleScopePending(null);
-      void updateLessonTiming(payload.lesson, payload.startAt, payload.durationMinutes, scope)
-        .then(() => {
-          showToast({
-            message: 'Урок перенесён',
-            variant: 'success',
-            actionLabel: 'Отменить',
-            onAction: () => {
-              void updateLessonTiming(
-                payload.lesson,
-                payload.previousStartAt,
-                payload.previousDuration,
-                scope,
-              ).catch(() => {
-                showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+      if (!seriesScopeDialogState) return;
+      const state = seriesScopeDialogState;
+      setSeriesScopeDialogState(null);
+
+      const runRequest =
+        state.request.kind === 'delete'
+          ? api.deleteLesson(state.lesson.id, { scope })
+          : api.updateLesson(state.lesson.id, {
+              ...state.request.payload,
+              scope,
+            });
+
+      void runRequest
+        .then(async (data) => {
+          if (state.request.kind === 'delete') {
+            if (scope !== 'SINGLE' && state.lesson.recurrenceGroupId) {
+              removeLessonsFromRanges({
+                recurrenceGroupId: state.lesson.recurrenceGroupId,
+                startFrom: scope === 'FOLLOWING' ? new Date(state.lesson.startAt) : new Date(),
               });
-            },
-          });
-          closeRescheduleModal();
+            } else {
+              removeLessonsFromRanges({ ids: [state.lesson.id] });
+            }
+            await loadStudentLessons();
+            await loadStudentLessonsSummary();
+            await loadDashboardUnpaidLessons();
+            closeLessonModal();
+            showToast({ message: 'Урок удалён', variant: 'success' });
+            return;
+          }
+
+          applyLessonUpdateResult(data as { lesson?: Lesson; lessons?: Lesson[] }, state.lesson, { scope });
+          await loadStudentLessons();
+          await loadStudentLessonsSummary();
+          await loadDashboardUnpaidLessons();
+
+          const successMessage =
+            state.action === 'RESCHEDULE' ? 'Урок перенесён' : 'Изменения сохранены';
+          showToast({ message: successMessage, variant: 'success' });
+
+          if (state.action === 'RESCHEDULE') {
+            closeRescheduleModal();
+          } else if (state.action === 'EDIT') {
+            closeLessonModal();
+          }
         })
         .catch((error) => {
-          showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+          const message =
+            state.action === 'DELETE'
+              ? 'Не удалось удалить урок'
+              : state.action === 'RESCHEDULE'
+                ? 'Не удалось перенести урок'
+                : 'Не удалось сохранить изменения';
+          showToast({ message, variant: 'error' });
           // eslint-disable-next-line no-console
-          console.error('Failed to reschedule lesson', error);
-          setRescheduleModalOpen(true);
+          console.error('Failed to confirm lesson series scope', error);
+          if (state.reopenModal === 'reschedule') {
+            setRescheduleModalOpen(true);
+          }
         });
     },
-    [closeRescheduleModal, rescheduleScopePending, showToast, updateLessonTiming],
+    [
+      applyLessonUpdateResult,
+      closeLessonModal,
+      closeRescheduleModal,
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      removeLessonsFromRanges,
+      seriesScopeDialogState,
+      showToast,
+    ],
   );
 
-  const cancelRescheduleScope = useCallback(() => {
-    if (!rescheduleScopePending) return;
-    setRescheduleScopePending(null);
-    setRescheduleModalOpen(true);
-  }, [rescheduleScopePending]);
+  const cancelSeriesScope = useCallback(() => {
+    if (!seriesScopeDialogState) return;
+    const reopenModal = seriesScopeDialogState.reopenModal;
+    setSeriesScopeDialogState(null);
+    if (reopenModal === 'reschedule') {
+      setRescheduleModalOpen(true);
+    }
+  }, [seriesScopeDialogState]);
 
   const applyTogglePaid = useCallback(
     async (
@@ -1343,9 +1523,9 @@ export const useLessonActionsInternal = ({
       shiftLessonTime,
       cancelLesson,
       restoreLesson,
-      rescheduleScopePending,
-      confirmRescheduleScope,
-      cancelRescheduleScope,
+      seriesScopeDialogState,
+      confirmSeriesScope,
+      cancelSeriesScope,
     }),
     [
       closeLessonModal,
@@ -1376,9 +1556,9 @@ export const useLessonActionsInternal = ({
       shiftLessonTime,
       cancelLesson,
       restoreLesson,
-      rescheduleScopePending,
-      confirmRescheduleScope,
-      cancelRescheduleScope,
+      seriesScopeDialogState,
+      confirmSeriesScope,
+      cancelSeriesScope,
     ],
   );
 };

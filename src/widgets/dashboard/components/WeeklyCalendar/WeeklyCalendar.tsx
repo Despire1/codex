@@ -14,11 +14,17 @@ import { Lesson, LinkedStudent } from '@/entities/types';
 import { LessonChip } from '@/entities/lesson/ui/LessonChip/LessonChip';
 import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
 import { useLessonActions } from '@/features/lessons/model/useLessonActions';
-import type { LessonCancelRefundMode, LessonSeriesScope, LessonModalFocus } from '@/features/lessons/model/types';
+import type {
+  LessonCancelRefundMode,
+  LessonModalFocus,
+  LessonMutationPreview,
+  LessonSeriesScope,
+} from '@/features/lessons/model/types';
 import { LessonPopover } from '@/features/lessons/ui/LessonPopover/LessonPopover';
 import { LessonCancelDialog } from '@/features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
 import { LessonRestoreDialog } from '@/features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
 import { SeriesScopeDialog } from '@/features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { api } from '@/shared/api/client';
 import { AnchoredPopover } from '@/shared/ui/AnchoredPopover/AnchoredPopover';
 import { toZonedDate } from '@/shared/lib/timezoneDates';
 import { DayOverflowPopover } from './DayOverflowPopover';
@@ -35,8 +41,17 @@ interface WeeklyCalendarProps {
 }
 
 type PendingScopeAction =
-  | { type: 'cancel'; lesson: Lesson; refundMode?: LessonCancelRefundMode }
-  | { type: 'restore'; lesson: Lesson };
+  | {
+      type: 'cancel';
+      lesson: Lesson;
+      refundMode?: LessonCancelRefundMode;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    }
+  | {
+      type: 'restore';
+      lesson: Lesson;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    };
 
 const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 const SINGLE_CLICK_DELAY = 200;
@@ -216,7 +231,23 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
     const target = cancelDialogLesson;
     setCancelDialogLesson(null);
     if (isLessonInSeries(target)) {
-      setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'CANCEL', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'cancel',
+            lesson: target,
+            refundMode,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+        });
       return;
     }
     void cancelLesson(target, 'SINGLE', refundMode);
@@ -227,7 +258,22 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
     const target = restoreDialogLesson;
     setRestoreDialogLesson(null);
     if (isLessonInSeries(target)) {
-      setScopeDialog({ type: 'restore', lesson: target });
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'RESTORE', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'restore',
+            lesson: target,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'restore', lesson: target });
+        });
       return;
     }
     void restoreLesson(target, 'SINGLE');
@@ -427,6 +473,9 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
 
       <SeriesScopeDialog
         open={Boolean(scopeDialog)}
+        title={scopeDialog?.type === 'cancel' ? 'Отменить урок' : scopeDialog?.type === 'restore' ? 'Восстановить урок' : undefined}
+        confirmText={scopeDialog?.type === 'cancel' ? 'Отменить урок' : 'Восстановить'}
+        previews={scopeDialog?.previews}
         onClose={() => setScopeDialog(null)}
         onConfirm={handleScopeConfirm}
       />

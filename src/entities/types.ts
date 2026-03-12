@@ -332,6 +332,8 @@ export interface Lesson {
   id: number;
   teacherId: number;
   studentId: number;
+  seriesId?: number | null;
+  seriesOriginalStartAt?: string | null;
   price?: number;
   startAt: string; // ISO string
   durationMinutes: number;
@@ -351,6 +353,25 @@ export interface Lesson {
   recurrenceGroupId?: string | null;
   recurrenceWeekdays?: number[] | null;
   participants?: LessonParticipant[];
+}
+
+// `SERIES` is kept only for legacy client compatibility and is normalized to `FOLLOWING`.
+export type LessonSeriesScope = 'SINGLE' | 'FOLLOWING' | 'SERIES';
+export type LessonMutationAction = 'EDIT' | 'RESCHEDULE' | 'CANCEL' | 'RESTORE' | 'DELETE';
+
+export interface LessonMutationPreview {
+  action: LessonMutationAction;
+  scope: LessonSeriesScope;
+  affectedCount: number;
+  scheduledCount: number;
+  canceledCount: number;
+  completedCount: number;
+  paidCount: number;
+  historyUntouched: boolean;
+  isBlocked?: boolean;
+  blockReason?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 export interface StudentDebtItem {

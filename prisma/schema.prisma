@@ -47,6 +47,7 @@ model Teacher {
   homeworkAssignments   HomeworkAssignment[] @relation("HomeworkAssignmentTeacher")
   homeworkSubmissionsReviewed HomeworkSubmission[] @relation("HomeworkSubmissionReviewer")
   lessons               Lesson[]
+  lessonSeries          LessonSeries[]
   notificationLogs      NotificationLog[]
   activityEvents        ActivityEvent[]
   activityFeedSeenAt    DateTime?
@@ -70,6 +71,7 @@ model Student {
   homeworkSubmissions  HomeworkSubmission[] @relation("HomeworkSubmissionStudent")
   lessons              Lesson[]
   lessonParticipations LessonParticipant[]
+  lessonSeriesParticipations LessonSeriesParticipant[]
   paymentEvents        PaymentEvent[]
   notificationLogs     NotificationLog[]
   activityEvents       ActivityEvent[]
@@ -235,6 +237,8 @@ model Lesson {
   id                  Int                 @id @default(autoincrement())
   teacherId           BigInt
   studentId           Int
+  seriesId            Int?
+  seriesOriginalStartAt DateTime?
   price               Int                 @default(0)
   color               String              @default("blue")
   startAt             DateTime
@@ -255,7 +259,9 @@ model Lesson {
   recurrenceWeekdays  String?
   teacher             Teacher             @relation(fields: [teacherId], references: [chatId])
   student             Student             @relation(fields: [studentId], references: [id])
+  series              LessonSeries?       @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   participants        LessonParticipant[]
+  seriesExceptions    LessonSeriesException[]
   payments            Payment[]
   paymentEvents       PaymentEvent[]
   notificationLogs    NotificationLog[]
@@ -264,6 +270,71 @@ model Lesson {
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
+  @@index([seriesId])
+  @@index([seriesId, seriesOriginalStartAt])
+}
+
+model LessonSeries {
+  id                 Int                    @id @default(autoincrement())
+  teacherId          BigInt
+  groupKey           String                 @unique
+  timeZone           String
+  anchorStartAt      DateTime
+  durationMinutes    Int
+  recurrenceWeekdays String
+  recurrenceUntil    DateTime?
+  color              String                 @default("blue")
+  meetingLink        String?
+  status             String                 @default("ACTIVE")
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @default(now()) @updatedAt
+
+  teacher            Teacher                @relation(fields: [teacherId], references: [chatId])
+  participants       LessonSeriesParticipant[]
+  exceptions         LessonSeriesException[]
+  lessons            Lesson[]
+
+  @@index([teacherId, status])
+  @@index([teacherId, anchorStartAt])
+}
+
+model LessonSeriesParticipant {
+  id        Int          @id @default(autoincrement())
+  seriesId  Int
+  studentId Int
+  price     Int          @default(0)
+  createdAt DateTime     @default(now())
+
+  series    LessonSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  student   Student      @relation(fields: [studentId], references: [id])
+
+  @@unique([seriesId, studentId])
+  @@index([seriesId])
+  @@index([studentId])
+}
+
+model LessonSeriesException {
+  id                   Int          @id @default(autoincrement())
+  seriesId             Int
+  lessonId             Int?
+  originalStartAt      DateTime
+  kind                 String
+  status               String?
+  overrideStartAt      DateTime?
+  overrideDurationMinutes Int?
+  color                String?
+  meetingLink          String?
+  participantStudentIds String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @default(now()) @updatedAt
+
+  series               LessonSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  lesson               Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  @@unique([seriesId, originalStartAt])
+  @@index([seriesId])
+  @@index([lessonId])
+  @@index([kind])
 }
 
 model Payment {
