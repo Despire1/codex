@@ -1,4 +1,4 @@
-import { Homework, HomeworkStatus, Lesson } from '../../entities/types';
+import { Homework, HomeworkStatus, Lesson, ScheduleNote, ScheduleNoteType } from '../../entities/types';
 import { normalizeLessonColor } from './lessonColors';
 import { formatInTimeZone, todayISO as todayISOWithTimeZone } from './timezoneDates';
 
@@ -102,5 +102,21 @@ export const normalizeHomework = (homework: any, timeZone?: string | null): Home
     takenByStudentId: typeof homework.takenByStudentId === 'number' ? homework.takenByStudentId : null,
   };
 };
+
+const normalizeScheduleNoteType = (value: unknown): ScheduleNoteType => {
+  if (typeof value !== 'string') return 'IMPORTANT';
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'INFO' ? 'INFO' : 'IMPORTANT';
+};
+
+export const normalizeScheduleNote = (note: any): ScheduleNote => ({
+  ...note,
+  teacherId: typeof note.teacherId === 'number' ? note.teacherId : Number(note.teacherId ?? 0),
+  dateKey: typeof note.dateKey === 'string' ? note.dateKey : '',
+  noteType: normalizeScheduleNoteType(note.noteType),
+  content: typeof note.content === 'string' ? note.content : '',
+  createdAt: typeof note.createdAt === 'string' ? note.createdAt : new Date(note.createdAt).toISOString(),
+  updatedAt: typeof note.updatedAt === 'string' ? note.updatedAt : new Date(note.updatedAt).toISOString(),
+});
 
 export const todayISO = (timeZone?: string | null) => todayISOWithTimeZone(timeZone);

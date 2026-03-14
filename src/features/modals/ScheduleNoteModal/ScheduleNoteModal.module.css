@@ -1,0 +1,293 @@
+.bottomSheet {
+  height: 80vh;
+  max-height: 80vh;
+}
+
+.modalContent {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 28px;
+  box-shadow: 0 26px 56px rgba(15, 23, 42, 0.16);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.96);
+  background: #ffffff;
+}
+
+.title {
+  margin: 0;
+  min-width: 0;
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.closeButton {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.closeButton:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.closeButton:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.closeButtonIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 22px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: #475569;
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.typeButton {
+  min-height: 56px;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.typeButton:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.typeButton:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.typeButtonImportant {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.typeButtonInfo {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.typeButtonIconWrap {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.typeButtonIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 14px 16px;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: 16px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.textarea::placeholder {
+  color: #94a3b8;
+}
+
+.textarea:focus,
+.textarea:focus-visible {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.9);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.textarea:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
+  background: #ffffff;
+  border-top: 1px solid rgba(241, 245, 249, 0.96);
+}
+
+.submitButton {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.16);
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.submitButton:hover {
+  background: #1f2937;
+}
+
+.submitButton:disabled {
+  cursor: default;
+  opacity: 0.56;
+  box-shadow: none;
+}
+
+.submitButtonContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.submitSpinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top-color: #ffffff;
+  animation: schedule-note-spin 0.9s linear infinite;
+}
+
+.sheetModalContent {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 24px 24px 0 0;
+  box-shadow: none;
+  border-bottom: none;
+}
+
+@keyframes schedule-note-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .modalContent {
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .header {
+    padding: 14px 16px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .body {
+    padding: 14px 16px 0;
+  }
+
+  .typeGrid {
+    gap: 10px;
+  }
+
+  .typeButton {
+    min-height: 52px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+  }
+
+  .textarea {
+    min-height: 200px;
+  }
+
+  .footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+}

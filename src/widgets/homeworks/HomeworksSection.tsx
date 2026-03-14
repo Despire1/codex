@@ -133,6 +133,9 @@ const emptyTeacherSummary: TeacherAssignmentsSummary = {
   dueTodayCount: 0,
   reviewedWeekDeltaPercent: 0,
   averageScore30d: null,
+  permissions: {
+    canStartReviewQueue: false,
+  },
 };
 
 const toTeacherGroupKey = (groupId: number | null): TeacherHomeworkGroupKey =>

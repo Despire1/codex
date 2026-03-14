@@ -355,6 +355,18 @@ export interface Lesson {
   participants?: LessonParticipant[];
 }
 
+export type ScheduleNoteType = 'IMPORTANT' | 'INFO';
+
+export interface ScheduleNote {
+  id: number;
+  teacherId: number;
+  dateKey: string;
+  noteType: ScheduleNoteType;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // `SERIES` is kept only for legacy client compatibility and is normalized to `FOLLOWING`.
 export type LessonSeriesScope = 'SINGLE' | 'FOLLOWING' | 'SERIES';
 export type LessonMutationAction = 'EDIT' | 'RESCHEDULE' | 'CANCEL' | 'RESTORE' | 'DELETE';

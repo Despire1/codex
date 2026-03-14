@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { TeacherAssignmentsSummary } from '../../types';
 import {
   HomeworkArrowUpIcon,
@@ -16,6 +16,14 @@ import styles from './TeacherHomeworksKpiSection.module.css';
 
 interface TeacherHomeworksKpiSectionProps {
   summary: TeacherAssignmentsSummary;
+}
+
+interface TeacherHomeworksKpiCardConfig {
+  key: string;
+  cardClassName?: string;
+  hideOnMobile?: boolean;
+  glow?: ReactNode;
+  content: ReactNode;
 }
 
 const clampPercent = (value: number) => {
@@ -43,11 +51,12 @@ export const TeacherHomeworksKpiSection: FC<TeacherHomeworksKpiSectionProps> = (
   const filledStars = Math.max(0, Math.min(5, Math.round((averageScore ?? 0) / 2)));
   const weekDeltaLabel = `${summary.reviewedWeekDeltaPercent >= 0 ? '+' : ''}${summary.reviewedWeekDeltaPercent}% за неделю`;
   const hasDeadlinesToday = summary.dueTodayCount > 0;
-
-  return (
-    <section className={styles.kpiGrid} aria-label="Сводка по домашним заданиям">
-      <article className={`${styles.card} ${styles.primaryCard}`}>
-        <span className={styles.primaryGlow} aria-hidden="true" />
+  const cards: TeacherHomeworksKpiCardConfig[] = [
+    {
+      key: 'attention',
+      cardClassName: styles.primaryCard,
+      glow: <span className={styles.primaryGlow} aria-hidden="true" />,
+      content: (
         <div className={styles.cardInner}>
           <div className={styles.cardHeader}>
             <span className={`${styles.iconWrap} ${styles.primaryIconWrap}`}>
@@ -70,46 +79,58 @@ export const TeacherHomeworksKpiSection: FC<TeacherHomeworksKpiSectionProps> = (
             </span>
           </div>
         </div>
-      </article>
-
-      <article className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={`${styles.iconWrap} ${styles.infoIconWrap}`}>
-            <HomeworkPaperPlaneIcon size={15} />
-          </span>
-          <span className={styles.successBadge}>+{summary.sentTodayCount} сегодня</span>
-        </div>
-
-        <h3 className={styles.value}>{summary.inProgressCount}</h3>
-        <p className={styles.title}>В работе</p>
-
-        <div className={styles.progressRow}>
-          <div className={styles.progressTrack}>
-            <div className={styles.progressBar} style={{ width: `${activeProgressPercent}%` }} />
+      ),
+    },
+    {
+      key: 'in-progress',
+      hideOnMobile: true,
+      content: (
+        <>
+          <div className={styles.cardHeader}>
+            <span className={`${styles.iconWrap} ${styles.infoIconWrap}`}>
+              <HomeworkPaperPlaneIcon size={15} />
+            </span>
+            <span className={styles.successBadge}>+{summary.sentTodayCount} сегодня</span>
           </div>
-          <span className={styles.progressValue}>{activeProgressPercent}%</span>
-        </div>
-      </article>
 
-      <article className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={`${styles.iconWrap} ${styles.warningIconWrap}`}>
-            <HomeworkCalendarDayIcon size={15} />
-          </span>
-          <span className={styles.pulseDot} aria-hidden="true" />
-        </div>
+          <h3 className={styles.value}>{summary.inProgressCount}</h3>
+          <p className={styles.title}>В работе</p>
 
-        <h3 className={styles.value}>{summary.dueTodayCount}</h3>
-        <p className={styles.title}>Дедлайн сегодня</p>
+          <div className={styles.progressRow}>
+            <div className={styles.progressTrack}>
+              <div className={styles.progressBar} style={{ width: `${activeProgressPercent}%` }} />
+            </div>
+            <span className={styles.progressValue}>{activeProgressPercent}%</span>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'due-today',
+      content: (
+        <>
+          <div className={styles.cardHeader}>
+            <span className={`${styles.iconWrap} ${styles.warningIconWrap}`}>
+              <HomeworkCalendarDayIcon size={15} />
+            </span>
+            <span className={styles.pulseDot} aria-hidden="true" />
+          </div>
 
-        <div className={styles.deadlineHintRow}>
-          <HomeworkHourglassHalfIcon size={10} />
-          <span>{hasDeadlinesToday ? 'Осталось до 18:00' : 'На сегодня дедлайнов нет'}</span>
-        </div>
-      </article>
+          <h3 className={styles.value}>{summary.dueTodayCount}</h3>
+          <p className={styles.title}>Дедлайн сегодня</p>
 
-      <article className={`${styles.card} ${styles.successCard}`}>
-        <span className={styles.successGlow} aria-hidden="true" />
+          <div className={styles.deadlineHintRow}>
+            <HomeworkHourglassHalfIcon size={10} />
+            <span>{hasDeadlinesToday ? 'Осталось до 18:00' : 'На сегодня дедлайнов нет'}</span>
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'completion-rate',
+      cardClassName: styles.successCard,
+      glow: <span className={styles.successGlow} aria-hidden="true" />,
+      content: (
         <div className={styles.cardInner}>
           <div className={styles.cardHeader}>
             <span className={`${styles.iconWrap} ${styles.successIconWrap}`}>
@@ -134,28 +155,46 @@ export const TeacherHomeworksKpiSection: FC<TeacherHomeworksKpiSectionProps> = (
             {weekDeltaLabel}
           </div>
         </div>
-      </article>
+      ),
+    },
+    {
+      key: 'average-score',
+      content: (
+        <>
+          <div className={styles.cardHeader}>
+            <span className={`${styles.iconWrap} ${styles.gradeIconWrap}`}>
+              <HomeworkStarIcon size={15} />
+            </span>
+            <span className={styles.starsRow} aria-hidden="true">
+              {Array.from({ length: 5 }, (_, index) =>
+                index < filledStars ? (
+                  <HomeworkStarIcon key={`star_fill_${index}`} size={10} className={styles.starFilled} />
+                ) : (
+                  <HomeworkStarRegularIcon key={`star_empty_${index}`} size={10} className={styles.starOutline} />
+                ),
+              )}
+            </span>
+          </div>
 
-      <article className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={`${styles.iconWrap} ${styles.gradeIconWrap}`}>
-            <HomeworkStarIcon size={15} />
-          </span>
-          <span className={styles.starsRow} aria-hidden="true">
-            {Array.from({ length: 5 }, (_, index) =>
-              index < filledStars ? (
-                <HomeworkStarIcon key={`star_fill_${index}`} size={10} className={styles.starFilled} />
-              ) : (
-                <HomeworkStarRegularIcon key={`star_empty_${index}`} size={10} className={styles.starOutline} />
-              ),
-            )}
-          </span>
-        </div>
+          <h3 className={styles.value}>{formatScoreValue(averageScore)}</h3>
+          <p className={styles.title}>Средний балл</p>
+          <div className={styles.note}>За последние 30 дней</div>
+        </>
+      ),
+    },
+  ];
 
-        <h3 className={styles.value}>{formatScoreValue(averageScore)}</h3>
-        <p className={styles.title}>Средний балл</p>
-        <div className={styles.note}>За последние 30 дней</div>
-      </article>
+  return (
+    <section className={styles.kpiGrid} aria-label="Сводка по домашним заданиям">
+      {cards.map((card) => (
+        <article
+          key={card.key}
+          className={`${styles.card} ${card.cardClassName ?? ''} ${card.hideOnMobile ? styles.cardHiddenOnMobile : ''}`}
+        >
+          {card.glow}
+          {card.content}
+        </article>
+      ))}
     </section>
   );
 };

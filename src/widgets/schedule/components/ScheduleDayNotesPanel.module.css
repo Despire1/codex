@@ -1,0 +1,277 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 0;
+}
+
+.stateCard {
+  padding: 18px;
+  border: 1px dashed #d1d5db;
+  border-radius: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+  background: #ffffff;
+  margin-bottom: 12px;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 28px 8px 20px;
+  text-align: center;
+}
+
+.emptyStateTitle {
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.notesList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.noteCard {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.noteCard:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.noteCardWarning {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.noteCardInfo {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.noteHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.noteBody {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.noteIconWrap {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.noteIconWrapWarning {
+  color: #d97706;
+}
+
+.noteIconWrapInfo {
+  color: #2563eb;
+}
+
+.noteIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.noteContent {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.noteMeta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #6b7280;
+}
+
+.menuButton {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    opacity 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.menuButton:hover {
+  background: rgba(255, 255, 255, 0.75);
+  color: #0f172a;
+}
+
+.menuButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menuButton {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .noteCard:hover .menuButton,
+  .noteCard:focus-within .menuButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.actionsPopover {
+  border-radius: 14px;
+}
+
+.noteActions {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 14px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+}
+
+.actionItem {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  color: #334155;
+}
+
+.actionItem:hover {
+  background: #f8fafc;
+}
+
+.actionDanger {
+  color: #be123c;
+}
+
+.actionDanger:hover {
+  background: #fff1f2;
+}
+
+.actionButtonIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.addNoteButton {
+  width: 100%;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+
+.addNoteButton:hover {
+  border-color: #a3e635;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.addNoteButtonIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.footer {
+  flex: 0 0 auto;
+  padding: 12px 16px 18px;
+  border-top: 1px solid #f0f1f4;
+  background: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .scrollArea {
+    padding: 12px 14px 0;
+  }
+
+  .noteBody {
+    gap: 8px;
+  }
+
+  .noteContent {
+    font-size: 13px;
+  }
+
+  .menuButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .footer {
+    padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+}

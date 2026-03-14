@@ -47,6 +47,7 @@ model Teacher {
   homeworkAssignments   HomeworkAssignment[] @relation("HomeworkAssignmentTeacher")
   homeworkSubmissionsReviewed HomeworkSubmission[] @relation("HomeworkSubmissionReviewer")
   lessons               Lesson[]
+  scheduleNotes         ScheduleNote[]
   lessonSeries          LessonSeries[]
   notificationLogs      NotificationLog[]
   activityEvents        ActivityEvent[]
@@ -272,6 +273,21 @@ model Lesson {
   @@index([recurrenceGroupId])
   @@index([seriesId])
   @@index([seriesId, seriesOriginalStartAt])
+}
+
+model ScheduleNote {
+  id        Int      @id @default(autoincrement())
+  teacherId BigInt
+  dateKey   String
+  noteType  String   @default("IMPORTANT")
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  teacher   Teacher  @relation(fields: [teacherId], references: [chatId], onDelete: Cascade)
+
+  @@index([teacherId, dateKey])
+  @@index([teacherId, updatedAt])
 }
 
 model LessonSeries {

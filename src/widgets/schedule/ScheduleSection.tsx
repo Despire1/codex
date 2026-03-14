@@ -11,6 +11,7 @@ import {
   type CSSProperties,
 } from 'react';
 import {
+  AddOutlinedIcon,
   CalendarMonthIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -25,10 +26,13 @@ import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
 import { buildParticipants, getLessonLabel } from '../../entities/lesson/lib/lessonDetails';
+import { useToast } from '../../shared/lib/toast';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useScheduleState } from './model/useScheduleState';
 import { MonthSidebarLessonItem } from './components/MonthSidebarLessonItem';
+import { useScheduleNotesRangeInternal } from './model/useScheduleNotesRange';
+import { ScheduleDayNotesPanel } from './components/ScheduleDayNotesPanel';
 
 const DAY_START_MINUTE = 0;
 const DAY_END_MINUTE = 24 * 60;
@@ -40,20 +44,6 @@ const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
 const WEEK_LESSON_INSET = 8;
 const DAY_LESSON_INSET = 12;
-const MONTH_NOTE_PATTERN: Array<[day: number, count: number]> = [
-  [1, 1],
-  [4, 2],
-  [6, 1],
-  [11, 3],
-  [13, 1],
-  [15, 2],
-  [18, 1],
-  [20, 2],
-  [22, 1],
-  [25, 1],
-  [27, 2],
-];
-
 const resolveLessonsLabel = (count: number) => {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -69,6 +59,21 @@ const resolveLessonsLabel = (count: number) => {
   return `${count} занятий`;
 };
 
+const resolveNotesLabel = (count: number) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} заметка`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} заметки`;
+  }
+
+  return `${count} заметок`;
+};
+
 interface ScheduleSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
@@ -77,6 +82,7 @@ interface ScheduleSectionProps {
 
 export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
   const timeZone = useTimeZone();
+  const { showToast } = useToast();
   const { openLessonModal, startEditLesson, togglePaid } = useLessonActions();
   const {
     scheduleView,
@@ -102,6 +108,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
   const isMobileViewport = useIsMobile(720);
+  const [activeDayPanelTab, setActiveDayPanelTab] = useState<'lessons' | 'notes'>('lessons');
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
   const [drawerDragOffset, setDrawerDragOffset] = useState(0);
@@ -136,21 +143,16 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const dayHeight = useMemo(() => HOURS_IN_DAY * HOUR_BLOCK_HEIGHT, []);
 
   const selectedMonth = useMemo(() => addMonths(monthAnchor, monthOffset), [monthAnchor, monthOffset]);
-  const notesCountByDay = useMemo(() => {
-    const daysInMonth = endOfMonth(selectedMonth).getDate();
-    const year = selectedMonth.getFullYear();
-    const month = selectedMonth.getMonth();
-
-    return MONTH_NOTE_PATTERN.reduce<Record<string, number>>((acc, [dayOfMonth, count]) => {
-      if (dayOfMonth > daysInMonth) {
-        return acc;
-      }
-
-      const iso = format(new Date(year, month, dayOfMonth), 'yyyy-MM-dd');
-      acc[iso] = count;
-      return acc;
-    }, {});
-  }, [selectedMonth]);
+  const {
+    loading: loadingNotes,
+    currentMonthRange,
+    notesCountByDay,
+    loadNotesForRange,
+    getNotesForDay,
+    createNote,
+    updateNote,
+    deleteNote,
+  } = useScheduleNotesRangeInternal(selectedMonth);
   const [internalSelectedMonthDay, setInternalSelectedMonthDay] = useState<string | null>(null);
   const effectiveSelectedMonthDay = selectedMonthDay ?? internalSelectedMonthDay;
 
@@ -277,6 +279,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
       setDrawerMode('half');
     }
   }, [effectiveSelectedMonthDay]);
+
+  useEffect(() => {
+    if (scheduleView !== 'month') return;
+    void loadNotesForRange(currentMonthRange);
+  }, [currentMonthRange, loadNotesForRange, scheduleView]);
 
   const buildMonthDays = (monthDate: Date) => {
     const start = startOfWeek(startOfMonth(monthDate), { weekStartsOn: WEEK_STARTS_ON as 0 | 1 });
@@ -708,29 +715,38 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
           .slice()
           .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
       : [];
+    const selectedDayNotes = getNotesForDay(effectiveSelectedMonthDay);
     const selectedDayDate = effectiveSelectedMonthDay
       ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
       : null;
-    const selectedDayNotesCount = effectiveSelectedMonthDay ? (notesCountByDay[effectiveSelectedMonthDay] ?? 0) : 0;
+    const selectedDayNotesCount = selectedDayNotes.length;
 
     const selectedDayTitle = selectedDayDate ? format(selectedDayDate, 'd MMMM', { locale: ru }) : 'Выберите день';
     const selectedDayMeta = selectedDayDate
-      ? `${format(selectedDayDate, 'EEEE', { locale: ru })} • ${resolveLessonsLabel(selectedDayLessons.length)}`
+      ? [
+          format(selectedDayDate, 'EEEE', { locale: ru }),
+          resolveLessonsLabel(selectedDayLessons.length),
+          selectedDayNotesCount > 0 ? resolveNotesLabel(selectedDayNotesCount) : null,
+        ]
+          .filter(Boolean)
+          .join(' • ')
       : 'Выберите день в календаре';
     const selectedDayMetaCapitalized = selectedDayMeta.charAt(0).toUpperCase() + selectedDayMeta.slice(1);
 
-    const handleCreateLessonFromDrawer = () => {
+    const handleCreateLessonFromPanel = () => {
       if (!effectiveSelectedMonthDay) return;
 
       const targetDate = toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone);
       setDayViewDate(targetDate);
-      setDrawerMode('half');
-      setDrawerDragOffset(0);
-      setInternalSelectedMonthDay(null);
-      setSelectedMonthDay(null);
+      if (isMobileMonthView) {
+        setDrawerMode('half');
+        setDrawerDragOffset(0);
+        setInternalSelectedMonthDay(null);
+        setSelectedMonthDay(null);
+      }
       openLessonModal(effectiveSelectedMonthDay, undefined, undefined, {
         skipNavigation: true,
-        variant: 'sheet',
+        variant: isMobileMonthView ? 'sheet' : 'modal',
       });
     };
 
@@ -800,48 +816,90 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
         </div>
 
         <div className={styles.dayPanelTabs}>
-          <button type="button" className={`${styles.dayPanelTab} ${styles.dayPanelTabActive}`}>
-            Занятия
+          <button
+            type="button"
+            className={`${styles.dayPanelTab} ${activeDayPanelTab === 'lessons' ? styles.dayPanelTabActive : ''}`}
+            onClick={() => setActiveDayPanelTab('lessons')}
+          >
+            {selectedDayLessons.length > 0 ? `Занятия (${selectedDayLessons.length})` : 'Занятия'}
           </button>
           <button
             type="button"
-            className={`${styles.dayPanelTab} ${styles.dayPanelTabMuted}`}
-            onClick={(event) => event.preventDefault()}
+            className={`${styles.dayPanelTab} ${activeDayPanelTab === 'notes' ? styles.dayPanelTabActive : ''}`}
+            onClick={() => setActiveDayPanelTab('notes')}
           >
-            Заметки
+            {selectedDayNotesCount > 0 ? `Заметки (${selectedDayNotesCount})` : 'Заметки'}
           </button>
         </div>
 
-        {selectedDayLessons.length === 0 && <div className={styles.emptyDayState}>На этот день занятий пока нет</div>}
-
-        <div className={styles.dayPanelList}>
-          {selectedDayLessons.map((lesson) => {
-            return (
-              <MonthSidebarLessonItem
-                key={lesson.id}
-                lesson={lesson}
-                linkedStudentsById={linkedStudentsById}
-                timeZone={timeZone}
-                onClick={() => startEditLesson(lesson)}
-              />
-            );
-          })}
-        </div>
-        <div className={styles.notesStub}>
-          {selectedDayNotesCount > 0
-            ? `Заметки (${selectedDayNotesCount}) появятся в этом блоке в следующем обновлении.`
-            : 'Блок заметок пока в режиме заглушки.'}
-        </div>
-        {isMobileMonthView ? (
-          <div className={styles.dayDrawerActions}>
-            <button
-              type="button"
-              className={styles.dayDrawerCreateButton}
-              onClick={handleCreateLessonFromDrawer}
-            >
-              Создать урок
-            </button>
+        {activeDayPanelTab === 'lessons' ? (
+          <div className={styles.dayPanelTabContent}>
+            <div className={styles.dayPanelScrollArea}>
+              {selectedDayLessons.length === 0 ? (
+                <div className={styles.emptyDayState}>На этот день занятий пока нет</div>
+              ) : (
+                <div className={styles.dayPanelList}>
+                  {selectedDayLessons.map((lesson) => {
+                    return (
+                      <MonthSidebarLessonItem
+                        key={lesson.id}
+                        lesson={lesson}
+                        linkedStudentsById={linkedStudentsById}
+                        timeZone={timeZone}
+                        onClick={() => startEditLesson(lesson)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className={styles.dayPanelFooter}>
+              <button type="button" className={styles.dayPanelAddButton} onClick={handleCreateLessonFromPanel}>
+                <AddOutlinedIcon className={styles.dayPanelAddButtonIcon} />
+                Добавить занятие
+              </button>
+            </div>
           </div>
+        ) : effectiveSelectedMonthDay ? (
+          <ScheduleDayNotesPanel
+            dateKey={effectiveSelectedMonthDay}
+            notes={selectedDayNotes}
+            loading={loadingNotes}
+            timeZone={timeZone}
+            onCreate={async ({ content, noteType }) => {
+              try {
+                await createNote({ dateKey: effectiveSelectedMonthDay, content, noteType });
+              } catch (error) {
+                showToast({
+                  message: 'Не удалось сохранить заметку',
+                  variant: 'error',
+                });
+                throw error;
+              }
+            }}
+            onUpdate={async (noteId, { content, noteType }) => {
+              try {
+                await updateNote(noteId, { content, noteType });
+              } catch (error) {
+                showToast({
+                  message: 'Не удалось обновить заметку',
+                  variant: 'error',
+                });
+                throw error;
+              }
+            }}
+            onDelete={async (noteId) => {
+              try {
+                await deleteNote(noteId);
+              } catch (error) {
+                showToast({
+                  message: 'Не удалось удалить заметку',
+                  variant: 'error',
+                });
+                throw error;
+              }
+            }}
+          />
         ) : null}
       </div>
     );

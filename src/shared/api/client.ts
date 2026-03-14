@@ -23,6 +23,8 @@ import {
   PaymentCancelBehavior,
   PaymentEvent,
   PaymentReminderLog,
+  ScheduleNote,
+  ScheduleNoteType,
   Student,
   StudentDebtSummary,
   StudentListItem,
@@ -166,6 +168,9 @@ export type HomeworkAssignmentsSummary = {
   dueTodayCount: number;
   reviewedWeekDeltaPercent: number;
   averageScore30d: number | null;
+  permissions: {
+    canStartReviewQueue: boolean;
+  };
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -320,6 +325,27 @@ export const api = {
     });
     return apiFetch<{ lessons: Lesson[] }>(`/api/lessons?${search.toString()}`);
   },
+  listScheduleNotes: (params: { start: string; end: string }) => {
+    const search = new URLSearchParams({
+      start: params.start,
+      end: params.end,
+    });
+    return apiFetch<{ notes: ScheduleNote[] }>(`/api/schedule-notes?${search.toString()}`);
+  },
+  createScheduleNote: (payload: { dateKey: string; noteType: ScheduleNoteType; content: string }) =>
+    apiFetch<{ note: ScheduleNote }>('/api/schedule-notes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateScheduleNote: (noteId: number, payload: { noteType: ScheduleNoteType; content: string }) =>
+    apiFetch<{ note: ScheduleNote }>(`/api/schedule-notes/${noteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteScheduleNote: (noteId: number) =>
+    apiFetch<{ deletedId: number }>(`/api/schedule-notes/${noteId}`, {
+      method: 'DELETE',
+    }),
   listUnpaidLessons: () => apiFetch<{ entries: UnpaidLessonEntry[] }>('/api/lessons/unpaid'),
   listActivityFeed: (params?: {
     limit?: number;

@@ -336,6 +336,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     }),
     [summary],
   );
+  const canStartReviewQueue = summary.permissions.canStartReviewQueue;
 
   const studentsById = useMemo(() => new Map(students.map((item) => [item.id, item.name])), [students]);
 
@@ -588,10 +589,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               >
                 <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
               </button>
-              <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
-                <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
-                <span>Проверять подряд</span>
-              </button>
+              {canStartReviewQueue ? (
+                <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
+                  <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
+                  <span>Проверять подряд</span>
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
