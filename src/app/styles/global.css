@@ -101,7 +101,13 @@ body.telegram-webapp {
 
 body.telegram-webapp a {
   color: inherit !important;
+  -webkit-text-fill-color: currentColor;
   text-decoration: none;
+}
+
+body.telegram-webapp button {
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
 }
 
 body.telegram-webapp svg {

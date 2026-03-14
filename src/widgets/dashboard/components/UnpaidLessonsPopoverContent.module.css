@@ -92,6 +92,8 @@
   font-weight: 600;
   font-size: 16px;
   padding: 0;
+  color: var(--color-slate-900);
+  -webkit-text-fill-color: currentColor;
 }
 
 .lessonMeta {
