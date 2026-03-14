@@ -12,7 +12,13 @@ import {
 import { addMinutes, addYears, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { api } from '../../../shared/api/client';
-import { isVisibleLesson, resolveLessonMutationDisabledReason } from '../../../entities/lesson/lib/lessonMutationGuards';
+import {
+  isVisibleLesson,
+  resolveLessonAllowsLimitedMetadataEdit,
+  resolveLessonDeleteDisabledReason,
+  resolveLessonEditDisabledReason,
+  resolveLessonMutationDisabledReason,
+} from '../../../entities/lesson/lib/lessonMutationGuards';
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
 import { normalizeMeetingLinkInput } from '../../../shared/lib/meetingLink';
 import { normalizeLesson, todayISO } from '../../../shared/lib/normalizers';
@@ -151,6 +157,7 @@ export type LessonActionsContextValue = {
   lessonModalFocus: LessonModalFocus;
   lessonDraft: LessonDraft;
   editingLessonId: number | null;
+  editingLesson: Lesson | null;
   recurrenceLocked: boolean;
   defaultLessonDuration: number;
   rescheduleModalOpen: boolean;
@@ -329,7 +336,7 @@ export const useLessonActionsInternal = ({
       options?: OpenLessonModalOptions,
     ) => {
       if (existing) {
-        const disabledReason = resolveLessonMutationDisabledReason(existing);
+        const disabledReason = resolveLessonEditDisabledReason(existing);
         if (disabledReason) {
           showInfoDialog('Изменение недоступно', disabledReason);
           return;
@@ -583,7 +590,7 @@ export const useLessonActionsInternal = ({
   const requestDeleteLesson = useCallback(() => {
     if (!editingLessonId) return;
     const original = editingLessonOriginal;
-    const disabledReason = original ? resolveLessonMutationDisabledReason(original) : null;
+    const disabledReason = original ? resolveLessonDeleteDisabledReason(original) : null;
 
     if (disabledReason) {
       showInfoDialog('Изменение недоступно', disabledReason);
@@ -660,6 +667,7 @@ export const useLessonActionsInternal = ({
       try {
         if (editingLessonId) {
           const original = editingLessonOriginal;
+          const limitedMetadataEdit = original ? resolveLessonAllowsLimitedMetadataEdit(original) : false;
           const originalWeekdays = original?.recurrenceWeekdays ?? [];
           const originalUntil = original?.recurrenceUntil
             ? formatInTimeZone(original.recurrenceUntil, 'yyyy-MM-dd', { timeZone })
@@ -680,7 +688,12 @@ export const useLessonActionsInternal = ({
               ? toUtcEndOfDay(lessonDraft.repeatUntil, timeZone).toISOString()
               : null;
 
-          if (original?.isRecurring && (original.recurrenceGroupId || original.seriesId) && options?.applyToSeriesOverride === undefined) {
+          if (
+            !limitedMetadataEdit &&
+            original?.isRecurring &&
+            (original.recurrenceGroupId || original.seriesId) &&
+            options?.applyToSeriesOverride === undefined
+          ) {
             const previews = await fetchSeriesScopePreviews(original, 'EDIT', {
               startAt,
               durationMinutes,
@@ -710,22 +723,31 @@ export const useLessonActionsInternal = ({
             return;
           }
 
+          const originalStudentIds =
+            original?.participants && original.participants.length > 0
+              ? original.participants.map((participant) => participant.studentId)
+              : original?.studentId
+                ? [original.studentId]
+                : lessonDraft.studentIds;
+
           const data = await api.updateLesson(editingLessonId, {
-            studentIds: lessonDraft.studentIds,
-            startAt,
-            durationMinutes,
+            studentIds: limitedMetadataEdit ? originalStudentIds : lessonDraft.studentIds,
+            startAt: limitedMetadataEdit && original ? original.startAt : startAt,
+            durationMinutes: limitedMetadataEdit && original ? original.durationMinutes : durationMinutes,
             color: lessonDraft.color,
             meetingLink,
-            scope: options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
-            repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
-            repeatUntil: repeatUntilPayload,
+            scope: limitedMetadataEdit ? 'SINGLE' : options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
+            repeatWeekdays:
+              limitedMetadataEdit || !lessonDraft.isRecurring ? undefined : lessonDraft.repeatWeekdays,
+            repeatUntil: limitedMetadataEdit ? undefined : repeatUntilPayload,
           });
 
           applyLessonUpdateResult(data, editingLessonOriginal, {
-            scope: options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
+            scope: limitedMetadataEdit ? 'SINGLE' : options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
           });
 
           if (
+            !limitedMetadataEdit &&
             timeChanged &&
             (lessonModalContext.focus === 'focus_date' || lessonModalContext.focus === 'focus_time') &&
             original
@@ -974,7 +996,7 @@ export const useLessonActionsInternal = ({
 
   const requestDeleteLessonFromList = useCallback(
     (lesson: Lesson) => {
-      const disabledReason = resolveLessonMutationDisabledReason(lesson);
+      const disabledReason = resolveLessonDeleteDisabledReason(lesson);
       if (disabledReason) {
         showInfoDialog('Изменение недоступно', disabledReason);
         return;
@@ -1572,6 +1594,7 @@ export const useLessonActionsInternal = ({
       lessonModalFocus: lessonModalContext.focus,
       lessonDraft,
       editingLessonId,
+      editingLesson: editingLessonOriginal,
       recurrenceLocked: Boolean(editingLessonOriginal?.isRecurring),
       defaultLessonDuration: teacherDefaultLessonDuration,
       rescheduleModalOpen,
@@ -1604,6 +1627,7 @@ export const useLessonActionsInternal = ({
       closeLessonModal,
       closeRescheduleModal,
       editingLessonId,
+      editingLessonOriginal,
       editingLessonOriginal?.isRecurring,
       handleLessonDraftChange,
       lessonDraft,

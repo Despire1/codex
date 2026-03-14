@@ -8,6 +8,8 @@ import { toZonedDate } from '../../../shared/lib/timezoneDates';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../../entities/lesson/lib/lessonDetails';
 import {
+  resolveLessonDeleteDisabledReason,
+  resolveLessonEditDisabledReason,
   resolveLessonHasPaidParticipant,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
@@ -74,7 +76,9 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
   const startDate = toZonedDate(lesson.startAt, timeZone);
   const endDate = addMinutes(startDate, lesson.durationMinutes);
   const timeLabel = `${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`;
-  const mutationDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const editDisabledReason = resolveLessonEditDisabledReason(lesson);
+  const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const isCanceled = lesson.status === 'CANCELED';
   const isRecurring = isLessonInSeries(lesson);
   const isCorrectionCancel = lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson);
@@ -216,11 +220,11 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
             <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lesson.id}`}>
               {!isCanceled && (
                 <>
-                  <Tooltip content={mutationDisabledReason}>
+                  <Tooltip content={rescheduleDisabledReason}>
                     <button
                       type="button"
                       className={styles.actionItem}
-                      disabled={Boolean(mutationDisabledReason)}
+                      disabled={Boolean(rescheduleDisabledReason)}
                       onClick={(event) => {
                         event.stopPropagation();
                         openRescheduleModal(lesson);
@@ -230,11 +234,11 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
                       Перенести занятие
                     </button>
                   </Tooltip>
-                  <Tooltip content={mutationDisabledReason}>
+                  <Tooltip content={editDisabledReason}>
                     <button
                       type="button"
                       className={styles.actionItem}
-                      disabled={Boolean(mutationDisabledReason)}
+                      disabled={Boolean(editDisabledReason)}
                       onClick={(event) => {
                         event.stopPropagation();
                         startEditLesson(lesson);
@@ -270,11 +274,11 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
                   Восстановить
                 </button>
               )}
-              <Tooltip content={mutationDisabledReason}>
+              <Tooltip content={deleteDisabledReason}>
                 <button
                   type="button"
                   className={`${styles.actionItem} ${styles.actionDanger}`}
-                  disabled={Boolean(mutationDisabledReason)}
+                  disabled={Boolean(deleteDisabledReason)}
                   onClick={(event) => {
                     event.stopPropagation();
                     requestDeleteLessonFromList(lesson);

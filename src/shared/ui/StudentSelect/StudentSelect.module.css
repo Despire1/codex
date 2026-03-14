@@ -18,6 +18,18 @@
   color: var(--color-slate-700);
 }
 
+.triggerButton:disabled {
+  cursor: not-allowed;
+  color: var(--color-slate-300);
+  background: var(--color-slate-50);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.triggerButton:disabled .chevron {
+  color: var(--color-slate-300);
+}
+
 .triggerLabel {
   min-width: 0;
   overflow: hidden;

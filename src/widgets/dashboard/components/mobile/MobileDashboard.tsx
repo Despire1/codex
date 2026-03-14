@@ -15,7 +15,12 @@ import {
   faWallet,
 } from '@fortawesome/free-solid-svg-icons';
 import { ActivityFeedItem, Lesson, LinkedStudent, Teacher, UnpaidLessonEntry } from '@/entities/types';
-import { resolveLessonMutationDisabledReason } from '@/entities/lesson/lib/lessonMutationGuards';
+import {
+  resolveLessonDeleteDisabledReason,
+  resolveLessonEditDisabledReason,
+  resolveLessonLimitedEditNotice,
+  resolveLessonMutationDisabledReason,
+} from '@/entities/lesson/lib/lessonMutationGuards';
 import type { DashboardSummary } from '@/shared/api/client';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
@@ -189,7 +194,14 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   );
 
   const actionLessonPresentation = resolveCloseLessonForActions(presentation.closeLesson, actionsLesson);
-  const actionMutationDisabledReason = actionsLesson ? resolveLessonMutationDisabledReason(actionsLesson) : null;
+  const actionRescheduleDisabledReason = actionsLesson ? resolveLessonMutationDisabledReason(actionsLesson) : null;
+  const actionEditDisabledReason = actionsLesson ? resolveLessonEditDisabledReason(actionsLesson) : null;
+  const actionDeleteDisabledReason = actionsLesson ? resolveLessonDeleteDisabledReason(actionsLesson) : null;
+  const actionHelperText =
+    (actionsLesson ? resolveLessonLimitedEditNotice(actionsLesson) : null) ??
+    actionEditDisabledReason ??
+    actionRescheduleDisabledReason ??
+    actionDeleteDisabledReason;
 
   const quickHomeworkPrefill = useMemo(() => {
     if (presentation.nextLesson) {
@@ -746,11 +758,11 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 Выдать ДЗ
               </button>
 
-              <Tooltip content={actionMutationDisabledReason} className={styles.sheetActionTooltip}>
+              <Tooltip content={actionRescheduleDisabledReason} className={styles.sheetActionTooltip}>
                 <button
                   type="button"
                   className={styles.sheetAction}
-                  disabled={Boolean(actionMutationDisabledReason)}
+                  disabled={Boolean(actionRescheduleDisabledReason)}
                   onClick={() => {
                     setActionsLesson(null);
                     onRescheduleLesson(actionsLesson);
@@ -760,11 +772,11 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 </button>
               </Tooltip>
 
-              <Tooltip content={actionMutationDisabledReason} className={styles.sheetActionTooltip}>
+              <Tooltip content={actionEditDisabledReason} className={styles.sheetActionTooltip}>
                 <button
                   type="button"
                   className={styles.sheetAction}
-                  disabled={Boolean(actionMutationDisabledReason)}
+                  disabled={Boolean(actionEditDisabledReason)}
                   onClick={() => {
                     setActionsLesson(null);
                     onEditLesson(actionsLesson);
@@ -774,22 +786,25 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 </button>
               </Tooltip>
 
-              <button
-                type="button"
-                className={`${styles.sheetAction} ${styles.sheetActionDanger}`}
-                onClick={() => {
-                  setActionsLesson(null);
-                  onDeleteLesson(actionsLesson);
-                }}
-              >
-                Удалить
-              </button>
+              <Tooltip content={actionDeleteDisabledReason} className={styles.sheetActionTooltip}>
+                <button
+                  type="button"
+                  className={`${styles.sheetAction} ${styles.sheetActionDanger}`}
+                  disabled={Boolean(actionDeleteDisabledReason)}
+                  onClick={() => {
+                    setActionsLesson(null);
+                    onDeleteLesson(actionsLesson);
+                  }}
+                >
+                  Удалить
+                </button>
+              </Tooltip>
 
               <button type="button" className={styles.sheetCancel} onClick={() => setActionsLesson(null)}>
                 Отмена
               </button>
             </div>
-            {actionMutationDisabledReason && <div className={styles.sheetHelper}>{actionMutationDisabledReason}</div>}
+            {actionHelperText && <div className={styles.sheetHelper}>{actionHelperText}</div>}
           </div>
         ) : null}
       </BottomSheet>

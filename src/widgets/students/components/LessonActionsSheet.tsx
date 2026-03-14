@@ -1,7 +1,10 @@
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { Lesson } from '../../../entities/types';
-import { resolveLessonMutationDisabledReason } from '../../../entities/lesson/lib/lessonMutationGuards';
+import {
+  resolveLessonDeleteDisabledReason,
+  resolveLessonMutationDisabledReason,
+} from '../../../entities/lesson/lib/lessonMutationGuards';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from './LessonActionsSheet.module.css';
@@ -37,7 +40,8 @@ export const LessonActionsSheet = ({
   const durationLabel = lesson.durationMinutes ? `${lesson.durationMinutes} мин` : '—';
   const priceLabel = resolvedPrice === undefined || resolvedPrice === null ? '—' : `${resolvedPrice} ₽`;
   const isCompleted = lesson.status === 'COMPLETED';
-  const mutationDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const paymentActionLabel = isPaid ? 'Отменить оплату' : 'Отметить оплату';
 
   return (
@@ -73,24 +77,26 @@ export const LessonActionsSheet = ({
         </button>
         <button
           type="button"
-          className={styles.actionButton}
+          className={`${styles.actionButton} ${rescheduleDisabledReason ? styles.disabled : ''}`}
           onClick={() => {
+            if (rescheduleDisabledReason) return;
             onEdit();
             onClose();
           }}
+          disabled={Boolean(rescheduleDisabledReason)}
         >
           Перенести
         </button>
-        <Tooltip content={mutationDisabledReason}>
+        <Tooltip content={deleteDisabledReason}>
           <button
             type="button"
-            className={`${styles.actionButton} ${styles.danger} ${mutationDisabledReason ? styles.disabled : ''}`}
+            className={`${styles.actionButton} ${styles.danger} ${deleteDisabledReason ? styles.disabled : ''}`}
             onClick={() => {
-              if (mutationDisabledReason) return;
+              if (deleteDisabledReason) return;
               onDelete();
               onClose();
             }}
-            disabled={Boolean(mutationDisabledReason)}
+            disabled={Boolean(deleteDisabledReason)}
           >
             Удалить
           </button>

@@ -86,9 +86,3 @@
   text-align: left;
   cursor: pointer;
 }
-
-.helperText {
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--color-slate-500);
-}

@@ -4,7 +4,10 @@ import { useMemo } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
 import { toZonedDate } from '../../../../shared/lib/timezoneDates';
 import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../../entities/lesson/lib/lessonDetails';
-import { resolveLessonMutationDisabledReason } from '../../../../entities/lesson/lib/lessonMutationGuards';
+import {
+  resolveLessonEditDisabledReason,
+  resolveLessonMutationDisabledReason,
+} from '../../../../entities/lesson/lib/lessonMutationGuards';
 import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './LessonPopover.module.css';
 
@@ -32,7 +35,8 @@ export const LessonPopover = ({
   const isPaid = resolveLessonPaid(lesson, participants);
   const isCanceled = lesson.status === 'CANCELED';
   const isCorrectionCancel = lesson.status === 'COMPLETED' || isPaid;
-  const mutationDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const editDisabledReason = resolveLessonEditDisabledReason(lesson);
   const startDate = toZonedDate(lesson.startAt, timeZone);
   const endDate = addMinutes(startDate, lesson.durationMinutes);
   const dateLabel = format(startDate, 'd MMMM', { locale: ru });
@@ -56,21 +60,21 @@ export const LessonPopover = ({
       <div className={styles.actions}>
         {!isCanceled && (
           <>
-            <Tooltip content={mutationDisabledReason}>
+            <Tooltip content={rescheduleDisabledReason}>
               <button
                 type="button"
                 className={styles.actionButton}
-                disabled={Boolean(mutationDisabledReason)}
+                disabled={Boolean(rescheduleDisabledReason)}
                 onClick={onReschedule}
               >
                 Перенести
               </button>
             </Tooltip>
-            <Tooltip content={mutationDisabledReason}>
+            <Tooltip content={editDisabledReason}>
               <button
                 type="button"
                 className={styles.actionButton}
-                disabled={Boolean(mutationDisabledReason)}
+                disabled={Boolean(editDisabledReason)}
                 onClick={onEditFull}
               >
                 Редактировать
@@ -87,11 +91,11 @@ export const LessonPopover = ({
             <button type="button" className={styles.actionButton} onClick={onRestore}>
               Восстановить
             </button>
-            <Tooltip content={mutationDisabledReason}>
+            <Tooltip content={editDisabledReason}>
               <button
                 type="button"
                 className={styles.actionButton}
-                disabled={Boolean(mutationDisabledReason)}
+                disabled={Boolean(editDisabledReason)}
                 onClick={onEditFull}
               >
                 Редактировать
@@ -100,7 +104,6 @@ export const LessonPopover = ({
           </>
         )}
       </div>
-      {mutationDisabledReason && <div className={styles.helperText}>{mutationDisabledReason}</div>}
     </div>
   );
 };

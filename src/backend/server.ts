@@ -3127,6 +3127,10 @@ const normalizeLessonMutationAction = (value: unknown): LessonMutationAction => 
 
 const LESSON_HISTORY_LOCK_MESSAGE =
   'Урок уже оплачен или проведён. Чтобы не переписать историю, изменение недоступно.';
+const LESSON_DELETE_LOCK_MESSAGE =
+  'Проведённый или оплаченный урок нельзя удалить. Если урок не состоялся, используйте отмену.';
+const LESSON_COMPLETED_LIMITED_EDIT_MESSAGE =
+  'Урок уже проведён или оплачен. Можно изменить только безопасные поля: дата, время, ученики и повтор серии недоступны.';
 const LESSON_SERIES_HISTORY_LOCK_MESSAGE =
   'В выбранной части серии есть оплаченные, проведённые или уже связанные с историей уроки. Чтобы не переписать историю, начните изменение с более позднего урока или редактируйте один урок отдельно.';
 
@@ -3139,6 +3143,21 @@ const isLessonFullyPaid = (lesson: { isPaid?: boolean; participants?: Array<{ is
   }
   return Boolean(lesson.isPaid);
 };
+
+const hasLessonPaidParticipant = (lesson: { isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> }) => {
+  if (lesson.participants && lesson.participants.length > 0) {
+    return lesson.participants.some((participant) => Boolean(participant?.isPaid));
+  }
+  return Boolean(lesson.isPaid);
+};
+
+const isLessonLimitedMetadataEditable = (
+  lesson: { status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+) => lesson.status === 'COMPLETED' || hasLessonPaidParticipant(lesson);
+
+const isLessonDeleteLocked = (
+  lesson: { status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+) => lesson.status === 'COMPLETED' || hasLessonPaidParticipant(lesson);
 
 const isImmutableLessonForRecurringMutation = (
   lesson: { id?: number; status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
@@ -4170,6 +4189,75 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
       : recurrenceEndRaw
         ? new Date(recurrenceEndRaw)
         : null;
+  const limitedMetadataEdit = isLessonLimitedMetadataEditable(existing);
+  const previousStudentIdsSorted = [...previousParticipantIds].sort((left, right) => left - right);
+  const nextStudentIdsSorted = [...ids].sort((left, right) => left - right);
+  const participantsChanged =
+    previousStudentIdsSorted.length !== nextStudentIdsSorted.length ||
+    previousStudentIdsSorted.some((studentId, index) => studentId !== nextStudentIdsSorted[index]);
+  const timingChanged =
+    existingLesson.startAt.getTime() !== targetStart.getTime() ||
+    existingLesson.durationMinutes !== nextDuration;
+  const existingWeekdays = parseWeekdays(existingLesson.recurrenceWeekdays);
+  const recurrenceWeekdaysChanged =
+    weekdays !== undefined &&
+    (weekdays.length !== existingWeekdays.length ||
+      weekdays.some((day, index) => day !== existingWeekdays[index]));
+  const existingRecurrenceUntilTs = existingLesson.recurrenceUntil
+    ? new Date(existingLesson.recurrenceUntil).getTime()
+    : null;
+  const nextRecurrenceUntilTs =
+    recurrenceEnd === undefined ? existingRecurrenceUntilTs : recurrenceEnd ? recurrenceEnd.getTime() : null;
+  const recurrenceUntilChanged =
+    recurrenceEnd !== undefined && existingRecurrenceUntilTs !== nextRecurrenceUntilTs;
+
+  if (limitedMetadataEdit) {
+    if (timingChanged || participantsChanged || recurrenceWeekdaysChanged || recurrenceUntilChanged || scope !== 'SINGLE') {
+      throw new Error(LESSON_COMPLETED_LIMITED_EDIT_MESSAGE);
+    }
+
+    const updatedLesson = await updateLessonWithParticipants(prisma, {
+      lessonId,
+      seriesId: existingLesson.seriesId ?? null,
+      seriesOriginalStartAt: existingLesson.seriesOriginalStartAt ?? null,
+      studentIds: previousParticipantIds,
+      startAt: existingLesson.startAt,
+      durationMinutes: existingLesson.durationMinutes,
+      color: normalizedColor,
+      meetingLink: resolvedSeriesMeetingLink,
+      isRecurring: Boolean(existingLesson.isRecurring),
+      recurrenceUntil: existingLesson.recurrenceUntil ?? null,
+      recurrenceGroupId: existingLesson.recurrenceGroupId ?? null,
+      recurrenceWeekdays: existingLesson.recurrenceWeekdays ?? null,
+    });
+
+    const changedFields: string[] = [];
+    if ((existingLesson.meetingLink ?? null) !== (updatedLesson.meetingLink ?? null)) changedFields.push('meeting_link');
+    if (existingLesson.color !== updatedLesson.color) changedFields.push('color');
+
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId: updatedLesson.studentId,
+      lessonId: updatedLesson.id,
+      category: 'LESSON',
+      action: 'UPDATE',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: 'Занятие обновлено',
+      payload: {
+        lessonStartAt: updatedLesson.startAt.toISOString(),
+        previousLessonStartAt: existingLesson.startAt.toISOString(),
+        durationMinutes: updatedLesson.durationMinutes,
+        previousDurationMinutes: existingLesson.durationMinutes,
+        studentIds: previousParticipantIds,
+        studentNames: previousParticipantNames,
+        previousStudentNames: previousParticipantNames,
+        changedFields,
+      },
+    });
+
+    return updatedLesson;
+  }
 
   await ensureLessonCanBeDangerouslyMutated(prisma, existing);
 
@@ -4316,11 +4404,6 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
 
   const nextStudentIds = updatedLesson.participants.map((participant: any) => participant.studentId);
   const nextStudentNames = resolveLessonParticipantNames(nextStudentIds, allLinks as any);
-  const previousStudentIdsSorted = [...previousParticipantIds].sort((left, right) => left - right);
-  const nextStudentIdsSorted = [...nextStudentIds].sort((left, right) => left - right);
-  const participantsChanged =
-    previousStudentIdsSorted.length !== nextStudentIdsSorted.length ||
-    previousStudentIdsSorted.some((studentId, index) => studentId !== nextStudentIdsSorted[index]);
 
   const changedFields: string[] = [];
   if (existingLesson.startAt.getTime() !== updatedLesson.startAt.getTime()) changedFields.push('date_time');
@@ -4384,6 +4467,9 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
   if ((lesson.seriesId || lesson.recurrenceGroupId) && lesson.isRecurring) {
     const result = await prisma.$transaction(async (tx) => {
       const scoped = await loadScopedLessonTargets(tx, teacher, lessonId, scope);
+      if (scoped.lessons.some((item: any) => isLessonDeleteLocked(item))) {
+        throw new Error(LESSON_DELETE_LOCK_MESSAGE);
+      }
       const deletedIds: number[] = [];
       for (const targetLesson of scoped.lessons) {
         const targetResult = await suppressLessonInstance(tx, targetLesson);
@@ -4427,6 +4513,10 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
       },
     });
     return result;
+  }
+
+  if (isLessonDeleteLocked(lesson)) {
+    throw new Error(LESSON_DELETE_LOCK_MESSAGE);
   }
 
   const singleDeleteResult = await prisma.$transaction(async (tx) => {

@@ -1,5 +1,5 @@
 import { type FC, useEffect, useMemo, useRef } from 'react';
-import { LinkedStudent } from '../../../entities/types';
+import { type Lesson, type LinkedStudent, LessonColor } from '../../../entities/types';
 import type { LessonModalFocus } from '../../lessons/model/types';
 import {
   Accordion,
@@ -18,7 +18,11 @@ import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { StudentSelect } from '../../../shared/ui/StudentSelect';
 import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
-import { LessonColor } from '../../../entities/types';
+import {
+  resolveLessonAllowsLimitedMetadataEdit,
+  resolveLessonDeleteDisabledReason,
+  resolveLessonLimitedEditNotice,
+} from '../../../entities/lesson/lib/lessonMutationGuards';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 import { ClearIcon, MeetingLinkIcon } from '../../../icons/MaterialIcons';
@@ -50,6 +54,7 @@ export interface LessonDraft {
 interface LessonModalProps {
   open: boolean;
   editingLessonId: number | null;
+  editingLesson?: Lesson | null;
   defaultDuration: number;
   linkedStudents: LinkedStudent[];
   draft: LessonDraft;
@@ -75,6 +80,7 @@ const weekdayOptions: { value: number; label: string }[] = [
 export const LessonModal: FC<LessonModalProps> = ({
   open,
   editingLessonId,
+  editingLesson = null,
   defaultDuration,
   linkedStudents,
   draft,
@@ -89,6 +95,10 @@ export const LessonModal: FC<LessonModalProps> = ({
   const timeZone = useTimeZone();
   const isSheet = variant === 'sheet';
   const isEditing = Boolean(editingLessonId);
+  const hasLimitedMetadataEdit = Boolean(editingLesson && resolveLessonAllowsLimitedMetadataEdit(editingLesson));
+  const limitedEditNotice = editingLesson ? resolveLessonLimitedEditNotice(editingLesson) : null;
+  const deleteDisabledReason = editingLesson ? resolveLessonDeleteDisabledReason(editingLesson) : null;
+  const recurrenceControlsDisabled = hasLimitedMetadataEdit || (recurrenceLocked && draft.isRecurring);
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
   const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
@@ -113,7 +123,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   }, [draft.meetingLink, normalizedMeetingLink]);
 
   const handleRecurringToggle = (checked: boolean) => {
-    if (recurrenceLocked && !checked) return;
+    if (recurrenceControlsDisabled) return;
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getDay();
     onDraftChange({
       ...draft,
@@ -255,14 +265,21 @@ export const LessonModal: FC<LessonModalProps> = ({
       className={`${modalStyles.modal} ${isSheet ? sheetStyles.sheetModal : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className={`${modalStyles.modalHeader} ${isSheet ? sheetStyles.sheetHeader : ''}`}>
-        <div>
+      <div
+        className={`${modalStyles.modalHeader} ${isSheet ? sheetStyles.sheetHeader : ''} ${sheetStyles.headerTopAligned}`}
+      >
+        <div className={sheetStyles.headerContent}>
           <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
           <div className={modalStyles.modalSubtitle}>
             {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
           </div>
+          {limitedEditNotice && <div className={sheetStyles.lockNotice}>{limitedEditNotice}</div>}
         </div>
-        <button className={modalStyles.closeButton} onClick={onClose} aria-label="Закрыть модалку">
+        <button
+          className={`${modalStyles.closeButton} ${sheetStyles.closeButtonTop}`}
+          onClick={onClose}
+          aria-label="Закрыть модалку"
+        >
           ×
         </button>
       </div>
@@ -274,6 +291,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                 mode="multiple"
                 options={studentSelectOptions}
                 value={draft.studentIds}
+                disabled={hasLimitedMetadataEdit}
                 onChange={(nextStudentIds) =>
                   onDraftChange({
                     ...draft,
@@ -292,12 +310,14 @@ export const LessonModal: FC<LessonModalProps> = ({
               onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
               className={modalStyles.field}
               buttonRef={dateButtonRef}
+              disabled={hasLimitedMetadataEdit}
             />
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Начало</span>
               <TextField
                 type="time"
                 value={draft.time}
+                disabled={hasLimitedMetadataEdit}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
                 onBlur={handleStartTimeBlur}
                 fullWidth
@@ -312,6 +332,7 @@ export const LessonModal: FC<LessonModalProps> = ({
               <TextField
                 type="time"
                 value={draft.endTime}
+                disabled={hasLimitedMetadataEdit}
                 onChange={(e) => handleEndTimeChange(e.target.value)}
                 onBlur={handleEndTimeBlur}
                 fullWidth
@@ -373,12 +394,12 @@ export const LessonModal: FC<LessonModalProps> = ({
               )}
             </div>
           </div>
-          <div className={modalStyles.switchRow}>
+          <div className={`${modalStyles.switchRow} ${hasLimitedMetadataEdit ? sheetStyles.lockedControlRow : ''}`}>
             <label className={controls.switch}>
               <input
                 type="checkbox"
                 checked={draft.isRecurring}
-                disabled={recurrenceLocked && draft.isRecurring}
+                disabled={recurrenceControlsDisabled}
                 onChange={(e) => handleRecurringToggle(e.target.checked)}
               />
               <span className={controls.slider} />
@@ -399,6 +420,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                         className={`${modalStyles.weekdayButton} ${
                           isActive ? modalStyles.weekdayButtonActive : ''
                         }`}
+                        disabled={recurrenceControlsDisabled}
                         onClick={() => handleWeekdayToggle(day.value)}
                         aria-pressed={isActive}
                       >
@@ -427,6 +449,7 @@ export const LessonModal: FC<LessonModalProps> = ({
                   min={draft.date}
                   onChange={(nextDate) => onDraftChange({ ...draft, repeatUntil: nextDate || undefined })}
                   allowClear
+                  disabled={recurrenceControlsDisabled}
                 />
               </Box>
               {draft.repeatWeekdays.length === 0 && (
@@ -474,7 +497,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           </Accordion>
         </div>
         <div className={`${modalStyles.modalActions} ${isSheet ? sheetStyles.sheetActions : ''}`}>
-          {isEditing && onDelete && (
+          {isEditing && onDelete && !deleteDisabledReason && (
             <button className={controls.dangerButton} onClick={onDelete}>
               Удалить урок
             </button>

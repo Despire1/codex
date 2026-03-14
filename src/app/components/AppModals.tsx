@@ -84,6 +84,7 @@ export const AppModals: FC<AppModalsProps> = ({
     lessonModalFocus,
     lessonDraft,
     editingLessonId,
+    editingLesson,
     recurrenceLocked,
     defaultLessonDuration,
     setLessonDraft,
@@ -120,6 +121,7 @@ export const AppModals: FC<AppModalsProps> = ({
         focusTarget={lessonModalFocus}
         onClose={closeLessonModal}
         editingLessonId={editingLessonId}
+        editingLesson={editingLesson}
         defaultDuration={defaultLessonDuration}
         linkedStudents={linkedStudents}
         draft={lessonDraft}

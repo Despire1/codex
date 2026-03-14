@@ -105,11 +105,6 @@ body.telegram-webapp a {
   text-decoration: none;
 }
 
-body.telegram-webapp button {
-  color: inherit;
-  -webkit-text-fill-color: currentColor;
-}
-
 body.telegram-webapp svg {
   fill: currentColor !important;
 }
@@ -126,6 +121,8 @@ a {
 
 button {
   font: inherit;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
 }
 
 @media (max-width: 768px) {

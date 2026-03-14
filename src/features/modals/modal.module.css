@@ -164,6 +164,11 @@
   border-color: var(--color-blue-600);
 }
 
+.weekdayButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .weekdayDot {
   width: 6px;
   height: 6px;
@@ -191,7 +196,7 @@
 }
 
 .settingsDetails {
-  padding: 8px 12px 16px;
+  padding: 0 12px 16px!important;
 }
 
 .colorPicker {

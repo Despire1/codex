@@ -8,6 +8,8 @@ import { toZonedDate } from '../../../shared/lib/timezoneDates';
 import { buildParticipants, getLessonLabel, isLessonInSeries, resolveLessonPaid } from '../../../entities/lesson/lib/lessonDetails';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import {
+  resolveLessonDeleteDisabledReason,
+  resolveLessonEditDisabledReason,
   resolveLessonHasPaidParticipant,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
@@ -56,7 +58,9 @@ export const MonthDayLessonCard = ({
   const participant = participants[0];
   const isCanceled = lesson.status === 'CANCELED';
   const isRecurring = isLessonInSeries(lesson);
-  const mutationDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const editDisabledReason = resolveLessonEditDisabledReason(lesson);
+  const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const isCorrectionCancel = lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson);
   const paymentLabel = isPaid ? 'Оплачено' : 'Не оплачено';
 
@@ -118,11 +122,11 @@ export const MonthDayLessonCard = ({
                 <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lesson.id}`}>
                   {!isCanceled && (
                     <>
-                      <Tooltip content={mutationDisabledReason}>
+                      <Tooltip content={rescheduleDisabledReason}>
                         <button
                           type="button"
                           className={styles.actionItem}
-                          disabled={Boolean(mutationDisabledReason)}
+                          disabled={Boolean(rescheduleDisabledReason)}
                           onClick={(event) => {
                             event.stopPropagation();
                             onReschedule();
@@ -132,11 +136,11 @@ export const MonthDayLessonCard = ({
                           Перенести занятие
                         </button>
                       </Tooltip>
-                      <Tooltip content={mutationDisabledReason}>
+                      <Tooltip content={editDisabledReason}>
                         <button
                           type="button"
                           className={styles.actionItem}
-                          disabled={Boolean(mutationDisabledReason)}
+                          disabled={Boolean(editDisabledReason)}
                           onClick={(event) => {
                             event.stopPropagation();
                             onEdit();
@@ -172,11 +176,11 @@ export const MonthDayLessonCard = ({
                       Восстановить
                     </button>
                   )}
-                  <Tooltip content={mutationDisabledReason}>
+                  <Tooltip content={deleteDisabledReason}>
                     <button
                       type="button"
                       className={`${styles.actionItem} ${styles.actionDanger}`}
-                      disabled={Boolean(mutationDisabledReason)}
+                      disabled={Boolean(deleteDisabledReason)}
                       onClick={(event) => {
                         event.stopPropagation();
                         onDelete();
