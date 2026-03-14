@@ -13,6 +13,7 @@ import {
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from '../StudentsSection.module.css';
 import { LessonQuickActionsPopover } from './LessonQuickActionsPopover';
 import { SelectedStudent } from '../types';
@@ -206,17 +207,18 @@ export const LessonsTab: FC<LessonsTabProps> = ({
   const renderLessonActions = (lesson: Lesson, isPaid: boolean) => {
     if (isLessonsMobile) {
       return (
-        <button
-          className={controls.iconButton}
-          aria-label="Быстрые действия"
-          title="Быстрые действия"
-          onClick={() => {
-            setActiveLessonActions(lesson);
-            setIsLessonSheetOpen(true);
-          }}
-        >
-          <MoreHorizIcon width={18} height={18} />
-        </button>
+        <Tooltip content="Быстрые действия">
+          <button
+            className={controls.iconButton}
+            aria-label="Быстрые действия"
+            onClick={() => {
+              setActiveLessonActions(lesson);
+              setIsLessonSheetOpen(true);
+            }}
+          >
+            <MoreHorizIcon width={18} height={18} />
+          </button>
+        </Tooltip>
       );
     }
 
@@ -227,14 +229,15 @@ export const LessonsTab: FC<LessonsTabProps> = ({
         side="bottom"
         align="end"
         trigger={
-          <button
-            className={controls.iconButton}
-            aria-label="Быстрые действия"
-            title="Быстрые действия"
-            onClick={() => setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))}
-          >
-            <MoreHorizIcon width={18} height={18} />
-          </button>
+          <Tooltip content="Быстрые действия">
+            <button
+              className={controls.iconButton}
+              aria-label="Быстрые действия"
+              onClick={() => setOpenLessonMenuId((prev) => (prev === lesson.id ? null : lesson.id))}
+            >
+              <MoreHorizIcon width={18} height={18} />
+            </button>
+          </Tooltip>
         }
       >
         <LessonQuickActionsPopover

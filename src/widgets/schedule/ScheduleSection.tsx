@@ -24,13 +24,24 @@ import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
+import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
-import { buildParticipants, getLessonLabel } from '../../entities/lesson/lib/lessonDetails';
+import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../entities/lesson/lib/lessonDetails';
+import { resolveLessonHasPaidParticipant } from '../../entities/lesson/lib/lessonMutationGuards';
 import { useToast } from '../../shared/lib/toast';
+import { api } from '../../shared/api/client';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
+import type {
+  LessonCancelRefundMode,
+  LessonMutationPreview,
+  LessonSeriesScope,
+} from '../../features/lessons/model/types';
+import { LessonCancelDialog } from '../../features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import { LessonRestoreDialog } from '../../features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
+import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
 import { useScheduleState } from './model/useScheduleState';
-import { MonthSidebarLessonItem } from './components/MonthSidebarLessonItem';
+import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import { useScheduleNotesRangeInternal } from './model/useScheduleNotesRange';
 import { ScheduleDayNotesPanel } from './components/ScheduleDayNotesPanel';
 
@@ -44,6 +55,28 @@ const LAST_MINUTE = DAY_END_MINUTE - 1;
 const WEEK_STARTS_ON = 1;
 const WEEK_LESSON_INSET = 8;
 const DAY_LESSON_INSET = 12;
+
+type PendingScopeAction =
+  | {
+      type: 'cancel';
+      lesson: Lesson;
+      refundMode?: LessonCancelRefundMode;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    }
+  | {
+      type: 'restore';
+      lesson: Lesson;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    };
+
+const resolveCancelDialogCopy = (lesson: Lesson | null) => {
+  const isCorrectionFlow = Boolean(lesson && (lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)));
+  return {
+    title: isCorrectionFlow ? 'Исправить статус урока' : 'Отменить урок',
+    confirmText: isCorrectionFlow ? 'Изменить статус' : 'Отменить урок',
+  };
+};
+
 const resolveLessonsLabel = (count: number) => {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -83,7 +116,15 @@ interface ScheduleSectionProps {
 export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
   const timeZone = useTimeZone();
   const { showToast } = useToast();
-  const { openLessonModal, startEditLesson, togglePaid } = useLessonActions();
+  const {
+    openLessonModal,
+    startEditLesson,
+    togglePaid,
+    openRescheduleModal,
+    requestDeleteLessonFromList,
+    cancelLesson,
+    restoreLesson,
+  } = useLessonActions();
   const {
     scheduleView,
     setScheduleView,
@@ -104,6 +145,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [dayPanelActionsLessonId, setDayPanelActionsLessonId] = useState<number | null>(null);
+  const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
+  const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
+  const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
   const dayPickerRef = useRef<HTMLDivElement>(null);
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
@@ -440,28 +485,109 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     const isPaid = !!participant?.isPaid;
 
     return (
-      <button
-        type="button"
-        className={`${styles.paymentBadge} ${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaid}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          togglePaid(lessonId, participant?.studentId);
-        }}
-        title={isPaid ? 'Оплачено' : 'Не оплачено'}
-      >
-        <span className={styles.paymentBadgeIcon} aria-hidden="true" />
-        <span
-            className={`${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaidText}`}
+      <Tooltip content={isPaid ? 'Оплачено' : 'Не оплачено'}>
+        <button
+          type="button"
+          className={`${styles.paymentBadge} ${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaid}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            togglePaid(lessonId, participant?.studentId);
+          }}
         >
-          {isPaid ? 'Оплачено' : 'Не оплачено'}
-        </span>
-      </button>
+          <span className={styles.paymentBadgeIcon} aria-hidden="true" />
+          <span
+              className={`${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaidText}`}
+          >
+            {isPaid ? 'Оплачено' : 'Не оплачено'}
+          </span>
+        </button>
+      </Tooltip>
     );
   };
 
   const handleOpenMeetingLink = (event: MouseEvent, meetingLink: string) => {
     event.stopPropagation();
     window.open(meetingLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCancelLesson = (lesson: Lesson) => {
+    setDayPanelActionsLessonId(null);
+    setCancelDialogLesson(lesson);
+  };
+
+  const handleRestoreLesson = (lesson: Lesson) => {
+    setDayPanelActionsLessonId(null);
+    setRestoreDialogLesson(lesson);
+  };
+
+  const handleConfirmCancel = (refundMode?: LessonCancelRefundMode) => {
+    if (!cancelDialogLesson) return;
+    const target = cancelDialogLesson;
+    setCancelDialogLesson(null);
+
+    if (isLessonInSeries(target)) {
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'CANCEL', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'cancel',
+            lesson: target,
+            refundMode,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+        });
+      return;
+    }
+
+    void cancelLesson(target, 'SINGLE', refundMode);
+  };
+
+  const handleConfirmRestore = () => {
+    if (!restoreDialogLesson) return;
+    const target = restoreDialogLesson;
+    setRestoreDialogLesson(null);
+
+    if (isLessonInSeries(target)) {
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'RESTORE', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'restore',
+            lesson: target,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'restore', lesson: target });
+        });
+      return;
+    }
+
+    void restoreLesson(target, 'SINGLE');
+  };
+
+  const handleScopeConfirm = (scope: LessonSeriesScope) => {
+    if (!scopeDialog) return;
+    const payload = scopeDialog;
+    setScopeDialog(null);
+
+    if (payload.type === 'cancel') {
+      void cancelLesson(payload.lesson, scope, payload.refundMode);
+      return;
+    }
+
+    void restoreLesson(payload.lesson, scope);
   };
 
   const renderMeetingLinkButton = (lesson: Lesson, className?: string) => {
@@ -841,12 +967,42 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                 <div className={styles.dayPanelList}>
                   {selectedDayLessons.map((lesson) => {
                     return (
-                      <MonthSidebarLessonItem
+                      <MonthDayLessonCard
                         key={lesson.id}
                         lesson={lesson}
                         linkedStudentsById={linkedStudentsById}
                         timeZone={timeZone}
-                        onClick={() => startEditLesson(lesson)}
+                        isActionsOpen={dayPanelActionsLessonId === lesson.id}
+                        onOpenActions={() => setDayPanelActionsLessonId(lesson.id)}
+                        onCloseActions={() => setDayPanelActionsLessonId((current) => (current === lesson.id ? null : current))}
+                        onEdit={() => {
+                          setDayPanelActionsLessonId(null);
+                          startEditLesson(lesson);
+                        }}
+                        onTogglePaid={(studentId) => {
+                          setDayPanelActionsLessonId(null);
+                          void togglePaid(lesson.id, studentId);
+                        }}
+                        onDelete={() => {
+                          setDayPanelActionsLessonId(null);
+                          requestDeleteLessonFromList(lesson);
+                        }}
+                        onReschedule={() => {
+                          setDayPanelActionsLessonId(null);
+                          openRescheduleModal(lesson);
+                        }}
+                        onCancel={() => {
+                          setDayPanelActionsLessonId(null);
+                          handleCancelLesson(lesson);
+                        }}
+                        onRestore={() => {
+                          setDayPanelActionsLessonId(null);
+                          handleRestoreLesson(lesson);
+                        }}
+                        onOpenMeetingLink={(event, meetingLink) => {
+                          setDayPanelActionsLessonId(null);
+                          handleOpenMeetingLink(event, meetingLink);
+                        }}
                       />
                     );
                   })}
@@ -1153,6 +1309,45 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
+
+      <LessonCancelDialog
+        open={Boolean(cancelDialogLesson)}
+        lesson={cancelDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setCancelDialogLesson(null)}
+        onConfirm={handleConfirmCancel}
+      />
+
+      <LessonRestoreDialog
+        open={Boolean(restoreDialogLesson)}
+        lesson={restoreDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setRestoreDialogLesson(null)}
+        onConfirm={handleConfirmRestore}
+      />
+
+      <SeriesScopeDialog
+        open={Boolean(scopeDialog)}
+        title={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).title
+            : scopeDialog?.type === 'restore'
+              ? 'Восстановить урок'
+              : undefined
+        }
+        confirmText={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).confirmText
+            : scopeDialog?.type === 'restore'
+              ? 'Восстановить'
+              : undefined
+        }
+        previews={scopeDialog?.previews}
+        onClose={() => setScopeDialog(null)}
+        onConfirm={handleScopeConfirm}
+      />
     </section>
   );
 };

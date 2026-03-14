@@ -191,14 +191,38 @@ export const createStudentsService = ({
     };
   };
 
+  const filterSuppressedLessons = async (lessons: any[]) => {
+    if (lessons.length === 0) return lessons;
+    const visibleLessons = lessons.filter((lesson) => !lesson.isSuppressed);
+    if (visibleLessons.length === 0) return [];
+    const hidden = await prisma.lessonSeriesException.findMany({
+      where: {
+        lessonId: {
+          in: visibleLessons.map((lesson) => lesson.id),
+        },
+        kind: 'DELETE',
+      },
+      select: {
+        lessonId: true,
+      },
+    });
+    const hiddenIds = new Set(
+      hidden
+        .map((item) => item.lessonId)
+        .filter((lessonId): lessonId is number => typeof lessonId === 'number'),
+    );
+    return visibleLessons.filter((lesson) => !hiddenIds.has(lesson.id));
+  };
+
   const resolveStudentDebtSummary = async (teacherId: bigint, studentId: number) => {
     const link = await prisma.teacherStudent.findUnique({
       where: { teacherId_studentId: { teacherId, studentId } },
     });
     const now = new Date();
-    const lessons = await prisma.lesson.findMany({
+    let lessons = await prisma.lesson.findMany({
       where: {
         teacherId,
+        isSuppressed: false,
         status: { not: 'CANCELED' },
         OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
         participants: {
@@ -213,6 +237,7 @@ export const createStudentsService = ({
       },
       orderBy: { startAt: 'asc' },
     });
+    lessons = await filterSuppressedLessons(lessons);
 
     const items = lessons.map((lesson) => {
       const participant = lesson.participants.find((item) => item.studentId === studentId);
@@ -343,6 +368,7 @@ export const createStudentsService = ({
       ? await prisma.lesson.findMany({
           where: {
             teacherId: teacher.chatId,
+            isSuppressed: false,
             participants: {
               some: {
                 studentId: { in: studentIds },
@@ -350,6 +376,8 @@ export const createStudentsService = ({
             },
           },
           select: {
+            id: true,
+            isSuppressed: true,
             startAt: true,
             status: true,
             participants: {
@@ -361,6 +389,7 @@ export const createStudentsService = ({
           },
         })
       : [];
+    const visibleLessons = await filterSuppressedLessons(lessons);
 
     const homeworksByStudent = new Map<number, any[]>();
     homeworks.forEach((homework) => {
@@ -391,7 +420,7 @@ export const createStudentsService = ({
 
     const lessonStatsByStudent = new Map<number, ReturnType<typeof createEmptyLessonStats>>();
 
-    lessons.forEach((lesson) => {
+    visibleLessons.forEach((lesson) => {
       if (lesson.status === 'CANCELED') return;
       const lessonDate = new Date(lesson.startAt);
       const isPastOrCompleted = lesson.status === 'COMPLETED' || lessonDate.getTime() <= now.getTime();
@@ -748,7 +777,7 @@ export const createStudentsService = ({
       if (startTo) where.startAt.lte = startTo;
     }
 
-    const items = await prisma.lesson.findMany({
+    let items = await prisma.lesson.findMany({
       where,
       include: {
         participants: {
@@ -759,6 +788,7 @@ export const createStudentsService = ({
       },
       orderBy: { startAt: filters.sort === 'asc' ? 'asc' : 'desc' },
     });
+    items = await filterSuppressedLessons(items);
 
     const debt = await resolveStudentDebtSummary(teacher.chatId, studentId);
 

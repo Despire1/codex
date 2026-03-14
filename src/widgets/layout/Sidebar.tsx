@@ -155,7 +155,6 @@ export const Sidebar: FC<SidebarProps> = ({
         className={navLinkClassName}
         onClick={(event) => onItemClick(event, item)}
         aria-current={active ? 'page' : undefined}
-        title={isCollapsed ? item.label : undefined}
       >
         <span className={styles.navIcon} aria-hidden>
           <item.icon width={20} height={20} />

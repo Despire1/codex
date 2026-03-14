@@ -1,6 +1,7 @@
 import { addDays, addMonths, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Lesson } from '../../../entities/types';
+import { isVisibleLesson } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { api } from '../../../shared/api/client';
 import { normalizeLesson } from '../../../shared/lib/normalizers';
 import { formatInTimeZone, toUtcEndOfDay, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
@@ -131,7 +132,7 @@ export const useScheduleLessonsRangeInternal = ({
   );
 
   const applyLessonsForRange = useCallback((range: LessonRange, items: Lesson[]) => {
-    const normalized = items.map(normalizeLesson);
+    const normalized = items.map(normalizeLesson).filter(isVisibleLesson);
     setLessons(normalized);
     setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
     lessonRangeRef.current = range;
@@ -140,7 +141,7 @@ export const useScheduleLessonsRangeInternal = ({
   const updateLessonsForCurrentRange = useCallback((updater: (prev: Lesson[]) => Lesson[]) => {
     const range = lessonRangeRef.current;
     setLessons((prev) => {
-      const next = updater(prev);
+      const next = updater(prev).filter(isVisibleLesson);
       if (range) {
         setLessonsByRange((cache) => ({ ...cache, [range.key]: next }));
       }
@@ -151,7 +152,8 @@ export const useScheduleLessonsRangeInternal = ({
   const syncLessonsInRanges = useCallback(
     (items: Lesson[]) => {
       if (!items || items.length === 0) return;
-      const normalized = items.map(normalizeLesson);
+      const normalized = items.map(normalizeLesson).filter(isVisibleLesson);
+      if (normalized.length === 0) return;
       const ids = new Set(normalized.map((lesson) => lesson.id));
       const currentKey = lessonRangeRef.current?.key ?? null;
 
@@ -195,9 +197,7 @@ export const useScheduleLessonsRangeInternal = ({
             if (recurrenceGroupId && lesson.recurrenceGroupId === recurrenceGroupId) {
               if (!startFromTime) return false;
               const lessonStart = new Date(lesson.startAt).getTime();
-              if (lessonStart >= startFromTime) {
-                return lesson.status !== 'SCHEDULED';
-              }
+              if (lessonStart >= startFromTime) return false;
               return true;
             }
             return true;
@@ -227,7 +227,7 @@ export const useScheduleLessonsRangeInternal = ({
           start: range.startAt.toISOString(),
           end: range.endAt.toISOString(),
         });
-        const normalized = (data.lessons ?? []).map(normalizeLesson);
+        const normalized = (data.lessons ?? []).map(normalizeLesson).filter(isVisibleLesson);
         setLessonsByRange((prev) => ({ ...prev, [range.key]: normalized }));
         if (lessonRangeRequestId.current === requestId) {
           setLessons(normalized);

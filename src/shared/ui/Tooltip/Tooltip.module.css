@@ -1,0 +1,67 @@
+.root {
+  display: contents;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 9999;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  color: var(--color-white);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  width: max-content;
+  max-width: min(200px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
+.tooltip::before {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.side_bottom {
+  top: calc(100% + 8px);
+}
+
+.side_bottom::before {
+  top: -5px;
+}
+
+.side_top {
+  bottom: calc(100% + 8px);
+}
+
+.side_top::before {
+  bottom: -5px;
+}
+
+.align_start.side_bottom::before,
+.align_start.side_top::before {
+  left: 12px;
+}
+
+.align_center.side_bottom::before,
+.align_center.side_top::before {
+  left: calc(50% - 5px);
+}
+
+.align_end.side_bottom::before,
+.align_end.side_top::before {
+  right: 12px;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .tooltip {
+    display: none;
+  }
+}

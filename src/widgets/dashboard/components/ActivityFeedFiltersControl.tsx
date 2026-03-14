@@ -5,6 +5,7 @@ import controls from '../../../shared/styles/controls.module.css';
 import { AnchoredPopover } from '../../../shared/ui/AnchoredPopover/AnchoredPopover';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { StudentSelect } from '../../../shared/ui/StudentSelect';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import type { DashboardActivityFilters } from '../model/useDashboardActivityFeed';
 import styles from './ActivityFeedFiltersControl.module.css';
 
@@ -105,19 +106,20 @@ export const ActivityFeedFiltersControl: FC<ActivityFeedFiltersControlProps> = (
 
   return (
     <>
-      <button
-        ref={filterButtonRef}
-        type="button"
-        className={`${controls.iconButton} ${styles.trigger} ${buttonClassName}`.trim()}
-        aria-label="Фильтры ленты активности"
-        title={`Фильтры${activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}`}
-        onClick={() => setIsOpen((prev) => !prev)}
-      >
-        <span className={styles.iconWrapper}>
-          <FilterAltOutlinedIcon width={18} height={18} />
-          {activeFiltersCount > 0 && <span className={styles.filterCounter}>{activeFiltersCount}</span>}
-        </span>
-      </button>
+      <Tooltip content={`Фильтры${activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}`}>
+        <button
+          ref={filterButtonRef}
+          type="button"
+          className={`${controls.iconButton} ${styles.trigger} ${buttonClassName}`.trim()}
+          aria-label="Фильтры ленты активности"
+          onClick={() => setIsOpen((prev) => !prev)}
+        >
+          <span className={styles.iconWrapper}>
+            <FilterAltOutlinedIcon width={18} height={18} />
+            {activeFiltersCount > 0 && <span className={styles.filterCounter}>{activeFiltersCount}</span>}
+          </span>
+        </button>
+      </Tooltip>
 
       <AnchoredPopover
         isOpen={isOpen}

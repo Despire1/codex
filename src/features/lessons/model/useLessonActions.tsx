@@ -12,6 +12,7 @@ import {
 import { addMinutes, addYears, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { api } from '../../../shared/api/client';
+import { isVisibleLesson, resolveLessonMutationDisabledReason } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
 import { normalizeMeetingLinkInput } from '../../../shared/lib/meetingLink';
 import { normalizeLesson, todayISO } from '../../../shared/lib/normalizers';
@@ -55,6 +56,13 @@ type OpenRecurringDeleteDialogOptions = {
 
 export type LessonActionSource = 'default' | 'onboarding_hero' | 'onboarding_stepper' | 'onboarding_quick_action';
 export type ModalVariant = 'modal' | 'sheet';
+export type OpenLessonModalOptions = {
+  source?: LessonActionSource;
+  variant?: ModalVariant;
+  skipNavigation?: boolean;
+  focus?: LessonModalFocus;
+  studentIds?: number[];
+};
 
 type SeriesScopeDialogState = {
   action: 'EDIT' | 'RESCHEDULE' | 'DELETE';
@@ -152,7 +160,7 @@ export type LessonActionsContextValue = {
     dateISO: string,
     time?: string,
     existing?: Lesson,
-    options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean; focus?: LessonModalFocus },
+    options?: OpenLessonModalOptions,
   ) => void;
   openRescheduleModal: (lesson: Lesson, options?: { skipNavigation?: boolean }) => void;
   closeLessonModal: () => void;
@@ -222,6 +230,38 @@ const createLessonDraft = (timeZone: string, defaultDuration: number): LessonDra
   repeatUntil: undefined as string | undefined,
 });
 
+const normalizeLessonStudentIds = (studentIds?: number[]) =>
+  Array.from(
+    new Set((studentIds ?? []).filter((studentId) => Number.isInteger(studentId) && studentId > 0)),
+  );
+
+const createNewLessonDraft = ({
+  timeZone,
+  defaultDuration,
+  dateISO,
+  time,
+  studentIds,
+}: {
+  timeZone: string;
+  defaultDuration: number;
+  dateISO?: string;
+  time?: string;
+  studentIds?: number[];
+}): LessonDraft => {
+  const baseDraft = createLessonDraft(timeZone, defaultDuration);
+  const resolvedTime = time ?? baseDraft.time;
+  const resolvedStudentIds = normalizeLessonStudentIds(studentIds);
+
+  return {
+    ...baseDraft,
+    date: dateISO ?? baseDraft.date,
+    time: resolvedTime,
+    endTime: resolveLessonEndTime(resolvedTime, defaultDuration),
+    studentId: resolvedStudentIds[0],
+    studentIds: resolvedStudentIds,
+  };
+};
+
 export const useLessonActionsInternal = ({
   timeZone,
   teacherDefaultLessonDuration,
@@ -281,19 +321,20 @@ export const useLessonActionsInternal = ({
     }));
   }, [teacherDefaultLessonDuration]);
 
-  useEffect(() => {
-    if (selectedStudentId) {
-      setLessonDraft((draft) => ({ ...draft, studentId: selectedStudentId }));
-    }
-  }, [selectedStudentId]);
-
   const openLessonModal = useCallback(
     (
       dateISO: string,
       time?: string,
       existing?: Lesson,
-      options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean; focus?: LessonModalFocus },
+      options?: OpenLessonModalOptions,
     ) => {
+      if (existing) {
+        const disabledReason = resolveLessonMutationDisabledReason(existing);
+        if (disabledReason) {
+          showInfoDialog('Изменение недоступно', disabledReason);
+          return;
+        }
+      }
       const nextContext: LessonModalContext = {
         source: options?.source ?? 'default',
         variant: options?.variant ?? 'modal',
@@ -317,33 +358,35 @@ export const useLessonActionsInternal = ({
             ? [existing.studentId]
             : [];
 
-      setLessonDraft((draft) => {
-        const nextStartTime = time ?? (startDate ? format(startDate, 'HH:mm') : draft.time);
+      if (!existing) {
+        setLessonDraft(
+          createNewLessonDraft({
+            timeZone,
+            defaultDuration: teacherDefaultLessonDuration,
+            dateISO,
+            time,
+            studentIds: options?.studentIds,
+          }),
+        );
+      } else {
+        const nextStartTime = time ?? format(startDate, 'HH:mm');
         const nextDuration = existing?.durationMinutes ?? teacherDefaultLessonDuration;
 
-        return {
-          ...draft,
+        setLessonDraft({
+          studentId: existing?.studentId ?? existingStudentIds[0],
+          studentIds: existingStudentIds,
           date: dateISO,
           time: nextStartTime,
-          studentId: existing?.studentId ?? draft.studentId ?? selectedStudentId ?? undefined,
-          studentIds:
-            existingStudentIds.length > 0
-              ? existingStudentIds
-              : draft.studentIds.length > 0
-                ? draft.studentIds
-                : selectedStudentId
-                  ? [selectedStudentId]
-                  : [],
           endTime: resolveLessonEndTime(nextStartTime, nextDuration),
           meetingLink: existing?.meetingLink ?? '',
           color: existing?.color ?? DEFAULT_LESSON_COLOR,
-          isRecurring: existing ? Boolean(existing.isRecurring) : draft.isRecurring,
-          repeatWeekdays: existing ? recurrenceWeekdays : draft.repeatWeekdays,
+          isRecurring: Boolean(existing.isRecurring),
+          repeatWeekdays: recurrenceWeekdays,
           repeatUntil: existing?.recurrenceUntil
             ? formatInTimeZone(existing.recurrenceUntil, 'yyyy-MM-dd', { timeZone })
-            : draft.repeatUntil,
-        };
-      });
+            : undefined,
+        });
+      }
 
       setEditingLessonId(existing?.id ?? null);
       setEditingLessonOriginal(existing ?? null);
@@ -353,11 +396,16 @@ export const useLessonActionsInternal = ({
       }
       setDayViewDate(toZonedDate(toUtcDateFromDate(dateISO, timeZone), timeZone));
     },
-    [navigateToSchedule, selectedStudentId, setDayViewDate, teacherDefaultLessonDuration, timeZone],
+    [navigateToSchedule, setDayViewDate, showInfoDialog, teacherDefaultLessonDuration, timeZone],
   );
 
   const openRescheduleModal = useCallback(
     (lesson: Lesson, options?: { skipNavigation?: boolean }) => {
+      const disabledReason = resolveLessonMutationDisabledReason(lesson);
+      if (disabledReason) {
+        showInfoDialog('Изменение недоступно', disabledReason);
+        return;
+      }
       const start = toZonedDate(lesson.startAt, timeZone);
       const time = format(start, 'HH:mm');
       const endTime = format(addMinutes(start, lesson.durationMinutes), 'HH:mm');
@@ -373,7 +421,7 @@ export const useLessonActionsInternal = ({
       }
       setDayViewDate(toZonedDate(toUtcDateFromDate(format(start, 'yyyy-MM-dd'), timeZone), timeZone));
     },
-    [navigateToSchedule, setDayViewDate, timeZone],
+    [navigateToSchedule, setDayViewDate, showInfoDialog, timeZone],
   );
 
   const closeRescheduleModal = useCallback(() => {
@@ -388,8 +436,8 @@ export const useLessonActionsInternal = ({
     setEditingLessonId(null);
     setEditingLessonOriginal(null);
     setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false, focus: 'full' });
-    setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
-  }, []);
+    setLessonDraft(createNewLessonDraft({ timeZone, defaultDuration: teacherDefaultLessonDuration }));
+  }, [teacherDefaultLessonDuration, timeZone]);
 
   const handleLessonDraftChange = useCallback((draft: LessonDraft) => {
     setLessonDraft(draft);
@@ -402,19 +450,25 @@ export const useLessonActionsInternal = ({
       options?: { scope?: LessonSeriesScope },
     ) => {
       if (data.lessons && data.lessons.length > 0) {
-        const normalizedLessons = data.lessons.map(normalizeLesson);
+        const normalizedLessons = data.lessons.map(normalizeLesson).filter(isVisibleLesson);
         if (options?.scope && baseLesson?.recurrenceGroupId) {
           removeLessonsFromRanges({
             recurrenceGroupId: baseLesson.recurrenceGroupId,
             startFrom: new Date(baseLesson.startAt),
           });
         }
-        syncLessonsInRanges(normalizedLessons);
+        if (normalizedLessons.length > 0) {
+          syncLessonsInRanges(normalizedLessons);
+        }
         return normalizedLessons;
       }
 
       if (data.lesson) {
         const normalizedLesson = normalizeLesson(data.lesson);
+        if (!isVisibleLesson(normalizedLesson)) {
+          removeLessonsFromRanges({ ids: [normalizedLesson.id] });
+          return [];
+        }
         const base = lessons.find((lesson) => lesson.id === normalizedLesson.id) ?? baseLesson ?? null;
         const mergedLesson = base ? { ...base, ...normalizedLesson } : normalizedLesson;
         syncLessonsInRanges([mergedLesson]);
@@ -529,6 +583,12 @@ export const useLessonActionsInternal = ({
   const requestDeleteLesson = useCallback(() => {
     if (!editingLessonId) return;
     const original = editingLessonOriginal;
+    const disabledReason = original ? resolveLessonMutationDisabledReason(original) : null;
+
+    if (disabledReason) {
+      showInfoDialog('Изменение недоступно', disabledReason);
+      return;
+    }
 
     if (original?.isRecurring && (original.recurrenceGroupId || original.seriesId)) {
       void fetchSeriesScopePreviews(original, 'DELETE')
@@ -561,7 +621,14 @@ export const useLessonActionsInternal = ({
         void performDeleteLesson('SINGLE');
       },
     });
-  }, [editingLessonId, editingLessonOriginal, fetchSeriesScopePreviews, openConfirmDialog, performDeleteLesson, showInfoDialog]);
+  }, [
+    editingLessonId,
+    editingLessonOriginal,
+    fetchSeriesScopePreviews,
+    openConfirmDialog,
+    performDeleteLesson,
+    showInfoDialog,
+  ]);
 
   const saveLesson = useCallback(
     async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
@@ -700,7 +767,7 @@ export const useLessonActionsInternal = ({
             repeatUntil: resolvedRepeatUntil,
           });
 
-          const normalizedLessons = data.lessons.map(normalizeLesson);
+          const normalizedLessons = data.lessons.map(normalizeLesson).filter(isVisibleLesson);
           syncLessonsInRanges(normalizedLessons);
           const lessonsInRange = filterLessonsForCurrentRange(normalizedLessons);
           if (!editingLessonId && lessonsInRange.length > 0) {
@@ -719,7 +786,9 @@ export const useLessonActionsInternal = ({
           });
 
           const normalizedLesson = normalizeLesson(data.lesson);
-          syncLessonsInRanges([normalizedLesson]);
+          if (isVisibleLesson(normalizedLesson)) {
+            syncLessonsInRanges([normalizedLesson]);
+          }
           if (!editingLessonId) {
             onLessonCreated?.({ lesson: normalizedLesson, source: lessonModalContext.source });
             if (isOnboardingSource) {
@@ -728,14 +797,14 @@ export const useLessonActionsInternal = ({
           }
         }
 
+        const shouldNavigate = !lessonModalContext.skipNavigation;
+
         await loadStudentLessons();
         await loadStudentLessonsSummary();
-        setLessonModalOpen(false);
-        setEditingLessonId(null);
-        if (!lessonModalContext.skipNavigation) {
+        closeLessonModal();
+        if (shouldNavigate) {
           navigateToSchedule();
         }
-        setLessonDraft((draft) => ({ ...draft, isRecurring: false, repeatWeekdays: [], repeatUntil: undefined }));
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось создать урок';
         showInfoDialog('Ошибка', message);
@@ -747,6 +816,7 @@ export const useLessonActionsInternal = ({
       }
     },
     [
+      closeLessonModal,
       editingLessonId,
       editingLessonOriginal,
       applyLessonUpdateResult,
@@ -868,18 +938,15 @@ export const useLessonActionsInternal = ({
 
   const openCreateLessonForStudent = useCallback(
     (studentId?: number, options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean }) => {
-      const targetDate = lessonDraft.date || todayISO(timeZone);
       if (studentId) {
         setSelectedStudentId((prev) => prev ?? studentId);
-        setLessonDraft((draft) => ({
-          ...draft,
-          studentId,
-          studentIds: [studentId],
-        }));
       }
-      openLessonModal(targetDate, lessonDraft.time, undefined, options);
+      openLessonModal(todayISO(timeZone), undefined, undefined, {
+        ...options,
+        studentIds: studentId ? [studentId] : undefined,
+      });
     },
-    [lessonDraft.date, lessonDraft.time, openLessonModal, setSelectedStudentId, timeZone],
+    [openLessonModal, setSelectedStudentId, timeZone],
   );
 
   const deleteLessonWithOptions = useCallback(
@@ -907,6 +974,12 @@ export const useLessonActionsInternal = ({
 
   const requestDeleteLessonFromList = useCallback(
     (lesson: Lesson) => {
+      const disabledReason = resolveLessonMutationDisabledReason(lesson);
+      if (disabledReason) {
+        showInfoDialog('Изменение недоступно', disabledReason);
+        return;
+      }
+
       if (lesson.isRecurring && (lesson.recurrenceGroupId || lesson.seriesId)) {
         void fetchSeriesScopePreviews(lesson, 'DELETE')
           .then((previews) => {

@@ -3,6 +3,7 @@ import { ru } from 'date-fns/locale';
 import type { FC, KeyboardEvent, MouseEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
+import { resolveLessonHasPaidParticipant } from '@/entities/lesson/lib/lessonMutationGuards';
 import type { Lesson, LinkedStudent } from '@/entities/types';
 import { useLessonActions } from '@/features/lessons/model/useLessonActions';
 import type {
@@ -47,6 +48,14 @@ type PendingScopeAction =
       lesson: Lesson;
       previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
     };
+
+const resolveCancelDialogCopy = (lesson: Lesson | null) => {
+  const isCorrectionFlow = Boolean(lesson && (lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)));
+  return {
+    title: isCorrectionFlow ? 'Исправить статус урока' : 'Отменить урок',
+    confirmText: isCorrectionFlow ? 'Изменить статус' : 'Отменить урок',
+  };
+};
 
 export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
   lessons,
@@ -481,8 +490,18 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
 
       <SeriesScopeDialog
         open={Boolean(scopeDialog)}
-        title={scopeDialog?.type === 'cancel' ? 'Отменить урок' : scopeDialog?.type === 'restore' ? 'Восстановить урок' : undefined}
-        confirmText={scopeDialog?.type === 'cancel' ? 'Отменить урок' : 'Восстановить'}
+        title={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).title
+            : scopeDialog?.type === 'restore'
+              ? 'Восстановить урок'
+              : undefined
+        }
+        confirmText={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).confirmText
+            : 'Восстановить'
+        }
         previews={scopeDialog?.previews}
         onClose={() => setScopeDialog(null)}
         onConfirm={handleScopeConfirm}

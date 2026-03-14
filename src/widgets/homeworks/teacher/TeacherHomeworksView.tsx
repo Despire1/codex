@@ -7,6 +7,7 @@ import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../
 import { HomeworkReviewModal } from '../../../features/homework-review/ui/HomeworkReviewModal';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import { Checkbox } from '../../../shared/ui/Checkbox/Checkbox';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { loadStoredCreateTemplateDraftSummary } from '../../../features/homework-template-editor/model/lib/createTemplateDraftStorage';
 import {
   HomeworkAlignLeftIcon,
@@ -564,31 +565,34 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
           {workspaceMode === 'list' ? (
             <div className={styles.actionsRow}>
-              <button
-                type="button"
-                className={styles.toolIconButton}
-                title="События"
-                onClick={handleOpenActivity}
-              >
-                <HomeworkBellRegularIcon size={15} className={styles.toolbarIcon} />
-                {homeworkActivityHasUnread ? <span className={styles.unreadDot} /> : null}
-              </button>
-              <button
-                type="button"
-                className={styles.toolIconButton}
-                title="Массовые действия"
-                onClick={() => setIsBulkPanelOpen((prev) => !prev)}
-              >
-                <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
-              </button>
-              <button
-                type="button"
-                className={styles.toolIconButton}
-                title="Фильтры"
-                onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
-              >
-                <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
-              </button>
+              <Tooltip content="События">
+                <button
+                  type="button"
+                  className={styles.toolIconButton}
+                  onClick={handleOpenActivity}
+                >
+                  <HomeworkBellRegularIcon size={15} className={styles.toolbarIcon} />
+                  {homeworkActivityHasUnread ? <span className={styles.unreadDot} /> : null}
+                </button>
+              </Tooltip>
+              <Tooltip content="Массовые действия">
+                <button
+                  type="button"
+                  className={styles.toolIconButton}
+                  onClick={() => setIsBulkPanelOpen((prev) => !prev)}
+                >
+                  <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Фильтры">
+                <button
+                  type="button"
+                  className={styles.toolIconButton}
+                  onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
+                >
+                  <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
+                </button>
+              </Tooltip>
               {canStartReviewQueue ? (
                 <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
                   <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
@@ -908,17 +912,18 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                             </button>
                           ) : isOverdueRow ? (
                             <>
-                              <button
-                                type="button"
-                                className={styles.iconActionButton}
-                                onClick={() => {
-                                  void onRemindAssignment(assignment);
-                                }}
-                                title="Напомнить"
-                                aria-label="Напомнить"
-                              >
-                                <HomeworkBellRegularIcon size={13} className={styles.inlineFaIcon} />
-                              </button>
+                              <Tooltip content="Напомнить">
+                                <button
+                                  type="button"
+                                  className={styles.iconActionButton}
+                                  onClick={() => {
+                                    void onRemindAssignment(assignment);
+                                  }}
+                                  aria-label="Напомнить"
+                                >
+                                  <HomeworkBellRegularIcon size={13} className={styles.inlineFaIcon} />
+                                </button>
+                              </Tooltip>
                               <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
                                 Детали
                               </button>
@@ -1109,18 +1114,19 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         </span>
                         <span className={styles.groupHeaderActions}>
                           {!group.isSystem && group.id !== null ? (
-                            <button
-                              type="button"
-                              className={styles.groupEditIconButton}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openEditGroupEditor(group);
-                              }}
-                              aria-label="Редактировать группу"
-                              title="Редактировать группу"
-                            >
-                              <HomeworkPenIcon size={11} className={styles.inlineFaIcon} />
-                            </button>
+                            <Tooltip content="Редактировать группу">
+                              <button
+                                type="button"
+                                className={styles.groupEditIconButton}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openEditGroupEditor(group);
+                                }}
+                                aria-label="Редактировать группу"
+                              >
+                                <HomeworkPenIcon size={11} className={styles.inlineFaIcon} />
+                              </button>
+                            </Tooltip>
                           ) : null}
                           <HomeworkChevronDownIcon
                             size={12}
@@ -1172,15 +1178,16 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                                       >
                                         {resolveStatusLabel(assignment)}
                                       </span>
-                                      <button
-                                        type="button"
-                                        className={styles.groupAssignmentEditButton}
-                                        onClick={() => onOpenDetail(assignment)}
-                                        title="Редактировать"
-                                        aria-label="Редактировать"
-                                      >
-                                        <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
-                                      </button>
+                                      <Tooltip content="Редактировать">
+                                        <button
+                                          type="button"
+                                          className={styles.groupAssignmentEditButton}
+                                          onClick={() => onOpenDetail(assignment)}
+                                          aria-label="Редактировать"
+                                        >
+                                          <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
+                                        </button>
+                                      </Tooltip>
                                     </div>
                                   </article>
                                 );

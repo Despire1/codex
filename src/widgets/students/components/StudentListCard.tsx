@@ -1,5 +1,6 @@
 import { FC, type KeyboardEvent } from 'react';
 import { StudentListItem } from '../../../entities/types';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from '../StudentsSection.module.css';
 
 interface StudentListCardProps {
@@ -96,9 +97,11 @@ export const StudentListCard: FC<StudentListCardProps> = ({
           <div className={styles.studentTelegramRow}>
             <div className={styles.studentTelegram}>Telegram: @{username}</div>
             {showActivationBadge && (
-              <span className={`${styles.lozenge} ${styles.badgeInactive}`} title={activationHint}>
-                Не активирован
-              </span>
+              <Tooltip content={activationHint}>
+                <span className={`${styles.lozenge} ${styles.badgeInactive}`}>
+                  Не активирован
+                </span>
+              </Tooltip>
             )}
           </div>
         )}

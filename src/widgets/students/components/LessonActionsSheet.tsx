@@ -1,7 +1,9 @@
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 import { Lesson } from '../../../entities/types';
+import { resolveLessonMutationDisabledReason } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from './LessonActionsSheet.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
@@ -35,6 +37,7 @@ export const LessonActionsSheet = ({
   const durationLabel = lesson.durationMinutes ? `${lesson.durationMinutes} мин` : '—';
   const priceLabel = resolvedPrice === undefined || resolvedPrice === null ? '—' : `${resolvedPrice} ₽`;
   const isCompleted = lesson.status === 'COMPLETED';
+  const mutationDisabledReason = resolveLessonMutationDisabledReason(lesson);
   const paymentActionLabel = isPaid ? 'Отменить оплату' : 'Отметить оплату';
 
   return (
@@ -78,16 +81,20 @@ export const LessonActionsSheet = ({
         >
           Перенести
         </button>
-        <button
-          type="button"
-          className={`${styles.actionButton} ${styles.danger}`}
-          onClick={() => {
-            onDelete();
-            onClose();
-          }}
-        >
-          Удалить
-        </button>
+        <Tooltip content={mutationDisabledReason}>
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.danger} ${mutationDisabledReason ? styles.disabled : ''}`}
+            onClick={() => {
+              if (mutationDisabledReason) return;
+              onDelete();
+              onClose();
+            }}
+            disabled={Boolean(mutationDisabledReason)}
+          >
+            Удалить
+          </button>
+        </Tooltip>
       </div>
       <button type="button" className={styles.cancelButton} onClick={onClose}>
         Отмена

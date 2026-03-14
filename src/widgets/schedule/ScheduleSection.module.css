@@ -457,7 +457,7 @@
 
 .monthWeekday {
   text-align: center;
-  font-size: 11px;
+  font-size: 14px;
   color: #9ca3af;
   font-weight: 700;
   text-transform: uppercase;
@@ -525,7 +525,7 @@
 
 .monthDateNumber {
   font-weight: 800;
-  font-size: 14px;
+  font-size: 16px;
   color: #111827;
 }
 
@@ -1323,6 +1323,10 @@
 
   .monthLayout {
     grid-template-columns: 1fr;
+  }
+
+  .monthDateNumber {
+    font-size: 14px;
   }
 
   .dayPanel {

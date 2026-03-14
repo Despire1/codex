@@ -31,6 +31,11 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
 }
 
+.card:focus-within {
+  border-color: var(--color-slate-300);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
 .canceled {
   border-style: dashed;
   background: var(--color-slate-50);
@@ -96,6 +101,25 @@
   gap: 8px;
 }
 
+.headerControls {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+}
+
+.headerControlsWithRecurring {
+  width: 68px;
+  min-width: 68px;
+}
+
+.headerControlsExpanded .recurringControl {
+  transform: translateX(-38px);
+}
+
 .linkBadge {
   display: inline-flex;
   align-items: center;
@@ -116,6 +140,74 @@
   color: var(--color-white) !important;
 }
 
+.linkIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.recurringControl {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.recurringIconBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lesson-hover-bg, var(--color-blue-600));
+  background: var(--lesson-bg, var(--color-blue-50));
+  border: 1px solid var(--lesson-border, var(--color-blue-200));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.recurringIcon {
+  width: 13px;
+  height: 13px;
+}
+
+.recurringTooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  color: var(--color-white);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 3;
+}
+
+.recurringTooltip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.recurringControl:hover .recurringTooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .canceledBadge {
   border-color: var(--color-slate-200);
   background: var(--color-slate-100);
@@ -127,11 +219,6 @@
   border-color: var(--color-slate-200);
   background: var(--color-slate-100);
   color: var(--color-slate-500) !important;
-}
-
-.linkIcon {
-  width: 16px;
-  height: 16px;
 }
 
 .divider {
@@ -195,17 +282,61 @@
 }
 
 .actionsButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
   border: none;
-  background: transparent;
-  padding: 4px;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0;
+  border-radius: 10px;
   color: var(--color-slate-400);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
 
 .actionsButton:hover {
-  background: var(--color-slate-100);
-  color: var(--color-slate-600);
+  background: var(--color-white);
+  color: var(--color-slate-700);
+}
+
+.actionsButton:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .actionsButton {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-2px);
+  }
+
+  .card:hover .actionsButton,
+  .card:focus-within .actionsButton {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .card:hover .headerControlsWithRecurring .recurringControl,
+  .card:focus-within .headerControlsWithRecurring .recurringControl {
+    transform: translateX(-38px);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .headerControlsWithRecurring .recurringControl {
+    transform: translateX(-38px);
+  }
+
+  .recurringTooltip {
+    display: none;
+  }
 }
 
 .actionsPopover {
@@ -231,8 +362,13 @@
   cursor: pointer;
 }
 
-.actionItem:hover {
+.actionItem:hover:not(:disabled) {
   background: var(--color-slate-100);
+}
+
+.actionItem:disabled {
+  color: var(--color-slate-400);
+  cursor: not-allowed;
 }
 
 .actionDanger {

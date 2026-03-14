@@ -29,6 +29,7 @@ import {
   HomeworkPlayIcon,
   HomeworkTrashIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
+import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './TemplateMaterialsSection.module.css';
 
 interface TemplateMaterialsSectionProps {
@@ -250,12 +251,16 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
             <article key={item.attachment.id} className={styles.materialCard}>
               <div className={`${styles.typeBadge} ${TYPE_BADGE_CLASS_MAP[item.kind]}`}>{resolveTypeIcon(item.kind)}</div>
               <div className={styles.materialContent}>
-                <h4 className={styles.materialTitle} title={item.title}>
-                  {item.title}
-                </h4>
-                <p className={styles.materialMeta} title={item.details}>
-                  {item.details}
-                </p>
+                <Tooltip content={item.title}>
+                  <h4 className={styles.materialTitle}>
+                    {item.title}
+                  </h4>
+                </Tooltip>
+                <Tooltip content={item.details}>
+                  <p className={styles.materialMeta}>
+                    {item.details}
+                  </p>
+                </Tooltip>
               </div>
               <div className={styles.materialActions}>
                 {item.isLink ? (

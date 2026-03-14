@@ -1,4 +1,5 @@
 import { ButtonHTMLAttributes, DetailedHTMLProps } from 'react';
+import { Tooltip } from '../Tooltip/Tooltip';
 import styles from './Badge.module.css';
 
 type BadgeVariant = 'paid' | 'unpaid' | 'groupPaid' | 'groupUnpaid' | 'pending';
@@ -17,22 +18,25 @@ interface BadgeProps {
 export const Badge = ({ label, variant, withDot = false, className = '', onClick, title }: BadgeProps) => {
   if (onClick) {
     return (
-      <button
-        type="button"
-        className={`${styles.badge} ${styles[variant]} ${styles.interactive} ${className}`}
-        onClick={onClick}
-        title={title}
-      >
-        {withDot && <span className={styles.dot} />}
-        {label}
-      </button>
+      <Tooltip content={title}>
+        <button
+          type="button"
+          className={`${styles.badge} ${styles[variant]} ${styles.interactive} ${className}`}
+          onClick={onClick}
+        >
+          {withDot && <span className={styles.dot} />}
+          {label}
+        </button>
+      </Tooltip>
     );
   }
 
   return (
-    <span className={`${styles.badge} ${styles[variant]} ${className}`} title={title}>
-      {withDot && <span className={styles.dot} />}
-      {label}
-    </span>
+    <Tooltip content={title}>
+      <span className={`${styles.badge} ${styles[variant]} ${className}`}>
+        {withDot && <span className={styles.dot} />}
+        {label}
+      </span>
+    </Tooltip>
   );
 };

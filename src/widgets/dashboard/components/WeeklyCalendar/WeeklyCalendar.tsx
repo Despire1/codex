@@ -13,6 +13,7 @@ import {
 import { Lesson, LinkedStudent } from '@/entities/types';
 import { LessonChip } from '@/entities/lesson/ui/LessonChip/LessonChip';
 import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
+import { resolveLessonHasPaidParticipant } from '@/entities/lesson/lib/lessonMutationGuards';
 import { useLessonActions } from '@/features/lessons/model/useLessonActions';
 import type {
   LessonCancelRefundMode,
@@ -58,6 +59,14 @@ const SINGLE_CLICK_DELAY = 200;
 const LESSON_ROW_HEIGHT = 44;
 const LESSON_ROW_GAP = 8;
 const MAX_VISIBLE_LESSONS = 10;
+
+const resolveCancelDialogCopy = (lesson: Lesson | null) => {
+  const isCorrectionFlow = Boolean(lesson && (lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)));
+  return {
+    title: isCorrectionFlow ? 'Исправить статус урока' : 'Отменить урок',
+    confirmText: isCorrectionFlow ? 'Изменить статус' : 'Отменить урок',
+  };
+};
 
 export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   lessons,
@@ -473,8 +482,18 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
 
       <SeriesScopeDialog
         open={Boolean(scopeDialog)}
-        title={scopeDialog?.type === 'cancel' ? 'Отменить урок' : scopeDialog?.type === 'restore' ? 'Восстановить урок' : undefined}
-        confirmText={scopeDialog?.type === 'cancel' ? 'Отменить урок' : 'Восстановить'}
+        title={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).title
+            : scopeDialog?.type === 'restore'
+              ? 'Восстановить урок'
+              : undefined
+        }
+        confirmText={
+          scopeDialog?.type === 'cancel'
+            ? resolveCancelDialogCopy(scopeDialog.lesson).confirmText
+            : 'Восстановить'
+        }
         previews={scopeDialog?.previews}
         onClose={() => setScopeDialog(null)}
         onConfirm={handleScopeConfirm}

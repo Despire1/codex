@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Tooltip } from '../Tooltip/Tooltip';
 import styles from './Ellipsis.module.css';
 
 interface EllipsisProps {
@@ -8,7 +9,9 @@ interface EllipsisProps {
 }
 
 export const Ellipsis = ({ children, className = '', title }: EllipsisProps) => (
-  <span className={`${styles.ellipsis} ${className}`} title={title}>
-    {children}
-  </span>
+  <Tooltip content={title}>
+    <span className={`${styles.ellipsis} ${className}`}>
+      {children}
+    </span>
+  </Tooltip>
 );

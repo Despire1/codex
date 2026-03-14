@@ -253,6 +253,7 @@ model Lesson {
   lastPaymentReminderAt DateTime?
   paymentReminderCount Int               @default(0)
   lastPaymentReminderSource PaymentReminderSource?
+  isSuppressed       Boolean             @default(false)
   isRecurring         Boolean             @default(false)
   meetingLink         String?
   recurrenceUntil     DateTime?

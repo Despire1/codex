@@ -6,6 +6,7 @@ import { MoreHorizIcon } from '../../../icons/MaterialIcons';
 import { SendTestNotificationModal, useNotificationChannelStatus } from '../../../features/notifications/sendTest';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '../../../shared/lib/toast';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
 import { useUnsavedChanges } from '../../../shared/lib/unsavedChanges';
 import controls from '../../../shared/styles/controls.module.css';
@@ -397,7 +398,7 @@ const TemplateEditor: FC<{
 
       {isMobile && (
         <div className={styles.mobileActions}>
-          <span className={styles.sendTestWrapper} title={sendTestHint}>
+          <Tooltip content={sendTestHint} className={styles.sendTestWrapper}>
             <button
               type="button"
               className={`${controls.secondaryButton} ${styles.mobileActionButton}`}
@@ -407,7 +408,7 @@ const TemplateEditor: FC<{
             >
               Тест
             </button>
-          </span>
+          </Tooltip>
           <button
             type="button"
             className={`${controls.primaryButton} ${styles.mobileActionButton} ${styles.saveButton}`}
@@ -542,7 +543,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
           ))}
         </div>
         {!isMobile && (
-          <span className={`${styles.sendTestWrapper} ${styles.tabAction}`} title={sendTestHint}>
+          <Tooltip content={sendTestHint} className={`${styles.sendTestWrapper} ${styles.tabAction}`}>
             <button
               type="button"
               className={`${controls.secondaryButton} ${styles.sendTestButton}`}
@@ -555,7 +556,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
             >
               Отправить тестовое уведомление
             </button>
-          </span>
+          </Tooltip>
         )}
       </div>
 

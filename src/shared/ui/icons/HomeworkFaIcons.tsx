@@ -1,6 +1,7 @@
 import { FC } from 'react';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Tooltip } from '../Tooltip/Tooltip';
 import {
   faBell as farBell,
   faBookmark as farBookmark,
@@ -81,14 +82,17 @@ const HomeworkFaIcon: FC<HomeworkFaIconProps & { icon: IconDefinition }> = ({
   className,
   title,
 }) => (
-  <FontAwesomeIcon
-    icon={icon}
-    className={className}
-    title={title}
-    style={{ fontSize: `${size}px`, lineHeight: 1 }}
-    fixedWidth
-    aria-hidden={!title}
-  />
+  <Tooltip content={title}>
+    <span>
+      <FontAwesomeIcon
+        icon={icon}
+        className={className}
+        style={{ fontSize: `${size}px`, lineHeight: 1 }}
+        fixedWidth
+        aria-hidden={!title}
+      />
+    </span>
+  </Tooltip>
 );
 
 export const HomeworkLayerGroupIcon: FC<HomeworkFaIconProps> = (props) => (

@@ -3,6 +3,7 @@ import { ru } from 'date-fns/locale';
 import { Lesson, StudentDebtItem } from '../../../entities/types';
 import { NotificationsNoneOutlinedIcon } from '../../../icons/MaterialIcons';
 import controls from '../../../shared/styles/controls.module.css';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from './StudentDebtPopoverContent.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 
@@ -56,17 +57,18 @@ export const StudentDebtPopoverContent = ({
                 </div>
                 <div className={styles.itemActions}>
                   <span className={styles.itemAmount}>{priceLabel}</span>
-                  <button
-                    type="button"
-                    className={styles.remindButton}
-                    onClick={() => onSendPaymentReminder(item.id)}
-                    disabled={isReminderLoading}
-                    title={reminderDisabledReason ?? 'Отправить напоминание'}
-                  >
-                    {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
-                      <NotificationsNoneOutlinedIcon width={16} height={16} />
-                    )}
-                  </button>
+                  <Tooltip content={reminderDisabledReason ?? 'Отправить напоминание'}>
+                    <button
+                      type="button"
+                      className={styles.remindButton}
+                      onClick={() => onSendPaymentReminder(item.id)}
+                      disabled={isReminderLoading}
+                    >
+                      {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
+                        <NotificationsNoneOutlinedIcon width={16} height={16} />
+                      )}
+                    </button>
+                  </Tooltip>
                   <button
                     type="button"
                     className={`${controls.primaryButton} ${styles.payButton}`}

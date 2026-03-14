@@ -9,12 +9,19 @@
   gap: 8px;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
 }
 
 .card:hover {
   background: #f2f4f8;
   border-color: #dde3ec;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.card:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 2px;
 }
 
 .headerRow {
@@ -32,12 +39,127 @@
   color: #111827;
 }
 
-.meetingIcon {
-  width: 14px;
-  height: 14px;
-  color: #2563eb;
+.headerControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
-  margin-top: 2px;
+}
+
+.iconBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.94));
+  color: #2563eb;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.iconBadgeButton {
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.iconBadgeButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
+}
+
+.iconBadgeIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.recurringBadge {
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.16);
+  background: linear-gradient(180deg, rgba(238, 242, 255, 0.98), rgba(224, 231, 255, 0.94));
+}
+
+.actionsButton {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.actionsButton:hover {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.actionsButton:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .actionsButton {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-2px);
+  }
+
+  .card:hover .actionsButton,
+  .card:focus-within .actionsButton {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+}
+
+.actionsPopover {
+  min-width: 196px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+}
+
+.actionItem {
+  border: none;
+  background: transparent;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  color: #334155;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.actionItem:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.actionItem:disabled {
+  cursor: not-allowed;
+  color: #94a3b8;
+}
+
+.actionDanger {
+  color: #dc2626;
+}
+
+.actionDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .subject {
@@ -47,8 +169,27 @@
   color: #6b7280;
 }
 
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .time {
   font-size: 12px;
   font-weight: 600;
   color: #374151;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }

@@ -4,6 +4,7 @@ import { ru } from 'date-fns/locale';
 import { Homework, HomeworkStatus } from '../../../entities/types';
 import controls from '../../../shared/styles/controls.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
@@ -229,34 +230,35 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
                         )}
                       </div>
                       <div className={styles.iconActions}>
-                        <button
-                          className={controls.iconButton}
-                          aria-label="Отметить выполненным"
-                          title="Переключить выполнено"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleHomework(hw.id);
-                          }}
-                        >
-                          <CheckCircleOutlineIcon width={18} height={18} />
-                        </button>
-                        <div className={styles.moreActionsWrapper}>
+                        <Tooltip content="Переключить выполнено">
                           <button
                             className={controls.iconButton}
-                            aria-label="Ещё"
-                            title="Ещё действия"
+                            aria-label="Отметить выполненным"
                             onClick={(event) => {
                               event.stopPropagation();
-                              onToggleHomeworkMenu(hw.id);
+                              onToggleHomework(hw.id);
                             }}
                           >
-                            <MoreHorizIcon width={18} height={18} />
+                            <CheckCircleOutlineIcon width={18} height={18} />
                           </button>
+                        </Tooltip>
+                        <div className={styles.moreActionsWrapper}>
+                          <Tooltip content="Ещё действия">
+                            <button
+                              className={controls.iconButton}
+                              aria-label="Ещё"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleHomeworkMenu(hw.id);
+                              }}
+                            >
+                              <MoreHorizIcon width={18} height={18} />
+                            </button>
+                          </Tooltip>
                           {openHomeworkMenuId === hw.id && (
                             <div className={styles.moreMenu}>
                               <button
                                 aria-label="Напомнить"
-                                title="Отправить напоминание"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   onHomeworkReminder(hw.id);
@@ -266,7 +268,6 @@ export const HomeworkTab: FC<HomeworkTabProps> = ({
                               </button>
                               <button
                                 aria-label="Редактировать"
-                                title="Редактировать"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   onEditHomework(hw.id);

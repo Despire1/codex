@@ -15,8 +15,10 @@ import {
   faWallet,
 } from '@fortawesome/free-solid-svg-icons';
 import { ActivityFeedItem, Lesson, LinkedStudent, Teacher, UnpaidLessonEntry } from '@/entities/types';
+import { resolveLessonMutationDisabledReason } from '@/entities/lesson/lib/lessonMutationGuards';
 import type { DashboardSummary } from '@/shared/api/client';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
+import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
 import {
@@ -120,6 +122,18 @@ const resolveLessonLocation = (lesson: Lesson) => {
   return { label: 'Онлайн', icon: faVideo };
 };
 
+const resolveParticipantName = (studentId: number, linkedStudents: LinkedStudent[]) =>
+  linkedStudents.find((student) => student.id === studentId)?.link.customName ??
+  linkedStudents.find((student) => student.id === studentId)?.username ??
+  'Ученик';
+
+type ParticipantActionState =
+  | {
+      lesson: Lesson;
+      action: 'togglePaid' | 'assignHomework';
+    }
+  | null;
+
 export const MobileDashboard: FC<MobileDashboardProps> = ({
   lessons,
   linkedStudents,
@@ -157,6 +171,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [actionsLesson, setActionsLesson] = useState<Lesson | null>(null);
+  const [participantActionState, setParticipantActionState] = useState<ParticipantActionState>(null);
   const activitySeenRef = useRef<string | null>(null);
   const now = new Date();
   const nowTs = now.getTime();
@@ -174,20 +189,27 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   );
 
   const actionLessonPresentation = resolveCloseLessonForActions(presentation.closeLesson, actionsLesson);
+  const actionMutationDisabledReason = actionsLesson ? resolveLessonMutationDisabledReason(actionsLesson) : null;
 
   const quickHomeworkPrefill = useMemo(() => {
     if (presentation.nextLesson) {
       const targetLesson = presentation.nextLesson.lesson;
       return {
         lessonId: targetLesson.id,
-        studentId: resolveLessonPrimaryStudentId(targetLesson, { preferUnpaid: true }) ?? null,
+        studentId:
+          targetLesson.participants && targetLesson.participants.length > 1
+            ? null
+            : (resolveLessonPrimaryStudentId(targetLesson, { preferUnpaid: true }) ?? null),
       };
     }
 
     if (presentation.closeLesson) {
       return {
         lessonId: presentation.closeLesson.lesson.id,
-        studentId: presentation.closeLesson.primaryStudentId,
+        studentId:
+          presentation.closeLesson.lesson.participants && presentation.closeLesson.lesson.participants.length > 1
+            ? null
+            : presentation.closeLesson.primaryStudentId,
       };
     }
 
@@ -237,6 +259,32 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
     () => unpaidEntries.reduce((sum, entry) => sum + Math.max(0, Math.round(Number(entry.price) || 0)), 0),
     [unpaidEntries],
   );
+
+  const participantActionOptions = useMemo(() => {
+    if (!participantActionState?.lesson.participants || participantActionState.lesson.participants.length === 0) {
+      return [];
+    }
+
+    return participantActionState.lesson.participants.map((participant) => ({
+      studentId: participant.studentId,
+      label: resolveParticipantName(participant.studentId, linkedStudents),
+      isPaid: participant.isPaid,
+    }));
+  }, [linkedStudents, participantActionState]);
+
+  const requestParticipantAction = (lesson: Lesson, action: 'togglePaid' | 'assignHomework') => {
+    if (!lesson.participants || lesson.participants.length <= 1) {
+      const studentId = resolveLessonPrimaryStudentId(lesson, { preferUnpaid: true }) ?? null;
+      if (action === 'togglePaid') {
+        void onTogglePaid(lesson.id, studentId ?? undefined);
+        return;
+      }
+      onOpenHomeworkAssign(studentId, lesson.id);
+      return;
+    }
+
+    setParticipantActionState({ lesson, action });
+  };
 
   const weekDaysWithLessons = useMemo(
     () => presentation.weekTimeline.filter((day) => day.items.length > 0).slice(0, 4),
@@ -680,12 +728,8 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 type="button"
                 className={styles.sheetAction}
                 onClick={() => {
-                  const studentId =
-                    resolveLessonPrimaryStudentId(actionsLesson, {
-                      preferUnpaid: true,
-                    }) ?? undefined;
                   setActionsLesson(null);
-                  void onTogglePaid(actionsLesson.id, studentId);
+                  requestParticipantAction(actionsLesson, 'togglePaid');
                 }}
               >
                 {actionLessonPresentation?.isPaid ? 'Отменить оплату' : 'Отметить оплату'}
@@ -695,38 +739,40 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 type="button"
                 className={styles.sheetAction}
                 onClick={() => {
-                  const studentId =
-                    resolveLessonPrimaryStudentId(actionsLesson, {
-                      preferUnpaid: true,
-                    }) ?? null;
                   setActionsLesson(null);
-                  onOpenHomeworkAssign(studentId, actionsLesson.id);
+                  requestParticipantAction(actionsLesson, 'assignHomework');
                 }}
               >
                 Выдать ДЗ
               </button>
 
-              <button
-                type="button"
-                className={styles.sheetAction}
-                onClick={() => {
-                  setActionsLesson(null);
-                  onRescheduleLesson(actionsLesson);
-                }}
-              >
-                Перенести
-              </button>
+              <Tooltip content={actionMutationDisabledReason} className={styles.sheetActionTooltip}>
+                <button
+                  type="button"
+                  className={styles.sheetAction}
+                  disabled={Boolean(actionMutationDisabledReason)}
+                  onClick={() => {
+                    setActionsLesson(null);
+                    onRescheduleLesson(actionsLesson);
+                  }}
+                >
+                  Перенести
+                </button>
+              </Tooltip>
 
-              <button
-                type="button"
-                className={styles.sheetAction}
-                onClick={() => {
-                  setActionsLesson(null);
-                  onEditLesson(actionsLesson);
-                }}
-              >
-                Редактировать
-              </button>
+              <Tooltip content={actionMutationDisabledReason} className={styles.sheetActionTooltip}>
+                <button
+                  type="button"
+                  className={styles.sheetAction}
+                  disabled={Boolean(actionMutationDisabledReason)}
+                  onClick={() => {
+                    setActionsLesson(null);
+                    onEditLesson(actionsLesson);
+                  }}
+                >
+                  Редактировать
+                </button>
+              </Tooltip>
 
               <button
                 type="button"
@@ -740,6 +786,58 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
               </button>
 
               <button type="button" className={styles.sheetCancel} onClick={() => setActionsLesson(null)}>
+                Отмена
+              </button>
+            </div>
+            {actionMutationDisabledReason && <div className={styles.sheetHelper}>{actionMutationDisabledReason}</div>}
+          </div>
+        ) : null}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={Boolean(participantActionState)}
+        onClose={() => setParticipantActionState(null)}
+        className={styles.lessonSheet}
+      >
+        {participantActionState ? (
+          <div className={styles.lessonSheetContent}>
+            <div className={styles.lessonSheetHeader}>
+              <div className={styles.lessonSheetTitle}>
+                {participantActionState.action === 'togglePaid'
+                  ? 'Выберите ученика для оплаты'
+                  : 'Выберите ученика для ДЗ'}
+              </div>
+              <div className={styles.lessonSheetMeta}>
+                {participantActionState.action === 'togglePaid'
+                  ? 'Оплата применится только к выбранному участнику.'
+                  : 'Домашнее задание будет выдано выбранному участнику.'}
+              </div>
+            </div>
+            <div className={styles.sheetActions}>
+              {participantActionOptions.map((participant) => (
+                <button
+                  key={participant.studentId}
+                  type="button"
+                  className={styles.sheetAction}
+                  onClick={() => {
+                    const current = participantActionState;
+                    setParticipantActionState(null);
+                    if (current.action === 'togglePaid') {
+                      void onTogglePaid(current.lesson.id, participant.studentId);
+                      return;
+                    }
+                    onOpenHomeworkAssign(participant.studentId, current.lesson.id);
+                  }}
+                >
+                  {participant.label}
+                  {participantActionState.action === 'togglePaid' && participant.isPaid ? ' • уже оплачено' : ''}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={styles.sheetCancel}
+                onClick={() => setParticipantActionState(null)}
+              >
                 Отмена
               </button>
             </div>

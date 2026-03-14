@@ -6,6 +6,7 @@ export const normalizeLesson = (lesson: any): Lesson => ({
   ...lesson,
   price: typeof lesson.price === 'number' ? lesson.price : Number(lesson.price ?? 0),
   seriesId: typeof lesson.seriesId === 'number' ? lesson.seriesId : lesson.seriesId ?? null,
+  isSuppressed: Boolean(lesson.isSuppressed),
   seriesOriginalStartAt: lesson.seriesOriginalStartAt
     ? typeof lesson.seriesOriginalStartAt === 'string'
       ? lesson.seriesOriginalStartAt

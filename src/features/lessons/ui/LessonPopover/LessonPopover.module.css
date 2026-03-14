@@ -68,6 +68,13 @@
   border-color: var(--color-slate-300);
 }
 
+.actionButton:disabled {
+  cursor: not-allowed;
+  color: var(--color-slate-400);
+  border-color: var(--color-slate-200);
+  background: var(--color-slate-100);
+}
+
 .actionDanger {
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: rgba(254, 226, 226, 0.7);
@@ -78,4 +85,10 @@
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+}
+
+.helperText {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-slate-500);
 }

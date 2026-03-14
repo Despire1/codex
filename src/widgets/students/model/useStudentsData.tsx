@@ -23,6 +23,7 @@ import {
 import { api } from '../../../shared/api/client';
 import { normalizeHomework, normalizeLesson } from '../../../shared/lib/normalizers';
 import { toUtcDateFromTimeZone } from '../../../shared/lib/timezoneDates';
+import { isVisibleLesson } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { StudentTabId } from '../types';
 
 const PAYMENT_REMINDERS_PAGE_SIZE = 10;
@@ -228,7 +229,7 @@ export const useStudentsDataInternal = ({
           sort: sortOrder,
         });
         if (lessonLoadRequestId.current !== requestId) return;
-        setStudentLessons(data.items.map(normalizeLesson));
+        setStudentLessons(data.items.map(normalizeLesson).filter(isVisibleLesson));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons', error);
@@ -273,7 +274,7 @@ export const useStudentsDataInternal = ({
           sort: 'asc',
         });
         if (lessonSummaryLoadRequestId.current !== requestId) return;
-        setStudentLessonsSummary(data.items.map(normalizeLesson));
+        setStudentLessonsSummary(data.items.map(normalizeLesson).filter(isVisibleLesson));
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to load student lessons summary', error);

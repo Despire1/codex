@@ -3,6 +3,7 @@ import { ru } from 'date-fns/locale';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
 import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../../entities/lesson/lib/lessonDetails';
+import { resolveLessonHasPaidParticipant } from '../../../../entities/lesson/lib/lessonMutationGuards';
 import { toZonedDate } from '../../../../shared/lib/timezoneDates';
 import { useFocusTrap } from '../../../../shared/lib/useFocusTrap';
 import { Modal } from '../../../../shared/ui/Modal/Modal';
@@ -37,11 +38,14 @@ export const LessonCancelDialog = ({
     [lesson, linkedStudentsById],
   );
   const isPaid = lesson ? resolveLessonPaid(lesson, participants) : false;
+  const hasPaidParticipants = lesson ? resolveLessonHasPaidParticipant(lesson) : false;
+  const isCompleted = lesson?.status === 'COMPLETED';
+  const isCorrectionFlow = isCompleted || hasPaidParticipants;
   const [refundMode, setRefundMode] = useState<LessonCancelRefundMode | undefined>(undefined);
 
   useEffect(() => {
     if (!open) return;
-    if (!isPaid) {
+    if (!hasPaidParticipants) {
       setRefundMode(undefined);
       return;
     }
@@ -50,7 +54,7 @@ export const LessonCancelDialog = ({
       return;
     }
     setRefundMode(undefined);
-  }, [isPaid, open, refundableToBalance]);
+  }, [hasPaidParticipants, open, refundableToBalance]);
 
   if (!lesson) return null;
 
@@ -64,15 +68,28 @@ export const LessonCancelDialog = ({
     onConfirm(refundMode);
   };
 
-  const isConfirmDisabled = isPaid && (!refundMode || (refundMode === 'RETURN_TO_BALANCE' && !refundableToBalance));
+  const isConfirmDisabled =
+    hasPaidParticipants && (!refundMode || (refundMode === 'RETURN_TO_BALANCE' && !refundableToBalance));
+  const title = isCorrectionFlow ? 'Исправить статус урока?' : 'Отменить урок?';
+  const confirmLabel = isCorrectionFlow ? 'Изменить статус' : 'Отменить урок';
+  const cancelLabel = isCorrectionFlow ? 'Назад' : 'Не отменять';
+
+  const correctionMessage = isCompleted
+    ? hasPaidParticipants
+      ? 'Урок уже отмечен проведённым. Мы изменим его статус на «Отменён» и ниже нужно выбрать, что сделать с оплатой.'
+      : 'Урок уже отмечен проведённым. Мы изменим его статус на «Отменён».'
+    : hasPaidParticipants
+      ? 'Урок уже оплачен. При отмене выберите, что сделать с оплатой.'
+      : null;
 
   return (
-    <Modal open={open} title="Отменить урок?" onClose={onClose}>
+    <Modal open={open} title={title} onClose={onClose}>
       <div ref={containerRef}>
         <p className={modalStyles.message}>
           {dateLabel}, {timeLabel} • {lessonLabel}
         </p>
-        {isPaid && (
+        {correctionMessage && <div className={styles.notice}>{correctionMessage}</div>}
+        {hasPaidParticipants && (
           <div className={styles.options} role="radiogroup" aria-label="Что сделать с оплатой">
             <label
               className={`${styles.option} ${refundMode === 'RETURN_TO_BALANCE' ? styles.optionActive : ''} ${
@@ -106,9 +123,14 @@ export const LessonCancelDialog = ({
             </label>
           </div>
         )}
+        {hasPaidParticipants && !isPaid && (
+          <p className={modalStyles.message}>
+            Возврат затронет только тех участников, у которых это занятие уже отмечено как оплаченное.
+          </p>
+        )}
         <div className={styles.actions}>
           <button type="button" className={controls.secondaryButton} onClick={onClose}>
-            Не отменять
+            {cancelLabel}
           </button>
           <button
             type="button"
@@ -116,7 +138,7 @@ export const LessonCancelDialog = ({
             disabled={isConfirmDisabled}
             onClick={handleConfirm}
           >
-            Отменить урок
+            {confirmLabel}
           </button>
         </div>
       </div>

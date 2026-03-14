@@ -277,7 +277,10 @@ export const buildMobileDashboardPresentation = ({
         amountRub: resolveLessonAmountRub(closeLessonRaw),
         isPaid: resolveLessonIsPaid(closeLessonRaw),
         needsCompletion: closeLessonRaw.status !== 'COMPLETED',
-        primaryStudentId: resolveLessonPrimaryStudentId(closeLessonRaw, { preferUnpaid: true }) ?? null,
+        primaryStudentId:
+          closeLessonRaw.participants && closeLessonRaw.participants.length > 1
+            ? null
+            : (resolveLessonPrimaryStudentId(closeLessonRaw, { preferUnpaid: true }) ?? null),
       }
     : null;
 

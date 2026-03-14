@@ -1,0 +1,2 @@
+ALTER TABLE "Lesson"
+ADD COLUMN "isSuppressed" BOOLEAN NOT NULL DEFAULT false;

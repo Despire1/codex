@@ -4,6 +4,7 @@ import { ru } from 'date-fns/locale';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import styles from './UnpaidLessonsPopoverContent.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { NotificationsNoneOutlinedIcon } from '../../../icons/MaterialIcons';
@@ -210,21 +211,22 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                             Отметить оплату
                           </button>
 
-                          <button
-                              type="button"
-                              className={styles.remindButton}
-                              onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
-                              title={reminderDisabledReason ?? 'Отправить напоминание'}
-                              disabled={Boolean(reminderDisabledReason) || isPending}
-                          >
-                            {isPending ? (
-                                <span className={styles.iconSpinner} aria-hidden />
-                            ) : isSuccess ? (
-                                <span className={styles.iconCheck} aria-hidden />
-                            ) : (
-                                <NotificationsNoneOutlinedIcon width={18} height={18} />
-                            )}
-                          </button>
+                          <Tooltip content={reminderDisabledReason ?? 'Отправить напоминание'}>
+                            <button
+                                type="button"
+                                className={styles.remindButton}
+                                onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
+                                disabled={Boolean(reminderDisabledReason) || isPending}
+                            >
+                              {isPending ? (
+                                  <span className={styles.iconSpinner} aria-hidden />
+                              ) : isSuccess ? (
+                                  <span className={styles.iconCheck} aria-hidden />
+                              ) : (
+                                  <NotificationsNoneOutlinedIcon width={18} height={18} />
+                              )}
+                            </button>
+                          </Tooltip>
                         </div>
 
                         {showProgress && (

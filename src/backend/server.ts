@@ -938,7 +938,7 @@ const bootstrap = async (
   const homeworks = includeHomeworks ? await prisma.homework.findMany({ where: { teacherId: teacher.chatId } }) : [];
   let lessons: any[] = [];
   if (filters?.lessonsStart || filters?.lessonsEnd) {
-    const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId, startAt: {} };
+    const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId, isSuppressed: false, startAt: {} };
     if (filters.lessonsStart) lessonsWhere.startAt.gte = filters.lessonsStart;
     if (filters.lessonsEnd) lessonsWhere.startAt.lte = filters.lessonsEnd;
     lessons = await prisma.lesson.findMany({
@@ -965,7 +965,7 @@ const listLessonsForRange = async (
   },
 ) => {
   const teacher = await ensureTeacher(user);
-  const where: Record<string, any> = { teacherId: teacher.chatId };
+  const where: Record<string, any> = { teacherId: teacher.chatId, isSuppressed: false };
   const startFrom = parseDateFilter(filters.start ?? undefined);
   const startTo = parseDateFilter(filters.end ?? undefined);
   if (startFrom || startTo) {
@@ -1110,13 +1110,14 @@ const getDashboardSummary = async (user: User) => {
       where: { teacherId: teacher.chatId, isArchived: false },
     }),
     prisma.lesson.count({
-      where: { teacherId: teacher.chatId },
+      where: { teacherId: teacher.chatId, isSuppressed: false },
     }),
   ]);
 
-  const plannedLessons = await prisma.lesson.findMany({
+  let plannedLessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
+      isSuppressed: false,
       status: { not: 'CANCELED' },
       startAt: {
         gte: previousWindowStartUtc,
@@ -1133,6 +1134,7 @@ const getDashboardSummary = async (user: User) => {
       },
     },
   });
+  plannedLessons = await filterSuppressedLessons(prisma, plannedLessons);
 
   const plannedByDay = new Map<string, number>();
   plannedLessons.forEach((lesson) => {
@@ -1161,9 +1163,10 @@ const getDashboardSummary = async (user: User) => {
     return sum + resolveLessonAmountRub(lesson);
   }, 0);
 
-  const unpaidLessons = await prisma.lesson.findMany({
+  let unpaidLessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
+      isSuppressed: false,
       status: { not: 'CANCELED' },
       OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
       AND: [
@@ -1182,6 +1185,7 @@ const getDashboardSummary = async (user: User) => {
       },
     },
   });
+  unpaidLessons = await filterSuppressedLessons(prisma, unpaidLessons);
 
   let unpaidRub = 0;
   const unpaidStudentIds = new Set<number>();
@@ -1269,9 +1273,10 @@ const sendLessonReminder = async (
 const listUnpaidLessons = async (user: User) => {
   const teacher = await ensureTeacher(user);
   const now = new Date();
-  const lessons = await prisma.lesson.findMany({
+  let lessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
+      isSuppressed: false,
       status: { not: 'CANCELED' },
       OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
       AND: [
@@ -1290,6 +1295,7 @@ const listUnpaidLessons = async (user: User) => {
     },
     orderBy: { startAt: 'asc' },
   });
+  lessons = await filterSuppressedLessons(prisma, lessons);
 
   const links = await prisma.teacherStudent.findMany({ where: { teacherId: teacher.chatId } });
   const linkMap = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
@@ -2636,15 +2642,18 @@ const resolveHomeworkDefaultDeadline = async (teacherId: bigint, studentId: numb
       referenceDate = lesson.startAt;
     }
   }
-  const nextLesson = await prisma.lesson.findFirst({
+  const nextLessons = await prisma.lesson.findMany({
     where: {
       teacherId,
+      isSuppressed: false,
       status: { not: 'CANCELED' },
       startAt: { gt: referenceDate },
       OR: [{ studentId }, { participants: { some: { studentId } } }],
     },
     orderBy: { startAt: 'asc' },
+    take: 25,
   });
+  const [nextLesson] = await filterSuppressedLessons(prisma, nextLessons);
   if (nextLesson) {
     return { deadlineAt: nextLesson.startAt, warning: null as string | null };
   }
@@ -3018,102 +3027,49 @@ const createLesson = async (user: User, body: any) => {
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
     include: { student: true },
   });
-  const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
   const participantNames = resolveLessonParticipantNames(studentIds, links);
 
-  const lesson = await prisma.lesson.create({
-    data: {
-      teacherId: teacher.chatId,
-      studentId: studentIds[0],
-      price: 0,
-      color: lessonColor,
-      meetingLink: meetingLink ?? null,
-      startAt: new Date(startAt),
-      durationMinutes: durationValue,
-      status: 'SCHEDULED',
-      isPaid: false,
-      participants: {
-        create: studentIds.map((id) => ({
-          studentId: id,
-          price: 0,
-          isPaid: false,
-        })),
-      },
-    },
-    include: {
-      participants: {
-        include: {
-          student: true,
+  const lesson = await prisma.$transaction(async (tx) => {
+    const createdLesson = await tx.lesson.create({
+      data: {
+        teacherId: teacher.chatId,
+        studentId: studentIds[0],
+        price: 0,
+        color: lessonColor,
+        meetingLink: meetingLink ?? null,
+        startAt: new Date(startAt),
+        durationMinutes: durationValue,
+        status: 'SCHEDULED',
+        isPaid: false,
+        participants: {
+          create: studentIds.map((id) => ({
+            studentId: id,
+            price: 0,
+            isPaid: false,
+          })),
         },
       },
-    },
-  });
-
-  if (markPaid) {
-    const confirmedPrice = basePrice;
-
-    await prisma.lessonParticipant.updateMany({
-      where: { lessonId: lesson.id },
-      data: { isPaid: true, price: confirmedPrice },
-    });
-
-    await prisma.payment.createMany({
-      data: lesson.participants.map((participant: any) => ({
-        lessonId: lesson.id,
-        studentId: participant.studentId,
-        amount: confirmedPrice,
-        teacherId: teacher.chatId,
-        paidAt: new Date(),
-        comment: null,
-      })),
-      skipDuplicates: true,
-    });
-    await prisma.paymentEvent.createMany({
-      data: lesson.participants.map((participant: any) => ({
-        studentId: participant.studentId,
-        teacherId: teacher.chatId,
-        lessonId: lesson.id,
-        type: 'MANUAL_PAID',
-        lessonsDelta: 0,
-        priceSnapshot: confirmedPrice,
-        moneyAmount: confirmedPrice,
-        createdBy: 'TEACHER',
-        reason: null,
-      })),
-      skipDuplicates: true,
-    });
-
-    const updated = await prisma.lesson.update({
-      where: { id: lesson.id },
-      data: { isPaid: true, price: confirmedPrice },
       include: {
         participants: {
-          include: { student: true },
+          include: {
+            student: true,
+          },
         },
       },
     });
 
-    await safeLogActivityEvent({
-      teacherId: teacher.chatId,
-      studentId: updated.studentId,
-      lessonId: updated.id,
-      category: 'LESSON',
-      action: 'CREATE',
-      status: 'SUCCESS',
-      source: 'USER',
-      title: 'Создано и оплачено занятие',
-      payload: {
-        lessonStartAt: updated.startAt.toISOString(),
-        durationMinutes: updated.durationMinutes,
-        studentIds,
-        studentNames: participantNames,
-        isPaidAtCreation: true,
-      },
-    });
+    if (!markPaid) {
+      return createdLesson;
+    }
 
-    return updated;
-  }
+    return markLessonPaidAtCreation(tx, {
+      teacherId: teacher.chatId,
+      lesson: createdLesson,
+      studentIds,
+      links,
+    });
+  });
 
   await safeLogActivityEvent({
     teacherId: teacher.chatId,
@@ -3129,7 +3085,7 @@ const createLesson = async (user: User, body: any) => {
       durationMinutes: lesson.durationMinutes,
       studentIds,
       studentNames: participantNames,
-      isPaidAtCreation: false,
+      isPaidAtCreation: markPaid,
     },
   });
 
@@ -3169,6 +3125,11 @@ const normalizeLessonMutationAction = (value: unknown): LessonMutationAction => 
   return 'EDIT';
 };
 
+const LESSON_HISTORY_LOCK_MESSAGE =
+  'Урок уже оплачен или проведён. Чтобы не переписать историю, изменение недоступно.';
+const LESSON_SERIES_HISTORY_LOCK_MESSAGE =
+  'В выбранной части серии есть оплаченные, проведённые или уже связанные с историей уроки. Чтобы не переписать историю, начните изменение с более позднего урока или редактируйте один урок отдельно.';
+
 const getLessonOriginalStartAt = (lesson: { startAt: Date | string; seriesOriginalStartAt?: Date | string | null }) =>
   new Date(lesson.seriesOriginalStartAt ?? lesson.startAt);
 
@@ -3180,8 +3141,72 @@ const isLessonFullyPaid = (lesson: { isPaid?: boolean; participants?: Array<{ is
 };
 
 const isImmutableLessonForRecurringMutation = (
-  lesson: { status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
-) => lesson.status === 'COMPLETED' || isLessonFullyPaid(lesson);
+  lesson: { id?: number; status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+  protectedLessonIds?: Set<number>,
+) => lesson.status === 'COMPLETED' || isLessonFullyPaid(lesson) || (typeof lesson.id === 'number' && protectedLessonIds?.has(lesson.id));
+
+const findLessonIdsWithProtectedDependents = async (tx: any, lessonIds: number[]) => {
+  if (lessonIds.length === 0) return new Set<number>();
+  const [payments, paymentEvents, homeworkAssignments, notifications] = await Promise.all([
+    tx.payment.findMany({
+      where: { lessonId: { in: lessonIds } },
+      select: { lessonId: true },
+    }),
+    tx.paymentEvent.findMany({
+      where: { lessonId: { in: lessonIds } },
+      select: { lessonId: true },
+    }),
+    tx.homeworkAssignment.findMany({
+      where: { lessonId: { in: lessonIds } },
+      select: { lessonId: true },
+    }),
+    tx.notificationLog.findMany({
+      where: { lessonId: { in: lessonIds } },
+      select: { lessonId: true },
+    }),
+  ]);
+
+  return new Set<number>(
+    [...payments, ...paymentEvents, ...homeworkAssignments, ...notifications]
+      .map((item: { lessonId: number | null }) => item.lessonId)
+      .filter((lessonId): lessonId is number => typeof lessonId === 'number'),
+  );
+};
+
+const resolveHistoryBoundLessonIds = async (
+  tx: any,
+  lessons: Array<{ id: number; status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> }>,
+) => {
+  const protectedLessonIds = await findLessonIdsWithProtectedDependents(
+    tx,
+    lessons.map((lesson) => lesson.id),
+  );
+  return new Set<number>(
+    lessons
+      .filter((lesson) => isImmutableLessonForRecurringMutation(lesson, protectedLessonIds))
+      .map((lesson) => lesson.id),
+  );
+};
+
+const isHistoryBoundLesson = async (
+  tx: any,
+  lesson: { id: number; status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+) => {
+  if (lesson.status === 'COMPLETED' || isLessonFullyPaid(lesson)) {
+    return true;
+  }
+  return (await findLessonIdsWithProtectedDependents(tx, [lesson.id])).has(lesson.id);
+};
+
+const ensureLessonCanBeDangerouslyMutated = async (
+  tx: any,
+  lesson: { id: number; status?: string; isPaid?: boolean; participants?: Array<{ isPaid?: boolean | null }> },
+  message = LESSON_HISTORY_LOCK_MESSAGE,
+) => {
+  if (await isHistoryBoundLesson(tx, lesson)) {
+    throw new Error(message);
+  }
+};
 
 const shiftWeekdays = (weekdays: number[], deltaDays: number) =>
   Array.from(new Set(weekdays.map((day) => ((day + deltaDays) % 7 + 7) % 7))).sort((left, right) => left - right);
@@ -3338,15 +3363,8 @@ const upsertLessonSeriesException = async (
     },
   });
 
-const lessonHasProtectedDependents = async (tx: any, lessonId: number) => {
-  const [paymentsCount, paymentEventsCount, homeworkAssignmentsCount, notificationCount] = await Promise.all([
-    tx.payment.count({ where: { lessonId } }),
-    tx.paymentEvent.count({ where: { lessonId } }),
-    tx.homeworkAssignment.count({ where: { lessonId } }),
-    tx.notificationLog.count({ where: { lessonId } }),
-  ]);
-  return paymentsCount > 0 || paymentEventsCount > 0 || homeworkAssignmentsCount > 0 || notificationCount > 0;
-};
+const lessonHasProtectedDependents = async (tx: any, lessonId: number) =>
+  (await findLessonIdsWithProtectedDependents(tx, [lessonId])).has(lessonId);
 
 const suppressLessonInstance = async (
   tx: any,
@@ -3366,16 +3384,17 @@ const suppressLessonInstance = async (
       kind: 'DELETE',
     });
   }
-  if (await lessonHasProtectedDependents(tx, lesson.id)) {
+  if (await isHistoryBoundLesson(tx, lesson)) {
     await tx.lesson.update({
       where: { id: lesson.id },
-      data: { status: 'CANCELED' },
+      data: { status: 'CANCELED', isSuppressed: true },
     });
-    return;
+    return { deleted: false };
   }
   await tx.lesson.delete({
     where: { id: lesson.id },
   });
+  return { deleted: true };
 };
 
 const ensureLessonSeriesMetadata = async (
@@ -3502,15 +3521,93 @@ const loadScopedLessonTargets = async (
       startAt: 'asc',
     },
   });
+  const visibleLessons = await filterSuppressedLessons(tx, lessons);
 
   const filtered =
     scope === 'SINGLE'
-      ? lessons.filter((item: any) => item.id === lesson.id)
-      : lessons.filter(
-          (item: any) => item.status !== 'COMPLETED' && getLessonOriginalStartAt(item).getTime() >= thresholdTime,
-        );
+      ? visibleLessons.filter((item: any) => item.id === lesson.id)
+      : visibleLessons.filter((item: any) => getLessonOriginalStartAt(item).getTime() >= thresholdTime);
 
   return { lesson, series, lessons: filtered };
+};
+
+const markLessonPaidAtCreation = async (
+  tx: any,
+  params: {
+    teacherId: bigint;
+    lesson: {
+      id: number;
+      studentId: number;
+    };
+    studentIds: number[];
+    links: any[];
+  },
+) => {
+  const linksByStudentId = new Map<number, any>(params.links.map((link: any) => [Number(link.studentId), link]));
+
+  for (const studentId of params.studentIds) {
+    const link = linksByStudentId.get(studentId);
+    if (!link) continue;
+    const amount = resolveProfileLessonPrice(link);
+
+    await tx.lessonParticipant.update({
+      where: {
+        lessonId_studentId: {
+          lessonId: params.lesson.id,
+          studentId,
+        },
+      },
+      data: {
+        isPaid: true,
+        price: amount,
+      },
+    });
+
+    await tx.payment.create({
+      data: {
+        lessonId: params.lesson.id,
+        teacherStudentId: link.id,
+        amount,
+        paidAt: new Date(),
+        comment: null,
+      },
+    });
+
+    await createPaymentEvent(tx, {
+      studentId,
+      teacherId: params.teacherId,
+      lessonId: params.lesson.id,
+      type: 'MANUAL_PAID',
+      lessonsDelta: 0,
+      priceSnapshot: amount,
+      moneyAmount: amount,
+      createdBy: 'TEACHER',
+      reason: null,
+    });
+  }
+
+  const participants = await tx.lessonParticipant.findMany({
+    where: { lessonId: params.lesson.id },
+    include: { student: true },
+  });
+  const primaryParticipant = participants.find((participant: any) => participant.studentId === params.lesson.studentId);
+  const primaryPaid = Boolean(primaryParticipant?.isPaid);
+
+  return tx.lesson.update({
+    where: { id: params.lesson.id },
+    data: {
+      isPaid: participants.length > 0 ? participants.every((participant: any) => participant.isPaid) : false,
+      price: primaryParticipant?.price ?? 0,
+      paidAt: new Date(),
+      paymentStatus: primaryPaid ? 'PAID' : 'UNPAID',
+      paidSource: primaryPaid ? 'MANUAL' : 'NONE',
+    },
+    include: {
+      participants: {
+        include: { student: true },
+      },
+    },
+  });
 };
 
 const createLessonSeriesRecord = async (
@@ -3644,10 +3741,12 @@ const updateLessonWithParticipants = async (
 
 const filterSuppressedLessons = async (tx: any, lessons: any[]) => {
   if (lessons.length === 0) return lessons;
+  const visibleLessons = lessons.filter((lesson) => !lesson.isSuppressed);
+  if (visibleLessons.length === 0) return [];
   const hidden = await tx.lessonSeriesException.findMany({
     where: {
       lessonId: {
-        in: lessons.map((lesson) => lesson.id),
+        in: visibleLessons.map((lesson) => lesson.id),
       },
       kind: 'DELETE',
     },
@@ -3656,7 +3755,7 @@ const filterSuppressedLessons = async (tx: any, lessons: any[]) => {
     },
   });
   const hiddenIds = new Set(hidden.map((item: { lessonId: number | null }) => item.lessonId).filter(Boolean));
-  return lessons.filter((lesson) => !hiddenIds.has(lesson.id));
+  return visibleLessons.filter((lesson) => !hiddenIds.has(lesson.id));
 };
 
 const createRecurringLessons = async (user: User, body: any) => {
@@ -3677,8 +3776,6 @@ const createRecurringLessons = async (user: User, body: any) => {
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
     include: { student: true },
   });
-
-  const basePrice = links.find((link) => link.studentId === studentIds[0])?.pricePerLesson ?? 0;
   const markPaid = Boolean(body?.isPaid || body?.markPaid);
   const participantNames = resolveLessonParticipantNames(studentIds, links);
 
@@ -3707,6 +3804,7 @@ const createRecurringLessons = async (user: User, body: any) => {
   const existingLessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
+      isSuppressed: false,
       startAt: {
         gte: seriesStart,
         lte: endDate,
@@ -3749,45 +3847,11 @@ const createRecurringLessons = async (user: User, body: any) => {
       if (!lesson) continue;
 
       if (markPaid) {
-        const confirmedPrice = basePrice;
-
-        await tx.lessonParticipant.updateMany({
-          where: { lessonId: lesson.id },
-          data: { isPaid: true, price: confirmedPrice },
-        });
-
-        await tx.payment.createMany({
-          data: lesson.participants.map((participant: any) => ({
-            lessonId: lesson.id,
-            studentId: participant.studentId,
-            amount: confirmedPrice,
-            teacherId: teacher.chatId,
-            paidAt: new Date(),
-            comment: null,
-          })),
-          skipDuplicates: true,
-        });
-        await tx.paymentEvent.createMany({
-          data: lesson.participants.map((participant: any) => ({
-            studentId: participant.studentId,
-            teacherId: teacher.chatId,
-            lessonId: lesson.id,
-            type: 'MANUAL_PAID',
-            lessonsDelta: 0,
-            priceSnapshot: confirmedPrice,
-            moneyAmount: confirmedPrice,
-            createdBy: 'TEACHER',
-            reason: null,
-          })),
-          skipDuplicates: true,
-        });
-
-        const updatedLesson = await tx.lesson.update({
-          where: { id: lesson.id },
-          data: { isPaid: true, price: confirmedPrice },
-          include: {
-            participants: { include: { student: true } },
-          },
+        const updatedLesson = await markLessonPaidAtCreation(tx, {
+          teacherId: teacher.chatId,
+          lesson,
+          studentIds,
+          links,
         });
         createdLessons.push(updatedLesson);
       } else {
@@ -3859,16 +3923,16 @@ const mutateRecurringLessons = async (
       : params.repeatUntil ?? null;
   const recurrenceWeekdaysValue = JSON.stringify(resolvedWeekdays);
   const selectedDeltaMs = params.startAt.getTime() - selectedLesson.startAt.getTime();
-  const protectedLessons =
-    params.scope === 'SINGLE'
-      ? []
-      : scopedLessons.filter((lesson: any) => isImmutableLessonForRecurringMutation(lesson));
   const targetLessons = scopedLessons;
+  const historyBoundLessonIds =
+    params.scope === 'SINGLE' ? new Set<number>() : await resolveHistoryBoundLessonIds(tx, scopedLessons as any);
 
-  if (params.scope !== 'SINGLE' && protectedLessons.length > 0) {
-    throw new Error(
-      'В выбранной части серии есть оплаченные или проведённые уроки. Чтобы не переписать историю, начните изменение с более позднего урока или редактируйте один урок отдельно.',
-    );
+  if (params.scope === 'SINGLE') {
+    await ensureLessonCanBeDangerouslyMutated(tx, selectedLesson);
+  }
+
+  if (params.scope !== 'SINGLE' && historyBoundLessonIds.size > 0) {
+    throw new Error(LESSON_SERIES_HISTORY_LOCK_MESSAGE);
   }
 
   if (params.scope === 'SINGLE') {
@@ -4107,6 +4171,8 @@ const updateLesson = async (user: User, lessonId: number, body: any) => {
         ? new Date(recurrenceEndRaw)
         : null;
 
+  await ensureLessonCanBeDangerouslyMutated(prisma, existing);
+
   if ((existingLesson.isRecurring && existingLesson.recurrenceGroupId) || existingLesson.seriesId) {
     const result = await prisma.$transaction(async (tx) =>
       mutateRecurringLessons(tx, {
@@ -4320,9 +4386,8 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
       const scoped = await loadScopedLessonTargets(tx, teacher, lessonId, scope);
       const deletedIds: number[] = [];
       for (const targetLesson of scoped.lessons) {
-        const hasProtected = await lessonHasProtectedDependents(tx, targetLesson.id);
-        await suppressLessonInstance(tx, targetLesson);
-        if (!hasProtected) {
+        const targetResult = await suppressLessonInstance(tx, targetLesson);
+        if (targetResult.deleted) {
           deletedIds.push(targetLesson.id);
         }
       }
@@ -4364,7 +4429,14 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
     return result;
   }
 
-  await prisma.lesson.delete({ where: { id: lessonId } });
+  const singleDeleteResult = await prisma.$transaction(async (tx) => {
+    const targetLesson = await tx.lesson.findUnique({
+      where: { id: lessonId },
+      include: { participants: true },
+    });
+    if (!targetLesson || targetLesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+    return suppressLessonInstance(tx, targetLesson);
+  });
   await safeLogActivityEvent({
     teacherId: teacher.chatId,
     studentId: lesson.studentId,
@@ -4381,7 +4453,7 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
       studentNames: lessonStudentNames,
     },
   });
-  return { deletedIds: [lessonId], deletedCount: 1 };
+  return { deletedIds: singleDeleteResult.deleted ? [lessonId] : [], deletedCount: 1 };
 };
 
 const markLessonCompleted = async (user: User, lessonId: number) => {
@@ -4438,6 +4510,21 @@ const applyLessonCancelStatus = async (
     const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
     const paidParticipants = lesson.participants.filter((participant: any) => Boolean(participant.isPaid));
 
+    const paymentTeacherStudentIdsToDelete = paidParticipants
+      .map((participant: any) => linksByStudentId.get(participant.studentId)?.id ?? null)
+      .filter((linkId: number | null): linkId is number => typeof linkId === 'number');
+
+    if (paymentTeacherStudentIdsToDelete.length > 0) {
+      await tx.payment.deleteMany({
+        where: {
+          lessonId,
+          teacherStudentId: {
+            in: paymentTeacherStudentIdsToDelete,
+          },
+        },
+      });
+    }
+
     for (const participant of paidParticipants) {
       if (adjustedStudentIds.has(participant.studentId)) continue;
       const link = linksByStudentId.get(participant.studentId);
@@ -4470,7 +4557,9 @@ const applyLessonCancelStatus = async (
     where: { id: lessonId },
     data: {
       status: 'CANCELED',
+      isSuppressed: false,
       isPaid: refundMode === 'KEEP_AS_PAID' ? lesson.isPaid : false,
+      paidAt: refundMode === 'KEEP_AS_PAID' ? lesson.paidAt : null,
       paymentStatus: refundMode === 'KEEP_AS_PAID' ? lesson.paymentStatus : 'UNPAID',
       paidSource: refundMode === 'KEEP_AS_PAID' ? lesson.paidSource : 'NONE',
     },
@@ -4496,7 +4585,7 @@ const applyLessonRestoreStatus = async (tx: any, teacher: { chatId: bigint }, le
 
   const updatedLesson = await tx.lesson.update({
     where: { id: lessonId },
-    data: { status: 'SCHEDULED' },
+    data: { status: 'SCHEDULED', isSuppressed: false },
     include: { participants: { include: { student: true } } },
   });
 
@@ -4518,16 +4607,23 @@ const previewLessonMutation = async (user: User, lessonId: number, body: any) =>
   }
 
   const scoped = await prisma.$transaction((tx) => loadScopedLessonTargets(tx, teacher, lessonId, scope));
+  const historyBoundLessonIds =
+    action === 'EDIT' || action === 'RESCHEDULE'
+      ? await prisma.$transaction((tx) => resolveHistoryBoundLessonIds(tx, scoped.lessons as any))
+      : new Set<number>();
   const isBlocked =
-    scope !== 'SINGLE' &&
     (action === 'EDIT' || action === 'RESCHEDULE') &&
-    scoped.lessons.some((item: any) => isImmutableLessonForRecurringMutation(item));
+    (scope === 'SINGLE'
+      ? historyBoundLessonIds.has(scoped.lesson.id)
+      : historyBoundLessonIds.size > 0);
 
   return buildLessonMutationPreview(action, scope, scoped.lessons, {
     historyUntouched: action === 'EDIT' || action === 'RESCHEDULE',
     isBlocked,
     blockReason: isBlocked
-      ? 'В этом диапазоне есть оплаченные или проведённые уроки. Чтобы не переписать историю, выберите "Только этот урок" или начните изменения позже.'
+      ? scope === 'SINGLE'
+        ? LESSON_HISTORY_LOCK_MESSAGE
+        : 'В этом диапазоне есть оплаченные, проведённые или уже связанные с историей уроки. Чтобы не переписать историю, выберите "Только этот урок" или начните изменения позже.'
       : null,
   });
 };
@@ -4806,67 +4902,9 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
     return result;
   }
   if (normalizedStatus === 'CANCELED') {
-    const result = await prisma.$transaction(async (tx) => {
-      const autoChargeEvents = await tx.paymentEvent.findMany({
-        where: { lessonId, type: 'AUTO_CHARGE' },
-      });
-      const existingAdjustments = await tx.paymentEvent.findMany({
-        where: { lessonId, type: 'ADJUSTMENT', reason: 'LESSON_CANCELED' },
-      });
-      const adjustedStudentIds = new Set(existingAdjustments.map((event: any) => event.studentId));
-      const links = lessonParticipantIds.length
-        ? await tx.teacherStudent.findMany({
-            where: { teacherId: teacher.chatId, studentId: { in: lessonParticipantIds }, isArchived: false },
-            include: { student: true },
-          })
-        : [];
-      const linksByStudentId = new Map<number, any>(links.map((link: any) => [link.studentId, link]));
-
-      for (const event of autoChargeEvents) {
-        if (adjustedStudentIds.has(event.studentId)) continue;
-        const link = linksByStudentId.get(event.studentId);
-        if (!link) continue;
-
-        await tx.teacherStudent.update({
-          where: { id: link.id },
-          data: { balanceLessons: link.balanceLessons + 1 },
-        });
-        await createPaymentEvent(tx, {
-          studentId: event.studentId,
-          teacherId: teacher.chatId,
-          lessonId,
-          type: 'ADJUSTMENT',
-          lessonsDelta: 1,
-          priceSnapshot: event.priceSnapshot,
-          moneyAmount: null,
-          createdBy: 'SYSTEM',
-          reason: 'LESSON_CANCELED',
-        });
-        await tx.lessonParticipant.update({
-          where: { lessonId_studentId: { lessonId, studentId: event.studentId } },
-          data: { isPaid: false, price: 0 },
-        });
-      }
-
-      const participants = await tx.lessonParticipant.findMany({
-        where: { lessonId },
-        include: { student: true },
-      });
-      const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
-
-      const updatedLesson = await tx.lesson.update({
-        where: { id: lessonId },
-        data: {
-          status: normalizedStatus,
-          isPaid: false,
-          paymentStatus: 'UNPAID',
-          paidSource: 'NONE',
-        },
-        include: { participants: { include: { student: true } } },
-      });
-
-      return { lesson: updatedLesson, links };
-    });
+    const result = await prisma.$transaction((tx) =>
+      applyLessonCancelStatus(tx, teacher, lessonId, 'RETURN_TO_BALANCE'),
+    );
 
     await safeLogActivityEvent({
       teacherId: teacher.chatId,
@@ -4889,11 +4927,8 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
     return result;
   }
 
-  const updatedLesson = await prisma.lesson.update({
-    where: { id: lessonId },
-    data: { status: normalizedStatus, isPaid: false, paymentStatus: 'UNPAID', paidSource: 'NONE' },
-    include: { participants: { include: { student: true } } },
-  });
+  const result = await prisma.$transaction((tx) => applyLessonRestoreStatus(tx, teacher, lessonId));
+  const updatedLesson = result.lesson;
   const updatedLessonParticipantIds = updatedLesson.participants.map((participant: any) => participant.studentId);
   const updatedLessonLinks = updatedLessonParticipantIds.length
     ? await prisma.teacherStudent.findMany({
@@ -4918,7 +4953,7 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
     },
   });
 
-  return { lesson: updatedLesson, links: [] as any[] };
+  return result;
 };
 
 const remindHomework = async (user: User, studentId: number) => {
@@ -4945,14 +4980,18 @@ const remindLessonPayment = async (
   if (lesson.status !== 'COMPLETED') {
     const now = new Date();
     if (lesson.status === 'SCHEDULED' && lesson.startAt.getTime() < now.getTime()) {
-      lesson = await prisma.lesson.update({
+      const settled = await settleLessonPayments(lessonId, teacher.chatId);
+      await dispatchScheduledHomeworkAssignmentsForLesson(settled.lesson.id);
+      lesson = await prisma.lesson.findUnique({
         where: { id: lessonId },
-        data: { status: 'COMPLETED', completedAt: lesson.completedAt ?? now },
         include: { student: true, participants: true },
       });
     } else {
       throw new Error('Напоминание доступно только для завершённых занятий');
     }
+  }
+  if (!lesson) {
+    throw new Error('Урок не найден');
   }
   if (lesson.status !== 'COMPLETED') {
     throw new Error('Напоминание доступно только для завершённых занятий');
@@ -6766,10 +6805,11 @@ const runLessonAutomationTick = async () => {
 
   for (const teacher of teachers) {
     if (teacher.autoConfirmLessons) {
-      const scheduledLessons = await prisma.lesson.findMany({
-        where: { teacherId: teacher.chatId, status: 'SCHEDULED', startAt: { lt: now } },
+      let scheduledLessons = await prisma.lesson.findMany({
+        where: { teacherId: teacher.chatId, isSuppressed: false, status: 'SCHEDULED', startAt: { lt: now } },
         include: { participants: { include: { student: true } } },
       });
+      scheduledLessons = await filterSuppressedLessons(prisma, scheduledLessons);
 
       const dueLessons = scheduledLessons.filter((lesson) => {
         const lessonEnd = resolveLessonEndTime(lesson);
@@ -6813,15 +6853,17 @@ const runLessonAutomationTick = async () => {
       }
     }
 
-    const unpaidCompleted = await prisma.lesson.findMany({
+    let unpaidCompleted = await prisma.lesson.findMany({
       where: {
         teacherId: teacher.chatId,
+        isSuppressed: false,
         status: 'COMPLETED',
         paymentStatus: 'UNPAID',
         paidSource: 'NONE',
       },
       include: { participants: { include: { student: true } } },
     });
+    unpaidCompleted = await filterSuppressedLessons(prisma, unpaidCompleted);
 
     for (const lesson of unpaidCompleted) {
       try {
@@ -6844,9 +6886,10 @@ const runLessonAutomationTick = async () => {
     const completedBefore = new Date(now.getTime() - delayMs);
     const repeatBefore = new Date(now.getTime() - repeatMs);
 
-    const reminderCandidates = await prisma.lesson.findMany({
+    let reminderCandidates = await prisma.lesson.findMany({
       where: {
         teacherId: teacher.chatId,
+        isSuppressed: false,
         status: 'COMPLETED',
         paymentStatus: 'UNPAID',
         completedAt: { lte: completedBefore },
@@ -6855,6 +6898,7 @@ const runLessonAutomationTick = async () => {
       },
       include: { student: true },
     });
+    reminderCandidates = await filterSuppressedLessons(prisma, reminderCandidates);
 
     const quietHours = resolveQuietHoursResume(now, teacher.timezone);
     if (quietHours.inQuietHours && now.getTime() < quietHours.nextSendAt.getTime()) {
@@ -6920,20 +6964,23 @@ const buildDailySummaryData = async (teacher: any, targetDate: Date, includeUnpa
   const dayEnd = toUtcEndOfDay(dateKey, resolvedTimeZone);
   const summaryDate = toUtcDateFromTimeZone(dateKey, '12:00', resolvedTimeZone);
 
-  const lessons = await prisma.lesson.findMany({
+  let lessons = await prisma.lesson.findMany({
     where: {
       teacherId: teacher.chatId,
+      isSuppressed: false,
       status: 'SCHEDULED',
       startAt: { gte: dayStart, lte: dayEnd },
     },
     include: { student: true, participants: { include: { student: true } } },
     orderBy: { startAt: 'asc' },
   });
+  lessons = await filterSuppressedLessons(prisma, lessons);
 
-  const unpaidLessons = includeUnpaid
+  let unpaidLessons = includeUnpaid
     ? await prisma.lesson.findMany({
         where: {
           teacherId: teacher.chatId,
+          isSuppressed: false,
           status: 'COMPLETED',
           isPaid: false,
           startAt: { lt: dayStart },
@@ -6942,6 +6989,7 @@ const buildDailySummaryData = async (teacher: any, targetDate: Date, includeUnpa
         orderBy: { startAt: 'asc' },
       })
     : [];
+  unpaidLessons = await filterSuppressedLessons(prisma, unpaidLessons);
 
   const studentIds = new Set<number>();
   lessons.forEach((lesson) => {
@@ -7001,13 +7049,15 @@ const runNotificationTick = async () => {
       const reminderMinutes = Number(teacher.lessonReminderMinutes ?? 0);
       const windowStart = new Date(now.getTime() + reminderMinutes * 60_000 - NOTIFICATION_TICK_MS);
       const windowEnd = new Date(now.getTime() + reminderMinutes * 60_000);
-      const lessons = await prisma.lesson.findMany({
+      let lessons = await prisma.lesson.findMany({
         where: {
           teacherId: teacher.chatId,
+          isSuppressed: false,
           status: 'SCHEDULED',
           startAt: { gte: windowStart, lt: windowEnd },
         },
       });
+      lessons = await filterSuppressedLessons(prisma, lessons);
 
       for (const lesson of lessons) {
         const scheduledFor = new Date(lesson.startAt.getTime() - reminderMinutes * 60_000);

@@ -13,6 +13,7 @@ import styles from '../StudentsSection.module.css';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '../../../shared/ui/Modal/Modal';
+import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { StudentDebtPopoverContent } from './StudentDebtPopoverContent';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
@@ -182,19 +183,20 @@ export const StudentHero: FC<StudentHeroProps> = ({
     const balanceValue = selectedStudent.link.balanceLessons;
 
     return (
-      <button
-        type="button"
-        className={styles.balanceTrigger}
-        onClick={onOpenBalanceTopup}
-        title="Нажмите, чтобы изменить баланс"
-        aria-label={`Изменить баланс. Текущий баланс: ${balanceValue}`}
-      >
-        <span className={`${styles.summaryLabel} ${styles.balanceLabel}`}>Баланс:</span>
-        <span className={styles.balanceValue}>
-          <span className={styles.balanceValueNumber}>{balanceValue}</span>
-          {balanceValue < 0 && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
-        </span>
-      </button>
+      <Tooltip content="Нажмите, чтобы изменить баланс">
+        <button
+          type="button"
+          className={styles.balanceTrigger}
+          onClick={onOpenBalanceTopup}
+          aria-label={`Изменить баланс. Текущий баланс: ${balanceValue}`}
+        >
+          <span className={`${styles.summaryLabel} ${styles.balanceLabel}`}>Баланс:</span>
+          <span className={styles.balanceValue}>
+            <span className={styles.balanceValueNumber}>{balanceValue}</span>
+            {balanceValue < 0 && <span className={`${styles.lozenge} ${styles.badgeDanger}`}>Долг</span>}
+          </span>
+        </button>
+      </Tooltip>
     );
   };
 

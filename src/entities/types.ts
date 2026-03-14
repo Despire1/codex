@@ -346,6 +346,7 @@ export interface Lesson {
   lastPaymentReminderAt?: string | null;
   paymentReminderCount?: number;
   lastPaymentReminderSource?: 'AUTO' | 'MANUAL' | null;
+  isSuppressed?: boolean;
   color?: LessonColor;
   meetingLink?: string | null;
   isRecurring?: boolean;
