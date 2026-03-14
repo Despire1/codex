@@ -49,11 +49,13 @@
   cursor: pointer;
   font-weight: 600;
   color: var(--color-slate-700);
+  -webkit-text-fill-color: currentColor;
 }
 
 .navItemActive {
   background: var(--color-blue-100);
   color: var(--color-blue-700);
+  -webkit-text-fill-color: currentColor;
 }
 
 .moduleHeader {
@@ -80,6 +82,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  color: var(--color-slate-700);
+  -webkit-text-fill-color: currentColor;
 }
 
 .moduleStack {
@@ -231,6 +235,8 @@
   background: var(--color-white);
   cursor: pointer;
   font-weight: 600;
+  color: var(--color-slate-900);
+  -webkit-text-fill-color: currentColor;
 }
 
 .moduleContent {

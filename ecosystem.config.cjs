@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "api",
       script: "npm",
-      args: "run api",
+      args: "run api:prod",
     },
     {
       name: "bot",

@@ -9,6 +9,7 @@
     "dev:local:bot": "./scripts/dev-local-bot.sh",
     "db:local": "./scripts/db-local.sh",
     "api": "prisma generate && tsx src/backend/server.ts",
+    "api:prod": "prisma migrate deploy && prisma generate && tsx src/backend/server.ts",
     "bot": "tsx src/backend/telegramBot.ts",
     "start:local": "./scripts/start-local-dev.sh",
     "start:all": "./scripts/start-all.sh",

@@ -163,6 +163,7 @@
   border: none;
   background: transparent;
   color: #4d7c0f;
+  -webkit-text-fill-color: currentColor;
   font-size: 12px;
   font-weight: 700;
 }

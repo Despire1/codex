@@ -7127,17 +7127,25 @@ const runOnboardingNudgeTick = async () => {
   });
 
   for (const candidate of candidates) {
-    const hasStudent = await prisma.teacherStudent.findFirst({
-      where: { teacherId: candidate.telegramUserId, isArchived: false },
-      select: { id: true },
-    });
-    if (hasStudent) continue;
+    try {
+      const hasStudent = await prisma.teacherStudent.findFirst({
+        where: { teacherId: candidate.telegramUserId, isArchived: false },
+        select: { id: true },
+      });
+      if (hasStudent) continue;
 
-    await sendTeacherOnboardingNudge({ teacherId: candidate.telegramUserId, scheduledFor: now });
-    await prisma.user.update({
-      where: { telegramUserId: candidate.telegramUserId },
-      data: { lastOnboardingNudgeAt: now },
-    });
+      await sendTeacherOnboardingNudge({ teacherId: candidate.telegramUserId, scheduledFor: now });
+      await prisma.user.update({
+        where: { telegramUserId: candidate.telegramUserId },
+        data: { lastOnboardingNudgeAt: now },
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Не удалось обработать onboarding-напоминание для учителя', {
+        teacherId: candidate.telegramUserId.toString(),
+        error,
+      });
+    }
   }
 };
 
@@ -7691,7 +7699,10 @@ setInterval(() => {
   });
 }, ONBOARDING_NUDGE_TICK_MS);
 
-void runOnboardingNudgeTick();
+void runOnboardingNudgeTick().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error('Не удалось отправить напоминание по онбордингу', error);
+});
 
 scheduleDailySessionCleanup();
 
