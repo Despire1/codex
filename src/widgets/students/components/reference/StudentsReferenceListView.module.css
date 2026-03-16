@@ -1,9 +1,9 @@
 .screen {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  background: var(--color-slate-50);
   overflow: hidden;
 }
 
@@ -256,15 +256,49 @@
   color: #4b5563;
   font-size: 13px;
   font-weight: 700;
-}
-
-.tabButton:hover {
-  background: #f3f4f6;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tabButtonActive {
   background: #111111;
   color: #ffffff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tabButton:hover {
+    background: #f3f4f6;
+  }
+
+  .tabButtonActive:hover {
+    background: #f3f4f6;
+    color: #111111;
+  }
+}
+
+.mobileAddButton {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 5;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 999px;
+  background: #a3e635;
+  color: #111111;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.22);
+  font-size: 18px;
+}
+
+.mobileAddButton:hover {
+  background: #b5ec57;
+}
+
+.mobileAddButton:active {
+  transform: translateY(1px);
 }
 
 .controlsRow {
@@ -325,6 +359,10 @@
   min-width: 0;
 }
 
+.studentIdentityText {
+  min-width: 0;
+}
+
 .avatarCircle {
   width: 56px;
   height: 56px;
@@ -350,10 +388,31 @@
   text-overflow: ellipsis;
 }
 
+.studentNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .studentLevel {
   margin: 2px 0 0;
   font-size: 12px;
   color: #6b7280;
+}
+
+.studentDebtBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: help;
 }
 
 .cardMenuButton {
@@ -366,6 +425,53 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.cardMenuPopover {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  padding: 6px;
+}
+
+.cardMenuList {
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+}
+
+.cardMenuList button {
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+}
+
+.cardMenuDanger {
+  color: #dc2626 !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cardMenuButton:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+  }
+
+  .cardMenuList button:hover {
+    background: #f3f4f6;
+  }
+
+  .cardMenuDanger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c !important;
+  }
 }
 
 .studentMetricsGrid {
@@ -573,7 +679,7 @@
   }
 
   .inner {
-    padding: 14px;
+    padding: 12px;
   }
 
   .filtersRow {
@@ -592,6 +698,66 @@
 
   .studentGrid {
     grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 767px) {
+  .overviewGrid {
+    display: none;
+  }
+
+  .inner {
+    padding: 0;
+  }
+
+  .filtersCard {
+    padding: 12px;
+    border-radius: 22px;
+  }
+
+  .filtersRow {
+    gap: 10px;
+  }
+
+  .tabRow {
+    width: 100%;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .tabButton {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 9px 4px;
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .controlsRow {
+    gap: 6px;
+  }
+
+  .selectControl {
+    min-width: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .iconControlButton {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+
+  .mobileAddButton {
+    right: 14px;
+    bottom: calc(6px + env(safe-area-inset-bottom));
+    display: inline-flex;
+    width: 62px;
+    height: 62px;
+    font-size: 19px;
   }
 }
 

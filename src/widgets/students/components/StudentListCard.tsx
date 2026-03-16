@@ -70,7 +70,7 @@ export const StudentListCard: FC<StudentListCardProps> = ({
   const username = item.student.username?.trim();
   const showActivationBadge = Boolean(username) && item.student.isActivated === false;
   const activationHint =
-    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда он появится в системе и будет получать уведомления.';
   const balanceBadge = resolveBalanceBadge(item);
   const nextLessonClassName = resolveNextLessonClassName(nextLessonVariant);
 

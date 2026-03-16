@@ -329,6 +329,7 @@ export const createStudentsService = ({
     filter?: 'all' | 'debt' | 'overdue',
     limit = defaultPageSize,
     offset = 0,
+    studentId?: number,
   ) => {
     const teacher = await ensureTeacher(user);
     const resolvedTimeZone = resolveTimeZone(teacher.timezone);
@@ -354,6 +355,10 @@ export const createStudentsService = ({
         const username = link.student?.username?.toLowerCase() ?? '';
         return customName.includes(normalizedQueryLower) || username.includes(normalizedQueryLower);
       });
+    }
+
+    if (typeof studentId === 'number' && Number.isFinite(studentId) && studentId > 0) {
+      links = links.filter((link) => link.studentId === studentId);
     }
 
     const studentIds = links.map((link) => link.studentId);

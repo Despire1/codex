@@ -16,6 +16,7 @@ import {
   LessonPaymentFilter,
   LessonMutationAction,
   LessonMutationPreview,
+  LessonPaymentHandling,
   LessonSortOrder,
   LessonSeriesScope,
   LessonStatusFilter,
@@ -480,6 +481,7 @@ export const api = {
       scope: LessonSeriesScope;
       startAt?: string;
       durationMinutes?: number;
+      studentIds?: number[];
       repeatWeekdays?: number[];
       repeatUntil?: string | null;
     },
@@ -496,8 +498,13 @@ export const api = {
       scope?: LessonSeriesScope;
       repeatWeekdays?: number[];
       repeatUntil?: string | null;
+      acknowledgeRisk?: boolean;
+      paymentHandling?: LessonPaymentHandling;
     },
-  ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[] }>(`/api/lessons/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  }),
   updateLessonStatus: (id: number, status: Lesson['status']) =>
     apiFetch<{ lesson: Lesson; links?: TeacherStudent[] }>(`/api/lessons/${id}/status`, {
       method: 'PATCH',
@@ -516,8 +523,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  deleteLesson: (id: number, payload?: { scope?: LessonSeriesScope }) =>
-    apiFetch<{ deletedIds?: number[] }>(`/api/lessons/${id}`, { method: 'DELETE', body: JSON.stringify(payload ?? {}) }),
+  deleteLesson: (
+    id: number,
+    payload?: { scope?: LessonSeriesScope; refundMode?: 'RETURN_TO_BALANCE' | 'KEEP_AS_PAID' },
+  ) =>
+    apiFetch<{ deletedIds?: number[]; deletedCount?: number; links?: TeacherStudent[] }>(`/api/lessons/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify(payload ?? {}),
+    }),
   markLessonCompleted: (lessonId: number) =>
     apiFetch<{ lesson: Lesson; link?: TeacherStudent }>(`/api/lessons/${lessonId}/complete`, {
       method: 'POST',
@@ -603,12 +616,19 @@ export const api = {
 
     return apiFetch<{ students: Student[]; links: TeacherStudent[]; homeworks: Homework[] }>(path);
   },
-  listStudents: (params: { query?: string; filter?: 'all' | 'debt' | 'overdue'; limit?: number; offset?: number }) => {
+  listStudents: (params: {
+    query?: string;
+    filter?: 'all' | 'debt' | 'overdue';
+    limit?: number;
+    offset?: number;
+    studentId?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params.query) query.set('query', params.query);
     if (params.filter) query.set('filter', params.filter);
     if (params.limit) query.set('limit', String(params.limit));
     if (params.offset) query.set('offset', String(params.offset));
+    if (typeof params.studentId === 'number') query.set('studentId', String(params.studentId));
 
     const suffix = query.toString();
     const path = suffix ? `/api/students?${suffix}` : '/api/students';

@@ -6,32 +6,42 @@ export type OpenConfirmDialogOptions = {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  onConfirm: () => void;
-  onCancel?: () => void;
+  onConfirm: () => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
 };
 
 export type OpenRecurringDeleteDialogOptions = {
   title: string;
   message: string;
   applyToSeries?: boolean;
-  onConfirm: (applyToSeries: boolean) => void;
-  onCancel?: () => void;
+  onConfirm: (applyToSeries: boolean) => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
 };
 
 export type OpenPaymentCancelDialogOptions = {
   title: string;
   message: string;
-  onRefund: () => void;
-  onWriteOff: () => void;
-  onCancel?: () => void;
+  helperText?: string;
+  refundText?: string;
+  writeOffText?: string;
+  onRefund: () => void | Promise<void>;
+  onWriteOff: () => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
 };
 
 export type OpenPaymentBalanceDialogOptions = {
   title: string;
   message: string;
-  onWriteOff: () => void;
-  onSkip: () => void;
-  onCancel?: () => void;
+  onWriteOff: () => void | Promise<void>;
+  onSkip: () => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
+};
+
+export type OpenLessonEditPaymentResetDialogOptions = {
+  title: string;
+  message: string;
+  onConfirm: () => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
 };
 
 export type AppDialogsValue = {
@@ -43,6 +53,7 @@ export type AppDialogsValue = {
   openRecurringDeleteDialog: (options: OpenRecurringDeleteDialogOptions) => void;
   openPaymentCancelDialog: (options: OpenPaymentCancelDialogOptions) => void;
   openPaymentBalanceDialog: (options: OpenPaymentBalanceDialogOptions) => void;
+  openLessonEditPaymentResetDialog: (options: OpenLessonEditPaymentResetDialogOptions) => void;
 };
 
 export const useAppDialogs = (): AppDialogsValue => {
@@ -64,13 +75,13 @@ export const useAppDialogs = (): AppDialogsValue => {
         message: options.message,
         confirmText: options.confirmText,
         cancelText: options.cancelText,
-        onConfirm: () => {
+        onConfirm: async () => {
+          await options.onConfirm();
           closeDialog();
-          options.onConfirm();
         },
-        onCancel: () => {
+        onCancel: async () => {
+          await options.onCancel?.();
           closeDialog();
-          options.onCancel?.();
         },
       });
     },
@@ -84,13 +95,13 @@ export const useAppDialogs = (): AppDialogsValue => {
         title: options.title,
         message: options.message,
         applyToSeries: options.applyToSeries ?? false,
-        onConfirm: (applyToSeries) => {
+        onConfirm: async (applyToSeries) => {
+          await options.onConfirm(applyToSeries);
           closeDialog();
-          options.onConfirm(applyToSeries);
         },
-        onCancel: () => {
+        onCancel: async () => {
+          await options.onCancel?.();
           closeDialog();
-          options.onCancel?.();
         },
       });
     },
@@ -103,17 +114,20 @@ export const useAppDialogs = (): AppDialogsValue => {
         type: 'payment-cancel',
         title: options.title,
         message: options.message,
-        onRefund: () => {
+        helperText: options.helperText,
+        refundText: options.refundText,
+        writeOffText: options.writeOffText,
+        onRefund: async () => {
+          await options.onRefund();
           closeDialog();
-          options.onRefund();
         },
-        onWriteOff: () => {
+        onWriteOff: async () => {
+          await options.onWriteOff();
           closeDialog();
-          options.onWriteOff();
         },
-        onCancel: () => {
+        onCancel: async () => {
+          await options.onCancel?.();
           closeDialog();
-          options.onCancel?.();
         },
       });
     },
@@ -126,17 +140,36 @@ export const useAppDialogs = (): AppDialogsValue => {
         type: 'payment-balance',
         title: options.title,
         message: options.message,
-        onWriteOff: () => {
+        onWriteOff: async () => {
+          await options.onWriteOff();
           closeDialog();
-          options.onWriteOff();
         },
-        onSkip: () => {
+        onSkip: async () => {
+          await options.onSkip();
           closeDialog();
-          options.onSkip();
         },
-        onCancel: () => {
+        onCancel: async () => {
+          await options.onCancel?.();
           closeDialog();
-          options.onCancel?.();
+        },
+      });
+    },
+    [closeDialog],
+  );
+
+  const openLessonEditPaymentResetDialog = useCallback(
+    (options: OpenLessonEditPaymentResetDialogOptions) => {
+      setDialogState({
+        type: 'lesson-edit-payment-reset',
+        title: options.title,
+        message: options.message,
+        onConfirm: async () => {
+          await options.onConfirm();
+          closeDialog();
+        },
+        onCancel: async () => {
+          await options.onCancel?.();
+          closeDialog();
         },
       });
     },
@@ -153,11 +186,13 @@ export const useAppDialogs = (): AppDialogsValue => {
       openRecurringDeleteDialog,
       openPaymentCancelDialog,
       openPaymentBalanceDialog,
+      openLessonEditPaymentResetDialog,
     }),
     [
       closeDialog,
       dialogState,
       openConfirmDialog,
+      openLessonEditPaymentResetDialog,
       openPaymentBalanceDialog,
       openPaymentCancelDialog,
       openRecurringDeleteDialog,

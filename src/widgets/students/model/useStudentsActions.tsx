@@ -12,6 +12,7 @@ import { api } from '../../../shared/api/client';
 import { PaymentEvent, Student, TeacherStudent } from '../../../entities/types';
 import { type ToastOptions } from '../../../shared/lib/toast';
 import { isValidEmail, normalizeEmail } from '../../../shared/lib/email';
+import { type StudentModalFocusField } from '../../../features/modals/StudentModal/types';
 
 type StudentDraft = {
   customName: string;
@@ -47,6 +48,7 @@ export type StudentsActionsConfig = {
   showInfoDialog: (title: string, message: string, confirmText?: string) => void;
   openConfirmDialog: (options: OpenConfirmDialogOptions) => void;
   navigateToStudents: () => void;
+  navigateToStudentProfile: (studentId: number) => void;
   triggerStudentsListReload: () => void;
   refreshPayments: (studentId: number) => Promise<void>;
   clearStudentData: (studentId: number) => void;
@@ -58,13 +60,19 @@ export type StudentsActionsConfig = {
 export type StudentsActionsContextValue = {
   studentModalOpen: boolean;
   studentModalVariant: ModalVariant;
+  studentModalFocusField: StudentModalFocusField | null;
   newStudentDraft: StudentDraft;
   studentEmailSuggestions: string[];
   isEditingStudent: boolean;
+  isStudentSubmitting: boolean;
   priceEditState: { id: number | null; value: string };
 
   openCreateStudentModal: (options?: { source?: StudentActionSource; variant?: ModalVariant }) => void;
-  openEditStudentModal: () => void;
+  openEditStudentModal: (options?: {
+    studentId?: number;
+    variant?: ModalVariant;
+    focusField?: StudentModalFocusField;
+  }) => void;
   closeStudentModal: () => void;
   setStudentDraft: (draft: StudentDraft) => void;
   submitStudent: () => void;
@@ -133,6 +141,7 @@ export const useStudentsActionsInternal = ({
   showInfoDialog,
   openConfirmDialog,
   navigateToStudents,
+  navigateToStudentProfile,
   triggerStudentsListReload,
   refreshPayments,
   clearStudentData,
@@ -143,8 +152,10 @@ export const useStudentsActionsInternal = ({
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [studentModalSource, setStudentModalSource] = useState<StudentActionSource>('default');
   const [studentModalVariant, setStudentModalVariant] = useState<ModalVariant>('modal');
+  const [studentModalFocusField, setStudentModalFocusField] = useState<StudentModalFocusField | null>(null);
   const [newStudentDraft, setNewStudentDraft] = useState<StudentDraft>(() => createEmptyDraft());
   const [editingStudentId, setEditingStudentId] = useState<number | null>(null);
+  const [isStudentSubmitting, setIsStudentSubmitting] = useState(false);
   const [priceEditState, setPriceEditState] = useState<{ id: number | null; value: string }>({ id: null, value: '' });
   const studentEmailSuggestions = useMemo(
     () =>
@@ -168,15 +179,21 @@ export const useStudentsActionsInternal = ({
       setEditingStudentId(null);
       setStudentModalSource(options?.source ?? 'default');
       setStudentModalVariant(options?.variant ?? 'modal');
+      setStudentModalFocusField(null);
       setStudentModalOpen(true);
     },
     [resetStudentDraft],
   );
 
-  const openEditStudentModal = useCallback(() => {
-    if (!selectedStudentId) return;
-    const student = students.find((entry) => entry.id === selectedStudentId);
-    const link = links.find((entry) => entry.studentId === selectedStudentId && !entry.isArchived);
+  const openEditStudentModal = useCallback((options?: {
+    studentId?: number;
+    variant?: ModalVariant;
+    focusField?: StudentModalFocusField;
+  }) => {
+    const targetStudentId = options?.studentId ?? selectedStudentId;
+    if (!targetStudentId) return;
+    const student = students.find((entry) => entry.id === targetStudentId);
+    const link = links.find((entry) => entry.studentId === targetStudentId && !entry.isArchived);
     if (!student || !link) return;
     setNewStudentDraft({
       customName: link.customName,
@@ -188,17 +205,21 @@ export const useStudentsActionsInternal = ({
       learningGoal: link.learningGoal ?? '',
       notes: link.notes ?? '',
     });
-    setEditingStudentId(selectedStudentId);
+    setSelectedStudentId(targetStudentId);
+    setEditingStudentId(targetStudentId);
     setStudentModalSource('default');
-    setStudentModalVariant('modal');
+    setStudentModalVariant(options?.variant ?? 'modal');
+    setStudentModalFocusField(options?.focusField ?? null);
     setStudentModalOpen(true);
-  }, [links, selectedStudentId, students]);
+  }, [links, selectedStudentId, setSelectedStudentId, students]);
 
   const closeStudentModal = useCallback(() => {
     setStudentModalOpen(false);
     setEditingStudentId(null);
     setStudentModalSource('default');
     setStudentModalVariant('modal');
+    setStudentModalFocusField(null);
+    setIsStudentSubmitting(false);
   }, []);
 
   const setStudentDraft = useCallback((draft: StudentDraft) => {
@@ -206,6 +227,7 @@ export const useStudentsActionsInternal = ({
   }, []);
 
   const handleAddStudent = useCallback(async () => {
+    if (isStudentSubmitting) return;
     if (!newStudentDraft.customName.trim()) {
       showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
       return;
@@ -227,6 +249,7 @@ export const useStudentsActionsInternal = ({
 
     const isOnboardingSource = studentModalSource.startsWith('onboarding');
     onStudentCreateStarted?.(studentModalSource);
+    setIsStudentSubmitting(true);
     try {
       const data = await api.addStudent({
         customName: newStudentDraft.customName.trim(),
@@ -257,7 +280,7 @@ export const useStudentsActionsInternal = ({
       resetStudentDraft();
       setSelectedStudentId(student.id);
       if (!isOnboardingSource) {
-        navigateToStudents();
+        navigateToStudentProfile(student.id);
       }
       closeStudentModal();
       triggerStudentsListReload();
@@ -269,10 +292,12 @@ export const useStudentsActionsInternal = ({
       // eslint-disable-next-line no-console
       console.error('Failed to add student', error);
       onStudentCreateError?.(error, studentModalSource);
+    } finally {
+      setIsStudentSubmitting(false);
     }
   }, [
     closeStudentModal,
-    navigateToStudents,
+    isStudentSubmitting,
     newStudentDraft.customName,
     newStudentDraft.email,
     newStudentDraft.learningGoal,
@@ -281,6 +306,7 @@ export const useStudentsActionsInternal = ({
     newStudentDraft.pricePerLesson,
     newStudentDraft.studentLevel,
     newStudentDraft.username,
+    navigateToStudentProfile,
     onStudentCreateError,
     onStudentCreateStarted,
     onStudentCreated,
@@ -295,6 +321,7 @@ export const useStudentsActionsInternal = ({
   ]);
 
   const handleUpdateStudent = useCallback(async () => {
+    if (isStudentSubmitting) return;
     if (!editingStudentId) return;
     if (!newStudentDraft.customName.trim()) {
       showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
@@ -314,6 +341,7 @@ export const useStudentsActionsInternal = ({
       showInfoDialog('Некорректный email', 'Проверьте формат email ученика.');
       return;
     }
+    setIsStudentSubmitting(true);
     try {
       const data = await api.updateStudent(editingStudentId, {
         customName: newStudentDraft.customName.trim(),
@@ -338,10 +366,13 @@ export const useStudentsActionsInternal = ({
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to update student', error);
+    } finally {
+      setIsStudentSubmitting(false);
     }
   }, [
     closeStudentModal,
     editingStudentId,
+    isStudentSubmitting,
     newStudentDraft.customName,
     newStudentDraft.email,
     newStudentDraft.learningGoal,
@@ -503,9 +534,11 @@ export const useStudentsActionsInternal = ({
     () => ({
       studentModalOpen,
       studentModalVariant,
+      studentModalFocusField,
       newStudentDraft,
       studentEmailSuggestions,
       isEditingStudent: Boolean(editingStudentId),
+      isStudentSubmitting,
       priceEditState,
       openCreateStudentModal,
       openEditStudentModal,
@@ -526,6 +559,7 @@ export const useStudentsActionsInternal = ({
       cancelPriceEdit,
       closeStudentModal,
       editingStudentId,
+      isStudentSubmitting,
       newStudentDraft,
       openCreateStudentModal,
       openEditStudentModal,
@@ -535,6 +569,7 @@ export const useStudentsActionsInternal = ({
       setPriceValue,
       setStudentDraft,
       studentEmailSuggestions,
+      studentModalFocusField,
       studentModalOpen,
       studentModalVariant,
       submitStudent,

@@ -5,10 +5,13 @@ import {
   faClock,
   faEllipsis,
   faFilter,
+  faPlus,
   faUserCheck,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { StudentListItem } from '../../../../entities/types';
+import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
+import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import {
   buildStudentCardPresentation,
   getStatusUiMeta,
@@ -37,6 +40,9 @@ interface StudentsReferenceListViewProps {
   listRef: RefObject<HTMLDivElement>;
   loadMoreRef: RefObject<HTMLDivElement>;
   onOpenStudent: (studentId: number) => void;
+  onAddStudent: () => void;
+  onEditStudent: (studentId: number) => void;
+  onDeleteStudent: (studentId: number) => void;
   timeZone: string;
 }
 
@@ -46,8 +52,6 @@ const statusTabs: Array<{ id: 'all' | StudentLifecycleStatus; label: string }> =
   { id: 'PAUSED', label: 'На паузе' },
   { id: 'COMPLETED', label: 'Завершили' },
 ];
-
-const levelOptions = ['Все уровни', 'Beginner', 'Elementary', 'Intermediate', 'Upper-Intermediate', 'Advanced'];
 
 const sortOptions: Array<{ value: 'name' | 'created' | 'score' | 'activity'; label: string }> = [
   { value: 'name', label: 'Сортировка: По имени' },
@@ -65,11 +69,27 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   listRef,
   loadMoreRef,
   onOpenStudent,
+  onAddStudent,
+  onEditStudent,
+  onDeleteStudent,
   timeZone,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | StudentLifecycleStatus>('all');
   const [levelFilter, setLevelFilter] = useState('Все уровни');
   const [sortBy, setSortBy] = useState<'name' | 'created' | 'score' | 'activity'>('name');
+  const [menuStudentId, setMenuStudentId] = useState<number | null>(null);
+
+  const levelOptions = useMemo(() => {
+    const uniqueLevels = Array.from(
+      new Set(
+        students
+          .map((entry) => entry.link.studentLevel?.trim())
+          .filter((level): level is string => Boolean(level)),
+      ),
+    ).sort((a, b) => a.localeCompare(b, 'ru'));
+
+    return ['Все уровни', ...uniqueLevels];
+  }, [students]);
 
   const preparedStudents = useMemo(() => {
     const withPresentation = students.map((entry) => ({
@@ -210,6 +230,8 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
           <section className={styles.studentGrid}>
             {preparedStudents.map(({ entry, presentation }) => {
               const statusMeta = getStatusUiMeta(presentation.status);
+              const hasDebt =
+                (typeof entry.debtRub === 'number' && entry.debtRub > 0) || (entry.debtLessonCount ?? 0) > 0;
 
               return (
                 <article
@@ -237,14 +259,63 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                       >
                         {getStudentInitials(entry)}
                       </div>
-                      <div>
-                        <h3 className={styles.studentName}>{getStudentDisplayName(entry)}</h3>
-                        <p className={styles.studentLevel}>{presentation.levelLabel}</p>
+                      <div className={styles.studentIdentityText}>
+                        <div className={styles.studentNameRow}>
+                          <h3 className={styles.studentName}>{getStudentDisplayName(entry)}</h3>
+                          {hasDebt ? (
+                            <Tooltip content="Есть неоплаченные занятия" side="bottom" align="start">
+                              <span className={styles.studentDebtBadge}>Долг</span>
+                            </Tooltip>
+                          ) : null}
+                        </div>
+                        {presentation.levelLabel ? (
+                          <p className={styles.studentLevel}>{presentation.levelLabel}</p>
+                        ) : null}
                       </div>
                     </div>
-                    <button type="button" className={styles.cardMenuButton} aria-label="Действия по ученику">
-                      <FontAwesomeIcon icon={faEllipsis} />
-                    </button>
+                    <AdaptivePopover
+                      isOpen={menuStudentId === entry.student.id}
+                      onClose={() => setMenuStudentId((prev) => (prev === entry.student.id ? null : prev))}
+                      side="bottom"
+                      align="end"
+                      offset={8}
+                      className={styles.cardMenuPopover}
+                      trigger={(
+                        <button
+                          type="button"
+                          className={styles.cardMenuButton}
+                          aria-label="Действия по ученику"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setMenuStudentId((prev) => (prev === entry.student.id ? null : entry.student.id));
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faEllipsis} />
+                        </button>
+                      )}
+                    >
+                      <div className={styles.cardMenuList} role="menu" onClick={(event) => event.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuStudentId(null);
+                            onEditStudent(entry.student.id);
+                          }}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.cardMenuDanger}
+                          onClick={() => {
+                            setMenuStudentId(null);
+                            onDeleteStudent(entry.student.id);
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </AdaptivePopover>
                   </div>
 
                   <div className={styles.studentMetricsGrid}>
@@ -320,6 +391,15 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
           {hasMore ? <div ref={loadMoreRef} className={styles.loadMoreAnchor} aria-hidden /> : null}
         </div>
       </div>
+
+      <button
+        type="button"
+        className={styles.mobileAddButton}
+        onClick={onAddStudent}
+        aria-label="Добавить ученика"
+      >
+        <FontAwesomeIcon icon={faPlus} />
+      </button>
     </div>
   );
 };

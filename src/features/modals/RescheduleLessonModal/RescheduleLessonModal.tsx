@@ -24,6 +24,7 @@ interface RescheduleLessonModalProps {
   onDraftChange: (draft: RescheduleDraft) => void;
   onClose: () => void;
   onSubmit: () => void;
+  isSubmitting?: boolean;
 }
 
 export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
@@ -33,6 +34,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   onDraftChange,
   onClose,
   onSubmit,
+  isSubmitting = false,
 }) => {
   const timeZone = useTimeZone();
   const startTimeRef = useRef<HTMLInputElement>(null);
@@ -116,6 +118,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   };
 
   const handleSubmit = () => {
+    if (isSubmitting) return;
     if (!draft.date || !draft.time) {
       startTimeRef.current?.focus();
       return;
@@ -127,13 +130,14 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   const durationMinutes = diffTimeMinutes(draft.time, draft.endTime) ?? lesson.durationMinutes;
 
   return (
-    <Modal open={open} title="Перенести урок" onClose={onClose}>
+    <Modal open={open} title="Перенести урок" onClose={isSubmitting ? () => undefined : onClose}>
       <div className={styles.subtitle}>{subtitle}</div>
       <div className={styles.formGrid}>
         <DatePickerField
           label="Дата"
           value={draft.date}
           onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
+          disabled={isSubmitting}
         />
         <div className={styles.field}>
           <span className={styles.label}>Начало</span>
@@ -146,6 +150,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
             sx={textFieldSx}
             inputProps={{ step: 60 }}
             inputRef={startTimeRef}
+            disabled={isSubmitting}
           />
         </div>
         <div className={styles.field}>
@@ -161,6 +166,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
               step: 60,
               min: parseTimeToMinutes(draft.time) !== null ? normalizeTimeInput(draft.time) : '00:00',
             }}
+            disabled={isSubmitting}
           />
         </div>
       </div>
@@ -170,11 +176,14 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
         <span className={styles.duration}> · {durationMinutes} мин</span>
       </div>
       <div className={styles.actions}>
-        <button type="button" className={controls.secondaryButton} onClick={onClose}>
+        <button type="button" className={controls.secondaryButton} onClick={onClose} disabled={isSubmitting}>
           Отмена
         </button>
-        <button type="button" className={controls.primaryButton} onClick={handleSubmit}>
-          Перенести
+        <button type="button" className={controls.primaryButton} onClick={handleSubmit} disabled={isSubmitting}>
+          <span className={styles.submitButtonContent}>
+            {isSubmitting ? <span className={styles.submitSpinner} aria-hidden /> : null}
+            <span>{isSubmitting ? 'Переносим...' : 'Перенести'}</span>
+          </span>
         </button>
       </div>
     </Modal>

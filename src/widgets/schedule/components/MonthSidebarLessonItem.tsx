@@ -7,10 +7,10 @@ import { api } from '../../../shared/api/client';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../../entities/lesson/lib/lessonDetails';
+import { resolveLessonCancelActionCopy } from '../../../entities/lesson/lib/lessonStatusPresentation';
 import {
   resolveLessonDeleteDisabledReason,
   resolveLessonEditDisabledReason,
-  resolveLessonHasPaidParticipant,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { useLessonActions } from '../../../features/lessons/model/useLessonActions';
@@ -81,12 +81,7 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
   const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const isCanceled = lesson.status === 'CANCELED';
   const isRecurring = isLessonInSeries(lesson);
-  const isCorrectionCancel = lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson);
-
-  const resolveCancelDialogCopy = () => ({
-    title: isCorrectionCancel ? 'Исправить статус урока' : 'Отменить урок',
-    confirmText: isCorrectionCancel ? 'Изменить статус' : 'Отменить урок',
-  });
+  const cancelCopy = resolveLessonCancelActionCopy(lesson);
 
   const handleCardOpen = () => {
     startEditLesson(lesson);
@@ -257,7 +252,7 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
                       setIsActionsOpen(false);
                     }}
                   >
-                    {isCorrectionCancel ? 'Исправить статус' : 'Отменить'}
+                    {cancelCopy.actionLabel}
                   </button>
                 </>
               )}
@@ -319,8 +314,8 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
 
       <SeriesScopeDialog
         open={Boolean(scopeDialog)}
-        title={scopeDialog?.type === 'cancel' ? resolveCancelDialogCopy().title : 'Восстановить урок'}
-        confirmText={scopeDialog?.type === 'cancel' ? resolveCancelDialogCopy().confirmText : 'Восстановить'}
+        title={scopeDialog?.type === 'cancel' ? cancelCopy.title.replace('?', '') : 'Восстановить урок'}
+        confirmText={scopeDialog?.type === 'cancel' ? cancelCopy.confirmText : 'Восстановить'}
         previews={scopeDialog?.previews}
         onClose={() => setScopeDialog(null)}
         onConfirm={handleScopeConfirm}

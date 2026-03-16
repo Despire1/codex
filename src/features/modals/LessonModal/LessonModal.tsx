@@ -19,7 +19,6 @@ import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { StudentSelect } from '../../../shared/ui/StudentSelect';
 import { DEFAULT_LESSON_COLOR, LESSON_COLOR_OPTIONS } from '../../../shared/lib/lessonColors';
 import {
-  resolveLessonAllowsLimitedMetadataEdit,
   resolveLessonDeleteDisabledReason,
   resolveLessonLimitedEditNotice,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
@@ -58,6 +57,7 @@ interface LessonModalProps {
   defaultDuration: number;
   linkedStudents: LinkedStudent[];
   draft: LessonDraft;
+  isSubmitting?: boolean;
   recurrenceLocked?: boolean;
   onDraftChange: (draft: LessonDraft) => void;
   onClose: () => void;
@@ -84,6 +84,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   defaultDuration,
   linkedStudents,
   draft,
+  isSubmitting = false,
   recurrenceLocked = false,
   onDraftChange,
   onClose,
@@ -95,10 +96,10 @@ export const LessonModal: FC<LessonModalProps> = ({
   const timeZone = useTimeZone();
   const isSheet = variant === 'sheet';
   const isEditing = Boolean(editingLessonId);
-  const hasLimitedMetadataEdit = Boolean(editingLesson && resolveLessonAllowsLimitedMetadataEdit(editingLesson));
   const limitedEditNotice = editingLesson ? resolveLessonLimitedEditNotice(editingLesson) : null;
   const deleteDisabledReason = editingLesson ? resolveLessonDeleteDisabledReason(editingLesson) : null;
-  const recurrenceControlsDisabled = hasLimitedMetadataEdit || (recurrenceLocked && draft.isRecurring);
+  const recurrenceToggleDisabled = recurrenceLocked;
+  const recurrenceControlsDisabled = false;
   const dateButtonRef = useRef<HTMLButtonElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
   const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
@@ -279,6 +280,7 @@ export const LessonModal: FC<LessonModalProps> = ({
           className={`${modalStyles.closeButton} ${sheetStyles.closeButtonTop}`}
           onClick={onClose}
           aria-label="Закрыть модалку"
+          disabled={isSubmitting}
         >
           ×
         </button>
@@ -291,7 +293,6 @@ export const LessonModal: FC<LessonModalProps> = ({
                 mode="multiple"
                 options={studentSelectOptions}
                 value={draft.studentIds}
-                disabled={hasLimitedMetadataEdit}
                 onChange={(nextStudentIds) =>
                   onDraftChange({
                     ...draft,
@@ -310,14 +311,12 @@ export const LessonModal: FC<LessonModalProps> = ({
               onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
               className={modalStyles.field}
               buttonRef={dateButtonRef}
-              disabled={hasLimitedMetadataEdit}
             />
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Начало</span>
               <TextField
                 type="time"
                 value={draft.time}
-                disabled={hasLimitedMetadataEdit}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
                 onBlur={handleStartTimeBlur}
                 fullWidth
@@ -332,7 +331,6 @@ export const LessonModal: FC<LessonModalProps> = ({
               <TextField
                 type="time"
                 value={draft.endTime}
-                disabled={hasLimitedMetadataEdit}
                 onChange={(e) => handleEndTimeChange(e.target.value)}
                 onBlur={handleEndTimeBlur}
                 fullWidth
@@ -394,12 +392,12 @@ export const LessonModal: FC<LessonModalProps> = ({
               )}
             </div>
           </div>
-          <div className={`${modalStyles.switchRow} ${hasLimitedMetadataEdit ? sheetStyles.lockedControlRow : ''}`}>
+          <div className={modalStyles.switchRow}>
             <label className={controls.switch}>
               <input
                 type="checkbox"
                 checked={draft.isRecurring}
-                disabled={recurrenceControlsDisabled}
+                disabled={recurrenceToggleDisabled}
                 onChange={(e) => handleRecurringToggle(e.target.checked)}
               />
               <span className={controls.slider} />
@@ -498,15 +496,18 @@ export const LessonModal: FC<LessonModalProps> = ({
         </div>
         <div className={`${modalStyles.modalActions} ${isSheet ? sheetStyles.sheetActions : ''}`}>
           {isEditing && onDelete && !deleteDisabledReason && (
-            <button className={controls.dangerButton} onClick={onDelete}>
+            <button className={controls.dangerButton} onClick={onDelete} disabled={isSubmitting}>
               Удалить урок
             </button>
           )}
-          <button className={controls.secondaryButton} onClick={onClose}>
+          <button className={controls.secondaryButton} onClick={onClose} disabled={isSubmitting}>
             Отмена
           </button>
-          <button className={controls.primaryButton} onClick={onSubmit} disabled={isSubmitDisabled}>
-            Сохранить урок
+          <button className={controls.primaryButton} onClick={onSubmit} disabled={isSubmitDisabled || isSubmitting}>
+            <span className={sheetStyles.submitButtonContent}>
+              {isSubmitting ? <span className={sheetStyles.submitSpinner} aria-hidden /> : null}
+              <span>{isSubmitting ? 'Сохраняем...' : 'Сохранить урок'}</span>
+            </span>
           </button>
         </div>
       </div>

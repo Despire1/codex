@@ -11,6 +11,7 @@ import {
   SaveOutlinedIcon,
 } from '../../icons/MaterialIcons';
 import { Avatar } from '../../shared/ui/Avatar/Avatar';
+import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -24,6 +25,7 @@ interface TopbarProps {
   showTemplateSaveDraft?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
+  backButtonTooltip?: string;
   onSaveDraft?: () => void;
   onCreateTemplate?: () => void;
   templateCreateSubmitting?: boolean;
@@ -49,6 +51,7 @@ export const Topbar: FC<TopbarProps> = ({
   showTemplateSaveDraft = true,
   showBackButton = false,
   onBack,
+  backButtonTooltip = 'Назад',
   onSaveDraft,
   onCreateTemplate,
   templateCreateSubmitting = false,
@@ -69,9 +72,11 @@ export const Topbar: FC<TopbarProps> = ({
     <header className={styles.topbar}>
       <div className={styles.left}>
         {showBackButton ? (
-          <button type="button" className={styles.backButton} aria-label="Назад" onClick={onBack}>
-            <ChevronLeftIcon width={18} height={18} />
-          </button>
+          <Tooltip content={backButtonTooltip} side="bottom" align="start">
+            <button type="button" className={styles.backButton} aria-label={backButtonTooltip} onClick={onBack}>
+              <ChevronLeftIcon width={18} height={18} />
+            </button>
+          </Tooltip>
         ) : null}
         <h1 className={styles.title}>{title}</h1>
         <span className={styles.separator} aria-hidden>

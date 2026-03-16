@@ -89,6 +89,11 @@
   background: var(--color-gray-200);
 }
 
+.closeButton:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
 .closeButtonIcon {
   width: 18px;
   height: 18px;
@@ -111,6 +116,21 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.fieldHighlighted {
+  transform-origin: center;
+  animation: student-modal-field-breathe 1.9s ease;
+}
+
+.fieldHighlighted .label,
+.fieldHighlighted .secondaryLabel {
+  animation: student-modal-label-highlight 1.9s ease;
+}
+
+.fieldHighlighted .input,
+.fieldHighlighted .textarea {
+  animation: student-modal-input-highlight 1.9s ease;
 }
 
 .fieldFull {
@@ -169,6 +189,12 @@
   border-color: var(--primary);
   box-shadow: 0 0 0 4px rgba(91, 141, 239, 0.2);
   outline: none;
+}
+
+.input:disabled,
+.textarea:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .inputWithIcon {
@@ -266,6 +292,11 @@
   background: var(--color-gray-200);
 }
 
+.cancelButton:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
 .submitButton {
   display: inline-flex;
   align-items: center;
@@ -280,9 +311,32 @@
   background: #1f2937;
 }
 
+.submitButton:disabled {
+  cursor: default;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
 .submitButtonIcon {
   width: 14px;
   height: 14px;
+}
+
+.submitButtonContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.submitSpinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top-color: #ffffff;
+  animation: student-modal-spin 0.9s linear infinite;
 }
 
 .sheetModalContent {
@@ -293,6 +347,56 @@
 
 .sheetModalContent .header {
   border-radius: 24px 24px 0 0;
+}
+
+@keyframes student-modal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes student-modal-field-breathe {
+  0% {
+    transform: scale(0.995);
+  }
+
+  18% {
+    transform: scale(1.012);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes student-modal-label-highlight {
+  0%,
+  100% {
+    color: inherit;
+  }
+
+  16%,
+  68% {
+    color: var(--primary-strong);
+  }
+}
+
+@keyframes student-modal-input-highlight {
+  0%,
+  100% {
+    border-color: var(--color-gray-200);
+    background: var(--color-gray-50);
+    box-shadow: none;
+  }
+
+  16%,
+  68% {
+    border-color: rgba(91, 141, 239, 0.92);
+    background: rgba(239, 246, 255, 0.95);
+    box-shadow:
+      0 0 0 6px rgba(91, 141, 239, 0.14),
+      0 18px 34px rgba(91, 141, 239, 0.14);
+  }
 }
 
 @media (max-width: 720px) {

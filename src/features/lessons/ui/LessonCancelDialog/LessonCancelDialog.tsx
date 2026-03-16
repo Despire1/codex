@@ -9,6 +9,7 @@ import { useFocusTrap } from '../../../../shared/lib/useFocusTrap';
 import { Modal } from '../../../../shared/ui/Modal/Modal';
 import modalStyles from '../../../../shared/ui/Modal/Modal.module.css';
 import controls from '../../../../shared/styles/controls.module.css';
+import { resolveLessonCancelActionCopy } from '../../../../entities/lesson/lib/lessonStatusPresentation';
 import type { LessonCancelRefundMode } from '../../model/types';
 import styles from './LessonCancelDialog.module.css';
 
@@ -70,9 +71,7 @@ export const LessonCancelDialog = ({
 
   const isConfirmDisabled =
     hasPaidParticipants && (!refundMode || (refundMode === 'RETURN_TO_BALANCE' && !refundableToBalance));
-  const title = isCorrectionFlow ? 'Исправить статус урока?' : 'Отменить урок?';
-  const confirmLabel = isCorrectionFlow ? 'Изменить статус' : 'Отменить урок';
-  const cancelLabel = isCorrectionFlow ? 'Назад' : 'Не отменять';
+  const cancelCopy = resolveLessonCancelActionCopy(lesson);
 
   const correctionMessage = isCompleted
     ? hasPaidParticipants
@@ -83,7 +82,7 @@ export const LessonCancelDialog = ({
       : null;
 
   return (
-    <Modal open={open} title={title} onClose={onClose}>
+    <Modal open={open} title={cancelCopy.title} onClose={onClose}>
       <div ref={containerRef}>
         <p className={modalStyles.message}>
           {dateLabel}, {timeLabel} • {lessonLabel}
@@ -130,7 +129,7 @@ export const LessonCancelDialog = ({
         )}
         <div className={styles.actions}>
           <button type="button" className={controls.secondaryButton} onClick={onClose}>
-            {cancelLabel}
+            {cancelCopy.cancelText}
           </button>
           <button
             type="button"
@@ -138,7 +137,7 @@ export const LessonCancelDialog = ({
             disabled={isConfirmDisabled}
             onClick={handleConfirm}
           >
-            {confirmLabel}
+            {cancelCopy.confirmText}
           </button>
         </div>
       </div>

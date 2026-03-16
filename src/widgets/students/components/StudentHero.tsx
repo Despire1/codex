@@ -87,7 +87,7 @@ export const StudentHero: FC<StudentHeroProps> = ({
   const telegramUsername = selectedStudent.username?.trim();
   const showActivationBadge = Boolean(telegramUsername) && selectedStudent.isActivated === false;
   const activationHint =
-    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда появится в системе и будет получать уведомления.';
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда он появится в системе и будет получать уведомления.';
   const reminderDisabledReason = !selectedStudent.isActivated
     ? 'Ученик не активировал бота — отправка напоминаний невозможна'
     : null;

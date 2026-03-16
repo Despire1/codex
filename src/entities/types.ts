@@ -371,6 +371,8 @@ export interface ScheduleNote {
 // `SERIES` is kept only for legacy client compatibility and is normalized to `FOLLOWING`.
 export type LessonSeriesScope = 'SINGLE' | 'FOLLOWING' | 'SERIES';
 export type LessonMutationAction = 'EDIT' | 'RESCHEDULE' | 'CANCEL' | 'RESTORE' | 'DELETE';
+export type LessonMutationResolution = 'warning' | 'requiresPaymentReset';
+export type LessonPaymentHandling = 'KEEP' | 'RETURN_TO_BALANCE';
 
 export interface LessonMutationPreview {
   action: LessonMutationAction;
@@ -383,6 +385,10 @@ export interface LessonMutationPreview {
   historyUntouched: boolean;
   isBlocked?: boolean;
   blockReason?: string | null;
+  resolution?: LessonMutationResolution | null;
+  resolutionReason?: string | null;
+  skippedProtectedCount?: number;
+  effectiveDateFrom?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
 }

@@ -2,11 +2,28 @@ import { addMinutes, format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useMemo } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
+import {
+  CancelCircleOutlinedIcon,
+  CloseIcon,
+  DeleteOutlineIcon,
+  EditOutlinedIcon,
+  PeopleIcon,
+  PersonOutlineIcon,
+  ReplayOutlinedIcon,
+} from '../../../../icons/MaterialIcons';
+import { getLessonColorTheme } from '../../../../shared/lib/lessonColors';
 import { toZonedDate } from '../../../../shared/lib/timezoneDates';
-import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../../entities/lesson/lib/lessonDetails';
+import { buildParticipants, getLessonLabel } from '../../../../entities/lesson/lib/lessonDetails';
+import {
+  resolveLessonCancelActionCopy,
+  resolveLessonRecurrenceLabel,
+  resolveLessonPaymentStatusLabel,
+  resolveLessonPaymentTone,
+  resolveLessonStatusLabel,
+  resolveLessonStatusTone,
+} from '../../../../entities/lesson/lib/lessonStatusPresentation';
 import {
   resolveLessonEditDisabledReason,
-  resolveLessonMutationDisabledReason,
 } from '../../../../entities/lesson/lib/lessonMutationGuards';
 import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './LessonPopover.module.css';
@@ -15,94 +32,114 @@ interface LessonPopoverProps {
   lesson: Lesson;
   linkedStudentsById: Map<number, LinkedStudent>;
   timeZone: string;
-  onReschedule: () => void;
   onEditFull: () => void;
+  onDelete: () => void;
   onCancel: () => void;
   onRestore: () => void;
+  onClose: () => void;
 }
 
 export const LessonPopover = ({
   lesson,
   linkedStudentsById,
   timeZone,
-  onReschedule,
   onEditFull,
+  onDelete,
   onCancel,
   onRestore,
+  onClose,
 }: LessonPopoverProps) => {
   const participants = useMemo(() => buildParticipants(lesson, linkedStudentsById), [lesson, linkedStudentsById]);
   const lessonLabel = useMemo(() => getLessonLabel(participants, linkedStudentsById), [participants, linkedStudentsById]);
-  const isPaid = resolveLessonPaid(lesson, participants);
   const isCanceled = lesson.status === 'CANCELED';
-  const isCorrectionCancel = lesson.status === 'COMPLETED' || isPaid;
-  const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
+  const cancelCopy = resolveLessonCancelActionCopy(lesson);
   const editDisabledReason = resolveLessonEditDisabledReason(lesson);
   const startDate = toZonedDate(lesson.startAt, timeZone);
   const endDate = addMinutes(startDate, lesson.durationMinutes);
-  const dateLabel = format(startDate, 'd MMMM', { locale: ru });
+  const dateLabel = format(startDate, 'EEEE, d MMMM', { locale: ru });
   const timeLabel = `${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`;
+  const statusLabel = resolveLessonStatusLabel(lesson);
+  const statusTone = resolveLessonStatusTone(lesson);
+  const paymentLabel = resolveLessonPaymentStatusLabel(lesson, participants);
+  const paymentTone = resolveLessonPaymentTone(lesson, participants);
+  const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
+  const title = `Занятие с ${lessonLabel}`;
+  const lessonColorTheme = getLessonColorTheme(lesson.color);
+  const studentLabel = participants.length > 1 ? `Ученики: ${lessonLabel}` : lessonLabel;
+  const headerDateLabel = dateLabel ? `${dateLabel[0].toUpperCase()}${dateLabel.slice(1)}` : dateLabel;
+  const ParticipantIcon = participants.length > 1 ? PeopleIcon : PersonOutlineIcon;
 
   return (
     <div className={styles.root}>
-      <div className={styles.summary}>
-        <div className={styles.title}>{lessonLabel}</div>
-        <div className={styles.metaRow}>
-          <span>{dateLabel}</span>
-          <span className={styles.dot}>•</span>
-          <span>{timeLabel}</span>
-        </div>
-        <div className={styles.metaRow}>
-          {isCanceled && <span className={styles.status}>Отменён</span>}
-          {isPaid && <span className={styles.paid}>Оплачен</span>}
+      <div className={styles.toolbar}>
+        <div
+          className={styles.colorSwatch}
+          style={{
+            background: lessonColorTheme.hoverBackground,
+            boxShadow: `0 10px 22px ${lessonColorTheme.shadow}`,
+          }}
+        />
+        <div className={styles.toolbarActions}>
+          <Tooltip content={editDisabledReason ?? 'Редактировать'}>
+            <button
+              type="button"
+              className={styles.iconButton}
+              disabled={Boolean(editDisabledReason)}
+              onClick={onEditFull}
+            >
+              <EditOutlinedIcon className={styles.icon} />
+            </button>
+          </Tooltip>
+          <Tooltip content={isCanceled ? 'Восстановить' : cancelCopy.actionLabel}>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${isCanceled ? styles.iconButtonNeutral : styles.iconButtonDanger}`}
+              onClick={isCanceled ? onRestore : onCancel}
+            >
+              {isCanceled ? (
+                <ReplayOutlinedIcon className={styles.icon} />
+              ) : (
+                <CancelCircleOutlinedIcon className={styles.icon} />
+              )}
+            </button>
+          </Tooltip>
+          <Tooltip content="Удалить">
+            <button type="button" className={styles.iconButton} onClick={onDelete}>
+              <DeleteOutlineIcon className={styles.icon} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Закрыть">
+            <button type="button" className={`${styles.iconButton} ${styles.closeButton}`} onClick={onClose}>
+              <CloseIcon className={styles.icon} />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
-      <div className={styles.actions}>
-        {!isCanceled && (
-          <>
-            <Tooltip content={rescheduleDisabledReason}>
-              <button
-                type="button"
-                className={styles.actionButton}
-                disabled={Boolean(rescheduleDisabledReason)}
-                onClick={onReschedule}
-              >
-                Перенести
-              </button>
-            </Tooltip>
-            <Tooltip content={editDisabledReason}>
-              <button
-                type="button"
-                className={styles.actionButton}
-                disabled={Boolean(editDisabledReason)}
-                onClick={onEditFull}
-              >
-                Редактировать
-              </button>
-            </Tooltip>
-            <button type="button" className={styles.actionDanger} onClick={onCancel}>
-              {isCorrectionCancel ? 'Исправить статус' : 'Отменить'}
-            </button>
-          </>
-        )}
+      <div className={styles.content}>
+        <div className={styles.summary}>
+          <div className={styles.title}>{title}</div>
+          <div className={styles.primaryMeta}>
+            {headerDateLabel} <span className={styles.primaryMetaDivider}>•</span> {timeLabel}
+          </div>
+          {recurrenceLabel && <div className={styles.secondaryMeta}>{recurrenceLabel}</div>}
+        </div>
 
-        {isCanceled && (
-          <>
-            <button type="button" className={styles.actionButton} onClick={onRestore}>
-              Восстановить
-            </button>
-            <Tooltip content={editDisabledReason}>
-              <button
-                type="button"
-                className={styles.actionButton}
-                disabled={Boolean(editDisabledReason)}
-                onClick={onEditFull}
-              >
-                Редактировать
-              </button>
-            </Tooltip>
-          </>
-        )}
+        <div className={styles.statusGrid}>
+          <div className={styles.statusCard}>
+            <div className={styles.statusLabel}>Статус урока</div>
+            <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>{statusLabel}</span>
+          </div>
+          <div className={styles.statusCard}>
+            <div className={styles.statusLabel}>Оплата</div>
+            <span className={`${styles.statusBadge} ${styles[`statusBadge_${paymentTone}`]}`}>{paymentLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.footerRow}>
+        <ParticipantIcon className={styles.footerIcon} />
+        <span className={styles.footerText}>{studentLabel}</span>
       </div>
     </div>
   );

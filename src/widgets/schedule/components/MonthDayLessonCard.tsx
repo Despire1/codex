@@ -6,11 +6,11 @@ import { MeetingLinkIcon, MoreHorizIcon, RotateIcon } from '../../../icons/Mater
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
 import { buildParticipants, getLessonLabel, isLessonInSeries, resolveLessonPaid } from '../../../entities/lesson/lib/lessonDetails';
+import { resolveLessonCancelActionCopy } from '../../../entities/lesson/lib/lessonStatusPresentation';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import {
   resolveLessonDeleteDisabledReason,
   resolveLessonEditDisabledReason,
-  resolveLessonHasPaidParticipant,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
 import styles from './MonthDayLessonCard.module.css';
@@ -61,8 +61,8 @@ export const MonthDayLessonCard = ({
   const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
   const editDisabledReason = resolveLessonEditDisabledReason(lesson);
   const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
-  const isCorrectionCancel = lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson);
   const paymentLabel = isPaid ? 'Оплачено' : 'Не оплачено';
+  const cancelCopy = resolveLessonCancelActionCopy(lesson);
 
   return (
     <div className={styles.cardWrap} style={style}>
@@ -159,7 +159,7 @@ export const MonthDayLessonCard = ({
                           onCloseActions();
                         }}
                       >
-                        {isCorrectionCancel ? 'Исправить статус' : 'Отменить'}
+                        {cancelCopy.actionLabel}
                       </button>
                     </>
                   )}

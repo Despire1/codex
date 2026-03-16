@@ -14,9 +14,8 @@ import { ru } from 'date-fns/locale';
 import { api } from '../../../shared/api/client';
 import {
   isVisibleLesson,
-  resolveLessonAllowsLimitedMetadataEdit,
-  resolveLessonDeleteDisabledReason,
   resolveLessonEditDisabledReason,
+  resolveLessonHasPaidParticipant,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
@@ -30,7 +29,7 @@ import {
   toUtcDateFromTimeZone,
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
-import { Lesson, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
+import { Lesson, LessonPaymentHandling, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import type {
   LessonCancelRefundMode,
   LessonModalFocus,
@@ -81,15 +80,7 @@ type SeriesScopeDialogState = {
   request:
     | {
         kind: 'update';
-        payload: {
-          studentIds?: number[];
-          startAt: string;
-          durationMinutes: number;
-          color?: Lesson['color'];
-          meetingLink?: string | null;
-          repeatWeekdays?: number[];
-          repeatUntil?: string | null;
-        };
+        payload: LessonUpdatePayload;
       }
     | {
         kind: 'delete';
@@ -101,6 +92,19 @@ type LessonModalContext = {
   variant: ModalVariant;
   skipNavigation: boolean;
   focus: LessonModalFocus;
+};
+
+type LessonUpdatePayload = {
+  studentIds?: number[];
+  startAt: string;
+  durationMinutes: number;
+  color?: Lesson['color'];
+  meetingLink?: string | null;
+  scope?: LessonSeriesScope;
+  repeatWeekdays?: number[];
+  repeatUntil?: string | null;
+  acknowledgeRisk?: boolean;
+  paymentHandling?: LessonPaymentHandling;
 };
 
 export type LessonActionsConfig = {
@@ -118,6 +122,9 @@ export type LessonActionsConfig = {
   openPaymentCancelDialog: (options: {
     title: string;
     message: string;
+    helperText?: string;
+    refundText?: string;
+    writeOffText?: string;
     onRefund: () => void;
     onWriteOff: () => void;
     onCancel?: () => void;
@@ -127,6 +134,12 @@ export type LessonActionsConfig = {
     message: string;
     onWriteOff: () => void;
     onSkip: () => void;
+    onCancel?: () => void;
+  }) => void;
+  openLessonEditPaymentResetDialog: (options: {
+    title: string;
+    message: string;
+    onConfirm: () => void;
     onCancel?: () => void;
   }) => void;
   navigateToSchedule: () => void;
@@ -153,6 +166,7 @@ export type LessonActionsConfig = {
 
 export type LessonActionsContextValue = {
   lessonModalOpen: boolean;
+  lessonModalSubmitting: boolean;
   lessonModalVariant: ModalVariant;
   lessonModalFocus: LessonModalFocus;
   lessonDraft: LessonDraft;
@@ -161,6 +175,7 @@ export type LessonActionsContextValue = {
   recurrenceLocked: boolean;
   defaultLessonDuration: number;
   rescheduleModalOpen: boolean;
+  rescheduleModalSubmitting: boolean;
   rescheduleDraft: RescheduleDraft;
   rescheduleLesson: Lesson | null;
   openLessonModal: (
@@ -177,7 +192,7 @@ export type LessonActionsContextValue = {
   saveLesson: (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => void;
   saveRescheduleLesson: () => void;
   requestDeleteLesson: () => void;
-  startEditLesson: (lesson: Lesson) => void;
+  startEditLesson: (lesson: Lesson, options?: { skipNavigation?: boolean }) => void;
   openCreateLessonForStudent: (
     studentId?: number,
     options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
@@ -283,6 +298,7 @@ export const useLessonActionsInternal = ({
   openRecurringDeleteDialog,
   openPaymentCancelDialog,
   openPaymentBalanceDialog,
+  openLessonEditPaymentResetDialog,
   navigateToSchedule,
   setDayViewDate,
   filterLessonsForCurrentRange,
@@ -301,12 +317,14 @@ export const useLessonActionsInternal = ({
   onLessonCreateError,
 }: LessonActionsConfig): LessonActionsContextValue => {
   const [lessonModalOpen, setLessonModalOpen] = useState(false);
+  const [lessonModalSubmitting, setLessonModalSubmitting] = useState(false);
   const [lessonDraft, setLessonDraft] = useState<LessonDraft>(() =>
     createLessonDraft(timeZone, teacherDefaultLessonDuration),
   );
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [editingLessonOriginal, setEditingLessonOriginal] = useState<Lesson | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleModalSubmitting, setRescheduleModalSubmitting] = useState(false);
   const [rescheduleLesson, setRescheduleLesson] = useState<Lesson | null>(null);
   const [rescheduleDraft, setRescheduleDraft] = useState<RescheduleDraft>({
     date: '',
@@ -397,6 +415,7 @@ export const useLessonActionsInternal = ({
 
       setEditingLessonId(existing?.id ?? null);
       setEditingLessonOriginal(existing ?? null);
+      setLessonModalSubmitting(false);
       setLessonModalOpen(true);
       if (!nextContext.skipNavigation) {
         navigateToSchedule();
@@ -417,6 +436,7 @@ export const useLessonActionsInternal = ({
       const time = format(start, 'HH:mm');
       const endTime = format(addMinutes(start, lesson.durationMinutes), 'HH:mm');
       setRescheduleLesson(lesson);
+      setRescheduleModalSubmitting(false);
       setRescheduleDraft({
         date: format(start, 'yyyy-MM-dd'),
         time,
@@ -433,6 +453,7 @@ export const useLessonActionsInternal = ({
 
   const closeRescheduleModal = useCallback(() => {
     setRescheduleModalOpen(false);
+    setRescheduleModalSubmitting(false);
     setRescheduleLesson(null);
     setRescheduleDraft({ date: '', time: '', endTime: '' });
     setSeriesScopeDialogState(null);
@@ -440,6 +461,7 @@ export const useLessonActionsInternal = ({
 
   const closeLessonModal = useCallback(() => {
     setLessonModalOpen(false);
+    setLessonModalSubmitting(false);
     setEditingLessonId(null);
     setEditingLessonOriginal(null);
     setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false, focus: 'full' });
@@ -500,6 +522,16 @@ export const useLessonActionsInternal = ({
     [setLinks, triggerStudentsListReload],
   );
 
+  const refreshDeleteFinancialState = useCallback(
+    async (nextLinks?: TeacherStudent[] | null) => {
+      applyLinksUpdate(nextLinks);
+      if (!selectedStudentId || !nextLinks?.some((link) => link.studentId === selectedStudentId)) return;
+      await refreshPayments(selectedStudentId);
+      await loadStudentUnpaidLessons({ studentIdOverride: selectedStudentId, force: true });
+    },
+    [applyLinksUpdate, loadStudentUnpaidLessons, refreshPayments, selectedStudentId],
+  );
+
   const fetchSeriesScopePreviews = useCallback(
     async (
       lesson: Lesson,
@@ -507,6 +539,7 @@ export const useLessonActionsInternal = ({
       payload?: {
         startAt?: string;
         durationMinutes?: number;
+        studentIds?: number[];
         repeatWeekdays?: number[];
         repeatUntil?: string | null;
       },
@@ -518,6 +551,7 @@ export const useLessonActionsInternal = ({
             scope,
             startAt: payload?.startAt,
             durationMinutes: payload?.durationMinutes,
+            studentIds: payload?.studentIds,
             repeatWeekdays: payload?.repeatWeekdays,
             repeatUntil: payload?.repeatUntil ?? null,
           });
@@ -530,33 +564,159 @@ export const useLessonActionsInternal = ({
     [],
   );
 
-  const updateLessonTiming = useCallback(
-    async (lesson: Lesson, startAt: string, durationMinutes: number, scope: LessonSeriesScope) => {
-      const data = await api.updateLesson(lesson.id, {
-        startAt,
-        durationMinutes,
-        scope,
+  const buildPreviewResolutionMessage = useCallback(
+    (preview: LessonMutationPreview) => {
+      const segments: string[] = [];
+      if (preview.resolutionReason?.trim()) {
+        segments.push(preview.resolutionReason.trim());
+      }
+      if (preview.effectiveDateFrom) {
+        const formattedDate = formatInTimeZone(preview.effectiveDateFrom, 'd MMM yyyy, HH:mm', {
+          locale: ru,
+          timeZone,
+        });
+        const skippedCount = preview.skippedProtectedCount ?? 0;
+        if (skippedCount > 0) {
+          segments.push(`Изменения начнутся с ${formattedDate}.`);
+        }
+      }
+      return segments.join(' ').trim();
+    },
+    [timeZone],
+  );
+
+  const requestLessonUpdateResolution = useCallback(
+    (params: {
+      preview: LessonMutationPreview;
+      confirmText?: string;
+      onCancel?: () => void;
+      onProceed: (meta: { acknowledgeRisk?: boolean; paymentHandling?: LessonPaymentHandling }) => void;
+    }) => {
+      if (params.preview.isBlocked) {
+        showInfoDialog('Изменение недоступно', params.preview.blockReason ?? 'Не удалось применить изменения');
+        return;
+      }
+
+      const resolutionMessage = buildPreviewResolutionMessage(params.preview);
+      if (params.preview.resolution === 'requiresPaymentReset') {
+        openLessonEditPaymentResetDialog({
+          title: 'Вернуть оплату на баланс?',
+          message: resolutionMessage || 'Перед сохранением нужно вернуть оплату на баланс.',
+          onConfirm: () => {
+            params.onProceed({ acknowledgeRisk: true, paymentHandling: 'RETURN_TO_BALANCE' });
+          },
+          onCancel: params.onCancel,
+        });
+        return;
+      }
+
+      if (params.preview.resolution === 'warning') {
+        openConfirmDialog({
+          title: 'Проверьте историю урока',
+          message: resolutionMessage || 'После сохранения проверьте связанные данные урока.',
+          confirmText: params.confirmText ?? 'Продолжить',
+          cancelText: 'Назад',
+          onConfirm: () => {
+            params.onProceed({ acknowledgeRisk: true, paymentHandling: 'KEEP' });
+          },
+          onCancel: params.onCancel,
+        });
+        return;
+      }
+
+      params.onProceed({});
+    },
+    [buildPreviewResolutionMessage, openConfirmDialog, openLessonEditPaymentResetDialog, showInfoDialog],
+  );
+
+  const requestLessonDeleteResolution = useCallback(
+    (params: {
+      hasPaidLessons: boolean;
+      affectsSeries?: boolean;
+      onConfirm: (refundMode?: LessonCancelRefundMode) => void;
+    }) => {
+      if (params.hasPaidLessons) {
+        openPaymentCancelDialog({
+          title: params.affectsSeries ? 'Что сделать с оплатой в удаляемых уроках?' : 'Что сделать с оплатой урока?',
+          message: params.affectsSeries
+            ? 'В выбранных уроках уже отмечена оплата. Перед удалением выберите, что с ней сделать.'
+            : 'У этого урока уже отмечена оплата. Перед удалением выберите, что с ней сделать.',
+          helperText: params.affectsSeries
+            ? 'Если вернуть, по каждому оплаченному занятию баланс увеличится на 1 урок. Если оставить, уроки будут скрыты из расписания, а отметки оплаты сохранятся в истории.'
+            : 'Если вернуть, баланс увеличится на 1 урок. Если оставить, урок будет скрыт из расписания, а отметка оплаты сохранится в истории.',
+          refundText: 'Вернуть на баланс',
+          writeOffText: 'Оставить как оплаченный',
+          onRefund: () => {
+            params.onConfirm('RETURN_TO_BALANCE');
+          },
+          onWriteOff: () => {
+            params.onConfirm('KEEP_AS_PAID');
+          },
+        });
+        return;
+      }
+
+      openConfirmDialog({
+        title: params.affectsSeries ? 'Удалить уроки?' : 'Удалить урок?',
+        message: params.affectsSeries
+          ? 'Удалённые уроки нельзя будет вернуть. Продолжить?'
+          : 'Удалённый урок нельзя будет вернуть. Продолжить?',
+        confirmText: 'Удалить',
+        cancelText: 'Отмена',
+        onConfirm: () => {
+          params.onConfirm();
+        },
       });
+    },
+    [openConfirmDialog, openPaymentCancelDialog],
+  );
+
+  const performLessonUpdate = useCallback(
+    async (lesson: Lesson, payload: LessonUpdatePayload, scope: LessonSeriesScope) => {
+      const data = await api.updateLesson(lesson.id, payload);
       applyLessonUpdateResult(data, lesson, { scope });
+      applyLinksUpdate(data.links);
       await loadStudentLessons();
       await loadStudentLessonsSummary();
       await loadDashboardUnpaidLessons();
+      return data;
     },
     [
       applyLessonUpdateResult,
+      applyLinksUpdate,
       loadDashboardUnpaidLessons,
       loadStudentLessons,
       loadStudentLessonsSummary,
     ],
   );
 
+  const updateLessonTiming = useCallback(
+    async (
+      lesson: Lesson,
+      startAt: string,
+      durationMinutes: number,
+      scope: LessonSeriesScope,
+      meta?: { acknowledgeRisk?: boolean; paymentHandling?: LessonPaymentHandling },
+    ) => {
+      const data = await performLessonUpdate(lesson, {
+        startAt,
+        durationMinutes,
+        scope,
+        acknowledgeRisk: meta?.acknowledgeRisk,
+        paymentHandling: meta?.paymentHandling,
+      }, scope);
+      return data;
+    },
+    [performLessonUpdate],
+  );
+
   const performDeleteLesson = useCallback(
-    async (scope: LessonSeriesScope = 'SINGLE') => {
+    async (scope: LessonSeriesScope = 'SINGLE', refundMode?: LessonCancelRefundMode) => {
       if (!editingLessonId) return;
       const recurrenceGroupId = editingLessonOriginal?.recurrenceGroupId;
 
       try {
-        await api.deleteLesson(editingLessonId, { scope });
+        const data = await api.deleteLesson(editingLessonId, { scope, refundMode });
         if (scope !== 'SINGLE' && recurrenceGroupId) {
           removeLessonsFromRanges({
             recurrenceGroupId,
@@ -565,8 +725,10 @@ export const useLessonActionsInternal = ({
         } else if (editingLessonId) {
           removeLessonsFromRanges({ ids: [editingLessonId] });
         }
+        await refreshDeleteFinancialState(data.links);
         await loadStudentLessons();
         await loadStudentLessonsSummary();
+        await loadDashboardUnpaidLessons();
         closeLessonModal();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
@@ -580,9 +742,11 @@ export const useLessonActionsInternal = ({
       editingLessonId,
       editingLessonOriginal,
       editingLessonOriginal?.recurrenceGroupId,
+      loadDashboardUnpaidLessons,
       loadStudentLessons,
       loadStudentLessonsSummary,
       removeLessonsFromRanges,
+      refreshDeleteFinancialState,
       showInfoDialog,
     ],
   );
@@ -590,12 +754,6 @@ export const useLessonActionsInternal = ({
   const requestDeleteLesson = useCallback(() => {
     if (!editingLessonId) return;
     const original = editingLessonOriginal;
-    const disabledReason = original ? resolveLessonDeleteDisabledReason(original) : null;
-
-    if (disabledReason) {
-      showInfoDialog('Изменение недоступно', disabledReason);
-      return;
-    }
 
     if (original?.isRecurring && (original.recurrenceGroupId || original.seriesId)) {
       void fetchSeriesScopePreviews(original, 'DELETE')
@@ -619,26 +777,24 @@ export const useLessonActionsInternal = ({
       return;
     }
 
-    openConfirmDialog({
-      title: 'Удалить урок?',
-      message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
-      confirmText: 'Удалить',
-      cancelText: 'Отмена',
-      onConfirm: () => {
-        void performDeleteLesson('SINGLE');
+    requestLessonDeleteResolution({
+      hasPaidLessons: Boolean(original && resolveLessonHasPaidParticipant(original)),
+      onConfirm: (refundMode) => {
+        void performDeleteLesson('SINGLE', refundMode);
       },
     });
   }, [
     editingLessonId,
     editingLessonOriginal,
     fetchSeriesScopePreviews,
-    openConfirmDialog,
     performDeleteLesson,
+    requestLessonDeleteResolution,
     showInfoDialog,
   ]);
 
   const saveLesson = useCallback(
     async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
+      if (lessonModalSubmitting) return;
       if (lessonDraft.studentIds.length === 0 || !lessonDraft.date || !lessonDraft.time) {
         showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
         return;
@@ -664,10 +820,16 @@ export const useLessonActionsInternal = ({
         onLessonCreateStarted?.(lessonModalContext.source);
       }
 
+      setLessonModalSubmitting(true);
+      let keepSubmittingAfterReturn = false;
       try {
         if (editingLessonId) {
           const original = editingLessonOriginal;
-          const limitedMetadataEdit = original ? resolveLessonAllowsLimitedMetadataEdit(original) : false;
+          if (!original) {
+            setLessonModalSubmitting(false);
+            showInfoDialog('Ошибка', 'Не удалось найти исходный урок');
+            return;
+          }
           const originalWeekdays = original?.recurrenceWeekdays ?? [];
           const originalUntil = original?.recurrenceUntil
             ? formatInTimeZone(original.recurrenceUntil, 'yyyy-MM-dd', { timeZone })
@@ -687,9 +849,19 @@ export const useLessonActionsInternal = ({
             lessonDraft.isRecurring && lessonDraft.repeatUntil
               ? toUtcEndOfDay(lessonDraft.repeatUntil, timeZone).toISOString()
               : null;
+          const updateScope: LessonSeriesScope = options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE';
+          const updatePayload: LessonUpdatePayload = {
+            studentIds: lessonDraft.studentIds,
+            startAt,
+            durationMinutes,
+            color: lessonDraft.color,
+            meetingLink,
+            scope: updateScope,
+            repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
+            repeatUntil: repeatUntilPayload,
+          };
 
           if (
-            !limitedMetadataEdit &&
             original?.isRecurring &&
             (original.recurrenceGroupId || original.seriesId) &&
             options?.applyToSeriesOverride === undefined
@@ -697,6 +869,7 @@ export const useLessonActionsInternal = ({
             const previews = await fetchSeriesScopePreviews(original, 'EDIT', {
               startAt,
               durationMinutes,
+              studentIds: lessonDraft.studentIds,
               repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
               repeatUntil: repeatUntilPayload,
             });
@@ -709,66 +882,81 @@ export const useLessonActionsInternal = ({
               previews,
               request: {
                 kind: 'update',
-                payload: {
-                  studentIds: lessonDraft.studentIds,
-                  startAt,
-                  durationMinutes,
-                  color: lessonDraft.color,
-                  meetingLink,
-                  repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
-                  repeatUntil: repeatUntilPayload,
-                },
+                payload: updatePayload,
               },
             });
+            setLessonModalSubmitting(false);
             return;
           }
 
-          const originalStudentIds =
-            original?.participants && original.participants.length > 0
-              ? original.participants.map((participant) => participant.studentId)
-              : original?.studentId
-                ? [original.studentId]
-                : lessonDraft.studentIds;
-
-          const data = await api.updateLesson(editingLessonId, {
-            studentIds: limitedMetadataEdit ? originalStudentIds : lessonDraft.studentIds,
-            startAt: limitedMetadataEdit && original ? original.startAt : startAt,
-            durationMinutes: limitedMetadataEdit && original ? original.durationMinutes : durationMinutes,
-            color: lessonDraft.color,
-            meetingLink,
-            scope: limitedMetadataEdit ? 'SINGLE' : options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
-            repeatWeekdays:
-              limitedMetadataEdit || !lessonDraft.isRecurring ? undefined : lessonDraft.repeatWeekdays,
-            repeatUntil: limitedMetadataEdit ? undefined : repeatUntilPayload,
+          const previewData = await api.previewLessonMutation(editingLessonId, {
+            action: 'EDIT',
+            scope: updateScope,
+            startAt,
+            durationMinutes,
+            studentIds: lessonDraft.studentIds,
+            repeatWeekdays: lessonDraft.isRecurring ? lessonDraft.repeatWeekdays : undefined,
+            repeatUntil: repeatUntilPayload,
           });
+          let proceededWithSave = false;
+          requestLessonUpdateResolution({
+            preview: previewData.preview,
+            confirmText: 'Сохранить',
+            onProceed: (meta) => {
+              keepSubmittingAfterReturn = true;
+              proceededWithSave = true;
+              setLessonModalSubmitting(true);
+              void performLessonUpdate(original, { ...updatePayload, ...meta }, updateScope)
+                .then(() => {
+                  if (
+                    timeChanged &&
+                    (lessonModalContext.focus === 'focus_date' || lessonModalContext.focus === 'focus_time') &&
+                    (previewData.preview.skippedProtectedCount ?? 0) === 0
+                  ) {
+                    const message = lessonModalContext.focus === 'focus_date' ? 'Урок перенесён' : 'Время изменено';
+                    const undoStartAt = original.startAt;
+                    const undoDuration = original.durationMinutes;
+                    showToast({
+                      message,
+                      variant: 'success',
+                      actionLabel: 'Отменить',
+                      onAction: () => {
+                        void updateLessonTiming(original, undoStartAt, undoDuration, updateScope, {
+                          acknowledgeRisk: true,
+                          paymentHandling: 'KEEP',
+                        }).catch(() => {
+                          showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+                        });
+                      },
+                    });
+                  } else {
+                    showToast({ message: 'Изменения сохранены', variant: 'success' });
+                  }
 
-          applyLessonUpdateResult(data, editingLessonOriginal, {
-            scope: limitedMetadataEdit ? 'SINGLE' : options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE',
-          });
-
-          if (
-            !limitedMetadataEdit &&
-            timeChanged &&
-            (lessonModalContext.focus === 'focus_date' || lessonModalContext.focus === 'focus_time') &&
-            original
-          ) {
-            const message = lessonModalContext.focus === 'focus_date' ? 'Урок перенесён' : 'Время изменено';
-            const undoScope: LessonSeriesScope = options?.applyToSeriesOverride ? 'FOLLOWING' : 'SINGLE';
-            const undoStartAt = original.startAt;
-            const undoDuration = original.durationMinutes;
-            showToast({
-              message,
-              variant: 'success',
-              actionLabel: 'Отменить',
-              onAction: () => {
-                void updateLessonTiming(original, undoStartAt, undoDuration, undoScope).catch(() => {
-                  showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+                  const shouldNavigate = !lessonModalContext.skipNavigation;
+                  closeLessonModal();
+                  if (shouldNavigate) {
+                    navigateToSchedule();
+                  }
+                })
+                .catch((error) => {
+                  const message = error instanceof Error ? error.message : 'Не удалось сохранить изменения';
+                  showInfoDialog('Ошибка', message);
+                  // eslint-disable-next-line no-console
+                  console.error('Failed to update lesson', error);
+                })
+                .finally(() => {
+                  setLessonModalSubmitting(false);
                 });
-              },
-            });
+            },
+          });
+          if (!proceededWithSave) {
+            setLessonModalSubmitting(false);
           }
+          return;
         } else if (lessonDraft.isRecurring) {
           if (lessonDraft.repeatWeekdays.length === 0) {
+            setLessonModalSubmitting(false);
             showInfoDialog('Нужно выбрать дни недели', 'Выберите хотя бы один день недели для повтора');
             return;
           }
@@ -835,34 +1023,39 @@ export const useLessonActionsInternal = ({
         if (!editingLessonId) {
           onLessonCreateError?.(error, lessonModalContext.source);
         }
+      } finally {
+        if (!keepSubmittingAfterReturn) {
+          setLessonModalSubmitting(false);
+        }
       }
     },
     [
       closeLessonModal,
       editingLessonId,
       editingLessonOriginal,
-      applyLessonUpdateResult,
+      fetchSeriesScopePreviews,
       filterLessonsForCurrentRange,
       lessonDraft,
-      lessons,
+      lessonModalSubmitting,
       loadStudentLessons,
       loadStudentLessonsSummary,
       navigateToSchedule,
       onLessonCreateError,
       onLessonCreateStarted,
       onLessonCreated,
-      openConfirmDialog,
+      performLessonUpdate,
+      requestLessonUpdateResolution,
       showInfoDialog,
       showToast,
       syncLessonsInRanges,
       updateLessonTiming,
       lessonModalContext,
       timeZone,
-      removeLessonsFromRanges,
     ],
   );
 
   const saveRescheduleLesson = useCallback(async () => {
+    if (rescheduleModalSubmitting) return;
     if (!rescheduleLesson) return;
     if (!rescheduleDraft.date || !rescheduleDraft.time) {
       showInfoDialog('Проверьте дату и время', 'Укажите дату и время урока');
@@ -883,6 +1076,8 @@ export const useLessonActionsInternal = ({
       closeRescheduleModal();
       return;
     }
+
+    setRescheduleModalSubmitting(true);
 
     if (rescheduleLesson.isRecurring && (rescheduleLesson.recurrenceGroupId || rescheduleLesson.seriesId)) {
       try {
@@ -909,35 +1104,73 @@ export const useLessonActionsInternal = ({
         setRescheduleModalOpen(false);
       } catch (error) {
         showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
+      } finally {
+        setRescheduleModalSubmitting(false);
       }
       return;
     }
 
     try {
-      await updateLessonTiming(rescheduleLesson, startAt, durationMinutes, 'SINGLE');
-      showToast({
-        message: 'Урок перенесён',
-        variant: 'success',
-        actionLabel: 'Отменить',
-        onAction: () => {
-          void updateLessonTiming(
-            rescheduleLesson,
-            rescheduleLesson.startAt,
-            rescheduleLesson.durationMinutes,
-            'SINGLE',
-          ).catch(() => {
-            showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
-          });
+      const previewData = await api.previewLessonMutation(rescheduleLesson.id, {
+        action: 'RESCHEDULE',
+        scope: 'SINGLE',
+        startAt,
+        durationMinutes,
+      });
+      let proceededWithSave = false;
+      requestLessonUpdateResolution({
+        preview: previewData.preview,
+        confirmText: 'Перенести',
+        onProceed: (meta) => {
+          proceededWithSave = true;
+          setRescheduleModalSubmitting(true);
+          void updateLessonTiming(rescheduleLesson, startAt, durationMinutes, 'SINGLE', meta)
+            .then(() => {
+              showToast({
+                message: 'Урок перенесён',
+                variant: 'success',
+                actionLabel: 'Отменить',
+                onAction: () => {
+                  void updateLessonTiming(
+                    rescheduleLesson,
+                    rescheduleLesson.startAt,
+                    rescheduleLesson.durationMinutes,
+                    'SINGLE',
+                    {
+                      acknowledgeRisk: true,
+                      paymentHandling: 'KEEP',
+                    },
+                  ).catch(() => {
+                    showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+                  });
+                },
+              });
+              closeRescheduleModal();
+            })
+            .catch((error) => {
+              showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+              // eslint-disable-next-line no-console
+              console.error('Failed to reschedule lesson', error);
+            })
+            .finally(() => {
+              setRescheduleModalSubmitting(false);
+            });
         },
       });
-      closeRescheduleModal();
+      if (!proceededWithSave) {
+        setRescheduleModalSubmitting(false);
+      }
     } catch (error) {
       showToast({ message: 'Не удалось перенести урок', variant: 'error' });
       // eslint-disable-next-line no-console
       console.error('Failed to reschedule lesson', error);
+      setRescheduleModalSubmitting(false);
     }
   }, [
     closeRescheduleModal,
+    fetchSeriesScopePreviews,
+    requestLessonUpdateResolution,
+    rescheduleModalSubmitting,
     rescheduleDraft.date,
     rescheduleDraft.endTime,
     rescheduleDraft.time,
@@ -946,14 +1179,15 @@ export const useLessonActionsInternal = ({
     showToast,
     timeZone,
     updateLessonTiming,
-    fetchSeriesScopePreviews,
   ]);
 
   const startEditLesson = useCallback(
-    (lesson: Lesson) => {
+    (lesson: Lesson, options?: { skipNavigation?: boolean }) => {
       const start = toZonedDate(lesson.startAt, timeZone);
       const time = format(start, 'HH:mm');
-      openLessonModal(format(start, 'yyyy-MM-dd'), time, lesson);
+      openLessonModal(format(start, 'yyyy-MM-dd'), time, lesson, {
+        skipNavigation: options?.skipNavigation ?? false,
+      });
     },
     [openLessonModal, timeZone],
   );
@@ -972,9 +1206,9 @@ export const useLessonActionsInternal = ({
   );
 
   const deleteLessonWithOptions = useCallback(
-    async (lesson: Lesson, scope: LessonSeriesScope) => {
+    async (lesson: Lesson, scope: LessonSeriesScope, refundMode?: LessonCancelRefundMode) => {
       try {
-        await api.deleteLesson(lesson.id, { scope });
+        const data = await api.deleteLesson(lesson.id, { scope, refundMode });
         if (scope !== 'SINGLE' && lesson.recurrenceGroupId) {
           removeLessonsFromRanges({
             recurrenceGroupId: lesson.recurrenceGroupId,
@@ -983,6 +1217,7 @@ export const useLessonActionsInternal = ({
         } else {
           removeLessonsFromRanges({ ids: [lesson.id] });
         }
+        await refreshDeleteFinancialState(data.links);
         await loadStudentLessons();
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
@@ -991,17 +1226,17 @@ export const useLessonActionsInternal = ({
         console.error('Failed to delete lesson', error);
       }
     },
-    [loadDashboardUnpaidLessons, loadStudentLessons, loadStudentLessonsSummary, removeLessonsFromRanges],
+    [
+      loadDashboardUnpaidLessons,
+      loadStudentLessons,
+      loadStudentLessonsSummary,
+      refreshDeleteFinancialState,
+      removeLessonsFromRanges,
+    ],
   );
 
   const requestDeleteLessonFromList = useCallback(
     (lesson: Lesson) => {
-      const disabledReason = resolveLessonDeleteDisabledReason(lesson);
-      if (disabledReason) {
-        showInfoDialog('Изменение недоступно', disabledReason);
-        return;
-      }
-
       if (lesson.isRecurring && (lesson.recurrenceGroupId || lesson.seriesId)) {
         void fetchSeriesScopePreviews(lesson, 'DELETE')
           .then((previews) => {
@@ -1024,17 +1259,14 @@ export const useLessonActionsInternal = ({
         return;
       }
 
-      openConfirmDialog({
-        title: 'Удалить урок?',
-        message: 'Удалённый урок нельзя будет вернуть. Продолжить?',
-        confirmText: 'Удалить',
-        cancelText: 'Отмена',
-        onConfirm: () => {
-          void deleteLessonWithOptions(lesson, 'SINGLE');
+      requestLessonDeleteResolution({
+        hasPaidLessons: resolveLessonHasPaidParticipant(lesson),
+        onConfirm: (refundMode) => {
+          void deleteLessonWithOptions(lesson, 'SINGLE', refundMode);
         },
       });
     },
-    [deleteLessonWithOptions, fetchSeriesScopePreviews, openConfirmDialog, showInfoDialog],
+    [deleteLessonWithOptions, fetchSeriesScopePreviews, requestLessonDeleteResolution, showInfoDialog],
   );
 
   const markLessonCompleted = useCallback(
@@ -1288,72 +1520,108 @@ export const useLessonActionsInternal = ({
       if (!seriesScopeDialogState) return;
       const state = seriesScopeDialogState;
       setSeriesScopeDialogState(null);
+      const selectedPreview = state.previews[scope];
 
-      const runRequest =
-        state.request.kind === 'delete'
-          ? api.deleteLesson(state.lesson.id, { scope })
-          : api.updateLesson(state.lesson.id, {
-              ...state.request.payload,
-              scope,
-            });
-
-      void runRequest
-        .then(async (data) => {
-          if (state.request.kind === 'delete') {
-            if (scope !== 'SINGLE' && state.lesson.recurrenceGroupId) {
-              removeLessonsFromRanges({
-                recurrenceGroupId: state.lesson.recurrenceGroupId,
-                startFrom: scope === 'FOLLOWING' ? new Date(state.lesson.startAt) : new Date(),
+      if (state.request.kind === 'delete') {
+        requestLessonDeleteResolution({
+          hasPaidLessons:
+            (selectedPreview?.paidCount ?? (scope === 'SINGLE' && resolveLessonHasPaidParticipant(state.lesson) ? 1 : 0)) > 0,
+          affectsSeries: scope !== 'SINGLE',
+          onConfirm: (refundMode) => {
+            void api.deleteLesson(state.lesson.id, { scope, refundMode })
+              .then(async (data) => {
+                if (scope !== 'SINGLE' && state.lesson.recurrenceGroupId) {
+                  removeLessonsFromRanges({
+                    recurrenceGroupId: state.lesson.recurrenceGroupId,
+                    startFrom: scope === 'FOLLOWING' ? new Date(state.lesson.startAt) : new Date(),
+                  });
+                } else {
+                  removeLessonsFromRanges({ ids: [state.lesson.id] });
+                }
+                await refreshDeleteFinancialState(data.links);
+                await loadStudentLessons();
+                await loadStudentLessonsSummary();
+                await loadDashboardUnpaidLessons();
+                closeLessonModal();
+                showToast({ message: 'Урок удалён', variant: 'success' });
+              })
+              .catch((error) => {
+                showToast({ message: 'Не удалось удалить урок', variant: 'error' });
+                // eslint-disable-next-line no-console
+                console.error('Failed to confirm lesson series scope', error);
+                if (state.reopenModal === 'reschedule') {
+                  setRescheduleModalOpen(true);
+                }
               });
-            } else {
-              removeLessonsFromRanges({ ids: [state.lesson.id] });
-            }
-            await loadStudentLessons();
-            await loadStudentLessonsSummary();
-            await loadDashboardUnpaidLessons();
-            closeLessonModal();
-            showToast({ message: 'Урок удалён', variant: 'success' });
-            return;
-          }
+          },
+        });
+        return;
+      }
 
-          applyLessonUpdateResult(data as { lesson?: Lesson; lessons?: Lesson[] }, state.lesson, { scope });
-          await loadStudentLessons();
-          await loadStudentLessonsSummary();
-          await loadDashboardUnpaidLessons();
+      if (!selectedPreview) {
+        showToast({ message: 'Не удалось подготовить изменения', variant: 'error' });
+        if (state.reopenModal === 'reschedule') {
+          setRescheduleModalOpen(true);
+        }
+        return;
+      }
+      const updatePayload = state.request.payload;
 
-          const successMessage =
-            state.action === 'RESCHEDULE' ? 'Урок перенесён' : 'Изменения сохранены';
-          showToast({ message: successMessage, variant: 'success' });
-
-          if (state.action === 'RESCHEDULE') {
-            closeRescheduleModal();
-          } else if (state.action === 'EDIT') {
-            closeLessonModal();
-          }
-        })
-        .catch((error) => {
-          const message =
-            state.action === 'DELETE'
-              ? 'Не удалось удалить урок'
-              : state.action === 'RESCHEDULE'
-                ? 'Не удалось перенести урок'
-                : 'Не удалось сохранить изменения';
-          showToast({ message, variant: 'error' });
-          // eslint-disable-next-line no-console
-          console.error('Failed to confirm lesson series scope', error);
+      requestLessonUpdateResolution({
+        preview: selectedPreview,
+        confirmText: state.confirmText,
+        onCancel: () => {
           if (state.reopenModal === 'reschedule') {
             setRescheduleModalOpen(true);
           }
-        });
+        },
+        onProceed: (meta) => {
+          void performLessonUpdate(
+            state.lesson,
+            {
+              ...updatePayload,
+              scope,
+              ...meta,
+            },
+            scope,
+          )
+            .then(() => {
+              const successMessage =
+                state.action === 'RESCHEDULE' ? 'Урок перенесён' : 'Изменения сохранены';
+              showToast({ message: successMessage, variant: 'success' });
+
+              if (state.action === 'RESCHEDULE') {
+                closeRescheduleModal();
+              } else if (state.action === 'EDIT') {
+                closeLessonModal();
+              }
+            })
+            .catch((error) => {
+              const message =
+                state.action === 'RESCHEDULE'
+                  ? 'Не удалось перенести урок'
+                  : 'Не удалось сохранить изменения';
+              showToast({ message, variant: 'error' });
+              // eslint-disable-next-line no-console
+              console.error('Failed to confirm lesson series scope', error);
+              if (state.reopenModal === 'reschedule') {
+                setRescheduleModalOpen(true);
+              }
+            });
+        },
+      });
     },
     [
-      applyLessonUpdateResult,
       closeLessonModal,
       closeRescheduleModal,
       loadDashboardUnpaidLessons,
       loadStudentLessons,
       loadStudentLessonsSummary,
+      performLessonUpdate,
+      refreshDeleteFinancialState,
       removeLessonsFromRanges,
+      requestLessonDeleteResolution,
+      requestLessonUpdateResolution,
       seriesScopeDialogState,
       showToast,
     ],
@@ -1590,6 +1858,7 @@ export const useLessonActionsInternal = ({
   return useMemo(
     () => ({
       lessonModalOpen,
+      lessonModalSubmitting,
       lessonModalVariant: lessonModalContext.variant,
       lessonModalFocus: lessonModalContext.focus,
       lessonDraft,
@@ -1598,6 +1867,7 @@ export const useLessonActionsInternal = ({
       recurrenceLocked: Boolean(editingLessonOriginal?.isRecurring),
       defaultLessonDuration: teacherDefaultLessonDuration,
       rescheduleModalOpen,
+      rescheduleModalSubmitting,
       rescheduleDraft,
       rescheduleLesson,
       openLessonModal,
@@ -1631,6 +1901,7 @@ export const useLessonActionsInternal = ({
       editingLessonOriginal?.isRecurring,
       handleLessonDraftChange,
       lessonDraft,
+      lessonModalSubmitting,
       lessonModalContext.focus,
       lessonModalContext.variant,
       lessonModalOpen,
@@ -1646,6 +1917,7 @@ export const useLessonActionsInternal = ({
       rescheduleDraft,
       rescheduleLesson,
       rescheduleModalOpen,
+      rescheduleModalSubmitting,
       markLessonCompleted,
       remindLessonPayment,
       togglePaid,

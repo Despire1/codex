@@ -57,9 +57,19 @@ export const SeriesScopeDialog = ({
   }, [defaultScope, open]);
 
   const preview = previews?.[scope];
+  const effectiveDateLabel = preview?.effectiveDateFrom
+    ? new Date(preview.effectiveDateFrom).toLocaleString('ru-RU', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
   const isConfirmDisabled = Boolean(preview) && (preview.affectedCount === 0 || preview.isBlocked);
   const summaryText = preview?.isBlocked
     ? 'Этот вариант сейчас недоступен.'
+    : effectiveDateLabel && (preview?.skippedProtectedCount ?? 0) > 0
+      ? `Изменения начнутся с ${effectiveDateLabel}.`
     : resolveScopeHint(scope);
 
   return (
@@ -88,6 +98,9 @@ export const SeriesScopeDialog = ({
         )}
         {preview && preview.affectedCount === 0 && !preview.isBlocked && (
           <div className={styles.notice}>Для этого варианта сейчас нет уроков, к которым можно применить действие.</div>
+        )}
+        {!preview?.isBlocked && preview?.resolutionReason && (
+          <div className={styles.notice}>{preview.resolutionReason}</div>
         )}
         <div className={styles.actions}>
           <button type="button" className={controls.secondaryButton} onClick={onClose}>

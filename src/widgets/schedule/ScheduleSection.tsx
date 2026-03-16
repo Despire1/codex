@@ -27,7 +27,7 @@ import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
 import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../entities/lesson/lib/lessonDetails';
-import { resolveLessonHasPaidParticipant } from '../../entities/lesson/lib/lessonMutationGuards';
+import { resolveLessonCancelActionCopy } from '../../entities/lesson/lib/lessonStatusPresentation';
 import { useToast } from '../../shared/lib/toast';
 import { api } from '../../shared/api/client';
 import styles from './ScheduleSection.module.css';
@@ -70,10 +70,10 @@ type PendingScopeAction =
     };
 
 const resolveCancelDialogCopy = (lesson: Lesson | null) => {
-  const isCorrectionFlow = Boolean(lesson && (lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)));
+  const copy = resolveLessonCancelActionCopy(lesson);
   return {
-    title: isCorrectionFlow ? 'Исправить статус урока' : 'Отменить урок',
-    confirmText: isCorrectionFlow ? 'Изменить статус' : 'Отменить урок',
+    title: copy.title.replace('?', ''),
+    confirmText: copy.confirmText,
   };
 };
 

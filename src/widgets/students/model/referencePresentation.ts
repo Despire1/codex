@@ -50,12 +50,12 @@ export const getStudentInitials = (item: StudentListItem) => {
   return `${parts[0]?.slice(0, 1) ?? ''}${parts[1]?.slice(0, 1) ?? ''}`.toUpperCase();
 };
 
-const resolveSyntheticLevel = (lessonsTotal: number) => {
-  if (lessonsTotal < 10) return 'Beginner';
-  if (lessonsTotal < 25) return 'Elementary';
-  if (lessonsTotal < 45) return 'Intermediate';
-  if (lessonsTotal < 70) return 'Upper-Intermediate';
-  return 'Advanced';
+const resolveLevelLabel = (item: StudentListItem) => {
+  const customLevel = item.link.studentLevel?.trim();
+  if (customLevel) {
+    return customLevel;
+  }
+  return '';
 };
 
 const resolveStatus = (item: StudentListItem): StudentLifecycleStatus => {
@@ -124,7 +124,7 @@ export const buildStudentCardPresentation = (item: StudentListItem, timeZone: st
     completedHomeworks,
     totalHomeworks,
     progressPercent,
-    levelLabel: resolveSyntheticLevel(lessonsTotal),
+    levelLabel: resolveLevelLabel(item),
     status,
     nextLessonLabel: nextLesson.label,
     nextLessonAt: item.stats.nextLessonAt ?? null,

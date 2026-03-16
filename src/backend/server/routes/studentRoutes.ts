@@ -14,6 +14,7 @@ type StudentRoutesHandlers = {
     filter?: 'all' | 'debt' | 'overdue',
     limit?: number,
     offset?: number,
+    studentId?: number,
   ) => Promise<unknown>;
   searchStudents: (
     user: unknown,
@@ -92,8 +93,10 @@ export const tryHandleStudentRoutes = async ({
     const { searchParams } = url;
     const query = searchParams.get('query') ?? undefined;
     const filter = (searchParams.get('filter') as 'all' | 'debt' | 'overdue' | null) ?? 'all';
+    const studentIdRaw = Number(searchParams.get('studentId'));
+    const studentId = Number.isFinite(studentIdRaw) && studentIdRaw > 0 ? studentIdRaw : undefined;
     const { limit, offset } = handlers.resolvePageParams(url);
-    const data = await handlers.listStudents(requireApiUser(), query, filter, limit, offset);
+    const data = await handlers.listStudents(requireApiUser(), query, filter, limit, offset, studentId);
     sendJson(res, 200, data);
     return true;
   }

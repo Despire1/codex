@@ -1,7 +1,8 @@
-import { type FC, type SVGProps, useId } from 'react';
+import { type FC, type SVGProps, useEffect, useId, useRef, useState } from 'react';
 import styles from './StudentModal.module.css';
 import modalStyles from '../modal.module.css';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
+import { type StudentModalFocusField } from './types';
 
 interface StudentModalDraft {
   customName: string;
@@ -20,6 +21,8 @@ interface StudentModalProps {
   draft: StudentModalDraft;
   emailSuggestions: string[];
   isEditing: boolean;
+  isSubmitting?: boolean;
+  focusField?: StudentModalFocusField | null;
   onDraftChange: (draft: StudentModalDraft) => void;
   onSubmit: () => void;
   variant?: 'modal' | 'sheet';
@@ -78,11 +81,39 @@ export const StudentModal: FC<StudentModalProps> = ({
   draft,
   emailSuggestions,
   isEditing,
+  isSubmitting = false,
+  focusField = null,
   onDraftChange,
   onSubmit,
   variant = 'modal',
 }) => {
   const emailSuggestionsId = useId();
+  const priceInputRef = useRef<HTMLInputElement | null>(null);
+  const [highlightedField, setHighlightedField] = useState<StudentModalFocusField | null>(null);
+
+  useEffect(() => {
+    if (!open || focusField !== 'price' || isSubmitting) {
+      return;
+    }
+
+    const focusTimer = window.setTimeout(() => {
+      const input = priceInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedField('price');
+    }, 80);
+
+    const highlightTimer = window.setTimeout(() => {
+      setHighlightedField((current) => (current === 'price' ? null : current));
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [focusField, isSubmitting, open]);
 
   const modalContent = (
     <div
@@ -104,7 +135,13 @@ export const StudentModal: FC<StudentModalProps> = ({
             </p>
           </div>
         </div>
-        <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Закрыть">
+        <button
+          type="button"
+          className={styles.closeButton}
+          onClick={onClose}
+          aria-label="Закрыть"
+          disabled={isSubmitting}
+        >
           <XMarkIcon className={styles.closeButtonIcon} />
         </button>
       </div>
@@ -129,6 +166,7 @@ export const StudentModal: FC<StudentModalProps> = ({
               autoComplete="name"
               placeholder="Введите имя ученика"
               value={draft.customName}
+              disabled={isSubmitting}
               onChange={(event) => onDraftChange({ ...draft, customName: event.target.value })}
             />
           </div>
@@ -153,6 +191,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 inputMode="text"
                 placeholder="username"
                 value={draft.username}
+                disabled={isSubmitting}
                 onChange={(event) =>
                   onDraftChange({
                     ...draft,
@@ -163,7 +202,9 @@ export const StudentModal: FC<StudentModalProps> = ({
             </div>
           </div>
 
-          <div className={styles.field}>
+          <div
+            className={`${styles.field} ${highlightedField === 'price' ? styles.fieldHighlighted : ''}`}
+          >
             <label className={styles.label} htmlFor="student-price">
               Цена занятия <span className={styles.requiredMark}>*</span>
             </label>
@@ -173,12 +214,14 @@ export const StudentModal: FC<StudentModalProps> = ({
               </span>
               <input
                 id="student-price"
+                ref={priceInputRef}
                 className={`${styles.input} ${styles.inputWithLeadingIcon}`}
                 type="number"
                 min={0}
                 required
                 placeholder="1500"
                 value={draft.pricePerLesson}
+                disabled={isSubmitting}
                 onChange={(event) => onDraftChange({ ...draft, pricePerLesson: event.target.value })}
               />
             </div>
@@ -206,6 +249,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                   placeholder="student@example.com"
                   list={emailSuggestions.length > 0 ? emailSuggestionsId : undefined}
                   value={draft.email}
+                  disabled={isSubmitting}
                   onChange={(event) => onDraftChange({ ...draft, email: event.target.value })}
                 />
                 {emailSuggestions.length > 0 ? (
@@ -234,6 +278,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                   inputMode="tel"
                   placeholder="+7 (999) 123-45-67"
                   value={draft.phone}
+                  disabled={isSubmitting}
                   onChange={(event) => onDraftChange({ ...draft, phone: event.target.value })}
                 />
               </div>
@@ -249,6 +294,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 type="text"
                 placeholder="Пока не указан"
                 value={draft.studentLevel}
+                disabled={isSubmitting}
                 onChange={(event) => onDraftChange({ ...draft, studentLevel: event.target.value })}
               />
             </div>
@@ -263,6 +309,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 rows={3}
                 placeholder="Например: подготовка к экзамену, разговорная практика, бизнес-английский..."
                 value={draft.learningGoal}
+                disabled={isSubmitting}
                 onChange={(event) => onDraftChange({ ...draft, learningGoal: event.target.value })}
               />
             </div>
@@ -277,6 +324,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 rows={2}
                 placeholder="Дополнительная информация об ученике..."
                 value={draft.notes}
+                disabled={isSubmitting}
                 onChange={(event) => onDraftChange({ ...draft, notes: event.target.value })}
               />
             </div>
@@ -284,12 +332,14 @@ export const StudentModal: FC<StudentModalProps> = ({
         </section>
 
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelButton} onClick={onClose}>
+          <button type="button" className={styles.cancelButton} onClick={onClose} disabled={isSubmitting}>
             Отмена
           </button>
-          <button type="submit" className={styles.submitButton}>
-            <CheckIcon className={styles.submitButtonIcon} />
-            {isEditing ? 'Сохранить изменения' : 'Добавить ученика'}
+          <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
+            <span className={styles.submitButtonContent}>
+              {isSubmitting ? <span className={styles.submitSpinner} aria-hidden /> : <CheckIcon className={styles.submitButtonIcon} />}
+              {isSubmitting ? (isEditing ? 'Сохраняем...' : 'Добавляем...') : isEditing ? 'Сохранить изменения' : 'Добавить ученика'}
+            </span>
           </button>
         </div>
       </form>
@@ -298,7 +348,10 @@ export const StudentModal: FC<StudentModalProps> = ({
 
   if (variant === 'sheet') {
     return (
-      <BottomSheet isOpen={open} onClose={onClose}>
+      <BottomSheet isOpen={open} onClose={() => {
+        if (isSubmitting) return;
+        onClose();
+      }}>
         {modalContent}
       </BottomSheet>
     );
@@ -307,7 +360,10 @@ export const StudentModal: FC<StudentModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className={modalStyles.modalOverlay} onClick={onClose}>
+    <div className={modalStyles.modalOverlay} onClick={() => {
+      if (isSubmitting) return;
+      onClose();
+    }}>
       {modalContent}
     </div>
   );

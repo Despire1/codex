@@ -1,4 +1,4 @@
-import { type FC, useMemo } from 'react';
+import { type FC, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faAddressCard,
@@ -19,7 +19,9 @@ import {
   faVideo,
   faWallet,
 } from '@fortawesome/free-solid-svg-icons';
+import { ru } from 'date-fns/locale';
 import { Homework, Lesson, PaymentEvent, StudentDebtItem, StudentListItem } from '../../../../entities/types';
+import { useIsMobile } from '@/shared/lib/useIsMobile';
 import {
   buildProfileStats,
   buildProgressSeries,
@@ -31,6 +33,12 @@ import {
   getStudentInitials,
 } from '../../model/referencePresentation';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
+import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
+import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
+import { Modal } from '@/shared/ui/Modal/Modal';
+import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
+import controls from '@/shared/styles/controls.module.css';
+import { StudentDebtPopoverContent } from '../StudentDebtPopoverContent';
 import styles from './StudentsReferenceProfileView.module.css';
 
 type ProfileTabId = 'homework' | 'lessons' | 'payments';
@@ -49,15 +57,24 @@ interface StudentsReferenceProfileViewProps {
   onTabChange: (tab: ProfileTabId) => void;
   onBack: () => void;
   onScheduleLesson: () => void;
+  onEditStudent: (options?: { focusField?: 'price' }) => void;
+  onRequestDeleteStudent: () => void;
+  onTogglePaymentReminders: (enabled: boolean) => void;
   onWriteToStudent: () => void;
+  onRemindLessonPayment: (
+    lessonId: number,
+    studentId?: number,
+    options?: { force?: boolean },
+  ) => Promise<{ status: 'sent' | 'error' }>;
+  onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
   onRemindHomework: (homeworkId: number) => void;
   onOpenLesson: (lesson: Lesson) => void;
   timeZone: string;
 }
 
 const profileTabs: Array<{ id: ProfileTabId; label: string; icon: typeof faBookOpen }> = [
-  { id: 'homework', label: 'Домашние задания', icon: faBookOpen },
   { id: 'lessons', label: 'Занятия', icon: faCalendarDays },
+  { id: 'homework', label: 'Домашние задания', icon: faBookOpen },
   { id: 'payments', label: 'Оплаты', icon: faWallet },
 ];
 
@@ -84,11 +101,24 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   onTabChange,
   onBack,
   onScheduleLesson,
+  onEditStudent,
+  onRequestDeleteStudent,
+  onTogglePaymentReminders,
   onWriteToStudent,
+  onRemindLessonPayment,
+  onTogglePaid,
   onRemindHomework,
   onOpenLesson,
   timeZone,
 }) => {
+  const isMobile = useIsMobile(760);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
+  const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
+  const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
+  const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
+  const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
+  const previousDebtCount = useRef(0);
   const cardPresentation = buildStudentCardPresentation(studentEntry, timeZone);
   const statusMeta = getStatusUiMeta(cardPresentation.status);
   const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworks, studentDebtItems);
@@ -111,14 +141,30 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     () => [...payments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
     [payments],
   );
+  const unpaidLessonsTotal = useMemo(() => {
+    const total = studentDebtItems.reduce(
+      (sum, item) => sum + (typeof item.price === 'number' && item.price > 0 ? item.price : 0),
+      0,
+    );
+
+    if (total > 0) {
+      return total;
+    }
+
+    return typeof studentEntry.debtRub === 'number' && studentEntry.debtRub > 0 ? studentEntry.debtRub : null;
+  }, [studentDebtItems, studentEntry.debtRub]);
 
   const generatedNotes = useMemo(() => {
     const notes: Array<{ text: string; date: string; tone: 'warning' | 'info' }> = [];
 
     if (studentDebtItems.length > 0) {
+      const debtSummary =
+        typeof unpaidLessonsTotal === 'number' && unpaidLessonsTotal > 0
+          ? `на сумму ${unpaidLessonsTotal.toLocaleString('ru-RU')} ₽`
+          : `в количестве ${studentDebtItems.length}`;
       notes.push({
-        text: `Есть неоплаченные занятия: ${studentDebtItems.length}. Стоит напомнить об оплате.`,
-        date: formatInTimeZone(new Date(), 'd MMM yyyy', { timeZone }),
+        text: `Есть неоплаченные занятия ${debtSummary}. Стоит напомнить об оплате.`,
+        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
         tone: 'warning',
       });
     }
@@ -126,7 +172,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     if (profileStats.averageScore >= 8) {
       notes.push({
         text: 'Хороший прогресс по домашним заданиям. Можно добавить задания повышенной сложности.',
-        date: formatInTimeZone(new Date(), 'd MMM yyyy', { timeZone }),
+        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
         tone: 'info',
       });
     }
@@ -134,13 +180,13 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     if (notes.length === 0) {
       notes.push({
         text: 'Заметок пока нет. Добавьте заметку после следующего занятия.',
-        date: formatInTimeZone(new Date(), 'd MMM yyyy', { timeZone }),
+        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
         tone: 'info',
       });
     }
 
     return notes.slice(0, 2);
-  }, [profileStats.averageScore, studentDebtItems.length, timeZone]);
+  }, [profileStats.averageScore, studentDebtItems.length, timeZone, unpaidLessonsTotal]);
 
   const renderHomeworkTab = () => {
     if (studentHomeworksLoading && homeworksOrdered.length === 0) {
@@ -171,7 +217,8 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <h3 className={styles.activityTitle}>{homework.text.slice(0, 70) || 'Домашнее задание'}</h3>
                   <p className={styles.activitySubtitle}>
                     {homework.deadlineAt || homework.deadline
-                      ? `Срок: ${formatInTimeZone(homework.deadlineAt ?? homework.deadline ?? '', 'd MMM yyyy', {
+                      ? `Срок: ${formatInTimeZone(homework.deadlineAt ?? homework.deadline ?? '', 'd MMMM yyyy', {
+                          locale: ru,
                           timeZone,
                         })}`
                       : 'Без дедлайна'}
@@ -235,7 +282,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </div>
                 <div className={styles.lessonMainBlock}>
                   <h3 className={styles.activityTitle}>
-                    {formatInTimeZone(lesson.startAt, 'd MMM • HH:mm', { timeZone })} -{' '}
+                    {formatInTimeZone(lesson.startAt, 'd MMMM • HH:mm', { locale: ru, timeZone })} -{' '}
                     {formatInTimeZone(lessonEndAt, 'HH:mm', { timeZone })}
                   </h3>
                   <p className={styles.activitySubtitle}>{lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок'}</p>
@@ -243,11 +290,13 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <span className={styles.statusBadge}>{statusLabel}</span>
               </div>
 
-              <div className={styles.activityFooter}>
-                <div className={styles.activityMetaLine}>
-                  <FontAwesomeIcon icon={faVideo} />
-                  <span>{lesson.meetingLink ? 'Есть ссылка на встречу' : 'Ссылка не указана'}</span>
-                </div>
+              <div className={`${styles.activityFooter} ${!lesson.meetingLink ? styles.activityFooterCompact : ''}`}>
+                {lesson.meetingLink ? (
+                  <div className={styles.activityMetaLine}>
+                    <FontAwesomeIcon icon={faVideo} />
+                    <span>Есть ссылка на встречу</span>
+                  </div>
+                ) : null}
 
                 <button
                   type="button"
@@ -294,7 +343,10 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <div>
                   <h3 className={styles.activityTitle}>{amountLabel}</h3>
                   <p className={styles.activitySubtitle}>
-                    {formatPaymentEventLabel(event)} • {formatInTimeZone(event.createdAt, 'd MMM yyyy', { timeZone })}
+                    {formatPaymentEventLabel(event)} • {formatInTimeZone(event.createdAt, 'd MMMM yyyy', {
+                      locale: ru,
+                      timeZone,
+                    })}
                   </p>
                 </div>
                 <span
@@ -319,19 +371,99 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const tabContent =
     activeTab === 'homework' ? renderHomeworkTab() : activeTab === 'lessons' ? renderLessonsTab() : renderPaymentsTab();
 
-  const phoneLabel = 'Не указан';
-  const emailLabel = 'Не указан';
+  const phoneLabel = studentEntry.link.phone?.trim() ?? '';
+  const emailLabel = studentEntry.link.email?.trim() ?? '';
+  const studentLevelLabel = studentEntry.link.studentLevel?.trim() ?? '';
+  const telegramUsername = studentEntry.student.username?.trim();
+  const showActivationBadge = Boolean(telegramUsername) && studentEntry.student.isActivated === false;
+  const activationHint =
+    'Ученик ещё не активирован. Нужно, чтобы он нажал кнопку Start в Telegram-боте — тогда он появится в системе и будет получать уведомления.';
+  const reminderDisabledReason = !studentEntry.student.isActivated
+    ? 'Ученик не активировал бота — отправка напоминаний невозможна'
+    : null;
+  const paymentRemindersEnabled = studentEntry.student.paymentRemindersEnabled !== false;
+  const hasUnpaidLessons = studentDebtItems.length > 0;
+  const hasDebtBadge =
+    hasUnpaidLessons ||
+    (typeof studentEntry.debtRub === 'number' && studentEntry.debtRub > 0) ||
+    (studentEntry.debtLessonCount ?? 0) > 0;
+  const unpaidLessonsLabel = 'Сумма неоплаченных занятий';
+  const unpaidLessonsValueLabel =
+    typeof unpaidLessonsTotal === 'number' && unpaidLessonsTotal > 0
+      ? `${unpaidLessonsTotal.toLocaleString('ru-RU')} ₽`
+      : '—';
+  const priceValueLabel =
+    typeof studentEntry.link.pricePerLesson === 'number' && studentEntry.link.pricePerLesson > 0
+      ? `${studentEntry.link.pricePerLesson.toLocaleString('ru-RU')}₽`
+      : '—';
+  const memberSinceLabel = studentEntry.student.createdAt
+    ? formatInTimeZone(studentEntry.student.createdAt, 'd MMMM yyyy', { locale: ru, timeZone })
+    : '—';
+
+  const handleMenuAction = (action: () => void) => {
+    setIsActionsMenuOpen(false);
+    action();
+  };
+
+  const openReminderSettings = () => {
+    setIsActionsMenuOpen(false);
+    setIsReminderSettingsOpen(true);
+  };
+
+  const handleTogglePaymentReminders = () => {
+    onTogglePaymentReminders(!paymentRemindersEnabled);
+  };
+
+  const handleRemindPayment = async (lessonId: number) => {
+    if (pendingReminderIds.includes(lessonId)) return;
+    setPendingReminderIds((prev) => [...prev, lessonId]);
+    try {
+      await onRemindLessonPayment(lessonId, studentEntry.student.id);
+    } finally {
+      setPendingReminderIds((prev) => prev.filter((id) => id !== lessonId));
+    }
+  };
+
+  const handleMarkPaid = async (lessonId: number) => {
+    if (pendingPaymentIds.includes(lessonId)) return;
+    setPendingPaymentIds((prev) => [...prev, lessonId]);
+    setShouldAutoCloseDebt(true);
+    try {
+      await onTogglePaid(lessonId, studentEntry.student.id);
+    } finally {
+      setPendingPaymentIds((prev) => prev.filter((id) => id !== lessonId));
+    }
+  };
+
+  useEffect(() => {
+    if (shouldAutoCloseDebt && previousDebtCount.current > 0 && studentDebtItems.length === 0) {
+      setIsDebtPopoverOpen(false);
+      setShouldAutoCloseDebt(false);
+    } else if (shouldAutoCloseDebt && studentDebtItems.length > 0 && pendingPaymentIds.length === 0) {
+      setShouldAutoCloseDebt(false);
+    }
+    previousDebtCount.current = studentDebtItems.length;
+  }, [pendingPaymentIds.length, shouldAutoCloseDebt, studentDebtItems.length]);
 
   return (
     <div className={styles.screen}>
       <div className={styles.scrollArea}>
         <div className={styles.inner}>
-          <div className={styles.backRow}>
-            <button type="button" className={styles.backButton} onClick={onBack}>
-              <FontAwesomeIcon icon={faArrowLeft} />
-            </button>
-            <h2 className={styles.backTitle}>Назад к списку</h2>
-          </div>
+          {isMobile ? (
+            <div className={styles.backRow}>
+              <Tooltip content="Вернуться к списку" side="bottom" align="start">
+                <button
+                  type="button"
+                  className={styles.backButton}
+                  onClick={onBack}
+                  aria-label="Вернуться к списку"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} />
+                </button>
+              </Tooltip>
+              <h2 className={styles.backTitle}>Ученики</h2>
+            </div>
+          ) : null}
 
           <section className={styles.heroCard}>
             <div className={styles.heroMainRow}>
@@ -346,49 +478,94 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 >
                   {getStudentInitials(studentEntry)}
                 </div>
-                <div>
-                  <h1 className={styles.heroName}>{getStudentDisplayName(studentEntry)}</h1>
-                  <div className={styles.heroBadges}>
-                    <span className={styles.heroLevelBadge}>{cardPresentation.levelLabel}</span>
-                    <span
-                      className={`${styles.heroStatusBadge} ${
-                        statusMeta.tone === 'active'
-                          ? styles.heroStatusActive
-                          : statusMeta.tone === 'paused'
-                            ? styles.heroStatusPaused
-                            : styles.heroStatusCompleted
-                      }`}
-                    >
-                      {statusMeta.label}
-                    </span>
+                <div className={styles.heroIdentityContent}>
+                  <div className={styles.heroTitleRow}>
+                    <h1 className={styles.heroName}>{getStudentDisplayName(studentEntry)}</h1>
+                    <div className={styles.heroBadges}>
+                      {studentLevelLabel ? (
+                        <Tooltip content="Уровень ученика" side="bottom" align="center">
+                          <span className={styles.heroLevelBadge}>{studentLevelLabel}</span>
+                        </Tooltip>
+                      ) : null}
+                      {hasDebtBadge ? (
+                        <Tooltip content="Есть неоплаченные занятия" side="bottom" align="center">
+                          <span className={styles.heroDebtBadge}>Долг</span>
+                        </Tooltip>
+                      ) : null}
+                      {showActivationBadge ? (
+                        <Tooltip content={activationHint} side="bottom" align="center">
+                          <span className={styles.heroInactiveBadge}>Не активирован</span>
+                        </Tooltip>
+                      ) : null}
+                      <Tooltip content="Статус ученика" side="bottom" align="center">
+                        <span
+                          className={`${styles.heroStatusBadge} ${
+                            statusMeta.tone === 'active'
+                              ? styles.heroStatusActive
+                              : statusMeta.tone === 'paused'
+                                ? styles.heroStatusPaused
+                                : styles.heroStatusCompleted
+                          }`}
+                        >
+                          {statusMeta.label}
+                        </span>
+                      </Tooltip>
+                    </div>
                   </div>
-                  <div className={styles.heroContactsRow}>
-                    <span>
-                      <FontAwesomeIcon icon={faEnvelope} /> {emailLabel}
-                    </span>
-                    <span>
-                      <FontAwesomeIcon icon={faPhone} /> {phoneLabel}
-                    </span>
-                    <span>
-                      <FontAwesomeIcon icon={faCalendar} /> С нами с{' '}
-                      {studentEntry.student.createdAt
-                        ? formatInTimeZone(studentEntry.student.createdAt, 'd MMM yyyy', { timeZone })
-                        : '—'}
-                    </span>
-                  </div>
+                  {emailLabel || phoneLabel ? (
+                    <div className={styles.heroContactsRow}>
+                      {emailLabel ? (
+                        <span className={styles.contactItem}>
+                          <FontAwesomeIcon icon={faEnvelope} /> {emailLabel}
+                        </span>
+                      ) : null}
+                      {phoneLabel ? (
+                        <span className={styles.contactItem}>
+                          <FontAwesomeIcon icon={faPhone} /> {phoneLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               <div className={styles.heroActions}>
-                <button type="button" className={styles.secondaryAction} onClick={onWriteToStudent}>
-                  <FontAwesomeIcon icon={faComment} /> Написать
-                </button>
+                <Tooltip content="Написать в Телеграм" side="bottom" align="center">
+                  <button type="button" className={styles.secondaryAction} onClick={onWriteToStudent}>
+                    <FontAwesomeIcon icon={faComment} /> Написать
+                  </button>
+                </Tooltip>
                 <button type="button" className={styles.primaryAction} onClick={onScheduleLesson}>
                   <FontAwesomeIcon icon={faCalendarPlus} /> Назначить занятие
                 </button>
-                <button type="button" className={styles.menuAction} aria-label="Дополнительные действия">
-                  <FontAwesomeIcon icon={faEllipsis} />
-                </button>
+                <AdaptivePopover
+                  isOpen={isActionsMenuOpen}
+                  onClose={() => setIsActionsMenuOpen(false)}
+                  side="bottom"
+                  align="end"
+                  offset={8}
+                  className={styles.actionsMenu}
+                  trigger={
+                    <button
+                      type="button"
+                      className={styles.menuAction}
+                      aria-label="Быстрые действия по ученику"
+                      onClick={() => setIsActionsMenuOpen((prev) => !prev)}
+                    >
+                      <FontAwesomeIcon icon={faEllipsis} />
+                    </button>
+                  }
+                >
+                  <button type="button" onClick={() => handleMenuAction(onEditStudent)}>
+                    Редактировать ученика
+                  </button>
+                  <button type="button" onClick={openReminderSettings}>
+                    Настройки уведомлений
+                  </button>
+                  <button type="button" className={styles.dangerButton} onClick={() => handleMenuAction(onRequestDeleteStudent)}>
+                    Удалить ученика
+                  </button>
+                </AdaptivePopover>
               </div>
             </div>
 
@@ -397,24 +574,131 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <div className={styles.heroStatValue}>{profileStats.lessonsConducted}</div>
                 <div className={styles.heroStatLabel}>Занятий проведено</div>
               </div>
-              <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatGreen}`}>{profileStats.attendanceRate}%</div>
-                <div className={styles.heroStatLabel}>Посещаемость</div>
-              </div>
-              <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{profileStats.averageScore}</div>
-                <div className={styles.heroStatLabel}>Средний балл</div>
-              </div>
+              <button
+                type="button"
+                className={styles.heroStatButton}
+                onClick={() => onEditStudent({ focusField: 'price' })}
+                aria-label="Изменить цену занятия"
+              >
+                <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{priceValueLabel}</div>
+                <div className={styles.heroStatLabel}>Цена за урок</div>
+              </button>
+              {hasUnpaidLessons ? (
+                <AdaptivePopover
+                  isOpen={isDebtPopoverOpen}
+                  onClose={() => setIsDebtPopoverOpen(false)}
+                  side="bottom"
+                  align="start"
+                  offset={8}
+                  className={styles.debtPopover}
+                  trigger={(
+                    <button
+                      type="button"
+                      className={`${styles.heroStatButton} ${styles.heroStatDangerButton}`}
+                      onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                      aria-label="Показать неоплаченные занятия"
+                    >
+                      <div className={`${styles.heroStatValue} ${styles.heroStatDanger}`}>{unpaidLessonsValueLabel}</div>
+                      <div className={styles.heroStatLabel}>{unpaidLessonsLabel}</div>
+                    </button>
+                  )}
+                >
+                  <StudentDebtPopoverContent
+                    items={studentDebtItems}
+                    pendingIds={pendingPaymentIds}
+                    pendingReminderIds={pendingReminderIds}
+                    onMarkPaid={handleMarkPaid}
+                    onSendPaymentReminder={handleRemindPayment}
+                    reminderDisabledReason={reminderDisabledReason}
+                  />
+                </AdaptivePopover>
+              ) : (
+                <div>
+                  <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{profileStats.averageScore}</div>
+                  <div className={styles.heroStatLabel}>Средний балл</div>
+                </div>
+              )}
               <div>
                 <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>{profileStats.completedHomeworks}</div>
                 <div className={styles.heroStatLabel}>Домашек сдано</div>
               </div>
               <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatOrange}`}>{profileStats.courseProgress}%</div>
-                <div className={styles.heroStatLabel}>Прогресс курса</div>
+                <div className={`${styles.heroStatValue} ${styles.heroStatGreen}`}>{profileStats.attendanceRate}%</div>
+                <div className={styles.heroStatLabel}>Посещаемость</div>
               </div>
             </div>
           </section>
+
+          {!isMobile && (
+            <Modal open={isReminderSettingsOpen} title="Настройки уведомлений" onClose={() => setIsReminderSettingsOpen(false)}>
+              <div className={styles.reminderSheet}>
+                <div className={styles.reminderRow}>
+                  <div>
+                    <div className={styles.reminderLabel}>Напоминания об оплате</div>
+                    <div className={styles.reminderHelper}>
+                      {paymentRemindersEnabled ? 'Сейчас включены для этого ученика' : 'Сейчас выключены для этого ученика'}
+                    </div>
+                  </div>
+                  <label className={controls.switch}>
+                    <input
+                      type="checkbox"
+                      checked={paymentRemindersEnabled}
+                      onChange={handleTogglePaymentReminders}
+                    />
+                    <span className={controls.slider} />
+                  </label>
+                </div>
+                <p className={styles.reminderHint}>
+                  Управляет автоматическими уведомлениями по оплате именно для этого ученика.
+                </p>
+                <div className={styles.reminderActions}>
+                  <button
+                    type="button"
+                    className={controls.secondaryButton}
+                    onClick={() => setIsReminderSettingsOpen(false)}
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          )}
+
+          {isMobile && (
+            <BottomSheet isOpen={isReminderSettingsOpen} onClose={() => setIsReminderSettingsOpen(false)}>
+              <div className={styles.reminderSheet}>
+                <h3 className={styles.reminderTitle}>Настройки уведомлений</h3>
+                <div className={styles.reminderRow}>
+                  <div>
+                    <div className={styles.reminderLabel}>Напоминания об оплате</div>
+                    <div className={styles.reminderHelper}>
+                      {paymentRemindersEnabled ? 'Сейчас включены для этого ученика' : 'Сейчас выключены для этого ученика'}
+                    </div>
+                  </div>
+                  <label className={controls.switch}>
+                    <input
+                      type="checkbox"
+                      checked={paymentRemindersEnabled}
+                      onChange={handleTogglePaymentReminders}
+                    />
+                    <span className={controls.slider} />
+                  </label>
+                </div>
+                <p className={styles.reminderHint}>
+                  Управляет автоматическими уведомлениями по оплате именно для этого ученика.
+                </p>
+                <div className={styles.reminderActions}>
+                  <button
+                    type="button"
+                    className={controls.secondaryButton}
+                    onClick={() => setIsReminderSettingsOpen(false)}
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </BottomSheet>
+          )}
 
           <div className={styles.bodyGrid}>
             <div className={styles.mainColumn}>
@@ -433,9 +717,6 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       </button>
                     ))}
                   </div>
-                  <button type="button" className={styles.viewAllButton}>
-                    Посмотреть всё
-                  </button>
                 </div>
 
                 <div className={styles.tabContent}>{tabContent}</div>
@@ -444,31 +725,57 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
 
             <div className={styles.sideColumn}>
               <section className={styles.sideCard}>
-                <div className={styles.sideCardHeader}>
-                  <div className={styles.sideIconWrap}>
-                    <FontAwesomeIcon icon={faChartLine} />
+                <div className={styles.notesHeader}>
+                  <h3 className={styles.sideUpperTitle}>Заметки</h3>
+                  <button type="button" className={styles.addNoteButton}>Добавить</button>
+                </div>
+                <div className={styles.notesList}>
+                  {generatedNotes.map((note) => (
+                    <article
+                      key={`${note.date}_${note.text.slice(0, 12)}`}
+                      className={`${styles.noteCard} ${note.tone === 'warning' ? styles.noteWarning : styles.noteInfo}`}
+                    >
+                      <p>{note.text}</p>
+                      <span>{note.date}</span>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className={styles.contactCard}>
+                <div className={styles.contactHeader}>
+                  <div className={styles.contactIconWrap}>
+                    <FontAwesomeIcon icon={faAddressCard} />
                   </div>
-                  <div>
-                    <h3 className={styles.sideTitle}>Прогресс</h3>
-                    <p className={styles.sideSubtitle}>Последние 6 месяцев</p>
-                  </div>
+                  <h3>Информация</h3>
                 </div>
 
-                <div className={styles.chartWrap}>
-                  <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.chartSvg} preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="studentsProgressGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#b9ff66" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#b9ff66" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <polygon points={chartGeometry.area} fill="url(#studentsProgressGradient)" />
-                    <polyline points={chartGeometry.line} fill="none" stroke="#b9ff66" strokeWidth="3" />
-                  </svg>
-                  <div className={styles.chartLabelsRow}>
-                    {progress.points.map((point) => (
-                      <span key={point.label}>{point.label}</span>
-                    ))}
+                <div className={styles.contactList}>
+                  <div>
+                    <FontAwesomeIcon icon={faPaperPlane} />
+                    <span>{studentEntry.student.username ? `@${studentEntry.student.username}` : 'Не указан'}</span>
+                  </div>
+                  {phoneLabel ? (
+                    <div>
+                      <FontAwesomeIcon icon={faPhone} />
+                      <span>{phoneLabel}</span>
+                    </div>
+                  ) : null}
+                  {emailLabel ? (
+                    <div>
+                      <FontAwesomeIcon icon={faEnvelope} />
+                      <span>{emailLabel}</span>
+                    </div>
+                  ) : null}
+                  {studentLevelLabel ? (
+                    <div>
+                      <FontAwesomeIcon icon={faStar} />
+                      <span>{studentLevelLabel}</span>
+                    </div>
+                  ) : null}
+                  <div>
+                    <FontAwesomeIcon icon={faCalendar} />
+                    <span>С нами с {memberSinceLabel}</span>
                   </div>
                 </div>
               </section>
@@ -499,47 +806,37 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </div>
               </section>
 
+              {/*
               <section className={styles.sideCard}>
-                <div className={styles.notesHeader}>
-                  <h3 className={styles.sideUpperTitle}>Заметки</h3>
-                  <button type="button" className={styles.addNoteButton}>Добавить</button>
-                </div>
-                <div className={styles.notesList}>
-                  {generatedNotes.map((note) => (
-                    <article
-                      key={`${note.date}_${note.text.slice(0, 12)}`}
-                      className={`${styles.noteCard} ${note.tone === 'warning' ? styles.noteWarning : styles.noteInfo}`}
-                    >
-                      <p>{note.text}</p>
-                      <span>{note.date}</span>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className={styles.contactCard}>
-                <div className={styles.contactHeader}>
-                  <div className={styles.contactIconWrap}>
-                    <FontAwesomeIcon icon={faAddressCard} />
+                <div className={styles.sideCardHeader}>
+                  <div className={styles.sideIconWrap}>
+                    <FontAwesomeIcon icon={faChartLine} />
                   </div>
-                  <h3>Контакты</h3>
+                  <div>
+                    <h3 className={styles.sideTitle}>Прогресс</h3>
+                    <p className={styles.sideSubtitle}>Последние 6 месяцев</p>
+                  </div>
                 </div>
 
-                <div className={styles.contactList}>
-                  <div>
-                    <FontAwesomeIcon icon={faPaperPlane} />
-                    <span>{studentEntry.student.username ? `@${studentEntry.student.username}` : 'Не указан'}</span>
-                  </div>
-                  <div>
-                    <FontAwesomeIcon icon={faPhone} />
-                    <span>{phoneLabel}</span>
-                  </div>
-                  <div>
-                    <FontAwesomeIcon icon={faStar} />
-                    <span>{cardPresentation.levelLabel}</span>
+                <div className={styles.chartWrap}>
+                  <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.chartSvg} preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="studentsProgressGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#b9ff66" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#b9ff66" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <polygon points={chartGeometry.area} fill="url(#studentsProgressGradient)" />
+                    <polyline points={chartGeometry.line} fill="none" stroke="#b9ff66" strokeWidth="3" />
+                  </svg>
+                  <div className={styles.chartLabelsRow}>
+                    {progress.points.map((point) => (
+                      <span key={point.label}>{point.label}</span>
+                    ))}
                   </div>
                 </div>
               </section>
+              */}
             </div>
           </div>
         </div>

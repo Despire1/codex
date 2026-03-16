@@ -1,4 +1,4 @@
-import { startOfMonth } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlockNavigation, useLocation, useNavigate } from 'react-router-dom';
 import { HomeworkGroupListItem, HomeworkTemplate, Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
@@ -186,6 +186,7 @@ const AppPageContent = () => {
     openRecurringDeleteDialog,
     openPaymentCancelDialog,
     openPaymentBalanceDialog,
+    openLessonEditPaymentResetDialog,
   } = useAppDialogs();
   const triggerStudentsListReload = useCallback(() => {
     setStudentListReloadKey((prev) => prev + 1);
@@ -330,6 +331,10 @@ const AppPageContent = () => {
     guardedNavigate(tabPathById.students);
   }, [guardedNavigate]);
 
+  const navigateToStudentProfile = useCallback((studentId: number) => {
+    guardedNavigate(`${tabPathById.students}/${studentId}`);
+  }, [guardedNavigate]);
+
   const navigateToSchedule = useCallback(() => {
     guardedNavigate(tabPathById.schedule);
   }, [guardedNavigate]);
@@ -401,6 +406,7 @@ const AppPageContent = () => {
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherHomeworkReviewRoute = !isStudentRole && /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
+  const isStudentProfileRoute = !isStudentRole && /^\/students\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
@@ -579,6 +585,7 @@ const AppPageContent = () => {
     showInfoDialog,
     openConfirmDialog,
     navigateToStudents,
+    navigateToStudentProfile,
     triggerStudentsListReload,
     refreshPayments,
     clearStudentData,
@@ -664,6 +671,7 @@ const AppPageContent = () => {
     openRecurringDeleteDialog,
     openPaymentCancelDialog,
     openPaymentBalanceDialog,
+    openLessonEditPaymentResetDialog,
     navigateToSchedule,
     setDayViewDate,
     filterLessonsForCurrentRange,
@@ -702,7 +710,9 @@ const AppPageContent = () => {
   const openCreateLesson = useCallback(
     (date?: Date) => {
       const lessonDate = date ?? new Date();
-      const lessonIso = formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+      const lessonIso = date
+        ? format(lessonDate, 'yyyy-MM-dd')
+        : formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
 
       if (date) {
         setScheduleView('month');
@@ -1045,7 +1055,7 @@ const AppPageContent = () => {
   const onDashboardOpenStudent = useCallback(
     (studentId: number) => {
       setSelectedStudentId(studentId);
-      guardedNavigate(tabPathById.students);
+      guardedNavigate(`${tabPathById.students}/${studentId}`);
     },
     [guardedNavigate, setSelectedStudentId],
   );
@@ -1308,8 +1318,9 @@ const AppPageContent = () => {
                             }
                             showTemplateCreateActions={isTeacherTemplateEditorRoute}
                             showTemplateSaveDraft={!isTeacherTemplateEditRoute}
-                            showBackButton={isTeacherTemplateEditorRoute}
-                            onBack={() => guardedNavigate(tabPathById.homeworks)}
+                            showBackButton={isTeacherTemplateEditorRoute || isStudentProfileRoute}
+                            onBack={() => guardedNavigate(isTeacherTemplateEditorRoute ? tabPathById.homeworks : tabPathById.students)}
+                            backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
                             onSaveDraft={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
                             onCreateTemplate={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
                             templateCreateSubmitting={templateCreateTopbarState.submitting}

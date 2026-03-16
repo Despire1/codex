@@ -1,13 +1,10 @@
 import type { Lesson } from '../../types';
 
 export const LESSON_DANGEROUS_MUTATION_LOCK_REASON =
-  'Урок уже проведён или оплачен. Перенос недоступен, чтобы не переписать историю.';
-
-export const LESSON_DELETE_LOCK_REASON =
-  'Проведённый или оплаченный урок нельзя удалить. Если урок не состоялся, используйте отмену.';
+  'Изменение этого урока потребует дополнительного подтверждения.';
 
 export const LESSON_COMPLETED_LIMITED_EDIT_NOTICE =
-  'Урок уже проведён или оплачен. Можно изменить только безопасные поля: дата, время, ученики и повтор серии недоступны.';
+  'Урок уже проведён или оплачен. При сохранении покажем предупреждение и, если нужно, предложим вернуть оплату на баланс.';
 
 export const resolveLessonFullyPaid = (lesson: Lesson) => {
   if (lesson.participants && lesson.participants.length > 0) {
@@ -31,13 +28,9 @@ export const resolveLessonHistoryLocked = (lesson: Lesson) =>
 
 export const resolveLessonEditDisabledReason = (_lesson: Lesson) => null;
 
-export const resolveLessonMutationDisabledReason = (lesson: Lesson) =>
-  resolveLessonHistoryLocked(lesson) ? LESSON_DANGEROUS_MUTATION_LOCK_REASON : null;
+export const resolveLessonMutationDisabledReason = (_lesson: Lesson) => null;
 
-export const resolveLessonDeleteDisabledReason = (lesson: Lesson) =>
-  lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)
-    ? LESSON_DELETE_LOCK_REASON
-    : null;
+export const resolveLessonDeleteDisabledReason = (_lesson: Lesson) => null;
 
 export const resolveLessonLimitedEditNotice = (lesson: Lesson) =>
   resolveLessonAllowsLimitedMetadataEdit(lesson) ? LESSON_COMPLETED_LIMITED_EDIT_NOTICE : null;

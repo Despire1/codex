@@ -51,6 +51,12 @@ export const PeopleIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const PersonOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm296.5-343.5Q560-607 560-640t-23.5-56.5Q513-720 480-720t-56.5 23.5Q400-673 400-640t23.5 56.5Q447-560 480-560t56.5-23.5ZM480-640Zm0 400Z" />
+  </svg>
+);
+
 export const EventNoteIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M17 10H7v2h10v-2zm0 4H7v2h10v-2zm2-12h-1V1h-2v1H8V1H6v1H5c-1.1 0-1.99.9-1.99 2L3 21c0 1.1.89 2 1.99 2H19c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 19H5V8h14v13z" />
@@ -151,9 +157,8 @@ export const NotificationsNoneOutlinedIcon = (props: SVGProps<SVGSVGElement>) =>
 );
 
 export const EditOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
-    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" />
-    <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L14.13 5.1l3.75 3.75 2.83-2.83z" />
+  <svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z" />
   </svg>
 );
 
@@ -176,8 +181,8 @@ export const CloseIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 export const ReplayOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
-    <path d="M12 5V1L7 6l5 5V7c2.76 0 5 2.24 5 5a5 5 0 1 1-5-5v2l4-4-4-4v2c-3.86 0-7 3.14-7 7s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7z" />
+  <svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" />
   </svg>
 );
 
@@ -276,6 +281,12 @@ export const EditCalendarOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
 export const DeleteOutlineIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM18 4h-3.5l-1-1h-3l-1 1H4v2h16V4z" />
+  </svg>
+);
+
+export const CancelCircleOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M324-111.5Q251-143 197-197t-85.5-127Q80-397 80-480t31.5-156Q143-709 197-763t127-85.5Q397-880 480-880t156 31.5Q709-817 763-763t85.5 127Q880-563 880-480t-31.5 156Q817-251 763-197t-127 85.5Q563-80 480-80t-156-31.5ZM480-160q54 0 104-17.5t92-50.5L228-676q-33 42-50.5 92T160-480q0 134 93 227t227 93Zm252-124q33-42 50.5-92T800-480q0-134-93-227t-227-93q-54 0-104 17.5T284-732l448 448ZM480-480Z" />
   </svg>
 );
 

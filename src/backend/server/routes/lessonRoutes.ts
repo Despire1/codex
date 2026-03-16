@@ -129,10 +129,16 @@ export const tryHandleLessonRoutes = async ({
     const body = await readBody(req);
     const result = await handlers.updateLesson(requireApiUser(), lessonId, body);
     if (result && typeof result === 'object' && 'lessons' in result) {
-      sendJson(res, 200, { lessons: (result as any).lessons });
+      sendJson(res, 200, { lessons: (result as any).lessons, links: (result as any).links });
       return true;
     }
-    sendJson(res, 200, { lesson: result });
+    sendJson(
+      res,
+      200,
+      result && typeof result === 'object' && 'lesson' in result
+        ? { lesson: (result as any).lesson, links: (result as any).links }
+        : { lesson: result },
+    );
     return true;
   }
 

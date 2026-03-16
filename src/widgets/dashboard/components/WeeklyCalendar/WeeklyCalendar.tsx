@@ -13,7 +13,7 @@ import {
 import { Lesson, LinkedStudent } from '@/entities/types';
 import { LessonChip } from '@/entities/lesson/ui/LessonChip/LessonChip';
 import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
-import { resolveLessonHasPaidParticipant } from '@/entities/lesson/lib/lessonMutationGuards';
+import { resolveLessonCancelActionCopy } from '@/entities/lesson/lib/lessonStatusPresentation';
 import { useLessonActions } from '@/features/lessons/model/useLessonActions';
 import type {
   LessonCancelRefundMode,
@@ -61,10 +61,10 @@ const LESSON_ROW_GAP = 8;
 const MAX_VISIBLE_LESSONS = 10;
 
 const resolveCancelDialogCopy = (lesson: Lesson | null) => {
-  const isCorrectionFlow = Boolean(lesson && (lesson.status === 'COMPLETED' || resolveLessonHasPaidParticipant(lesson)));
+  const copy = resolveLessonCancelActionCopy(lesson);
   return {
-    title: isCorrectionFlow ? 'Исправить статус урока' : 'Отменить урок',
-    confirmText: isCorrectionFlow ? 'Изменить статус' : 'Отменить урок',
+    title: copy.title.replace('?', ''),
+    confirmText: copy.confirmText,
   };
 };
 
@@ -90,7 +90,7 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
     [linkedStudents],
   );
 
-  const { openLessonModal, openRescheduleModal, cancelLesson, restoreLesson } = useLessonActions();
+  const { openLessonModal, cancelLesson, restoreLesson, requestDeleteLessonFromList } = useLessonActions();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const baseWeekStart = useMemo(() => startOfWeek(todayZoned, { weekStartsOn: 1 }), [todayZoned]);
   const weekStart = useMemo(() => addWeeks(baseWeekStart, weekOffset), [baseWeekStart, weekOffset]);
@@ -181,10 +181,6 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
       focus,
       skipNavigation: true,
     });
-  };
-
-  const openRescheduleLessonModal = (lesson: Lesson) => {
-    openRescheduleModal(lesson, { skipNavigation: true });
   };
 
   const openLessonPopoverForLesson = (lesson: Lesson, anchorEl: HTMLElement) => {
@@ -432,16 +428,17 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
             lesson={activeLesson}
             linkedStudentsById={linkedStudentsById}
             timeZone={timeZone}
-            onReschedule={() => {
-              closeLessonPopover();
-              openRescheduleLessonModal(activeLesson);
-            }}
             onEditFull={() => {
               closeLessonPopover();
               openLessonEditModal(activeLesson, 'full');
             }}
+            onDelete={() => {
+              closeLessonPopover();
+              requestDeleteLessonFromList(activeLesson);
+            }}
             onCancel={() => handleCancelLesson(activeLesson)}
             onRestore={() => handleRestoreLesson(activeLesson)}
+            onClose={closeLessonPopover}
           />
         )}
       </AnchoredPopover>

@@ -393,6 +393,7 @@
 
 .lessonPopover {
   overflow: visible;
+  border-radius: 26px;
 }
 
 .lessonPopover::before {

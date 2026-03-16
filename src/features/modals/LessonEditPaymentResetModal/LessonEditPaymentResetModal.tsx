@@ -2,24 +2,22 @@ import { FC, useState } from 'react';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import modalStyles from '../../../shared/ui/Modal/Modal.module.css';
 import controls from '../../../shared/styles/controls.module.css';
-import styles from './PaymentBalanceModal.module.css';
+import styles from './LessonEditPaymentResetModal.module.css';
 
-interface PaymentBalanceModalProps {
+interface LessonEditPaymentResetModalProps {
   open: boolean;
   title: string;
   message: string;
   onClose: () => void | Promise<void>;
-  onWriteOff: () => void | Promise<void>;
-  onSkip: () => void | Promise<void>;
+  onConfirm: () => void | Promise<void>;
 }
 
-export const PaymentBalanceModal: FC<PaymentBalanceModalProps> = ({
+export const LessonEditPaymentResetModal: FC<LessonEditPaymentResetModalProps> = ({
   open,
   title,
   message,
   onClose,
-  onWriteOff,
-  onSkip,
+  onConfirm,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,7 +34,9 @@ export const PaymentBalanceModal: FC<PaymentBalanceModalProps> = ({
   return (
     <Modal open={open} title={title} onClose={isSubmitting ? () => undefined : onClose}>
       <p className={modalStyles.message}>{message}</p>
-      <p className={modalStyles.message}>Можно списать 1 занятие с баланса или оставить оплату без списания.</p>
+      <p className={modalStyles.message}>
+        Мы снимем отметку оплаты у оплаченных участников этого урока и вернём по 1 занятию на их баланс перед сохранением.
+      </p>
       <div className={styles.actions}>
         <button
           type="button"
@@ -50,28 +50,15 @@ export const PaymentBalanceModal: FC<PaymentBalanceModalProps> = ({
         </button>
         <button
           type="button"
-          className={`${controls.secondaryButton} ${styles.button}`}
-          onClick={() => {
-            void handleAction(onSkip);
-          }}
-          disabled={isSubmitting}
-        >
-          <span className={modalStyles.buttonContent}>
-            {isSubmitting ? <span className={modalStyles.buttonSpinner} aria-hidden /> : null}
-            <span>Не списывать</span>
-          </span>
-        </button>
-        <button
-          type="button"
           className={`${controls.primaryButton} ${styles.button}`}
           onClick={() => {
-            void handleAction(onWriteOff);
+            void handleAction(onConfirm);
           }}
           disabled={isSubmitting}
         >
           <span className={modalStyles.buttonContent}>
             {isSubmitting ? <span className={modalStyles.buttonSpinner} aria-hidden /> : null}
-            <span>Списать с баланса</span>
+            <span>Вернуть и сохранить</span>
           </span>
         </button>
       </div>
