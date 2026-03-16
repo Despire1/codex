@@ -27,6 +27,7 @@ import { isVisibleLesson } from '../../../entities/lesson/lib/lessonMutationGuar
 import { StudentTabId } from '../types';
 
 const PAYMENT_REMINDERS_PAGE_SIZE = 10;
+const STUDENT_LESSONS_PAGE_SIZE = 10;
 
 const mergePaymentReminders = (current: PaymentReminderLog[], incoming: PaymentReminderLog[]) => {
   const seen = new Set<number>();
@@ -54,7 +55,12 @@ export type StudentsDataConfig = {
 };
 
 type LoadStudentHomeworksOptions = { offset?: number; append?: boolean; studentIdOverride?: number | null };
-type LoadStudentLessonsOptions = { studentIdOverride?: number | null; sortOverride?: LessonSortOrder };
+type LoadStudentLessonsOptions = {
+  studentIdOverride?: number | null;
+  sortOverride?: LessonSortOrder;
+  offset?: number;
+  append?: boolean;
+};
 type LoadStudentLessonsSummaryOptions = { studentIdOverride?: number | null };
 type LoadStudentUnpaidLessonsOptions = { studentIdOverride?: number | null; force?: boolean };
 
@@ -65,9 +71,12 @@ export type StudentsDataContextValue = {
   loadStudentHomeworks: (options?: LoadStudentHomeworksOptions) => Promise<void>;
   loadMoreStudentHomeworks: () => void;
   studentLessons: Lesson[];
+  studentLessonsHasMore: boolean;
   studentLessonsSummary: Lesson[];
   studentLessonLoading: boolean;
+  studentLessonLoadingMore: boolean;
   loadStudentLessons: (options?: LoadStudentLessonsOptions) => Promise<void>;
+  loadMoreStudentLessons: () => void;
   loadStudentLessonsSummary: (options?: LoadStudentLessonsSummaryOptions) => Promise<void>;
   loadStudentUnpaidLessons: (options?: LoadStudentUnpaidLessonsOptions) => Promise<void>;
   studentDebtItems: StudentDebtItem[];
@@ -122,8 +131,11 @@ export const useStudentsDataInternal = ({
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
+  const [studentLessonsHasMore, setStudentLessonsHasMore] = useState(false);
+  const [studentLessonsNextOffset, setStudentLessonsNextOffset] = useState<number | null>(null);
   const [studentLessonsSummary, setStudentLessonsSummary] = useState<Lesson[]>([]);
   const [studentLessonLoading, setStudentLessonLoading] = useState(false);
+  const [studentLessonLoadingMore, setStudentLessonLoadingMore] = useState(false);
   const [studentUnpaidLessonsByStudent, setStudentUnpaidLessonsByStudent] = useState<Record<number, StudentDebtItem[]>>(
     {},
   );
@@ -141,6 +153,8 @@ export const useStudentsDataInternal = ({
   >({});
   const lessonLoadRequestId = useRef(0);
   const lessonSummaryLoadRequestId = useRef(0);
+  const lessonRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
+  const lessonSummaryRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const paymentFilterRef = useRef(paymentFilter);
   const paymentDateRef = useRef(paymentDate);
 
@@ -202,40 +216,87 @@ export const useStudentsDataInternal = ({
     async (options?: LoadStudentLessonsOptions) => {
       if (!hasAccess) {
         setStudentLessons([]);
+        setStudentLessonsHasMore(false);
+        setStudentLessonsNextOffset(null);
         return;
       }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentLessons([]);
+        setStudentLessonsHasMore(false);
+        setStudentLessonsNextOffset(null);
         return;
+      }
+
+      const startFrom = lessonDateRange.from
+        ? toUtcDateFromTimeZone(lessonDateRange.from, lessonDateRange.fromTime || '00:00', timeZone).toISOString()
+        : undefined;
+      const startTo = lessonDateRange.to
+        ? toUtcDateFromTimeZone(lessonDateRange.to, lessonDateRange.toTime || '23:59', timeZone).toISOString()
+        : undefined;
+      const sortOrder = options?.sortOverride ?? lessonSortOrder;
+      const offset = options?.offset ?? 0;
+      const append = Boolean(options?.append);
+      const requestKey = JSON.stringify({
+        studentId: targetStudentId,
+        payment: lessonPaymentFilter,
+        status: lessonStatusFilter,
+        startFrom: startFrom ?? null,
+        startTo: startTo ?? null,
+        sort: sortOrder,
+        offset,
+        limit: STUDENT_LESSONS_PAGE_SIZE,
+      });
+
+      if (lessonRequestRef.current?.key === requestKey) {
+        return lessonRequestRef.current.promise;
       }
 
       const requestId = lessonLoadRequestId.current + 1;
       lessonLoadRequestId.current = requestId;
-      setStudentLessonLoading(true);
+      const promise = (async () => {
+        if (append) {
+          setStudentLessonLoadingMore(true);
+        } else {
+          setStudentLessonLoading(true);
+        }
+        try {
+          const data = await api.listStudentLessons(targetStudentId, {
+            payment: lessonPaymentFilter,
+            status: lessonStatusFilter,
+            startFrom,
+            startTo,
+            sort: sortOrder,
+            offset,
+            limit: STUDENT_LESSONS_PAGE_SIZE,
+          });
+          if (lessonLoadRequestId.current !== requestId) return;
+          const normalizedLessons = data.items.map(normalizeLesson).filter(isVisibleLesson);
+          setStudentLessons((prev) =>
+            append ? [...prev, ...normalizedLessons.filter((lesson) => !prev.some((item) => item.id === lesson.id))] : normalizedLessons,
+          );
+          setStudentLessonsHasMore(data.nextOffset !== null);
+          setStudentLessonsNextOffset(data.nextOffset);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load student lessons', error);
+        } finally {
+          if (lessonLoadRequestId.current === requestId) {
+            if (append) {
+              setStudentLessonLoadingMore(false);
+            } else {
+              setStudentLessonLoading(false);
+            }
+          }
+        }
+      })();
+
+      lessonRequestRef.current = { key: requestKey, promise };
       try {
-        const startFrom = lessonDateRange.from
-          ? toUtcDateFromTimeZone(lessonDateRange.from, lessonDateRange.fromTime || '00:00', timeZone).toISOString()
-          : undefined;
-        const startTo = lessonDateRange.to
-          ? toUtcDateFromTimeZone(lessonDateRange.to, lessonDateRange.toTime || '23:59', timeZone).toISOString()
-          : undefined;
-        const sortOrder = options?.sortOverride ?? lessonSortOrder;
-        const data = await api.listStudentLessons(targetStudentId, {
-          payment: lessonPaymentFilter,
-          status: lessonStatusFilter,
-          startFrom,
-          startTo,
-          sort: sortOrder,
-        });
-        if (lessonLoadRequestId.current !== requestId) return;
-        setStudentLessons(data.items.map(normalizeLesson).filter(isVisibleLesson));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student lessons', error);
+        await promise;
       } finally {
-        if (lessonLoadRequestId.current === requestId) {
-          setStudentLessonLoading(false);
+        if (lessonRequestRef.current?.key === requestKey) {
+          lessonRequestRef.current = null;
         }
       }
     },
@@ -265,21 +326,43 @@ export const useStudentsDataInternal = ({
         return;
       }
 
+      const requestKey = JSON.stringify({
+        studentId: targetStudentId,
+        payment: 'all',
+        status: 'all',
+        sort: 'asc',
+      });
+
+      if (lessonSummaryRequestRef.current?.key === requestKey) {
+        return lessonSummaryRequestRef.current.promise;
+      }
+
       const requestId = lessonSummaryLoadRequestId.current + 1;
       lessonSummaryLoadRequestId.current = requestId;
+      const promise = (async () => {
+        try {
+          const data = await api.listStudentLessons(targetStudentId, {
+            payment: 'all',
+            status: 'all',
+            sort: 'asc',
+          });
+          if (lessonSummaryLoadRequestId.current !== requestId) return;
+          setStudentLessonsSummary(data.items.map(normalizeLesson).filter(isVisibleLesson));
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load student lessons summary', error);
+          if (lessonSummaryLoadRequestId.current === requestId) {
+            setStudentLessonsSummary([]);
+          }
+        }
+      })();
+
+      lessonSummaryRequestRef.current = { key: requestKey, promise };
       try {
-        const data = await api.listStudentLessons(targetStudentId, {
-          payment: 'all',
-          status: 'all',
-          sort: 'asc',
-        });
-        if (lessonSummaryLoadRequestId.current !== requestId) return;
-        setStudentLessonsSummary(data.items.map(normalizeLesson).filter(isVisibleLesson));
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student lessons summary', error);
-        if (lessonSummaryLoadRequestId.current === requestId) {
-          setStudentLessonsSummary([]);
+        await promise;
+      } finally {
+        if (lessonSummaryRequestRef.current?.key === requestKey) {
+          lessonSummaryRequestRef.current = null;
         }
       }
     },
@@ -309,6 +392,18 @@ export const useStudentsDataInternal = ({
     if (studentHomeworkLoading || !studentHomeworkHasMore) return;
     void loadStudentHomeworks({ offset: studentHomeworks.length, append: true });
   }, [loadStudentHomeworks, studentHomeworkHasMore, studentHomeworkLoading, studentHomeworks.length]);
+
+  const loadMoreStudentLessons = useCallback(() => {
+    if (studentLessonLoading || studentLessonLoadingMore || !studentLessonsHasMore) return;
+    if (typeof studentLessonsNextOffset !== 'number') return;
+    void loadStudentLessons({ offset: studentLessonsNextOffset, append: true });
+  }, [
+    loadStudentLessons,
+    studentLessonLoading,
+    studentLessonLoadingMore,
+    studentLessonsHasMore,
+    studentLessonsNextOffset,
+  ]);
 
   const refreshPayments = useCallback(
     async (studentId: number, options?: { filter?: 'all' | 'topup' | 'charges' | 'manual'; date?: string }) => {
@@ -366,26 +461,6 @@ export const useStudentsDataInternal = ({
     },
     [fetchPaymentRemindersPage],
   );
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (studentActiveTab !== 'lessons') return;
-    loadStudentLessons();
-  }, [loadStudentLessons, hasAccess, studentActiveTab]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    if (studentActiveTab !== 'payments') return;
-    refreshPayments(selectedStudentId);
-  }, [selectedStudentId, paymentDate, paymentFilter, refreshPayments, hasAccess, studentActiveTab]);
-
-  useEffect(() => {
-    if (!hasAccess) return;
-    if (!selectedStudentId) return;
-    if (studentActiveTab !== 'payments') return;
-    refreshPaymentReminders(selectedStudentId);
-  }, [selectedStudentId, refreshPaymentReminders, hasAccess, studentActiveTab]);
 
   const payments = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
   const studentDebtItems = selectedStudentId ? studentUnpaidLessonsByStudent[selectedStudentId] ?? [] : [];
@@ -488,9 +563,12 @@ export const useStudentsDataInternal = ({
       loadStudentHomeworks,
       loadMoreStudentHomeworks,
       studentLessons,
+      studentLessonsHasMore,
       studentLessonsSummary,
       studentLessonLoading,
+      studentLessonLoadingMore,
       loadStudentLessons,
+      loadMoreStudentLessons,
       loadStudentLessonsSummary,
       loadStudentUnpaidLessons,
       studentDebtItems,
@@ -511,6 +589,7 @@ export const useStudentsDataInternal = ({
       clearStudentData,
       loadMorePaymentReminders,
       loadMoreStudentHomeworks,
+      loadMoreStudentLessons,
       loadStudentHomeworks,
       loadStudentLessons,
       loadStudentLessonsSummary,
@@ -530,7 +609,9 @@ export const useStudentsDataInternal = ({
       studentHomeworkLoading,
       studentHomeworks,
       studentLessonLoading,
+      studentLessonLoadingMore,
       studentLessons,
+      studentLessonsHasMore,
       studentLessonsSummary,
     ],
   );

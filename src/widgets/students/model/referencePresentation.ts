@@ -158,7 +158,9 @@ export const buildProfileStats = (
   const courseProgress = studentEntry.stats.homeworkCompletionRate ?? 0;
   const missedLessons = Math.max(0, totalLessons - lessonsConducted);
   const totalPlatformHours = Math.round(
-    lessonsSummary.reduce((sum, lesson) => sum + Math.max(0, lesson.durationMinutes || 0), 0) / 60,
+    ((studentEntry.stats.totalLessonMinutes ??
+      lessonsSummary.reduce((sum, lesson) => sum + Math.max(0, lesson.durationMinutes || 0), 0)) /
+      60),
   );
   const nextDebtLesson = debtLessons[0]?.startAt;
   const nextPaymentDateLabel = nextDebtLesson

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { api } from '../../../shared/api/client';
 import { PaymentEvent, Student, TeacherStudent } from '../../../entities/types';
+import { getStudentPrimaryNoteText, replaceStudentPrimaryNote } from '../../../entities/student/lib/profileNotes';
 import { type ToastOptions } from '../../../shared/lib/toast';
 import { isValidEmail, normalizeEmail } from '../../../shared/lib/email';
 import { type StudentModalFocusField } from '../../../features/modals/StudentModal/types';
@@ -203,7 +204,7 @@ export const useStudentsActionsInternal = ({
       phone: link.phone ?? '',
       studentLevel: link.studentLevel ?? '',
       learningGoal: link.learningGoal ?? '',
-      notes: link.notes ?? '',
+      notes: getStudentPrimaryNoteText(link.notes),
     });
     setSelectedStudentId(targetStudentId);
     setEditingStudentId(targetStudentId);
@@ -259,7 +260,7 @@ export const useStudentsActionsInternal = ({
         phone: normalizeOptionalDraftValue(newStudentDraft.phone),
         studentLevel: normalizeOptionalDraftValue(newStudentDraft.studentLevel),
         learningGoal: normalizeOptionalDraftValue(newStudentDraft.learningGoal),
-        notes: normalizeOptionalDraftValue(newStudentDraft.notes),
+        notes: replaceStudentPrimaryNote('', { content: normalizeOptionalDraftValue(newStudentDraft.notes) }),
       });
 
       const { student, link } = data;
@@ -343,6 +344,7 @@ export const useStudentsActionsInternal = ({
     }
     setIsStudentSubmitting(true);
     try {
+      const existingLink = links.find((entry) => entry.studentId === editingStudentId && !entry.isArchived) ?? null;
       const data = await api.updateStudent(editingStudentId, {
         customName: newStudentDraft.customName.trim(),
         username: normalizeOptionalDraftValue(newStudentDraft.username),
@@ -351,7 +353,9 @@ export const useStudentsActionsInternal = ({
         phone: normalizeOptionalDraftValue(newStudentDraft.phone),
         studentLevel: normalizeOptionalDraftValue(newStudentDraft.studentLevel),
         learningGoal: normalizeOptionalDraftValue(newStudentDraft.learningGoal),
-        notes: normalizeOptionalDraftValue(newStudentDraft.notes),
+        notes: replaceStudentPrimaryNote(existingLink?.notes, {
+          content: normalizeOptionalDraftValue(newStudentDraft.notes),
+        }),
       });
 
       setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
@@ -381,6 +385,7 @@ export const useStudentsActionsInternal = ({
     newStudentDraft.pricePerLesson,
     newStudentDraft.studentLevel,
     newStudentDraft.username,
+    links,
     resetStudentDraft,
     setLinks,
     setStudents,

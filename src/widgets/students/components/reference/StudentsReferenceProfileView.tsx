@@ -1,4 +1,10 @@
-import { type FC, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type FC,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faAddressCard,
@@ -20,7 +26,30 @@ import {
   faWallet,
 } from '@fortawesome/free-solid-svg-icons';
 import { ru } from 'date-fns/locale';
-import { Homework, Lesson, PaymentEvent, StudentDebtItem, StudentListItem } from '../../../../entities/types';
+import {
+  Homework,
+  Lesson,
+  LinkedStudent,
+  PaymentEvent,
+  StudentDebtItem,
+  StudentListItem,
+} from '../../../../entities/types';
+import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
+import {
+  resolveLessonCancelActionCopy,
+  resolveLessonPaymentStatusLabel,
+  resolveLessonPaymentTone,
+  resolveLessonRecurrenceLabel,
+  resolveLessonStatusLabel,
+  resolveLessonStatusTone,
+} from '@/entities/lesson/lib/lessonStatusPresentation';
+import { resolveLessonEditDisabledReason } from '@/entities/lesson/lib/lessonMutationGuards';
+import { useLessonActions } from '@/features/lessons/model/useLessonActions';
+import type { LessonCancelRefundMode, LessonMutationPreview, LessonSeriesScope } from '@/features/lessons/model/types';
+import { LessonCancelDialog } from '@/features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import { LessonRestoreDialog } from '@/features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
+import { SeriesScopeDialog } from '@/features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { api } from '@/shared/api/client';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import {
   buildProfileStats,
@@ -38,7 +67,14 @@ import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '@/shared/ui/Modal/Modal';
 import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import controls from '@/shared/styles/controls.module.css';
+import {
+  CancelCircleOutlinedIcon,
+  DeleteOutlineIcon,
+  EditOutlinedIcon,
+  ReplayOutlinedIcon,
+} from '@/icons/MaterialIcons';
 import { StudentDebtPopoverContent } from '../StudentDebtPopoverContent';
+import { StudentProfileNotesPanel } from './StudentProfileNotesPanel';
 import styles from './StudentsReferenceProfileView.module.css';
 
 type ProfileTabId = 'homework' | 'lessons' | 'payments';
@@ -48,11 +84,24 @@ interface StudentsReferenceProfileViewProps {
   studentHomeworks: Homework[];
   studentHomeworksLoading: boolean;
   studentLessons: Lesson[];
+  studentLessonsHasMore: boolean;
   studentLessonsLoading: boolean;
+  studentLessonsLoadingMore: boolean;
   studentLessonsSummary: Lesson[];
   studentDebtItems: StudentDebtItem[];
   payments: PaymentEvent[];
   paymentsLoading: boolean;
+  onLoadMoreLessons: () => void;
+  onCreateStudentNote: (
+    studentEntry: StudentListItem,
+    payload: { content: string; noteType: 'IMPORTANT' | 'INFO' },
+  ) => Promise<void>;
+  onUpdateStudentNote: (
+    studentEntry: StudentListItem,
+    noteId: string,
+    payload: { content: string; noteType: 'IMPORTANT' | 'INFO' },
+  ) => Promise<void>;
+  onDeleteStudentNote: (studentEntry: StudentListItem, noteId: string) => Promise<void>;
   activeTab: ProfileTabId;
   onTabChange: (tab: ProfileTabId) => void;
   onBack: () => void;
@@ -68,9 +117,21 @@ interface StudentsReferenceProfileViewProps {
   ) => Promise<{ status: 'sent' | 'error' }>;
   onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
   onRemindHomework: (homeworkId: number) => void;
-  onOpenLesson: (lesson: Lesson) => void;
   timeZone: string;
 }
+
+type PendingScopeAction =
+  | {
+      type: 'cancel';
+      lesson: Lesson;
+      refundMode?: LessonCancelRefundMode;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    }
+  | {
+      type: 'restore';
+      lesson: Lesson;
+      previews?: Partial<Record<LessonSeriesScope, LessonMutationPreview>>;
+    };
 
 const profileTabs: Array<{ id: ProfileTabId; label: string; icon: typeof faBookOpen }> = [
   { id: 'lessons', label: 'Занятия', icon: faCalendarDays },
@@ -92,11 +153,17 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   studentHomeworks,
   studentHomeworksLoading,
   studentLessons,
+  studentLessonsHasMore,
   studentLessonsLoading,
+  studentLessonsLoadingMore,
   studentLessonsSummary,
   studentDebtItems,
   payments,
   paymentsLoading,
+  onLoadMoreLessons,
+  onCreateStudentNote,
+  onUpdateStudentNote,
+  onDeleteStudentNote,
   activeTab,
   onTabChange,
   onBack,
@@ -108,13 +175,18 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   onRemindLessonPayment,
   onTogglePaid,
   onRemindHomework,
-  onOpenLesson,
   timeZone,
 }) => {
   const isMobile = useIsMobile(760);
+  const { startEditLesson, requestDeleteLessonFromList, cancelLesson, restoreLesson } = useLessonActions();
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
+  const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
+  const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
+  const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
+  const lessonsListRef = useRef<HTMLDivElement | null>(null);
+  const lessonsLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
@@ -133,14 +205,20 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     () => [...studentHomeworks].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
     [studentHomeworks],
   );
-  const lessonsOrdered = useMemo(
-    () => [...studentLessons].sort((a, b) => b.startAt.localeCompare(a.startAt)).slice(0, 8),
-    [studentLessons],
-  );
+  const lessonsOrdered = studentLessons;
   const paymentsOrdered = useMemo(
     () => [...payments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
     [payments],
   );
+  const linkedStudentsById = useMemo(() => {
+    const map = new Map<number, LinkedStudent>();
+    map.set(studentEntry.student.id, {
+      ...studentEntry.student,
+      link: studentEntry.link,
+      homeworks: [],
+    });
+    return map;
+  }, [studentEntry.link, studentEntry.student]);
   const unpaidLessonsTotal = useMemo(() => {
     const total = studentDebtItems.reduce(
       (sum, item) => sum + (typeof item.price === 'number' && item.price > 0 ? item.price : 0),
@@ -153,40 +231,6 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
 
     return typeof studentEntry.debtRub === 'number' && studentEntry.debtRub > 0 ? studentEntry.debtRub : null;
   }, [studentDebtItems, studentEntry.debtRub]);
-
-  const generatedNotes = useMemo(() => {
-    const notes: Array<{ text: string; date: string; tone: 'warning' | 'info' }> = [];
-
-    if (studentDebtItems.length > 0) {
-      const debtSummary =
-        typeof unpaidLessonsTotal === 'number' && unpaidLessonsTotal > 0
-          ? `на сумму ${unpaidLessonsTotal.toLocaleString('ru-RU')} ₽`
-          : `в количестве ${studentDebtItems.length}`;
-      notes.push({
-        text: `Есть неоплаченные занятия ${debtSummary}. Стоит напомнить об оплате.`,
-        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
-        tone: 'warning',
-      });
-    }
-
-    if (profileStats.averageScore >= 8) {
-      notes.push({
-        text: 'Хороший прогресс по домашним заданиям. Можно добавить задания повышенной сложности.',
-        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
-        tone: 'info',
-      });
-    }
-
-    if (notes.length === 0) {
-      notes.push({
-        text: 'Заметок пока нет. Добавьте заметку после следующего занятия.',
-        date: formatInTimeZone(new Date(), 'd MMMM yyyy', { locale: ru, timeZone }),
-        tone: 'info',
-      });
-    }
-
-    return notes.slice(0, 2);
-  }, [profileStats.averageScore, studentDebtItems.length, timeZone, unpaidLessonsTotal]);
 
   const renderHomeworkTab = () => {
     if (studentHomeworksLoading && homeworksOrdered.length === 0) {
@@ -263,58 +307,147 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
       return <div className={styles.tabEmpty}>Занятия пока не назначены.</div>;
     }
 
+    const currentYearLabel = formatInTimeZone(new Date(), 'yyyy', { timeZone });
+
     return (
-      <div className={styles.listStack}>
+      <div ref={lessonsListRef} className={`${styles.listStack} ${styles.lessonsListStack}`}>
         {lessonsOrdered.map((lesson) => {
           const lessonTimestamp = new Date(lesson.startAt).getTime();
-          const isUpcoming = lesson.status === 'SCHEDULED' && lessonTimestamp > Date.now();
-          const statusLabel = isUpcoming ? 'Предстоящее' : lesson.status === 'COMPLETED' ? 'Проведено' : 'Отменено';
           const lessonEndAt = new Date(lessonTimestamp + Math.max(0, lesson.durationMinutes || 0) * 60_000);
+          const lessonYearLabel = formatInTimeZone(lesson.startAt, 'yyyy', { timeZone });
+          const lessonDatePattern =
+            lessonYearLabel === currentYearLabel ? 'd MMMM • HH:mm' : 'd MMMM yyyy • HH:mm';
+          const isJoinAvailable = lesson.status === 'SCHEDULED' && lessonEndAt.getTime() >= Date.now();
+          const statusLabel = resolveLessonStatusLabel(lesson);
+          const statusTone = resolveLessonStatusTone(lesson);
+          const paymentLabel = resolveLessonPaymentStatusLabel(lesson, lesson.participants ?? []);
+          const paymentTone = resolveLessonPaymentTone(lesson, lesson.participants ?? []);
+          const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
+          const lessonKindLabel = lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок';
+          const editDisabledReason = resolveLessonEditDisabledReason(lesson);
+          const cancelCopy = resolveLessonCancelActionCopy(lesson);
+          const isCanceled = lesson.status === 'CANCELED';
+          const icon =
+            lesson.status === 'COMPLETED'
+              ? faCheck
+              : lesson.status === 'CANCELED'
+                ? faCalendar
+                : faCalendarPlus;
 
           return (
-            <article
-              key={lesson.id}
-              className={`${styles.activityCard} ${isUpcoming ? styles.activityDone : styles.activityMuted}`}
-            >
+            <article key={lesson.id} className={`${styles.activityCard} ${styles.lessonCard}`}>
               <div className={styles.activityHeader}>
-                <div className={styles.lessonIconWrap}>
-                  <FontAwesomeIcon icon={isUpcoming ? faCalendarPlus : faCheck} />
+                <div className={styles.lessonHeaderMain}>
+                  <div
+                    className={`${styles.lessonIconWrap} ${
+                      statusTone === 'completed'
+                        ? styles.lessonIconCompleted
+                        : statusTone === 'canceled'
+                          ? styles.lessonIconCanceled
+                          : styles.lessonIconScheduled
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={icon} />
+                  </div>
+                  <div className={styles.lessonMainBlock}>
+                    <h3 className={styles.activityTitle}>
+                      {formatInTimeZone(lesson.startAt, lessonDatePattern, { locale: ru, timeZone })} -{' '}
+                      {formatInTimeZone(lessonEndAt, 'HH:mm', { timeZone })}
+                    </h3>
+                    <p className={styles.activitySubtitle}>{lessonKindLabel}</p>
+                    <div className={styles.lessonMetaRow}>
+                      <span className={`${styles.lessonStatusBadge} ${styles[`lessonStatusBadge_${statusTone}`]}`}>
+                        {statusLabel}
+                      </span>
+                      <span className={`${styles.lessonStatusBadge} ${styles[`lessonPaymentBadge_${paymentTone}`]}`}>
+                        {paymentLabel}
+                      </span>
+                      {recurrenceLabel ? <span className={styles.lessonMetaBadge}>{recurrenceLabel}</span> : null}
+                    </div>
+                  </div>
                 </div>
-                <div className={styles.lessonMainBlock}>
-                  <h3 className={styles.activityTitle}>
-                    {formatInTimeZone(lesson.startAt, 'd MMMM • HH:mm', { locale: ru, timeZone })} -{' '}
-                    {formatInTimeZone(lessonEndAt, 'HH:mm', { timeZone })}
-                  </h3>
-                  <p className={styles.activitySubtitle}>{lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок'}</p>
+                <div className={styles.lessonQuickActions}>
+                  <Tooltip content={editDisabledReason ?? 'Редактировать'}>
+                    <button
+                      type="button"
+                      className={styles.lessonActionButton}
+                      disabled={Boolean(editDisabledReason)}
+                      aria-label="Редактировать"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        startEditLesson(lesson, { skipNavigation: true });
+                      }}
+                    >
+                      <EditOutlinedIcon className={styles.lessonActionIcon} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content={isCanceled ? 'Восстановить' : cancelCopy.actionLabel}>
+                    <button
+                      type="button"
+                      className={`${styles.lessonActionButton} ${
+                        isCanceled ? styles.lessonActionButtonNeutral : styles.lessonActionButtonDanger
+                      }`}
+                      aria-label={isCanceled ? 'Восстановить' : 'Отменить урок'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (isCanceled) {
+                          handleRestoreLesson(lesson);
+                          return;
+                        }
+                        handleCancelLesson(lesson);
+                      }}
+                    >
+                      {isCanceled ? (
+                        <ReplayOutlinedIcon className={styles.lessonActionIcon} />
+                      ) : (
+                        <CancelCircleOutlinedIcon className={styles.lessonActionIcon} />
+                      )}
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Удалить">
+                    <button
+                      type="button"
+                      className={styles.lessonActionButton}
+                      aria-label="Удалить"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        requestDeleteLessonFromList(lesson);
+                      }}
+                    >
+                      <DeleteOutlineIcon className={styles.lessonActionIcon} />
+                    </button>
+                  </Tooltip>
                 </div>
-                <span className={styles.statusBadge}>{statusLabel}</span>
               </div>
 
-              <div className={`${styles.activityFooter} ${!lesson.meetingLink ? styles.activityFooterCompact : ''}`}>
-                {lesson.meetingLink ? (
+              {lesson.meetingLink ? (
+                <div className={styles.activityFooter}>
                   <div className={styles.activityMetaLine}>
                     <FontAwesomeIcon icon={faVideo} />
                     <span>Есть ссылка на встречу</span>
                   </div>
-                ) : null}
 
-                <button
-                  type="button"
-                  className={styles.activityActionButton}
-                  onClick={() => {
-                    if (lesson.meetingLink && isUpcoming) {
-                      window.open(lesson.meetingLink, '_blank', 'noopener,noreferrer');
-                      return;
-                    }
-                    onOpenLesson(lesson);
-                  }}
-                >
-                  {lesson.meetingLink && isUpcoming ? 'Подключиться' : 'Открыть'}
-                </button>
-              </div>
+                  {isJoinAvailable ? (
+                    <button
+                      type="button"
+                      className={styles.lessonJoinButton}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.open(lesson.meetingLink, '_blank', 'noopener,noreferrer');
+                      }}
+                    >
+                      Подключиться
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           );
         })}
+        {studentLessonsHasMore ? (
+          <div ref={lessonsLoadMoreRef} className={styles.loadMoreSentinel} aria-hidden="true" />
+        ) : null}
+        {studentLessonsLoadingMore ? <div className={styles.listLoadingMore}>Загружаем ещё занятия…</div> : null}
       </div>
     );
   };
@@ -445,6 +578,106 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     previousDebtCount.current = studentDebtItems.length;
   }, [pendingPaymentIds.length, shouldAutoCloseDebt, studentDebtItems.length]);
 
+  useEffect(() => {
+    if (activeTab !== 'lessons') return;
+    const root = lessonsListRef.current;
+    const target = lessonsLoadMoreRef.current;
+    if (!root || !target || !studentLessonsHasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !studentLessonsLoadingMore) {
+          onLoadMoreLessons();
+        }
+      },
+      {
+        root,
+        rootMargin: '180px',
+      },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeTab, onLoadMoreLessons, studentLessonsHasMore, studentLessonsLoadingMore]);
+
+  const handleCancelLesson = (lesson: Lesson) => {
+    setCancelDialogLesson(lesson);
+  };
+
+  const handleRestoreLesson = (lesson: Lesson) => {
+    setRestoreDialogLesson(lesson);
+  };
+
+  const handleConfirmCancel = (refundMode?: LessonCancelRefundMode) => {
+    if (!cancelDialogLesson) return;
+    const target = cancelDialogLesson;
+    setCancelDialogLesson(null);
+    if (isLessonInSeries(target)) {
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'CANCEL', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'cancel',
+            lesson: target,
+            refundMode,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'cancel', lesson: target, refundMode });
+        });
+      return;
+    }
+    void cancelLesson(target, 'SINGLE', refundMode);
+  };
+
+  const handleConfirmRestore = () => {
+    if (!restoreDialogLesson) return;
+    const target = restoreDialogLesson;
+    setRestoreDialogLesson(null);
+    if (isLessonInSeries(target)) {
+      void Promise.all(
+        (['SINGLE', 'FOLLOWING'] as LessonSeriesScope[]).map(async (scope) => {
+          const data = await api.previewLessonMutation(target.id, { action: 'RESTORE', scope });
+          return [scope, data.preview] as const;
+        }),
+      )
+        .then((entries) => {
+          setScopeDialog({
+            type: 'restore',
+            lesson: target,
+            previews: Object.fromEntries(entries) as Partial<Record<LessonSeriesScope, LessonMutationPreview>>,
+          });
+        })
+        .catch(() => {
+          setScopeDialog({ type: 'restore', lesson: target });
+        });
+      return;
+    }
+    void restoreLesson(target, 'SINGLE');
+  };
+
+  const handleScopeConfirm = (scope: LessonSeriesScope) => {
+    if (!scopeDialog) return;
+    const target = scopeDialog;
+    setScopeDialog(null);
+    if (target.type === 'cancel') {
+      void cancelLesson(target.lesson, scope, target.refundMode);
+      return;
+    }
+    void restoreLesson(target.lesson, scope);
+  };
+
+  const resolveScopeDialogCopy = (lesson: Lesson | null) => {
+    const copy = resolveLessonCancelActionCopy(lesson);
+    return {
+      title: copy.title.replace('?', ''),
+      confirmText: copy.confirmText,
+    };
+  };
+
   return (
     <div className={styles.screen}>
       <div className={styles.scrollArea}>
@@ -511,6 +744,20 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                         </span>
                       </Tooltip>
                     </div>
+                  </div>
+                  <div className={styles.heroUsernameRow}>
+                    <span className={styles.heroUsernameLabel}>Telegram:</span>
+                    {telegramUsername ? (
+                      <button
+                        type="button"
+                        className={`${styles.heroUsernameValue} ${styles.heroUsernameButton}`}
+                        onClick={onWriteToStudent}
+                      >
+                        @{telegramUsername}
+                      </button>
+                    ) : (
+                      <span className={styles.heroUsernameValue}>@нет</span>
+                    )}
                   </div>
                   {emailLabel || phoneLabel ? (
                     <div className={styles.heroContactsRow}>
@@ -724,23 +971,13 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
             </div>
 
             <div className={styles.sideColumn}>
-              <section className={styles.sideCard}>
-                <div className={styles.notesHeader}>
-                  <h3 className={styles.sideUpperTitle}>Заметки</h3>
-                  <button type="button" className={styles.addNoteButton}>Добавить</button>
-                </div>
-                <div className={styles.notesList}>
-                  {generatedNotes.map((note) => (
-                    <article
-                      key={`${note.date}_${note.text.slice(0, 12)}`}
-                      className={`${styles.noteCard} ${note.tone === 'warning' ? styles.noteWarning : styles.noteInfo}`}
-                    >
-                      <p>{note.text}</p>
-                      <span>{note.date}</span>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <StudentProfileNotesPanel
+                studentEntry={studentEntry}
+                timeZone={timeZone}
+                onCreateNote={onCreateStudentNote}
+                onUpdateNote={onUpdateStudentNote}
+                onDeleteNote={onDeleteStudentNote}
+              />
 
               <section className={styles.contactCard}>
                 <div className={styles.contactHeader}>
@@ -841,6 +1078,43 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           </div>
         </div>
       </div>
+
+      <LessonCancelDialog
+        open={Boolean(cancelDialogLesson)}
+        lesson={cancelDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setCancelDialogLesson(null)}
+        onConfirm={handleConfirmCancel}
+      />
+
+      <LessonRestoreDialog
+        open={Boolean(restoreDialogLesson)}
+        lesson={restoreDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setRestoreDialogLesson(null)}
+        onConfirm={handleConfirmRestore}
+      />
+
+      <SeriesScopeDialog
+        open={Boolean(scopeDialog)}
+        title={
+          scopeDialog?.type === 'cancel'
+            ? resolveScopeDialogCopy(scopeDialog.lesson).title
+            : scopeDialog?.type === 'restore'
+              ? 'Восстановить урок'
+              : undefined
+        }
+        confirmText={
+          scopeDialog?.type === 'cancel'
+            ? resolveScopeDialogCopy(scopeDialog.lesson).confirmText
+            : 'Восстановить'
+        }
+        previews={scopeDialog?.previews}
+        onClose={() => setScopeDialog(null)}
+        onConfirm={handleScopeConfirm}
+      />
     </div>
   );
 };

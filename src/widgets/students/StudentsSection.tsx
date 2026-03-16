@@ -1,8 +1,13 @@
-import { type FC, useEffect, useMemo, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Lesson, Teacher } from '../../entities/types';
+import { Lesson, StudentListItem, Teacher } from '../../entities/types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useSelectedStudent } from '@/entities/student/model/selectedStudent';
+import {
+  appendStudentProfileNote,
+  deleteStudentProfileNote,
+  updateStudentProfileNote,
+} from '@/entities/student/lib/profileNotes';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { api } from '@/shared/api/client';
 import { useStudentsData } from './model/useStudentsData';
@@ -53,10 +58,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     studentHomeworkLoading,
     loadStudentHomeworks,
     studentLessons,
+    studentLessonsHasMore,
     studentLessonsSummary,
     studentLessonLoading,
+    studentLessonLoadingMore,
     loadStudentLessons,
-    loadStudentLessonsSummary,
+    loadMoreStudentLessons,
     loadStudentUnpaidLessons,
     studentDebtItems,
     studentDebtTotal,
@@ -67,7 +74,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   } = useStudentsData();
 
   const { remindHomeworkById } = useStudentsHomework();
-  const { openCreateLessonForStudent, startEditLesson, remindLessonPayment, togglePaid } = useLessonActions();
+  const { openCreateLessonForStudent, remindLessonPayment, togglePaid } = useLessonActions();
   const routeStudentId = (() => {
     const value = Number(routeStudentIdParam);
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -91,7 +98,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() => resolveTabFromSearch(location.search));
-  const [routeStudentEntry, setRouteStudentEntry] = useState<(typeof studentListItems)[number] | null>(null);
+  const [routeStudentEntry, setRouteStudentEntry] = useState<StudentListItem | null>(null);
   const [routeStudentEntryLoading, setRouteStudentEntryLoading] = useState(false);
   const isProfileOpen = routeStudentId !== null;
 
@@ -200,8 +207,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   useEffect(() => {
     const profileStudentId = routeStudentId ?? selectedStudentId;
     if (!profileStudentId || !isProfileOpen) return;
-
-    void loadStudentLessonsSummary({ studentIdOverride: profileStudentId });
     void loadStudentUnpaidLessons({ studentIdOverride: profileStudentId });
 
     if (activeTab === 'homework') {
@@ -223,7 +228,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     isProfileOpen,
     loadStudentHomeworks,
     loadStudentLessons,
-    loadStudentLessonsSummary,
     loadStudentUnpaidLessons,
     refreshPaymentReminders,
     refreshPayments,
@@ -304,9 +308,65 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     void togglePaymentReminders(profileStudentId, enabled);
   };
 
-  const handleOpenLesson = (lesson: Lesson) => {
-    startEditLesson(lesson, { skipNavigation: true });
-  };
+  const applyUpdatedStudentLink = useCallback(
+    (studentId: number, nextLink: StudentListItem['link']) => {
+      updateStudentListItem(studentId, (item) => ({ ...item, link: nextLink }));
+      setRouteStudentEntry((prev) =>
+        prev?.student.id === studentId
+          ? {
+              ...prev,
+              link: nextLink,
+            }
+          : prev,
+      );
+    },
+    [updateStudentListItem],
+  );
+
+  const saveStudentNotes = useCallback(
+    async (studentEntry: StudentListItem, notes: string) => {
+      const data = await api.updateStudent(studentEntry.student.id, {
+        customName: studentEntry.link.customName,
+        username: studentEntry.student.username ?? '',
+        pricePerLesson: studentEntry.link.pricePerLesson,
+        email: studentEntry.link.email ?? '',
+        phone: studentEntry.link.phone ?? '',
+        studentLevel: studentEntry.link.studentLevel ?? '',
+        learningGoal: studentEntry.link.learningGoal ?? '',
+        notes,
+      });
+      applyUpdatedStudentLink(studentEntry.student.id, data.link);
+    },
+    [applyUpdatedStudentLink],
+  );
+
+  const handleCreateStudentNote = useCallback(
+    async (studentEntry: StudentListItem, payload: { content: string; noteType: 'IMPORTANT' | 'INFO' }) => {
+      const nextNotes = appendStudentProfileNote(studentEntry.link.notes, payload);
+      await saveStudentNotes(studentEntry, nextNotes);
+    },
+    [saveStudentNotes],
+  );
+
+  const handleUpdateStudentNote = useCallback(
+    async (
+      studentEntry: StudentListItem,
+      noteId: string,
+      payload: { content: string; noteType: 'IMPORTANT' | 'INFO' },
+    ) => {
+      const nextNotes = updateStudentProfileNote(studentEntry.link.notes, noteId, payload);
+      await saveStudentNotes(studentEntry, nextNotes);
+    },
+    [saveStudentNotes],
+  );
+
+  const handleDeleteStudentNote = useCallback(
+    async (studentEntry: StudentListItem, noteId: string) => {
+      const nextNotes = deleteStudentProfileNote(studentEntry.link.notes, noteId);
+      await saveStudentNotes(studentEntry, nextNotes);
+    },
+    [saveStudentNotes],
+  );
 
   const handleWriteToStudent = () => {
     const username = selectedStudentEntry?.student.username?.trim();
@@ -346,11 +406,17 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           studentHomeworks={studentHomeworks}
           studentHomeworksLoading={studentHomeworkLoading}
           studentLessons={studentLessons}
+          studentLessonsHasMore={studentLessonsHasMore}
           studentLessonsLoading={studentLessonLoading}
+          studentLessonsLoadingMore={studentLessonLoadingMore}
           studentLessonsSummary={studentLessonsSummary}
           studentDebtItems={studentDebtItems}
           payments={payments}
           paymentsLoading={paymentsLoading}
+          onLoadMoreLessons={loadMoreStudentLessons}
+          onCreateStudentNote={handleCreateStudentNote}
+          onUpdateStudentNote={handleUpdateStudentNote}
+          onDeleteStudentNote={handleDeleteStudentNote}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onBack={handleBackToList}
@@ -364,7 +430,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onRemindHomework={(homeworkId) => {
             void remindHomeworkById(homeworkId);
           }}
-          onOpenLesson={handleOpenLesson}
           timeZone={timeZone}
         />
       )}

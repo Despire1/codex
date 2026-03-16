@@ -374,17 +374,24 @@ export const createStudentsService = ({
           where: {
             teacherId: teacher.chatId,
             isSuppressed: false,
-            participants: {
-              some: {
-                studentId: { in: studentIds },
+            OR: [
+              { studentId: { in: studentIds } },
+              {
+                participants: {
+                  some: {
+                    studentId: { in: studentIds },
+                  },
+                },
               },
-            },
+            ],
           },
           select: {
             id: true,
             isSuppressed: true,
             startAt: true,
+            durationMinutes: true,
             status: true,
+            studentId: true,
             participants: {
               select: {
                 studentId: true,
@@ -419,6 +426,7 @@ export const createStudentsService = ({
       attendanceTrackedLessons: 0,
       weeklyLessonsCount: 0,
       todayLessonsCount: 0,
+      totalLessonMinutes: 0,
       nextLessonAt: null as Date | null,
       lastLessonAt: null as Date | null,
     });
@@ -433,11 +441,19 @@ export const createStudentsService = ({
       const isInCurrentWeek = lessonDate.getTime() >= weekStart.getTime() && lessonDate.getTime() <= weekEnd.getTime();
       const isToday = lessonDate.getTime() >= todayStart.getTime() && lessonDate.getTime() <= todayEnd.getTime();
 
-      lesson.participants.forEach((participant) => {
-        if (!studentIdsSet.has(participant.studentId)) return;
+      const participantEntries = lesson.participants.filter((participant) => studentIdsSet.has(participant.studentId));
+      const normalizedParticipants =
+        participantEntries.length > 0
+          ? participantEntries
+          : studentIdsSet.has(lesson.studentId)
+            ? [{ studentId: lesson.studentId, attended: null }]
+            : [];
+
+      normalizedParticipants.forEach((participant) => {
         const stats = lessonStatsByStudent.get(participant.studentId) ?? createEmptyLessonStats();
 
         stats.totalLessons += 1;
+        stats.totalLessonMinutes += Math.max(0, lesson.durationMinutes || 0);
         if (isPastOrCompleted) {
           stats.completedLessons += 1;
         }
@@ -482,6 +498,7 @@ export const createStudentsService = ({
       attendanceRate: number | null;
       weeklyLessonsCount: number;
       todayLessonsCount: number;
+      totalLessonMinutes: number;
       nextLessonAt: string | null;
       lastLessonAt: string | null;
       lifecycleStatus: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
@@ -503,6 +520,7 @@ export const createStudentsService = ({
         attendanceRate,
         weeklyLessonsCount: lessonStats.weeklyLessonsCount,
         todayLessonsCount: lessonStats.todayLessonsCount,
+        totalLessonMinutes: lessonStats.totalLessonMinutes,
         nextLessonAt: lessonStats.nextLessonAt?.toISOString() ?? null,
         lastLessonAt: lessonStats.lastLessonAt?.toISOString() ?? null,
         lifecycleStatus: resolveLifecycleStatus(lessonStats),
@@ -521,6 +539,7 @@ export const createStudentsService = ({
       attendanceRate: null,
       weeklyLessonsCount: 0,
       todayLessonsCount: 0,
+      totalLessonMinutes: 0,
       nextLessonAt: null,
       lastLessonAt: null,
       lifecycleStatus: 'ACTIVE' as const,
@@ -743,6 +762,8 @@ export const createStudentsService = ({
       startFrom?: string;
       startTo?: string;
       sort?: 'asc' | 'desc';
+      limit?: number;
+      offset?: number;
     },
   ) => {
     const teacher = await ensureTeacher(user);
@@ -751,19 +772,27 @@ export const createStudentsService = ({
     });
     if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
+    const directLessonWhere: Record<string, any> = { studentId };
     const participantWhere: Record<string, any> = { studentId };
     if (filters.payment === 'paid') {
+      directLessonWhere.isPaid = true;
       participantWhere.isPaid = true;
     }
     if (filters.payment === 'unpaid') {
+      directLessonWhere.isPaid = false;
       participantWhere.isPaid = false;
     }
 
     const where: Record<string, any> = {
       teacherId: teacher.chatId,
-      participants: {
-        some: participantWhere,
-      },
+      OR: [
+        directLessonWhere,
+        {
+          participants: {
+            some: participantWhere,
+          },
+        },
+      ],
     };
 
     if (filters.status === 'completed') {
@@ -791,13 +820,42 @@ export const createStudentsService = ({
           },
         },
       },
-      orderBy: { startAt: filters.sort === 'asc' ? 'asc' : 'desc' },
+      orderBy: { startAt: 'asc' },
     });
     items = await filterSuppressedLessons(items);
 
+    const now = new Date();
+    const resolveStatusPriority = (lesson: (typeof items)[number]) => {
+      if (lesson.status === 'COMPLETED') return 2;
+      if (lesson.status === 'CANCELED') return 1;
+      if (lesson.status === 'SCHEDULED' && lesson.startAt.getTime() < now.getTime()) return 1;
+      return 0;
+    };
+
+    items.sort((left, right) => {
+      const priorityDiff = resolveStatusPriority(left) - resolveStatusPriority(right);
+      if (priorityDiff !== 0) {
+        return filters.sort === 'desc' ? -priorityDiff : priorityDiff;
+      }
+      const dateDiff = left.startAt.getTime() - right.startAt.getTime();
+      return filters.sort === 'desc' ? -dateDiff : dateDiff;
+    });
+
+    const safeOffset =
+      typeof filters.offset === 'number' && Number.isFinite(filters.offset) && filters.offset > 0
+        ? Math.floor(filters.offset)
+        : 0;
+    const safeLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit) && filters.limit > 0
+        ? Math.floor(filters.limit)
+        : null;
+    const total = items.length;
+    const pagedItems = safeLimit === null ? items : items.slice(safeOffset, safeOffset + safeLimit);
+    const nextOffset = safeLimit !== null && safeOffset + safeLimit < total ? safeOffset + safeLimit : null;
+
     const debt = await resolveStudentDebtSummary(teacher.chatId, studentId);
 
-    return { items, debt };
+    return { items: pagedItems, debt, total, nextOffset };
   };
 
   const addStudent = async (user: User, body: any) => {

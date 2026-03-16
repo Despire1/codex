@@ -45,6 +45,8 @@ type StudentRoutesHandlers = {
       startFrom?: string;
       startTo?: string;
       sort?: 'asc' | 'desc';
+      limit?: number;
+      offset?: number;
     },
   ) => Promise<unknown>;
   listStudentUnpaidLessons: (user: unknown, studentId: number) => Promise<unknown>;
@@ -163,13 +165,19 @@ export const tryHandleStudentRoutes = async ({
     const status = (searchParams.get('status') as 'all' | 'completed' | 'not_completed' | null) ?? 'all';
     const startFrom = searchParams.get('startFrom') ?? undefined;
     const startTo = searchParams.get('startTo') ?? undefined;
-    const sort = (searchParams.get('sort') as 'asc' | 'desc' | null) ?? 'desc';
+    const sort = (searchParams.get('sort') as 'asc' | 'desc' | null) ?? 'asc';
+    const limitParam = Number(searchParams.get('limit'));
+    const offsetParam = Number(searchParams.get('offset'));
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : undefined;
+    const offset = Number.isFinite(offsetParam) && offsetParam >= 0 ? Math.floor(offsetParam) : undefined;
     const data = await handlers.listStudentLessons(requireApiUser(), studentId, {
       payment,
       status,
       startFrom,
       startTo,
       sort,
+      limit,
+      offset,
     });
     sendJson(res, 200, data);
     return true;

@@ -484,6 +484,7 @@ export interface StudentListItem {
     attendanceRate?: number | null;
     weeklyLessonsCount?: number;
     todayLessonsCount?: number;
+    totalLessonMinutes?: number;
     nextLessonAt?: string | null;
     lastLessonAt?: string | null;
     lifecycleStatus?: 'ACTIVE' | 'PAUSED' | 'COMPLETED';

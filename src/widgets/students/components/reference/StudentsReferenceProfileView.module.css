@@ -10,12 +10,16 @@
 .scrollArea {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .inner {
   max-width: 1600px;
   margin: 0 auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .backRow {
@@ -111,6 +115,43 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.heroUsernameRow {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.heroUsernameLabel {
+  color: #6b7280;
+}
+
+.heroUsernameValue {
+  color: #6b7280;
+}
+
+.heroUsernameButton {
+  text-decoration: none;
+  border: none;
+  border-bottom: 1px dotted transparent;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.heroUsernameButton:hover,
+.heroUsernameButton:focus-visible {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
 }
 
 .heroLevelBadge,
@@ -343,11 +384,18 @@
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
   gap: 16px;
+  flex: 1;
+  min-height: 0;
 }
 
 .mainColumn,
 .sideColumn {
   min-width: 0;
+}
+
+.mainColumn {
+  display: flex;
+  min-height: 0;
 }
 
 .sideColumn {
@@ -365,6 +413,10 @@
 
 .tabsCard {
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tabsHeader {
@@ -425,12 +477,33 @@
 
 .tabContent {
   padding: 18px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .listStack {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.lessonsListStack {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.lessonsListStack::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lessonsListStack::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
 }
 
 .activityCard {
@@ -464,6 +537,7 @@
 .activityHeaderSimple {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -533,21 +607,214 @@
   font-weight: 800;
 }
 
+.lessonCard {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.lessonCard:hover {
+  transform: translateY(-1px);
+  border-color: #dbe2ea;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
 .lessonIconWrap {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
+.lessonIconScheduled {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.lessonIconCompleted {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.lessonIconCanceled {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+}
+
+.lessonHeaderMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lessonQuickActions {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-left: 12px;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.lessonCard:hover .lessonQuickActions,
+.lessonCard:focus-within .lessonQuickActions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.lessonActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.lessonActionButton:hover {
+  transform: translateY(-1px);
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.lessonActionButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lessonActionButtonDanger:hover {
+  background: rgba(255, 241, 242, 0.92);
+  color: #0f172a;
+}
+
+.lessonActionButtonNeutral:hover {
+  background: rgba(239, 246, 255, 0.92);
+  color: #2563eb;
+}
+
+.lessonActionIcon {
+  width: 18px;
+  height: 18px;
+}
+
 .lessonMainBlock {
   flex: 1;
   min-width: 0;
+}
+
+.lessonMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lessonStatusBadge,
+.lessonMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 11px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lessonStatusBadge_scheduled {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.lessonStatusBadge_completed {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.lessonStatusBadge_canceled {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.lessonPaymentBadge_unpaid {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.lessonPaymentBadge_partial {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.lessonPaymentBadge_paid {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.lessonMetaBadge {
+  background: #f3f4f6;
+  color: #4b5563;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.lessonJoinButton {
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.lessonJoinButton:hover {
+  background: #0f172a;
+}
+
+.loadMoreSentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.listLoadingMore {
+  padding: 10px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
 }
 
 .tabEmpty {
@@ -829,8 +1096,17 @@
 }
 
 @media (max-width: 1020px) {
+  .scrollArea {
+    overflow: auto;
+  }
+
+  .inner {
+    height: auto;
+  }
+
   .bodyGrid {
     grid-template-columns: 1fr;
+    flex: none;
   }
 
   .heroMainRow {
@@ -846,6 +1122,19 @@
   .primaryAction {
     flex: 1;
     justify-content: center;
+  }
+
+  .mainColumn,
+  .tabsCard,
+  .tabContent,
+  .lessonsListStack {
+    min-height: auto;
+  }
+
+  .lessonsListStack {
+    height: auto;
+    overflow: visible;
+    padding-right: 0;
   }
 }
 
@@ -905,5 +1194,22 @@
 
   .reminderRow {
     align-items: flex-start;
+  }
+
+  .activityFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lessonQuickActions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    margin-left: 8px;
+  }
+
+  .lessonJoinButton {
+    width: 100%;
+    justify-content: center;
   }
 }

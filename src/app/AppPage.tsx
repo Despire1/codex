@@ -205,6 +205,13 @@ const AppPageContent = () => {
   } = scheduleState;
 
   const studentCardFilters = useStudentCardFiltersInternal();
+  const isStudentProfileRoute = !isStudentRole && /^\/students\/\d+\/?$/.test(location.pathname);
+  const effectiveStudentLessonPaymentFilter = isStudentProfileRoute ? 'all' : studentCardFilters.lessonPaymentFilter;
+  const effectiveStudentLessonStatusFilter = isStudentProfileRoute ? 'all' : studentCardFilters.lessonStatusFilter;
+  const effectiveStudentLessonSortOrder = isStudentProfileRoute ? 'asc' : studentCardFilters.lessonSortOrder;
+  const effectiveStudentLessonDateRange = isStudentProfileRoute
+    ? { from: '', to: '', fromTime: '00:00', toTime: '23:59' }
+    : studentCardFilters.lessonDateRange;
 
   const studentsData = useStudentsDataInternal({
     hasAccess: hasTeacherAccess,
@@ -212,10 +219,10 @@ const AppPageContent = () => {
     selectedStudentId,
     studentActiveTab,
     homeworkFilter: studentCardFilters.homeworkFilter,
-    lessonPaymentFilter: studentCardFilters.lessonPaymentFilter,
-    lessonStatusFilter: studentCardFilters.lessonStatusFilter,
-    lessonDateRange: studentCardFilters.lessonDateRange,
-    lessonSortOrder: studentCardFilters.lessonSortOrder,
+    lessonPaymentFilter: effectiveStudentLessonPaymentFilter,
+    lessonStatusFilter: effectiveStudentLessonStatusFilter,
+    lessonDateRange: effectiveStudentLessonDateRange,
+    lessonSortOrder: effectiveStudentLessonSortOrder,
     paymentFilter: studentCardFilters.paymentFilter,
     paymentDate: studentCardFilters.paymentDate,
   });
@@ -406,7 +413,6 @@ const AppPageContent = () => {
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherHomeworkReviewRoute = !isStudentRole && /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
-  const isStudentProfileRoute = !isStudentRole && /^\/students\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];

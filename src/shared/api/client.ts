@@ -677,6 +677,8 @@ export const api = {
       startFrom?: string;
       startTo?: string;
       sort?: LessonSortOrder;
+      limit?: number;
+      offset?: number;
     },
   ) => {
     const query = new URLSearchParams();
@@ -685,11 +687,13 @@ export const api = {
     if (params.startFrom) query.set('startFrom', params.startFrom);
     if (params.startTo) query.set('startTo', params.startTo);
     if (params.sort) query.set('sort', params.sort);
+    if (typeof params.limit === 'number') query.set('limit', String(params.limit));
+    if (typeof params.offset === 'number') query.set('offset', String(params.offset));
 
     const suffix = query.toString();
     const path = suffix ? `/api/students/${studentId}/lessons?${suffix}` : `/api/students/${studentId}/lessons`;
 
-    return apiFetch<{ items: Lesson[]; debt: StudentDebtSummary }>(path);
+    return apiFetch<{ items: Lesson[]; debt: StudentDebtSummary; total: number; nextOffset: number | null }>(path);
   },
   listStudentUnpaidLessons: (studentId: number) =>
     apiFetch<StudentDebtSummary>(`/api/students/${studentId}/unpaid-lessons`),
