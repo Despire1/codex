@@ -70,6 +70,7 @@ const initialTeacher: Teacher = {
   dailySummaryTime: '09:00',
   tomorrowSummaryEnabled: false,
   tomorrowSummaryTime: '20:00',
+  weekendWeekdays: [],
   studentNotificationsEnabled: true,
   studentUpcomingLessonTemplate: null,
   studentPaymentDueTemplate: null,
@@ -666,6 +667,7 @@ const AppPageContent = () => {
   const lessonActions = useLessonActionsInternal({
     timeZone: resolvedTimeZone,
     teacherDefaultLessonDuration: teacher.defaultLessonDuration,
+    teacherWeekendWeekdays: teacher.weekendWeekdays,
     selectedStudentId,
     setSelectedStudentId,
     lessons,
@@ -1139,17 +1141,40 @@ const AppPageContent = () => {
       lessons,
       linkedStudents,
       autoConfirmLessons: teacher.autoConfirmLessons,
+      weekendWeekdays: teacher.weekendWeekdays,
     }),
-    [lessons, linkedStudents, teacher.autoConfirmLessons],
+    [lessons, linkedStudents, teacher.autoConfirmLessons, teacher.weekendWeekdays],
+  );
+
+  const handleSettingsLinksPatched = useCallback((patchedLinks: TeacherStudent[]) => {
+    if (patchedLinks.length === 0) return;
+    setLinks((prev) => {
+      const nextById = new Map(prev.map((link) => [link.id, link]));
+      patchedLinks.forEach((link) => {
+        nextById.set(link.id, link);
+      });
+      return Array.from(nextById.values());
+    });
+  }, []);
+
+  const handleSettingsLessonsRemoved = useCallback(
+    (lessonIds: number[]) => {
+      if (lessonIds.length === 0) return;
+      removeLessonsFromRanges({ ids: lessonIds });
+      dashboardSummary.refresh();
+    },
+    [dashboardSummary.refresh, removeLessonsFromRanges],
   );
 
   const settingsRouteProps = useMemo(
     () => ({
       teacher,
       onTeacherChange: setTeacher,
+      onLinksPatched: handleSettingsLinksPatched,
+      onLessonsRemoved: handleSettingsLessonsRemoved,
       onNavigate: guardedNavigate,
     }),
-    [guardedNavigate, teacher],
+    [guardedNavigate, handleSettingsLessonsRemoved, handleSettingsLinksPatched, teacher],
   );
 
   const homeworksRouteProps = useMemo<{ mode: 'teacher' | 'student' }>(
@@ -1391,6 +1416,7 @@ const AppPageContent = () => {
 
                       <AppModals
                         linkedStudents={linkedStudents}
+                        weekendWeekdays={teacher.weekendWeekdays}
                         dialogState={dialogState}
                         onCloseDialog={closeDialog}
                         onDialogStateChange={setDialogState}

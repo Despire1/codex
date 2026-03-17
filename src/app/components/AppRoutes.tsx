@@ -1,6 +1,6 @@
 import { memo, type FC } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { Lesson, LinkedStudent, Teacher } from '../../entities/types';
+import { Lesson, LinkedStudent, Teacher, TeacherStudent } from '../../entities/types';
 import { AnalyticsSection } from '../../widgets/analytics/AnalyticsSection';
 import { DashboardHome } from '../../widgets/dashboard/DashboardHome';
 import { HomeworksSection } from '../../widgets/homeworks/HomeworksSection';
@@ -44,10 +44,13 @@ interface AppRoutesProps {
     lessons: Lesson[];
     linkedStudents: LinkedStudent[];
     autoConfirmLessons: boolean;
+    weekendWeekdays: number[];
   };
   settings: {
     teacher: Teacher;
     onTeacherChange: (teacher: Teacher) => void;
+    onLinksPatched?: (links: TeacherStudent[]) => void;
+    onLessonsRemoved?: (lessonIds: number[]) => void;
     onNavigate?: (to: string) => void;
   };
   homeworks: {

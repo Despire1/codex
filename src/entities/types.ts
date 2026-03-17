@@ -14,6 +14,7 @@ export interface Teacher {
   dailySummaryTime: string;
   tomorrowSummaryEnabled: boolean;
   tomorrowSummaryTime: string;
+  weekendWeekdays: number[];
   studentNotificationsEnabled: boolean;
   studentUpcomingLessonTemplate: string | null;
   studentPaymentDueTemplate: string | null;
@@ -354,6 +355,25 @@ export interface Lesson {
   recurrenceGroupId?: string | null;
   recurrenceWeekdays?: number[] | null;
   participants?: LessonParticipant[];
+}
+
+export interface WeekendConflictLessonSummary {
+  id: number;
+  startAt: string;
+  participantNames: string[];
+  isRecurring: boolean;
+  seriesId?: number | null;
+}
+
+export interface WeekendConflictPreview {
+  conflictingLessonsCount: number;
+  paidLessonsCount: number;
+  refundAmount: number;
+  affectedDates: string[];
+  affectedLessons: WeekendConflictLessonSummary[];
+  affectedRecurringSeriesCount: number;
+  seriesToUpdateCount: number;
+  seriesToStopCount: number;
 }
 
 export type ScheduleNoteType = 'IMPORTANT' | 'INFO';

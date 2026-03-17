@@ -15,10 +15,11 @@ import {
 } from 'date-fns';
 import type { Locale } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
 import { useTimeZone } from '../lib/timezoneContext';
 import { toZonedDate } from '../lib/timezoneDates';
+import { Tooltip } from '../ui/Tooltip/Tooltip';
 
 type ClassNames = {
   root: string;
@@ -58,6 +59,7 @@ type DayPickerProps = {
   minDate?: Date;
   maxDate?: Date;
   disabled?: (date: Date) => boolean;
+  disabledReason?: (date: Date) => ReactNode | undefined;
 } | {
   mode: 'range';
   selected?: DateRange;
@@ -71,6 +73,7 @@ type DayPickerProps = {
   minDate?: Date;
   maxDate?: Date;
   disabled?: (date: Date) => boolean;
+  disabledReason?: (date: Date) => ReactNode | undefined;
 };
 
 const mergeClassName = (base: string, override?: string) => `${base}${override ? ` ${override}` : ''}`;
@@ -88,6 +91,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
   minDate,
   maxDate,
   disabled,
+  disabledReason,
 }) => {
   const timeZone = useTimeZone();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
@@ -309,6 +313,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                     (minBoundary ? isBefore(date, minBoundary) : false) ||
                     (maxBoundary ? isAfter(date, maxBoundary) : false) ||
                     Boolean(disabled?.(date));
+                  const resolvedDisabledReason = isDisabled ? disabledReason?.(date) : undefined;
                   const isSelected = !isRangeMode && selectedDate ? isSameDay(selectedDate, date) : false;
                   const isRangeStart = Boolean(selectedRange?.from && isSameDay(selectedRange.from, date));
                   const isRangeEnd = Boolean(selectedRange?.to && isSameDay(selectedRange.to, date));
@@ -328,7 +333,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                   if (isRangeMode && isRangeEnd) classes.push(styles.dayRangeEnd, classNames?.day_range_end);
                   if (today) classes.push(styles.dayToday, classNames?.day_today);
 
-                  return (
+                  const button = (
                     <button
                       key={date.toISOString()}
                       type="button"
@@ -338,6 +343,16 @@ export const DayPicker: React.FC<DayPickerProps> = ({
                     >
                       {format(date, 'd')}
                     </button>
+                  );
+
+                  if (!resolvedDisabledReason) {
+                    return button;
+                  }
+
+                  return (
+                    <Tooltip key={date.toISOString()} content={resolvedDisabledReason} align="center">
+                      <span className={styles.tooltipTarget}>{button}</span>
+                    </Tooltip>
                   );
                 })}
               </div>

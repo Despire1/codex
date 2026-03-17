@@ -299,6 +299,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           lessons={lessons}
           linkedStudents={linkedStudents}
           timeZone={timeZone}
+          weekendWeekdays={teacher.weekendWeekdays}
           isLoading={isWeekLessonsLoading}
           onCreateLesson={(date) => onCreateLesson(date)}
           onOpenLessonDay={onOpenLessonDay}

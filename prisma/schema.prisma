@@ -20,6 +20,7 @@ model Teacher {
   dailySummaryTime      String          @default("09:00")
   tomorrowSummaryEnabled Boolean        @default(false)
   tomorrowSummaryTime   String          @default("20:00")
+  weekendWeekdays      String          @default("[]")
   studentNotificationsEnabled Boolean   @default(true)
   studentUpcomingLessonTemplate String?
   studentPaymentDueTemplate String?

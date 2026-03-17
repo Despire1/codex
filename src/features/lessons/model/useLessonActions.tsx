@@ -29,6 +29,7 @@ import {
   toUtcDateFromTimeZone,
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
+import { hasWeekdayOverlap, isDateInWeekdayList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
 import { Lesson, LessonPaymentHandling, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
 import type {
   LessonCancelRefundMode,
@@ -110,6 +111,7 @@ type LessonUpdatePayload = {
 export type LessonActionsConfig = {
   timeZone: string;
   teacherDefaultLessonDuration: number;
+  teacherWeekendWeekdays: number[];
   selectedStudentId: number | null;
   setSelectedStudentId: Dispatch<SetStateAction<number | null>>;
   lessons: Lesson[];
@@ -287,6 +289,7 @@ const createNewLessonDraft = ({
 export const useLessonActionsInternal = ({
   timeZone,
   teacherDefaultLessonDuration,
+  teacherWeekendWeekdays,
   selectedStudentId,
   setSelectedStudentId,
   lessons,
@@ -338,6 +341,10 @@ export const useLessonActionsInternal = ({
     skipNavigation: false,
     focus: 'full',
   });
+  const normalizedWeekendWeekdays = useMemo(
+    () => normalizeWeekdayList(teacherWeekendWeekdays),
+    [teacherWeekendWeekdays],
+  );
 
   useEffect(() => {
     setLessonDraft((draft) => ({
@@ -799,6 +806,11 @@ export const useLessonActionsInternal = ({
         showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
         return;
       }
+      const selectedDate = toZonedDate(toUtcDateFromDate(lessonDraft.date, timeZone), timeZone);
+      if (isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
+        showInfoDialog('Выбран выходной день', 'На выходной день нельзя поставить занятие');
+        return;
+      }
       const durationMinutes = diffTimeMinutes(lessonDraft.time, lessonDraft.endTime);
       if (!durationMinutes || durationMinutes <= 0) {
         showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
@@ -807,6 +819,10 @@ export const useLessonActionsInternal = ({
 
       if (lessonDraft.isRecurring && lessonDraft.repeatUntil && lessonDraft.repeatUntil < lessonDraft.date) {
         showInfoDialog('Проверьте даты', 'Дата окончания повторов должна быть не раньше даты начала');
+        return;
+      }
+      if (lessonDraft.isRecurring && hasWeekdayOverlap(lessonDraft.repeatWeekdays, normalizedWeekendWeekdays)) {
+        showInfoDialog('Проверьте дни недели', 'Серия занятий не может проходить в выходные дни');
         return;
       }
 
@@ -1037,6 +1053,7 @@ export const useLessonActionsInternal = ({
       filterLessonsForCurrentRange,
       lessonDraft,
       lessonModalSubmitting,
+      normalizedWeekendWeekdays,
       loadStudentLessons,
       loadStudentLessonsSummary,
       navigateToSchedule,
@@ -1059,6 +1076,11 @@ export const useLessonActionsInternal = ({
     if (!rescheduleLesson) return;
     if (!rescheduleDraft.date || !rescheduleDraft.time) {
       showInfoDialog('Проверьте дату и время', 'Укажите дату и время урока');
+      return;
+    }
+    const selectedDate = toZonedDate(toUtcDateFromDate(rescheduleDraft.date, timeZone), timeZone);
+    if (isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
+      showInfoDialog('Выбран выходной день', 'На выходной день нельзя перенести занятие');
       return;
     }
     const durationMinutes = diffTimeMinutes(rescheduleDraft.time, rescheduleDraft.endTime);
@@ -1175,6 +1197,7 @@ export const useLessonActionsInternal = ({
     rescheduleDraft.endTime,
     rescheduleDraft.time,
     rescheduleLesson,
+    normalizedWeekendWeekdays,
     showInfoDialog,
     showToast,
     timeZone,

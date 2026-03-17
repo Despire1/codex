@@ -6,6 +6,7 @@ import type { Lesson } from '../../../entities/types';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { isDateInWeekdayList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
 import {
   addMinutesToTime,
   diffTimeMinutes,
@@ -20,6 +21,7 @@ import type { RescheduleDraft } from '../../lessons/model/types';
 interface RescheduleLessonModalProps {
   open: boolean;
   lesson: Lesson | null;
+  weekendWeekdays: number[];
   draft: RescheduleDraft;
   onDraftChange: (draft: RescheduleDraft) => void;
   onClose: () => void;
@@ -30,6 +32,7 @@ interface RescheduleLessonModalProps {
 export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   open,
   lesson,
+  weekendWeekdays,
   draft,
   onDraftChange,
   onClose,
@@ -38,6 +41,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
 }) => {
   const timeZone = useTimeZone();
   const startTimeRef = useRef<HTMLInputElement>(null);
+  const normalizedWeekendWeekdays = normalizeWeekdayList(weekendWeekdays);
   const startDate = lesson ? toZonedDate(lesson.startAt, timeZone) : null;
   const endDate = startDate && lesson ? addMinutes(startDate, lesson.durationMinutes) : null;
   const subtitle =
@@ -128,6 +132,11 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
 
   const startAt = toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone);
   const durationMinutes = diffTimeMinutes(draft.time, draft.endTime) ?? lesson.durationMinutes;
+  const dateSelectionError = draft.date
+    ? isDateInWeekdayList(toZonedDate(toUtcDateFromTimeZone(draft.date, '00:00', timeZone), timeZone), normalizedWeekendWeekdays)
+      ? 'Это выходной день. На него нельзя перенести занятие.'
+      : null
+    : null;
 
   return (
     <Modal open={open} title="Перенести урок" onClose={isSubmitting ? () => undefined : onClose}>
@@ -138,6 +147,9 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
           value={draft.date}
           onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
           disabled={isSubmitting}
+          disabledDateReason={(date) =>
+            isDateInWeekdayList(date, normalizedWeekendWeekdays) ? 'Выходной день' : undefined
+          }
         />
         <div className={styles.field}>
           <span className={styles.label}>Начало</span>
@@ -170,6 +182,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
           />
         </div>
       </div>
+      {dateSelectionError && <div className={controls.error}>{dateSelectionError}</div>}
       <div className={styles.preview}>
         {format(startAt, 'd MMMM', { locale: ru })} • {format(startAt, 'HH:mm')} -{' '}
         {format(addMinutes(startAt, durationMinutes), 'HH:mm')}

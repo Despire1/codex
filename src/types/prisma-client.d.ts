@@ -14,6 +14,7 @@ declare module '@prisma/client' {
     dailySummaryTime: string;
     tomorrowSummaryEnabled: boolean;
     tomorrowSummaryTime: string;
+    weekendWeekdays: string;
     studentNotificationsEnabled: boolean;
     studentUpcomingLessonTemplate: string | null;
     studentPaymentDueTemplate: string | null;

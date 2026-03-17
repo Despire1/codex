@@ -68,6 +68,7 @@ export type DialogState =
 
 interface AppModalsProps {
   linkedStudents: LinkedStudent[];
+  weekendWeekdays: number[];
   dialogState: DialogState;
   onCloseDialog: () => void;
   onDialogStateChange: (state: DialogState | ((prev: DialogState) => DialogState)) => void;
@@ -75,6 +76,7 @@ interface AppModalsProps {
 
 export const AppModals: FC<AppModalsProps> = ({
   linkedStudents,
+  weekendWeekdays,
   dialogState,
   onCloseDialog,
   onDialogStateChange,
@@ -148,6 +150,7 @@ export const AppModals: FC<AppModalsProps> = ({
         editingLesson={editingLesson}
         defaultDuration={defaultLessonDuration}
         linkedStudents={linkedStudents}
+        weekendWeekdays={weekendWeekdays}
         draft={lessonDraft}
         recurrenceLocked={recurrenceLocked}
         onDraftChange={setLessonDraft}
@@ -159,6 +162,7 @@ export const AppModals: FC<AppModalsProps> = ({
       <RescheduleLessonModal
         open={rescheduleModalOpen}
         lesson={rescheduleLesson}
+        weekendWeekdays={weekendWeekdays}
         draft={rescheduleDraft}
         onDraftChange={setRescheduleDraft}
         onClose={closeRescheduleModal}

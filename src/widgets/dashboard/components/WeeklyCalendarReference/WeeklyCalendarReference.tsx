@@ -18,7 +18,9 @@ import { LessonRestoreDialog } from '@/features/lessons/ui/LessonRestoreDialog/L
 import { SeriesScopeDialog } from '@/features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
 import { api } from '@/shared/api/client';
 import { toZonedDate } from '@/shared/lib/timezoneDates';
+import { normalizeWeekdayList } from '@/shared/lib/weekdays';
 import { AnchoredPopover } from '@/shared/ui/AnchoredPopover/AnchoredPopover';
+import { CoffeeIcon } from '@/icons/MaterialIcons';
 import { WeekLessonCard } from './WeekLessonCard';
 import styles from './WeeklyCalendarReference.module.css';
 
@@ -26,6 +28,7 @@ interface WeeklyCalendarReferenceProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   timeZone: string;
+  weekendWeekdays: number[];
   isLoading?: boolean;
   onCreateLesson: (date: Date) => void;
   onOpenLessonDay: (lesson: Lesson) => void;
@@ -61,6 +64,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
   lessons,
   linkedStudents,
   timeZone,
+  weekendWeekdays,
   isLoading = false,
   onCreateLesson,
   onOpenLessonDay: _onOpenLessonDay,
@@ -79,6 +83,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
     () => new Map(linkedStudents.map((student) => [student.id, student])),
     [linkedStudents],
   );
+  const weekendSet = useMemo(() => new Set(normalizeWeekdayList(weekendWeekdays)), [weekendWeekdays]);
   const { openLessonModal, cancelLesson, restoreLesson, requestDeleteLessonFromList } = useLessonActions();
 
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
@@ -161,7 +166,8 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
     return lessons.find((lesson) => lesson.id === lessonPopover.lessonId) ?? null;
   }, [lessonPopover, lessons]);
 
-  const handleDayKeyDown = (date: Date) => (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleDayKeyDown = (date: Date, disabled = false) => (event: KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     onCreateLesson(date);
@@ -356,7 +362,8 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
           const shouldShowLoading = shouldShowWeekLoading;
           const isToday = isSameDay(date, todayZoned);
           const isEmpty = dayLessons.length === 0;
-          const isSunday = index === DAY_LABELS.length - 1;
+          const isWeekend = weekendSet.has(date.getDay());
+          const canCreateOnDay = !isWeekend;
 
           return (
             <article className={styles.dayColumn} key={dayKey}>
@@ -378,15 +385,10 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
                   <span className={[styles.loadingLine, styles.loadingLineShort].join(' ')} />
                 </div>
               ) : isEmpty ? (
-                isSunday ? (
+                isWeekend ? (
                   <div className={styles.weekendState}>
                     <div className={styles.weekendIconWrap} aria-hidden>
-                      <svg viewBox="0 0 512 512" focusable="false">
-                        <path
-                          fill="currentColor"
-                          d="M88 0C74.7 0 64 10.7 64 24c0 38.9 23.4 59.4 39.1 73.1l1.1 1C120.5 112.3 128 119.9 128 136c0 13.3 10.7 24 24 24s24-10.7 24-24c0-38.9-23.4-59.4-39.1-73.1l-1.1-1C119.5 47.7 112 40.1 112 24c0-13.3-10.7-24-24-24zM32 192c-17.7 0-32 14.3-32 32V416c0 53 43 96 96 96H288c53 0 96-43 96-96h16c61.9 0 112-50.1 112-112s-50.1-112-112-112H352 32zm352 64h16c26.5 0 48 21.5 48 48s-21.5 48-48 48H384V256zM224 24c0-13.3-10.7-24-24-24s-24 10.7-24 24c0 38.9 23.4 59.4 39.1 73.1l1.1 1C232.5 112.3 240 119.9 240 136c0 13.3 10.7 24 24 24s24-10.7 24-24c0-38.9-23.4-59.4-39.1-73.1l-1.1-1C231.5 47.7 224 40.1 224 24z"
-                        />
-                      </svg>
+                      <CoffeeIcon />
                     </div>
                     <p className={styles.weekendTitle}>Выходной</p>
                     <p className={styles.weekendSubtitle}>Отдыхайте!</p>
@@ -397,7 +399,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
                     tabIndex={0}
                     className={styles.emptyState}
                     onClick={() => onCreateLesson(date)}
-                    onKeyDown={handleDayKeyDown(date)}
+                    onKeyDown={handleDayKeyDown(date, !canCreateOnDay)}
                   >
                     <div className={styles.emptyIconWrap}>
                       <svg viewBox="0 0 448 512" focusable="false">
@@ -413,11 +415,11 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
                 )
               ) : (
                 <div
-                  role="button"
-                  tabIndex={0}
+                  role={canCreateOnDay ? 'button' : undefined}
+                  tabIndex={canCreateOnDay ? 0 : -1}
                   className={[styles.lessonZone, isToday ? styles.lessonZoneToday : ''].filter(Boolean).join(' ')}
-                  onClick={() => onCreateLesson(date)}
-                  onKeyDown={handleDayKeyDown(date)}
+                  onClick={canCreateOnDay ? () => onCreateLesson(date) : undefined}
+                  onKeyDown={handleDayKeyDown(date, !canCreateOnDay)}
                 >
                   <div className={styles.lessonList}>
                     {dayLessons.map((lesson) => (

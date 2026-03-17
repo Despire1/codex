@@ -93,6 +93,12 @@
   justify-items: center;
 }
 
+.tooltipTarget {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+}
+
 .dayButton {
   width: clamp(30px, 100%, 38px);
   aspect-ratio: 1 / 1;

@@ -1,0 +1,74 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(48px, 1fr));
+  gap: 10px;
+}
+
+.tooltipTarget {
+  display: inline-flex;
+  width: 100%;
+}
+
+.button {
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--color-white);
+  padding: 10px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-700);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.button:hover {
+  border-color: var(--color-blue-300);
+  background: var(--color-sky-25);
+}
+
+.buttonActive {
+  border-color: var(--color-blue-600);
+  background: var(--color-white);
+}
+
+.buttonBlocked {
+  opacity: 0.54;
+}
+
+.buttonDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttonDisabled:hover,
+.buttonBlocked:hover {
+  background: var(--color-white);
+  border-color: var(--border);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-slate-300);
+}
+
+.dotActive {
+  background: var(--color-blue-600);
+}
+
+@media (max-width: 720px) {
+  .grid {
+    gap: 8px;
+  }
+
+  .button {
+    padding: 9px 0 7px;
+    font-size: 13px;
+  }
+}

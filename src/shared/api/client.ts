@@ -32,6 +32,7 @@ import {
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
+  WeekendConflictPreview,
 } from '../../entities/types';
 import { FormValidationIssue } from '../lib/form-validation/types';
 import { type OnboardingReminderTemplate } from '../lib/onboardingReminder';
@@ -47,6 +48,7 @@ type SettingsPayload = Pick<
   | 'dailySummaryTime'
   | 'tomorrowSummaryEnabled'
   | 'tomorrowSummaryTime'
+  | 'weekendWeekdays'
   | 'studentNotificationsEnabled'
   | 'studentUpcomingLessonTemplate'
   | 'studentPaymentDueTemplate'
@@ -66,6 +68,19 @@ type SettingsPayload = Pick<
   | 'homeworkOverdueReminderTime'
   | 'homeworkOverdueReminderMaxCount'
 >;
+
+export type UpdateSettingsSuccessResponse = {
+  settings: SettingsPayload;
+  links?: TeacherStudent[];
+  removedLessonIds?: number[];
+};
+
+export type UpdateSettingsConflictResponse = {
+  requiresWeekendConflictConfirmation: true;
+  conflict: WeekendConflictPreview;
+};
+
+export type UpdateSettingsResponse = UpdateSettingsSuccessResponse | UpdateSettingsConflictResponse;
 
 export type SessionSummary = {
   id: number;
@@ -375,8 +390,8 @@ export const api = {
       body: JSON.stringify(payload ?? {}),
     }),
   getSettings: () => apiFetch<{ settings: SettingsPayload }>('/api/settings'),
-  updateSettings: (payload: Partial<SettingsPayload>) =>
-    apiFetch<{ settings: SettingsPayload }>('/api/settings', {
+  updateSettings: (payload: Partial<SettingsPayload> & { confirmWeekendConflicts?: boolean }) =>
+    apiFetch<UpdateSettingsResponse>('/api/settings', {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),

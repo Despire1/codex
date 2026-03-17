@@ -32,6 +32,12 @@ import {
   toZonedDate,
 } from '../shared/lib/timezoneDates';
 import {
+  hasWeekdayOverlap,
+  isDateInWeekdayList,
+  normalizeWeekdayList,
+  stringifyWeekdayList,
+} from '../shared/lib/weekdays';
+import {
   STUDENT_LESSON_TEMPLATE_VARIABLES,
   STUDENT_PAYMENT_TEMPLATE_VARIABLES,
   STUDENT_LESSON_TEMPLATE_EXAMPLES,
@@ -257,6 +263,28 @@ const resolveWeekdayLabels = (weekdays: number[]) =>
       .map((day) => LESSON_WEEKDAY_LABELS_RU[day] ?? ''),
   );
 
+const resolveTeacherWeekendWeekdays = (teacher: { weekendWeekdays?: unknown }) =>
+  normalizeWeekdayList(teacher.weekendWeekdays);
+
+const ensureLessonDateIsWorkingDay = (
+  startAt: Date,
+  teacher: { timezone?: string | null; weekendWeekdays?: unknown },
+) => {
+  const zonedDate = toZonedDate(startAt, teacher.timezone);
+  if (isDateInWeekdayList(zonedDate, resolveTeacherWeekendWeekdays(teacher))) {
+    throw new Error('На выходной день нельзя поставить занятие');
+  }
+};
+
+const ensureRecurringWeekdaysAreWorking = (
+  weekdays: number[],
+  teacher: { weekendWeekdays?: unknown },
+) => {
+  if (hasWeekdayOverlap(weekdays, resolveTeacherWeekendWeekdays(teacher))) {
+    throw new Error('Серия занятий не может проходить в выходные дни');
+  }
+};
+
 const resolveLessonParticipantNames = (
   studentIds: number[],
   links: Array<{ studentId: number; customName?: string | null; student?: Student | null }>,
@@ -411,6 +439,7 @@ const pickTeacherSettings = (teacher: any) => ({
   dailySummaryTime: teacher.dailySummaryTime,
   tomorrowSummaryEnabled: teacher.tomorrowSummaryEnabled,
   tomorrowSummaryTime: teacher.tomorrowSummaryTime,
+  weekendWeekdays: resolveTeacherWeekendWeekdays(teacher),
   studentNotificationsEnabled: teacher.studentNotificationsEnabled,
   studentUpcomingLessonTemplate: teacher.studentUpcomingLessonTemplate,
   studentPaymentDueTemplate: teacher.studentPaymentDueTemplate,
@@ -436,10 +465,174 @@ const getSettings = async (user: User) => {
   return { settings: { ...pickTeacherSettings(teacher), receiptEmail: user.receiptEmail ?? null } };
 };
 
+type WeekendConflictLessonRecord = {
+  id: number;
+  teacherId: bigint;
+  studentId: number;
+  startAt: Date;
+  status: string;
+  isSuppressed: boolean;
+  isRecurring: boolean;
+  seriesId?: number | null;
+  recurrenceGroupId?: string | null;
+  participants: Array<{ studentId: number; isPaid?: boolean | null; student?: Student | null }>;
+};
+
+type WeekendConflictSeriesUpdate = {
+  id: number;
+  groupKey: string;
+  nextWeekdays: number[];
+  shouldStop: boolean;
+};
+
+const getLessonWeekdayInTeacherTimeZone = (startAt: Date, timeZone?: string | null) => toZonedDate(startAt, timeZone).getDay();
+
+const resolveWeekendConflictSeriesUpdates = async (
+  tx: any,
+  lessons: WeekendConflictLessonRecord[],
+  weekendWeekdays: number[],
+) => {
+  const seriesIds = Array.from(
+    new Set(lessons.map((lesson) => lesson.seriesId ?? null).filter((value): value is number => typeof value === 'number')),
+  );
+  const groupKeys = Array.from(
+    new Set(
+      lessons
+        .map((lesson) => lesson.recurrenceGroupId?.trim() ?? '')
+        .filter((value) => value.length > 0),
+    ),
+  );
+
+  if (seriesIds.length === 0 && groupKeys.length === 0) {
+    return [] as WeekendConflictSeriesUpdate[];
+  }
+
+  const seriesRecords = await tx.lessonSeries.findMany({
+    where: {
+      OR: [
+        seriesIds.length > 0 ? { id: { in: seriesIds } } : null,
+        groupKeys.length > 0 ? { groupKey: { in: groupKeys } } : null,
+      ].filter(Boolean),
+    },
+  });
+
+  const seriesById = new Map<number, any>(seriesRecords.map((series: any) => [series.id, series]));
+  const seriesByGroupKey = new Map<string, any>(seriesRecords.map((series: any) => [series.groupKey, series]));
+  const updates = new Map<number, WeekendConflictSeriesUpdate>();
+
+  lessons.forEach((lesson) => {
+    const series =
+      (typeof lesson.seriesId === 'number' ? seriesById.get(lesson.seriesId) : null) ??
+      (lesson.recurrenceGroupId ? seriesByGroupKey.get(lesson.recurrenceGroupId) : null);
+    if (!series || updates.has(series.id)) return;
+
+    const currentWeekdays = normalizeWeekdayList(series.recurrenceWeekdays);
+    const nextWeekdays = currentWeekdays.filter((weekday) => !weekendWeekdays.includes(weekday));
+    updates.set(series.id, {
+      id: series.id,
+      groupKey: series.groupKey,
+      nextWeekdays,
+      shouldStop: nextWeekdays.length === 0,
+    });
+  });
+
+  return Array.from(updates.values());
+};
+
+const resolveWeekendSettingsConflict = async (
+  tx: any,
+  teacher: { chatId: bigint; timezone?: string | null; weekendWeekdays?: unknown },
+  nextWeekendWeekdays: number[],
+) => {
+  const previousWeekendWeekdays = resolveTeacherWeekendWeekdays(teacher);
+  const newlyAddedWeekendWeekdays = nextWeekendWeekdays.filter((weekday) => !previousWeekendWeekdays.includes(weekday));
+
+  if (newlyAddedWeekendWeekdays.length === 0) {
+    return {
+      lessons: [] as WeekendConflictLessonRecord[],
+      conflict: null,
+      seriesUpdates: [] as WeekendConflictSeriesUpdate[],
+    };
+  }
+
+  const candidateLessons = (await tx.lesson.findMany({
+    where: {
+      teacherId: teacher.chatId,
+      startAt: { gt: new Date() },
+      isSuppressed: false,
+      status: { not: 'CANCELED' },
+    },
+    include: {
+      participants: {
+        include: {
+          student: true,
+        },
+      },
+    },
+    orderBy: {
+      startAt: 'asc',
+    },
+  })) as WeekendConflictLessonRecord[];
+
+  const lessons = candidateLessons.filter((lesson) =>
+    newlyAddedWeekendWeekdays.includes(getLessonWeekdayInTeacherTimeZone(lesson.startAt, teacher.timezone)),
+  );
+
+  if (lessons.length === 0) {
+    return {
+      lessons,
+      conflict: null,
+      seriesUpdates: [] as WeekendConflictSeriesUpdate[],
+    };
+  }
+
+  const participantIds = Array.from(
+    new Set(lessons.flatMap((lesson) => lesson.participants.map((participant) => participant.studentId))),
+  );
+  const links = participantIds.length
+    ? await tx.teacherStudent.findMany({
+        where: { teacherId: teacher.chatId, studentId: { in: participantIds }, isArchived: false },
+        include: { student: true },
+      })
+    : [];
+  const seriesUpdates = await resolveWeekendConflictSeriesUpdates(tx, lessons, nextWeekendWeekdays);
+  const paidLessonsCount = lessons.filter((lesson) => lesson.participants.some((participant) => Boolean(participant.isPaid))).length;
+  const refundAmount = lessons.reduce(
+    (count, lesson) => count + lesson.participants.filter((participant) => Boolean(participant.isPaid)).length,
+    0,
+  );
+
+  return {
+    lessons,
+    seriesUpdates,
+    conflict: {
+      conflictingLessonsCount: lessons.length,
+      paidLessonsCount,
+      refundAmount,
+      affectedDates: uniqueStrings(
+        lessons.map((lesson) => formatInTimeZone(lesson.startAt, 'dd.MM (EEE)', { timeZone: teacher.timezone, locale: ru })),
+      ),
+      affectedLessons: lessons.map((lesson) => ({
+        id: lesson.id,
+        startAt: lesson.startAt.toISOString(),
+        participantNames: resolveLessonParticipantNamesFromParticipants(lesson.participants as any, links as any),
+        isRecurring: Boolean(lesson.isRecurring),
+        seriesId: lesson.seriesId ?? null,
+      })),
+      affectedRecurringSeriesCount: seriesUpdates.length,
+      seriesToUpdateCount: seriesUpdates.filter((series) => !series.shouldStop).length,
+      seriesToStopCount: seriesUpdates.filter((series) => series.shouldStop).length,
+    },
+  };
+};
+
 const updateSettings = async (user: User, body: any) => {
   const teacher = await ensureTeacher(user);
   const data: Record<string, any> = {};
   const userData: Record<string, any> = {};
+  const nextWeekendWeekdays =
+    body.weekendWeekdays !== undefined ? normalizeWeekdayList(body.weekendWeekdays) : undefined;
+  const shouldConfirmWeekendConflicts = Boolean(body?.confirmWeekendConflicts);
 
   if (typeof body.timezone === 'string') {
     const trimmed = body.timezone.trim();
@@ -480,6 +673,10 @@ const updateSettings = async (user: User, body: any) => {
 
   if (typeof body.tomorrowSummaryTime === 'string' && isValidTimeString(body.tomorrowSummaryTime)) {
     data.tomorrowSummaryTime = body.tomorrowSummaryTime;
+  }
+
+  if (nextWeekendWeekdays !== undefined) {
+    data.weekendWeekdays = stringifyWeekdayList(nextWeekendWeekdays);
   }
 
   if (typeof body.studentNotificationsEnabled === 'boolean') {
@@ -591,23 +788,84 @@ const updateSettings = async (user: User, body: any) => {
 
   const shouldUpdateTeacher = Object.keys(data).length > 0;
   const shouldUpdateUser = Object.keys(userData).length > 0;
+  const weekendConflict =
+    nextWeekendWeekdays !== undefined
+      ? await prisma.$transaction((tx) => resolveWeekendSettingsConflict(tx, teacher, nextWeekendWeekdays))
+      : null;
 
-  const updatedTeacher = shouldUpdateTeacher
-    ? await prisma.teacher.update({
-        where: { chatId: teacher.chatId },
-        data,
-      })
-    : teacher;
+  if (weekendConflict?.conflict && !shouldConfirmWeekendConflicts) {
+    return {
+      requiresWeekendConflictConfirmation: true as const,
+      conflict: weekendConflict.conflict,
+    };
+  }
 
-  const updatedUser = shouldUpdateUser
-    ? await prisma.user.update({
-        where: { id: user.id },
-        data: userData,
-      })
-    : user;
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedTeacher = shouldUpdateTeacher
+      ? await tx.teacher.update({
+          where: { chatId: teacher.chatId },
+          data,
+        })
+      : teacher;
 
-  const changedTeacherKeys = Object.keys(data).filter((key) => (teacher as any)[key] !== (updatedTeacher as any)[key]);
-  const changedUserKeys = Object.keys(userData).filter((key) => (user as any)[key] !== (updatedUser as any)[key]);
+    const updatedUser = shouldUpdateUser
+      ? await tx.user.update({
+          where: { id: user.id },
+          data: userData,
+        })
+      : user;
+
+    const linksMap = new Map<string, any>();
+    const removedLessonIds: number[] = [];
+
+    if (weekendConflict?.lessons.length) {
+      for (const lesson of weekendConflict.lessons) {
+        const cancelResult = await applyLessonCancelStatus(tx, teacher, lesson.id, 'RETURN_TO_BALANCE');
+        removedLessonIds.push(lesson.id);
+        cancelResult.links.forEach((link: any) => {
+          linksMap.set(`${link.teacherId}_${link.studentId}`, link);
+        });
+        await tx.lesson.update({
+          where: { id: lesson.id },
+          data: { isSuppressed: true },
+        });
+      }
+
+      const now = new Date();
+      for (const series of weekendConflict.seriesUpdates) {
+        const recurrenceWeekdays = JSON.stringify(series.nextWeekdays);
+        await tx.lessonSeries.update({
+          where: { id: series.id },
+          data: {
+            recurrenceWeekdays,
+            status: series.shouldStop ? 'STOPPED' : 'ACTIVE',
+          },
+        });
+        await tx.lesson.updateMany({
+          where: {
+            teacherId: teacher.chatId,
+            startAt: { gt: now },
+            OR: [{ seriesId: series.id }, { recurrenceGroupId: series.groupKey }],
+          },
+          data: {
+            recurrenceWeekdays,
+          },
+        });
+      }
+    }
+
+    return {
+      updatedTeacher,
+      updatedUser,
+      links: Array.from(linksMap.values()),
+      removedLessonIds,
+    };
+  });
+
+  const changedTeacherKeys = Object.keys(data).filter(
+    (key) => (teacher as any)[key] !== (result.updatedTeacher as any)[key],
+  );
+  const changedUserKeys = Object.keys(userData).filter((key) => (user as any)[key] !== (result.updatedUser as any)[key]);
   if (changedTeacherKeys.length > 0 || changedUserKeys.length > 0) {
     await safeLogActivityEvent({
       teacherId: teacher.chatId,
@@ -625,12 +883,16 @@ const updateSettings = async (user: User, body: any) => {
       payload: {
         changedTeacherKeys,
         changedUserKeys,
+        weekendConflictLessonsCanceled: result.removedLessonIds.length,
+        weekendSeriesUpdated: weekendConflict?.seriesUpdates.length ?? 0,
       },
     });
   }
 
   return {
-    settings: { ...pickTeacherSettings(updatedTeacher), receiptEmail: updatedUser.receiptEmail ?? null },
+    settings: { ...pickTeacherSettings(result.updatedTeacher), receiptEmail: result.updatedUser.receiptEmail ?? null },
+    links: result.links,
+    removedLessonIds: result.removedLessonIds,
   };
 };
 
@@ -954,7 +1216,16 @@ const bootstrap = async (
     lessons = await filterSuppressedLessons(prisma, lessons);
   }
 
-  return { teacher, students, links, homeworks, lessons };
+  return {
+    teacher: {
+      ...teacher,
+      weekendWeekdays: resolveTeacherWeekendWeekdays(teacher),
+    },
+    students,
+    links,
+    homeworks,
+    lessons,
+  };
 };
 
 const listLessonsForRange = async (
@@ -3025,6 +3296,9 @@ const createLesson = async (user: User, body: any) => {
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
   const lessonColor = normalizeLessonColor(body?.color);
   const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
+  const startDate = new Date(startAt);
+  if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата урока');
+  ensureLessonDateIsWorkingDay(startDate, teacher);
 
   const links = await prisma.teacherStudent.findMany({
     where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },
@@ -3041,7 +3315,7 @@ const createLesson = async (user: User, body: any) => {
         price: 0,
         color: lessonColor,
         meetingLink: meetingLink ?? null,
-        startAt: new Date(startAt),
+        startAt: startDate,
         durationMinutes: durationValue,
         status: 'SCHEDULED',
         isPaid: false,
@@ -3096,22 +3370,7 @@ const createLesson = async (user: User, body: any) => {
 };
 
 const parseWeekdays = (repeatWeekdays: any): number[] => {
-  const raw = Array.isArray(repeatWeekdays)
-    ? repeatWeekdays
-    : typeof repeatWeekdays === 'string'
-      ? (() => {
-          try {
-            const parsed = JSON.parse(repeatWeekdays);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch (error) {
-            return [];
-          }
-        })()
-      : [];
-
-  return Array.from(
-    new Set(raw.map((day: any) => Number(day)).filter((day: number) => Number.isInteger(day) && day >= 0 && day <= 6)),
-  );
+  return normalizeWeekdayList(repeatWeekdays);
 };
 
 const normalizeLessonScope = (value: unknown): LessonSeriesScope => {
@@ -3922,6 +4181,8 @@ const createRecurringLessons = async (user: User, body: any) => {
   const seriesStart = startDate;
 
   const { teacher, durationValue, studentIds } = await validateLessonPayload(user, body);
+  ensureLessonDateIsWorkingDay(seriesStart, teacher);
+  ensureRecurringWeekdaysAreWorking(weekdays, teacher);
   const lessonColor = normalizeLessonColor(body?.color);
   const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
 
@@ -4265,7 +4526,12 @@ const areLessonStudentIdsEqual = (left: number[], right: number[]) => {
   return left.every((studentId, index) => studentId === right[index]);
 };
 
-const buildLessonUpdateDraft = async (tx: any, teacher: { chatId: bigint }, lessonId: number, body: any) => {
+const buildLessonUpdateDraft = async (
+  tx: any,
+  teacher: { chatId: bigint; timezone?: string | null; weekendWeekdays?: unknown },
+  lessonId: number,
+  body: any,
+) => {
   const {
     studentId,
     studentIds,
@@ -4318,10 +4584,14 @@ const buildLessonUpdateDraft = async (tx: any, teacher: { chatId: bigint }, less
 
   const targetStart = startAt ? new Date(startAt) : existing.startAt;
   if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
+  ensureLessonDateIsWorkingDay(targetStart, teacher);
 
   const existingLesson = existing as any;
   const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
   const weekdays = repeatWeekdays !== undefined ? parseWeekdays(repeatWeekdays) : undefined;
+  if (weekdays !== undefined) {
+    ensureRecurringWeekdaysAreWorking(weekdays, teacher);
+  }
   const recurrenceEndRaw = repeatUntil !== undefined ? repeatUntil : undefined;
   const requestedMeetingLink = resolveMeetingLinkValue(body?.meetingLink);
   const resolvedSeriesMeetingLink =
@@ -4419,7 +4689,7 @@ const buildSingleLessonEditPreview = async (
 
 const previewLessonEditMutation = async (
   tx: any,
-  teacher: { chatId: bigint; timezone?: string | null },
+  teacher: { chatId: bigint; timezone?: string | null; weekendWeekdays?: unknown },
   lessonId: number,
   body: any,
   action: LessonMutationAction = 'EDIT',

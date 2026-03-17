@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChangeEvent, type MutableRefObject, type Ref, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, type MutableRefObject, type ReactNode, type Ref, useMemo, useRef, useState } from 'react';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from '../../day-picker';
 import styles from './DatePickerField.module.css';
@@ -21,6 +21,7 @@ interface DatePickerFieldProps {
   buttonRef?: Ref<HTMLButtonElement>;
   mode?: 'date' | 'datetime';
   minuteStep?: number;
+  disabledDateReason?: (date: Date) => ReactNode | undefined;
 }
 
 const DATE_VALUE_FORMAT = 'yyyy-MM-dd';
@@ -59,6 +60,7 @@ export const DatePickerField = ({
   buttonRef,
   mode = 'date',
   minuteStep = 5,
+  disabledDateReason,
 }: DatePickerFieldProps) => {
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
@@ -234,6 +236,7 @@ export const DatePickerField = ({
             locale={ru}
             defaultMonth={initialMonth}
             disabled={isDateDisabled}
+            disabledReason={disabledDateReason}
           />
           {mode === 'datetime' && (
             <div className={styles.timePanel}>

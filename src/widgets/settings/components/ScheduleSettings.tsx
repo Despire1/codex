@@ -1,15 +1,70 @@
-import { FC } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { Teacher } from '../../../entities/types';
+import {
+  ExpandLessOutlinedIcon,
+  ExpandMoreOutlinedIcon,
+} from '../../../icons/MaterialIcons';
+import { useUnsavedChanges } from '../../../shared/lib/unsavedChanges';
+import { formatWeekdayShortList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
 import controls from '../../../shared/styles/controls.module.css';
+import { WeekdayToggleGroup } from '../../../shared/ui/WeekdayToggleGroup';
 import styles from '../SettingsSection.module.css';
 
 interface ScheduleSettingsProps {
   teacher: Teacher;
   onChange: (patch: Partial<Teacher>) => void;
+  onSaveWeekendWeekdays: (weekendWeekdays: number[]) => Promise<boolean>;
+  isWeekendSaving: boolean;
   onComingSoonClick: () => void;
 }
 
-export const ScheduleSettings: FC<ScheduleSettingsProps> = ({ teacher, onChange, onComingSoonClick }) => {
+export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
+  teacher,
+  onChange,
+  onSaveWeekendWeekdays,
+  isWeekendSaving,
+  onComingSoonClick,
+}) => {
+  const { setEntry, clearEntry } = useUnsavedChanges();
+  const [weekendsExpanded, setWeekendsExpanded] = useState(Boolean(teacher.weekendWeekdays.length));
+  const [weekendDraft, setWeekendDraft] = useState(() => normalizeWeekdayList(teacher.weekendWeekdays));
+  const isWeekendDirty = useMemo(() => {
+    const saved = normalizeWeekdayList(teacher.weekendWeekdays);
+    return (
+      saved.length !== weekendDraft.length || saved.some((weekday, index) => weekday !== weekendDraft[index])
+    );
+  }, [teacher.weekendWeekdays, weekendDraft]);
+  const weekendSummary = useMemo(() => {
+    const normalizedWeekends = normalizeWeekdayList(weekendDraft);
+    return normalizedWeekends.length > 0 ? formatWeekdayShortList(normalizedWeekends) : 'Не выбраны';
+  }, [weekendDraft]);
+
+  useEffect(() => {
+    if (teacher.weekendWeekdays.length > 0) {
+      setWeekendsExpanded(true);
+    }
+  }, [teacher.weekendWeekdays.length]);
+
+  useEffect(() => {
+    setWeekendDraft(normalizeWeekdayList(teacher.weekendWeekdays));
+  }, [teacher.weekendWeekdays]);
+
+  useEffect(() => {
+    const discardWeekendChanges = () => {
+      setWeekendDraft(normalizeWeekdayList(teacher.weekendWeekdays));
+    };
+
+    setEntry('settings-schedule-weekends', {
+      isDirty: isWeekendDirty,
+      onSave: () => onSaveWeekendWeekdays(weekendDraft),
+      onDiscard: discardWeekendChanges,
+      message: 'Вы изменили выходные дни. Сохранить перед выходом?',
+      cancelText: 'Выйти без сохранения',
+    });
+
+    return () => clearEntry('settings-schedule-weekends');
+  }, [clearEntry, isWeekendDirty, onSaveWeekendWeekdays, setEntry, teacher.weekendWeekdays, weekendDraft]);
+
   return (
     <div className={styles.moduleStack}>
       <div className={styles.sectionBlock}>
@@ -49,18 +104,53 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({ teacher, onChange,
           </label>
         </div>
       </div>
+      <div className={styles.sectionBlock}>
+        <button
+          type="button"
+          className={styles.accordionButton}
+          onClick={() => setWeekendsExpanded((current) => !current)}
+          aria-expanded={weekendsExpanded}
+        >
+          <div className={styles.accordionHeaderCopy}>
+            <div className={styles.label}>Выходные дни</div>
+            <div className={styles.helperText}>
+              В эти дни календарь пометит отдых, а создание уроков будет недоступно.
+            </div>
+          </div>
+          <div className={styles.accordionMeta}>
+            <span className={styles.accordionValue}>{weekendSummary}</span>
+            {weekendsExpanded ? <ExpandLessOutlinedIcon width={18} height={18} /> : <ExpandMoreOutlinedIcon width={18} height={18} />}
+          </div>
+        </button>
+        {weekendsExpanded && (
+          <div className={styles.accordionContent}>
+            <WeekdayToggleGroup
+              value={weekendDraft}
+              onChange={setWeekendDraft}
+              ariaLabel="Выберите выходные дни"
+            />
+            {isWeekendDirty && (
+              <div className={styles.weekendSavePanel}>
+                <div className={styles.weekendSaveActions}>
+                  <button
+                    type="button"
+                    className={controls.primaryButton}
+                    disabled={isWeekendSaving}
+                    onClick={() => void onSaveWeekendWeekdays(weekendDraft)}
+                  >
+                    {isWeekendSaving ? 'Сохраняем…' : 'Сохранить выходные'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className={styles.comingSoonGroup}>
         <div className={styles.comingSoonHeader}>Дополнительные настройки расписания</div>
         <div className={styles.comingSoonRow} onClick={onComingSoonClick} role="button" aria-disabled="true">
           <div>
             <div className={styles.label}>Перерыв между уроками (мин)</div>
-            <div className={styles.helperText}>Будет доступно в следующих обновлениях.</div>
-          </div>
-          <span className={styles.comingSoonBadge}>Скоро</span>
-        </div>
-        <div className={styles.comingSoonRow} onClick={onComingSoonClick} role="button" aria-disabled="true">
-          <div>
-            <div className={styles.label}>Рабочие дни недели</div>
             <div className={styles.helperText}>Будет доступно в следующих обновлениях.</div>
           </div>
           <span className={styles.comingSoonBadge}>Скоро</span>

@@ -36,6 +36,13 @@ import {
   normalizeTimeInput,
   parseTimeToMinutes,
 } from '../../../shared/lib/timeFields';
+import {
+  getFirstAvailableWeekday,
+  hasWeekdayOverlap,
+  isDateInWeekdayList,
+  normalizeWeekdayList,
+} from '../../../shared/lib/weekdays';
+import { WeekdayToggleGroup } from '../../../shared/ui/WeekdayToggleGroup';
 
 export interface LessonDraft {
   studentId: number | undefined;
@@ -56,6 +63,7 @@ interface LessonModalProps {
   editingLesson?: Lesson | null;
   defaultDuration: number;
   linkedStudents: LinkedStudent[];
+  weekendWeekdays: number[];
   draft: LessonDraft;
   isSubmitting?: boolean;
   recurrenceLocked?: boolean;
@@ -67,22 +75,13 @@ interface LessonModalProps {
   focusTarget?: LessonModalFocus;
 }
 
-const weekdayOptions: { value: number; label: string }[] = [
-  { value: 1, label: 'Пн' },
-  { value: 2, label: 'Вт' },
-  { value: 3, label: 'Ср' },
-  { value: 4, label: 'Чт' },
-  { value: 5, label: 'Пт' },
-  { value: 6, label: 'Сб' },
-  { value: 0, label: 'Вс' },
-];
-
 export const LessonModal: FC<LessonModalProps> = ({
   open,
   editingLessonId,
   editingLesson = null,
   defaultDuration,
   linkedStudents,
+  weekendWeekdays,
   draft,
   isSubmitting = false,
   recurrenceLocked = false,
@@ -111,6 +110,7 @@ export const LessonModal: FC<LessonModalProps> = ({
     () => normalizeMeetingLinkInput(draft.meetingLink ?? ''),
     [draft.meetingLink],
   );
+  const normalizedWeekendWeekdays = useMemo(() => normalizeWeekdayList(weekendWeekdays), [weekendWeekdays]);
   const meetingLinkError = useMemo(() => {
     const trimmed = draft.meetingLink?.trim() ?? '';
     if (!trimmed) return null;
@@ -122,27 +122,36 @@ export const LessonModal: FC<LessonModalProps> = ({
     }
     return null;
   }, [draft.meetingLink, normalizedMeetingLink]);
+  const dateSelectionError = useMemo(() => {
+    if (!draft.date) return null;
+    const selectedDate = toZonedDate(toUtcDateFromTimeZone(draft.date, '00:00', timeZone), timeZone);
+    return isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)
+      ? 'Это выходной день. На него нельзя поставить занятие.'
+      : null;
+  }, [draft.date, normalizedWeekendWeekdays, timeZone]);
+  const recurringWeekendError = useMemo(
+    () =>
+      draft.isRecurring && hasWeekdayOverlap(draft.repeatWeekdays, normalizedWeekendWeekdays)
+        ? 'Серия занятий не может проходить в выходные дни.'
+        : null,
+    [draft.isRecurring, draft.repeatWeekdays, normalizedWeekendWeekdays],
+  );
 
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceControlsDisabled) return;
     const currentDay = Number.isNaN(startAt.getTime()) ? undefined : startAt.getDay();
+    const nextDefaultDay = getFirstAvailableWeekday(normalizedWeekendWeekdays, currentDay);
     onDraftChange({
       ...draft,
       isRecurring: checked,
-      repeatWeekdays: checked && draft.repeatWeekdays.length === 0 && currentDay !== undefined
-        ? [currentDay]
-        : checked
-          ? draft.repeatWeekdays
-          : [],
+      repeatWeekdays:
+        checked && draft.repeatWeekdays.length === 0 && nextDefaultDay !== null
+          ? [nextDefaultDay]
+          : checked
+            ? normalizeWeekdayList(draft.repeatWeekdays)
+            : [],
       repeatUntil: checked ? draft.repeatUntil : undefined,
     });
-  };
-
-  const handleWeekdayToggle = (day: number) => {
-    const nextWeekdays = draft.repeatWeekdays.includes(day)
-      ? draft.repeatWeekdays.filter((item) => item !== day)
-      : [...draft.repeatWeekdays, day];
-    onDraftChange({ ...draft, repeatWeekdays: nextWeekdays });
   };
 
   const textFieldSx = {
@@ -311,6 +320,9 @@ export const LessonModal: FC<LessonModalProps> = ({
               onChange={(nextDate) => onDraftChange({ ...draft, date: nextDate ?? '' })}
               className={modalStyles.field}
               buttonRef={dateButtonRef}
+              disabledDateReason={(date) =>
+                isDateInWeekdayList(date, normalizedWeekendWeekdays) ? 'Выходной день' : undefined
+              }
             />
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Начало</span>
@@ -408,30 +420,14 @@ export const LessonModal: FC<LessonModalProps> = ({
             <Box>
               <div className={`${modalStyles.field} ${modalStyles.weekdaysRow}`}>
                 <span className={modalStyles.fieldLabel}>Выберите дни недели</span>
-                <div className={modalStyles.weekdayGrid} role="group" aria-label="Дни недели">
-                  {weekdayOptions.map((day) => {
-                    const isActive = draft.repeatWeekdays.includes(day.value);
-                    return (
-                      <button
-                        key={day.value}
-                        type="button"
-                        className={`${modalStyles.weekdayButton} ${
-                          isActive ? modalStyles.weekdayButtonActive : ''
-                        }`}
-                        disabled={recurrenceControlsDisabled}
-                        onClick={() => handleWeekdayToggle(day.value)}
-                        aria-pressed={isActive}
-                      >
-                        <span>{day.label}</span>
-                        <span
-                          className={`${modalStyles.weekdayDot} ${
-                            isActive ? modalStyles.weekdayDotActive : ''
-                          }`}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
+                <WeekdayToggleGroup
+                  value={draft.repeatWeekdays}
+                  onChange={(nextRepeatWeekdays) => onDraftChange({ ...draft, repeatWeekdays: nextRepeatWeekdays })}
+                  blockedDays={normalizedWeekendWeekdays}
+                  blockedDayTooltip="Выходной день"
+                  disabled={recurrenceControlsDisabled}
+                  ariaLabel="Выберите дни недели"
+                />
               </div>
               <Box
                 style={{
@@ -455,7 +451,17 @@ export const LessonModal: FC<LessonModalProps> = ({
                   Отметьте хотя бы один день недели
                 </Typography>
               )}
+              {recurringWeekendError && (
+                <Typography variant="caption" className={controls.error}>
+                  {recurringWeekendError}
+                </Typography>
+              )}
             </Box>
+          )}
+          {dateSelectionError && (
+            <Typography variant="caption" className={controls.error}>
+              {dateSelectionError}
+            </Typography>
           )}
           <Accordion sx={accordionSx} className={modalStyles.settingsAccordion}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />} className={modalStyles.settingsSummary}>

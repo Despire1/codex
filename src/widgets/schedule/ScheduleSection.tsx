@@ -15,6 +15,7 @@ import {
   CalendarMonthIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CoffeeIcon,
   MeetingLinkIcon,
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
@@ -30,6 +31,7 @@ import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../entit
 import { resolveLessonCancelActionCopy } from '../../entities/lesson/lib/lessonStatusPresentation';
 import { useToast } from '../../shared/lib/toast';
 import { api } from '../../shared/api/client';
+import { isDateInWeekdayList, normalizeWeekdayList } from '../../shared/lib/weekdays';
 import styles from './ScheduleSection.module.css';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import type {
@@ -111,9 +113,15 @@ interface ScheduleSectionProps {
   lessons: Lesson[];
   linkedStudents: LinkedStudent[];
   autoConfirmLessons: boolean;
+  weekendWeekdays: number[];
 }
 
-export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStudents, autoConfirmLessons }) => {
+export const ScheduleSection: FC<ScheduleSectionProps> = ({
+  lessons,
+  linkedStudents,
+  autoConfirmLessons,
+  weekendWeekdays,
+}) => {
   const timeZone = useTimeZone();
   const { showToast } = useToast();
   const {
@@ -153,6 +161,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
   const weekScrollRef = useRef<HTMLDivElement>(null);
   const dayScrollRef = useRef<HTMLDivElement>(null);
   const isMobileViewport = useIsMobile(720);
+  const normalizedWeekendWeekdays = useMemo(() => normalizeWeekdayList(weekendWeekdays), [weekendWeekdays]);
   const [activeDayPanelTab, setActiveDayPanelTab] = useState<'lessons' | 'notes'>('lessons');
   const [drawerMode, setDrawerMode] = useState<'half' | 'expanded'>('half');
   const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
@@ -459,6 +468,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     () => new Map(linkedStudents.map((student) => [student.id, student])),
     [linkedStudents],
   );
+  const isWeekendDate = (date: Date) => isDateInWeekdayList(date, normalizedWeekendWeekdays);
 
   const isAwaitingConfirmation = (lesson: Lesson) => {
     if (autoConfirmLessons) return false;
@@ -845,12 +855,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
     const selectedDayDate = effectiveSelectedMonthDay
       ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
       : null;
+    const selectedDayIsWeekend = selectedDayDate ? isWeekendDate(selectedDayDate) : false;
     const selectedDayNotesCount = selectedDayNotes.length;
 
     const selectedDayTitle = selectedDayDate ? format(selectedDayDate, 'd MMMM', { locale: ru }) : 'Выберите день';
     const selectedDayMeta = selectedDayDate
       ? [
           format(selectedDayDate, 'EEEE', { locale: ru }),
+          selectedDayIsWeekend ? 'выходной' : null,
           resolveLessonsLabel(selectedDayLessons.length),
           selectedDayNotesCount > 0 ? resolveNotesLabel(selectedDayNotesCount) : null,
         ]
@@ -861,6 +873,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
 
     const handleCreateLessonFromPanel = () => {
       if (!effectiveSelectedMonthDay) return;
+      if (selectedDayIsWeekend) return;
 
       const targetDate = toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone);
       setDayViewDate(targetDate);
@@ -962,7 +975,17 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
           <div className={styles.dayPanelTabContent}>
             <div className={styles.dayPanelScrollArea}>
               {selectedDayLessons.length === 0 ? (
-                <div className={styles.emptyDayState}>На этот день занятий пока нет</div>
+                selectedDayIsWeekend ? (
+                  <div className={styles.weekendDayState}>
+                    <div className={styles.weekendDayIcon} aria-hidden>
+                      <CoffeeIcon />
+                    </div>
+                    <p className={styles.weekendDayTitle}>Выходной</p>
+                    <p className={styles.weekendDaySubtitle}>Отдыхайте! На этот день нельзя поставить урок.</p>
+                  </div>
+                ) : (
+                  <div className={styles.emptyDayState}>На этот день занятий пока нет</div>
+                )
               ) : (
                 <div className={styles.dayPanelList}>
                   {selectedDayLessons.map((lesson) => {
@@ -1010,9 +1033,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
               )}
             </div>
             <div className={styles.dayPanelFooter}>
-              <button type="button" className={styles.dayPanelAddButton} onClick={handleCreateLessonFromPanel}>
+              <button
+                type="button"
+                className={`${styles.dayPanelAddButton} ${selectedDayIsWeekend ? styles.dayPanelAddButtonDisabled : ''}`}
+                onClick={handleCreateLessonFromPanel}
+                disabled={selectedDayIsWeekend}
+              >
                 <AddOutlinedIcon className={styles.dayPanelAddButtonIcon} />
-                Добавить занятие
+                {selectedDayIsWeekend ? 'Выходной день' : 'Добавить занятие'}
               </button>
             </div>
           </div>
@@ -1112,6 +1140,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                 {days.map((day) => {
                   const dayLessons = lessonsByDay[day.iso] ?? [];
                   const dayNotesCount = notesCountByDay[day.iso] ?? 0;
+                  const isWeekendCell = isWeekendDate(day.date);
                   const handleDayClick = () => {
                     setInternalSelectedMonthDay(day.iso);
                     setSelectedMonthDay(day.iso);
@@ -1138,6 +1167,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({ lessons, linkedStude
                         >
                           {day.date.getDate()}
                         </span>
+                        {isWeekendCell && (
+                          <Tooltip content="Выходной день" align="center">
+                            <span className={styles.monthWeekendBadge} aria-label="Выходной день">
+                              <CoffeeIcon />
+                            </span>
+                          </Tooltip>
+                        )}
                       </div>
                       <div className={styles.monthCounters}>
                         {dayLessons.length > 0 && (
