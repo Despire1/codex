@@ -202,7 +202,7 @@ export type LessonActionsContextValue = {
   requestDeleteLessonFromList: (lesson: Lesson) => void;
   markLessonCompleted: (lessonId: number) => Promise<void>;
   updateLessonStatus: (lessonId: number, status: Lesson['status']) => Promise<void>;
-  togglePaid: (lessonId: number, studentId?: number) => Promise<void>;
+  togglePaid: (lessonId: number, studentId?: number, options?: { currentIsPaid?: boolean }) => Promise<void>;
   remindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -1765,12 +1765,13 @@ export const useLessonActionsInternal = ({
   );
 
   const togglePaid = useCallback(
-    async (lessonId: number, studentId?: number) => {
+    async (lessonId: number, studentId?: number, options?: { currentIsPaid?: boolean }) => {
       const targetLesson = lessons.find((lesson) => lesson.id === lessonId);
       const isCurrentlyPaid =
-        studentId !== undefined
+        options?.currentIsPaid ??
+        (studentId !== undefined
           ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
-          : targetLesson?.isPaid ?? false;
+          : targetLesson?.isPaid ?? false);
 
       if (isCurrentlyPaid) {
         openPaymentCancelDialog({

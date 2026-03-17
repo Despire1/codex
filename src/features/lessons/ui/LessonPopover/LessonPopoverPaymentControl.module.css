@@ -1,0 +1,93 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.badgeButton {
+  border: none;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.badgeButton:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.04);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.badgeButtonExpanded {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+}
+
+.badgeButton:focus-visible,
+.participantButton:focus-visible {
+  outline: 2px solid var(--color-blue-600, #2563eb);
+  outline-offset: 2px;
+}
+
+.participantList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.participantListHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-slate-500);
+}
+
+.participantTooltip {
+  display: block;
+}
+
+.participantButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.participantButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(100, 116, 139, 0.26);
+  background: rgba(255, 255, 255, 1);
+}
+
+.participantName {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--color-slate-800);
+}
+
+.participantStatus {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.participantStatusPaid {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.participantStatusUnpaid {
+  color: #475569;
+  background: #e2e8f0;
+}

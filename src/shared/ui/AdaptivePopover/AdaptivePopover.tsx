@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { isElementFullyOutsideViewport } from '@/shared/lib/isElementFullyOutsideViewport';
 import styles from './AdaptivePopover.module.css';
 
 type PopoverSide = 'top' | 'bottom' | 'left' | 'right';
@@ -120,6 +121,12 @@ export const AdaptivePopover = ({
 
   const updatePosition = () => {
     if (!triggerRef.current || !popoverRef.current) return;
+
+    if (isElementFullyOutsideViewport(triggerRef.current)) {
+      onClose();
+      return;
+    }
+
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
 
@@ -156,7 +163,7 @@ export const AdaptivePopover = ({
   useLayoutEffect(() => {
     if (!isOpen) return;
     updatePosition();
-  }, [isOpen, side, align, offset, children]);
+  }, [isOpen, side, align, offset, children, onClose]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

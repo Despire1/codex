@@ -79,21 +79,24 @@ const resolveAverageScore = (item: StudentListItem) => {
 
 const resolveNextLessonPresentation = (nextLessonAt: string | null | undefined, timeZone: string) => {
   if (!nextLessonAt) {
-    return { label: 'Следующее: Нет занятий', tone: 'none' as NextLessonTone };
+    return { label: 'Следующее занятие: Нет занятий', tone: 'none' as NextLessonTone };
   }
   const lessonDate = toZonedDate(nextLessonAt, timeZone);
   const now = toZonedDate(new Date(), timeZone);
   const timeLabel = format(lessonDate, 'HH:mm', { locale: ru });
 
   if (isSameDay(lessonDate, now)) {
-    return { label: `Следующее: Сегодня ${timeLabel}`, tone: 'today' as NextLessonTone };
+    return { label: `Следующее занятие: Сегодня ${timeLabel}`, tone: 'today' as NextLessonTone };
   }
 
   if (isSameDay(lessonDate, addDays(now, 1))) {
-    return { label: `Следующее: Завтра ${timeLabel}`, tone: 'future' as NextLessonTone };
+    return { label: `Следующее занятие: Завтра ${timeLabel}`, tone: 'future' as NextLessonTone };
   }
 
-  return { label: `Следующее: ${format(lessonDate, 'd MMM HH:mm', { locale: ru })}`, tone: 'future' as NextLessonTone };
+  return {
+    label: `Следующее занятие: ${format(lessonDate, 'd MMM HH:mm', { locale: ru })}`,
+    tone: 'future' as NextLessonTone,
+  };
 };
 
 export const resolveStudentUiColor = (item: StudentListItem) => {

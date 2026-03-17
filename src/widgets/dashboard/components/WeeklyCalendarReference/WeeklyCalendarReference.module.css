@@ -408,8 +408,33 @@
   transform: rotate(45deg);
   pointer-events: none;
   z-index: -1;
-  left: -8px;
   top: 25px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.lessonPopover[data-visibility='open']::before {
+  opacity: 1;
+}
+
+.lessonPopover[data-side='right']::before {
+  left: -8px;
+}
+
+.lessonPopover[data-side='left']::before {
+  left: auto;
+  right: -8px;
+}
+
+.lessonPopover[data-side='bottom']::before {
+  top: -8px;
+  left: 24px;
+}
+
+.lessonPopover[data-side='top']::before {
+  top: auto;
+  bottom: -8px;
+  left: 24px;
 }
 
 @media (max-width: 1400px) {

@@ -26,6 +26,7 @@ import {
   resolveLessonEditDisabledReason,
 } from '../../../../entities/lesson/lib/lessonMutationGuards';
 import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
+import { LessonPopoverPaymentControl } from './LessonPopoverPaymentControl';
 import styles from './LessonPopover.module.css';
 
 interface LessonPopoverProps {
@@ -36,6 +37,7 @@ interface LessonPopoverProps {
   onDelete: () => void;
   onCancel: () => void;
   onRestore: () => void;
+  onTogglePaid: (studentId?: number) => void;
   onClose: () => void;
 }
 
@@ -47,6 +49,7 @@ export const LessonPopover = ({
   onDelete,
   onCancel,
   onRestore,
+  onTogglePaid,
   onClose,
 }: LessonPopoverProps) => {
   const participants = useMemo(() => buildParticipants(lesson, linkedStudentsById), [lesson, linkedStudentsById]);
@@ -132,7 +135,15 @@ export const LessonPopover = ({
           </div>
           <div className={styles.statusCard}>
             <div className={styles.statusLabel}>Оплата</div>
-            <span className={`${styles.statusBadge} ${styles[`statusBadge_${paymentTone}`]}`}>{paymentLabel}</span>
+            <LessonPopoverPaymentControl
+              lesson={lesson}
+              participants={participants}
+              linkedStudentsById={linkedStudentsById}
+              paymentLabel={paymentLabel}
+              paymentTone={paymentTone}
+              badgeClassName={`${styles.statusBadge} ${styles[`statusBadge_${paymentTone}`]}`}
+              onTogglePaid={onTogglePaid}
+            />
           </div>
         </div>
       </div>

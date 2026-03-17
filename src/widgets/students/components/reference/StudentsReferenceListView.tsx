@@ -19,6 +19,7 @@ import {
   getStudentInitials,
   type StudentLifecycleStatus,
 } from '../../model/referencePresentation';
+import { StudentsReferenceFilterSelect } from './StudentsReferenceFilterSelect';
 import styles from './StudentsReferenceListView.module.css';
 
 type ListSummary = {
@@ -90,6 +91,11 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
 
     return ['Все уровни', ...uniqueLevels];
   }, [students]);
+
+  const levelFilterOptions = useMemo(
+    () => levelOptions.map((option) => ({ value: option, label: option })),
+    [levelOptions],
+  );
 
   const preparedStudents = useMemo(() => {
     const withPresentation = students.map((entry) => ({
@@ -196,29 +202,21 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
               </div>
 
               <div className={styles.controlsRow}>
-                <select
+                <StudentsReferenceFilterSelect
                   value={levelFilter}
-                  onChange={(event) => setLevelFilter(event.target.value)}
+                  onChange={setLevelFilter}
+                  ariaLabel="Фильтр по уровню ученика"
                   className={styles.selectControl}
-                >
-                  {levelOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  options={levelFilterOptions}
+                />
 
-                <select
+                <StudentsReferenceFilterSelect
                   value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value as 'name' | 'created' | 'score' | 'activity')}
+                  onChange={(nextValue) => setSortBy(nextValue as 'name' | 'created' | 'score' | 'activity')}
+                  ariaLabel="Сортировка списка учеников"
                   className={styles.selectControl}
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  options={sortOptions}
+                />
 
                 <button type="button" className={styles.iconControlButton} aria-label="Дополнительные фильтры">
                   <FontAwesomeIcon icon={faFilter} />
@@ -321,7 +319,7 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                   <div className={styles.studentMetricsGrid}>
                     <div className={styles.metricCell}>
                       <div className={styles.metricValue}>{presentation.lessonsConducted}</div>
-                      <div className={styles.metricLabel}>Занятий</div>
+                      <div className={styles.metricLabel}>Занятий проведено</div>
                     </div>
                     <div className={styles.metricCell}>
                       <div className={`${styles.metricValue} ${styles.metricGreen}`}>{presentation.attendanceRate}%</div>

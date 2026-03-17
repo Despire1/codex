@@ -155,7 +155,8 @@ export const LessonsTab: FC<LessonsTabProps> = ({
       const lessonDate = startOfDay(toZonedDate(lesson.startAt, timeZone));
       const today = startOfDay(toZonedDate(new Date(), timeZone));
       const isPastLesson = lessonDate.getTime() < today.getTime();
-      return { participant, resolvedPrice, isPaid, isPastLesson };
+      const canMarkCompleted = new Date(lesson.startAt).getTime() <= Date.now();
+      return { participant, resolvedPrice, isPaid, isPastLesson, canMarkCompleted };
     },
     [selectedStudent?.link.pricePerLesson, selectedStudentId, timeZone],
   );
@@ -305,7 +306,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
             <div className={styles.lessonCardList}>
               {lessonListLoading && <div className={styles.loadingRow}>Обновляем список...</div>}
               {sortedLessons.map((lesson) => {
-                const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
+                const { resolvedPrice, isPaid, isPastLesson, canMarkCompleted } = getLessonDerivedData(lesson);
                 const awaitingConfirmation = isAwaitingConfirmation(lesson);
 
                 return (
@@ -329,7 +330,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           onBlur={onStopEditLessonStatus}
                         >
                           {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
-                          <option value="COMPLETED">Проведён</option>
+                          {canMarkCompleted && <option value="COMPLETED">Проведён</option>}
                           <option value="CANCELED">Отменён</option>
                         </select>
                       ) : (
@@ -406,7 +407,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                 </TableHead>
                 <TableBody>
                   {sortedLessons.map((lesson) => {
-                    const { resolvedPrice, isPaid, isPastLesson } = getLessonDerivedData(lesson);
+                    const { resolvedPrice, isPaid, isPastLesson, canMarkCompleted } = getLessonDerivedData(lesson);
                     const awaitingConfirmation = isAwaitingConfirmation(lesson);
 
                     return (
@@ -436,7 +437,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                                 onBlur={onStopEditLessonStatus}
                               >
                                 {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
-                                <option value="COMPLETED">Проведён</option>
+                                {canMarkCompleted && <option value="COMPLETED">Проведён</option>}
                                 <option value="CANCELED">Отменён</option>
                               </select>
                             ) : (

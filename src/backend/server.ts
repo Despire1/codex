@@ -5162,6 +5162,14 @@ const deleteLesson = async (user: User, lessonId: number, body: any) => {
 
 const markLessonCompleted = async (user: User, lessonId: number) => {
   const teacher = await ensureTeacher(user);
+  const lessonSnapshot = await prisma.lesson.findUnique({
+    where: { id: lessonId },
+    select: { id: true, teacherId: true, startAt: true },
+  });
+  if (!lessonSnapshot || lessonSnapshot.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+  if (lessonSnapshot.startAt.getTime() > Date.now()) {
+    throw new Error('Нельзя отметить будущий урок проведённым');
+  }
   const { lesson, links } = await settleLessonPayments(lessonId, teacher.chatId);
   await dispatchScheduledHomeworkAssignmentsForLesson(lesson.id);
   const primaryLink = links.find((link: any) => link.studentId === lesson.studentId) ?? null;
@@ -5511,16 +5519,14 @@ const togglePaymentForStudent = async (
     nextPaidSource = 'MANUAL';
   }
 
-  const nextStatus = lesson.status === 'SCHEDULED' ? 'COMPLETED' : lesson.status;
-  const completedAt = nextStatus === 'COMPLETED' ? lesson.completedAt ?? new Date() : null;
   const paidAt = participantsPaid ? lesson.paidAt ?? new Date() : null;
 
   const normalizedLesson = await prisma.lesson.update({
     where: { id: lessonId },
     data: {
       isPaid: participantsPaid,
-      status: nextStatus,
-      completedAt,
+      status: lesson.status,
+      completedAt: lesson.status === 'COMPLETED' ? lesson.completedAt ?? new Date() : null,
       paidAt,
       paymentStatus: nextPaymentStatus,
       paidSource: nextPaidSource,
@@ -5573,6 +5579,9 @@ const updateLessonStatus = async (user: User, lessonId: number, status: any) => 
   const lessonParticipantIds = lesson.participants.map((participant: any) => participant.studentId);
 
   if (normalizedStatus === 'COMPLETED') {
+    if (lesson.startAt.getTime() > Date.now()) {
+      throw new Error('Нельзя отметить будущий урок проведённым');
+    }
     const result = await settleLessonPayments(lessonId, teacher.chatId);
     await dispatchScheduledHomeworkAssignmentsForLesson(result.lesson.id);
     const participantIds = result.lesson.participants.map((participant: any) => participant.studentId);

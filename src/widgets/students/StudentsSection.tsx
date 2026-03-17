@@ -18,6 +18,7 @@ import { useLessonActions } from '../../features/lessons/model/useLessonActions'
 import { StudentTabId } from './types';
 import { StudentsReferenceListView } from './components/reference/StudentsReferenceListView';
 import { StudentsReferenceProfileView } from './components/reference/StudentsReferenceProfileView';
+import { BalanceTopupModal } from './components/BalanceTopupModal';
 import styles from './StudentsSectionReference.module.css';
 import { tabPathById } from '@/app/tabs';
 
@@ -50,7 +51,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const timeZone = useTimeZone();
   const isMobile = useIsMobile(900);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
-  const { openCreateStudentModal, openEditStudentModal, requestDeleteStudent, togglePaymentReminders } =
+  const { openCreateStudentModal, openEditStudentModal, requestDeleteStudent, togglePaymentReminders, topupBalance } =
     useStudentsActions();
 
   const {
@@ -100,6 +101,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() => resolveTabFromSearch(location.search));
   const [routeStudentEntry, setRouteStudentEntry] = useState<StudentListItem | null>(null);
   const [routeStudentEntryLoading, setRouteStudentEntryLoading] = useState(false);
+  const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
   const isProfileOpen = routeStudentId !== null;
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -302,6 +304,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     requestDeleteStudent(profileStudentId);
   };
 
+  const handleOpenBalanceTopup = () => {
+    if (!selectedStudentEntry) return;
+    setIsBalanceTopupOpen(true);
+  };
+
   const handleToggleStudentPaymentReminders = (enabled: boolean) => {
     const profileStudentId = selectedStudentEntry?.student.id ?? routeStudentId ?? selectedStudentId;
     if (!profileStudentId) return;
@@ -422,6 +429,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onBack={handleBackToList}
           onScheduleLesson={handleScheduleLesson}
           onEditStudent={handleEditStudent}
+          onOpenBalanceTopup={handleOpenBalanceTopup}
           onRequestDeleteStudent={handleDeleteStudent}
           onTogglePaymentReminders={handleToggleStudentPaymentReminders}
           onWriteToStudent={handleWriteToStudent}
@@ -433,6 +441,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           timeZone={timeZone}
         />
       )}
+      <BalanceTopupModal
+        isOpen={isBalanceTopupOpen}
+        isMobile={isMobile}
+        student={selectedStudentEntry ? { ...selectedStudentEntry.student, link: selectedStudentEntry.link } : null}
+        onClose={() => setIsBalanceTopupOpen(false)}
+        onSubmit={(payload) => {
+          if (!selectedStudentEntry) {
+            return Promise.resolve();
+          }
+          return topupBalance(selectedStudentEntry.student.id, payload);
+        }}
+      />
     </section>
   );
 };

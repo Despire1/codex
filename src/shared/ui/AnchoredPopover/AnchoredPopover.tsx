@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { isElementFullyOutsideViewport } from '@/shared/lib/isElementFullyOutsideViewport';
 import styles from './AnchoredPopover.module.css';
 
 type PopoverSide = 'top' | 'bottom' | 'left' | 'right';
@@ -121,6 +122,12 @@ export const AnchoredPopover = ({
   const updatePosition = () => {
     const resolvedAnchorEl = anchorEl ?? activeAnchorEl;
     if (!resolvedAnchorEl || !popoverRef.current) return;
+
+    if (isElementFullyOutsideViewport(resolvedAnchorEl)) {
+      onClose();
+      return;
+    }
+
     const anchorRect = resolvedAnchorEl.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
 
@@ -153,7 +160,7 @@ export const AnchoredPopover = ({
   useLayoutEffect(() => {
     if (!shouldRender || !isOpen) return;
     updatePosition();
-  }, [shouldRender, isOpen, anchorEl, activeAnchorEl, side, align, offset]);
+  }, [shouldRender, isOpen, anchorEl, activeAnchorEl, side, align, offset, onClose]);
 
   useEffect(() => {
     if (!isOpen || !anchorEl) return undefined;
@@ -220,7 +227,7 @@ export const AnchoredPopover = ({
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
-  }, [anchorEl, isOpen, onClose, preventCloseOnOtherPopoverClick]);
+  }, [anchorEl, isOpen, onClose, preventCloseOnOtherPopoverClick, activeAnchorEl]);
 
   if (!shouldRender || !activeAnchorEl) return null;
 
@@ -228,6 +235,7 @@ export const AnchoredPopover = ({
     <div
       ref={popoverRef}
       data-anchored-popover-root="true"
+      data-visibility={isVisible ? 'open' : 'closing'}
       className={`${styles.popover} ${isVisible ? styles.popoverOpen : styles.popoverClosing} ${className}`.trim()}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >

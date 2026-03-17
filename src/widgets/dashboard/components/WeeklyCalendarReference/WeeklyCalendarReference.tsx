@@ -84,7 +84,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
     [linkedStudents],
   );
   const weekendSet = useMemo(() => new Set(normalizeWeekdayList(weekendWeekdays)), [weekendWeekdays]);
-  const { openLessonModal, cancelLesson, restoreLesson, requestDeleteLessonFromList } = useLessonActions();
+  const { openLessonModal, cancelLesson, restoreLesson, requestDeleteLessonFromList, togglePaid } = useLessonActions();
 
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const baseWeekStart = useMemo(() => startOfWeek(todayZoned, { weekStartsOn: 1 }), [todayZoned]);
@@ -464,6 +464,9 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
             }}
             onCancel={() => handleCancelLesson(activeLesson)}
             onRestore={() => handleRestoreLesson(activeLesson)}
+            onTogglePaid={(studentId) => {
+              void togglePaid(activeLesson.id, studentId);
+            }}
             onClose={closeLessonPopover}
           />
         )}

@@ -488,6 +488,48 @@
   gap: 10px;
 }
 
+.paymentsListStack {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.paymentsListStack::-webkit-scrollbar {
+  width: 8px;
+}
+
+.paymentsListStack::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+
+.paymentGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paymentGroupTitle {
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.paymentGroupList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .lessonsListStack {
   height: 100%;
   min-height: 0;
@@ -577,6 +619,66 @@
 .statusPending {
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.paymentEventCard {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.paymentEventMain {
+  min-width: 0;
+}
+
+.paymentEventMain .activitySubtitle {
+  margin: 0;
+}
+
+.paymentEventMain .activityTitle {
+  margin-top: 9px;
+  line-height: 1.35;
+}
+
+.paymentEventStatusBadge {
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.paymentEventFooter {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.paymentEventValue {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
+  color: #111827;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.paymentEventMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6b7280;
+  min-width: 0;
+  flex: 1;
+}
+
+.paymentMetaLabel {
+  font-weight: 800;
+  color: #334155;
+}
+
+.paymentComment {
+  color: #475569;
+  font-weight: 600;
 }
 
 .activityFooter {
@@ -742,6 +844,30 @@
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+}
+
+.lessonPaymentButton {
+  border: none;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.lessonPaymentButton:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.06);
+}
+
+.lessonPaymentButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.lessonPaymentButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .lessonStatusBadge_scheduled {

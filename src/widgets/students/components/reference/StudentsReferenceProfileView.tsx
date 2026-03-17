@@ -13,7 +13,6 @@ import {
   faCalendar,
   faCalendarDays,
   faCalendarPlus,
-  faChartLine,
   faCheck,
   faClock,
   faComment,
@@ -37,8 +36,6 @@ import {
 import { isLessonInSeries } from '@/entities/lesson/lib/lessonDetails';
 import {
   resolveLessonCancelActionCopy,
-  resolveLessonPaymentStatusLabel,
-  resolveLessonPaymentTone,
   resolveLessonRecurrenceLabel,
   resolveLessonStatusLabel,
   resolveLessonStatusTone,
@@ -53,10 +50,7 @@ import { api } from '@/shared/api/client';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import {
   buildProfileStats,
-  buildProgressSeries,
   buildStudentCardPresentation,
-  formatPaymentEventLabel,
-  formatPaymentStatusLabel,
   getStatusUiMeta,
   getStudentDisplayName,
   getStudentInitials,
@@ -107,6 +101,7 @@ interface StudentsReferenceProfileViewProps {
   onBack: () => void;
   onScheduleLesson: () => void;
   onEditStudent: (options?: { focusField?: 'price' }) => void;
+  onOpenBalanceTopup: () => void;
   onRequestDeleteStudent: () => void;
   onTogglePaymentReminders: (enabled: boolean) => void;
   onWriteToStudent: () => void;
@@ -115,7 +110,7 @@ interface StudentsReferenceProfileViewProps {
     studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
-  onTogglePaid: (lessonId: number, studentId?: number) => void | Promise<void>;
+  onTogglePaid: (lessonId: number, studentId?: number, options?: { currentIsPaid?: boolean }) => void | Promise<void>;
   onRemindHomework: (homeworkId: number) => void;
   timeZone: string;
 }
@@ -139,13 +134,81 @@ const profileTabs: Array<{ id: ProfileTabId; label: string; icon: typeof faBookO
   { id: 'payments', label: 'Оплаты', icon: faWallet },
 ];
 
-const buildChartPolyline = (points: number[], width: number, height: number) => {
-  if (points.length === 0) return { line: '', area: '' };
-  const safeHeight = Math.max(1, height);
-  const step = points.length > 1 ? width / (points.length - 1) : width;
-  const linePoints = points.map((point, index) => `${index * step},${safeHeight - point}`).join(' ');
-  const area = `0,${safeHeight} ${linePoints} ${width},${safeHeight}`;
-  return { line: linePoints, area };
+const getPaymentEventTitle = (event: PaymentEvent) => {
+  switch (event.type) {
+    case 'TOP_UP':
+      return `Пополнение предоплаты: +${event.lessonsDelta} занятия`;
+    case 'SUBSCRIPTION':
+      return `Абонемент: +${event.lessonsDelta} занятия`;
+    case 'AUTO_CHARGE':
+      return 'Автосписание за занятие';
+    case 'MANUAL_PAID':
+      if (event.reason === 'BALANCE_PAYMENT') {
+        return 'Оплата занятия с баланса';
+      }
+      return 'Оплата занятия вручную';
+    case 'OTHER':
+      return `Другое: +${event.lessonsDelta} занятия`;
+    case 'ADJUSTMENT':
+      if (event.reason === 'LESSON_CANCELED') {
+        return 'Возврат урока после отмены занятия';
+      }
+      if (event.reason === 'PAYMENT_REVERT_REFUND' || event.reason === 'PAYMENT_REVERT') {
+        return 'Оплата отменена, урок возвращён на баланс';
+      }
+      if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+        return 'Оплата отменена без возврата';
+      }
+      if (event.lessonsDelta > 0) {
+        return 'Возврат урока на баланс';
+      }
+      if (event.lessonsDelta < 0) {
+        return 'Списание урока с баланса';
+      }
+      return 'Корректировка баланса';
+    default:
+      return 'Изменение оплаты';
+  }
+};
+
+const getPaymentStatusMeta = (event: PaymentEvent) => {
+  if (event.type === 'TOP_UP' || event.type === 'SUBSCRIPTION' || event.type === 'OTHER') {
+    return { label: 'Пополнение', tone: 'paid' as const };
+  }
+  if (event.type === 'AUTO_CHARGE') {
+    return { label: 'Списание', tone: 'charge' as const };
+  }
+  if (event.type === 'MANUAL_PAID') {
+    return {
+      label: event.reason === 'BALANCE_PAYMENT' ? 'Оплачено с баланса' : 'Ручная оплата',
+      tone: 'paid' as const,
+    };
+  }
+  if (event.type === 'ADJUSTMENT') {
+    if (
+      event.reason === 'LESSON_CANCELED' ||
+      event.reason === 'PAYMENT_REVERT_REFUND' ||
+      event.reason === 'PAYMENT_REVERT'
+    ) {
+      return { label: 'Возврат', tone: 'pending' as const };
+    }
+    if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+      return { label: 'Отмена оплаты', tone: 'charge' as const };
+    }
+    return { label: 'Корректировка', tone: 'pending' as const };
+  }
+  return { label: 'Событие', tone: 'pending' as const };
+};
+
+const formatPaymentEventValue = (event: PaymentEvent) => {
+  if (event.type === 'ADJUSTMENT' && event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+    return '—';
+  }
+  if (typeof event.moneyAmount === 'number' && event.moneyAmount > 0) {
+    return `${event.moneyAmount.toLocaleString('ru-RU')} ₽`;
+  }
+  const sign = event.lessonsDelta > 0 ? '+' : '';
+  return `${sign}${event.lessonsDelta} урок.`;
 };
 
 export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps> = ({
@@ -169,6 +232,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   onBack,
   onScheduleLesson,
   onEditStudent,
+  onOpenBalanceTopup,
   onRequestDeleteStudent,
   onTogglePaymentReminders,
   onWriteToStudent,
@@ -194,12 +258,6 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const cardPresentation = buildStudentCardPresentation(studentEntry, timeZone);
   const statusMeta = getStatusUiMeta(cardPresentation.status);
   const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworks, studentDebtItems);
-  const progress = buildProgressSeries(studentLessonsSummary, timeZone);
-
-  const chartHeight = 170;
-  const chartWidth = 360;
-  const normalizedChart = progress.points.map((point) => (point.value / progress.maxValue) * 150);
-  const chartGeometry = buildChartPolyline(normalizedChart, chartWidth, chartHeight);
 
   const homeworksOrdered = useMemo(
     () => [...studentHomeworks].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
@@ -207,7 +265,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   );
   const lessonsOrdered = studentLessons;
   const paymentsOrdered = useMemo(
-    () => [...payments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
+    () => [...payments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [payments],
   );
   const linkedStudentsById = useMemo(() => {
@@ -318,10 +376,12 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const lessonDatePattern =
             lessonYearLabel === currentYearLabel ? 'd MMMM • HH:mm' : 'd MMMM yyyy • HH:mm';
           const isJoinAvailable = lesson.status === 'SCHEDULED' && lessonEndAt.getTime() >= Date.now();
+          const lessonParticipant = lesson.participants?.find((participant) => participant.studentId === studentEntry.student.id);
+          const isPaidForStudent = lessonParticipant?.isPaid ?? lesson.isPaid;
           const statusLabel = resolveLessonStatusLabel(lesson);
           const statusTone = resolveLessonStatusTone(lesson);
-          const paymentLabel = resolveLessonPaymentStatusLabel(lesson, lesson.participants ?? []);
-          const paymentTone = resolveLessonPaymentTone(lesson, lesson.participants ?? []);
+          const paymentLabel = isPaidForStudent ? 'Оплачено' : 'Не оплачено';
+          const paymentTone = isPaidForStudent ? 'paid' : 'unpaid';
           const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
           const lessonKindLabel = lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок';
           const editDisabledReason = resolveLessonEditDisabledReason(lesson);
@@ -359,9 +419,19 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       <span className={`${styles.lessonStatusBadge} ${styles[`lessonStatusBadge_${statusTone}`]}`}>
                         {statusLabel}
                       </span>
-                      <span className={`${styles.lessonStatusBadge} ${styles[`lessonPaymentBadge_${paymentTone}`]}`}>
-                        {paymentLabel}
-                      </span>
+                      <Tooltip content={isPaidForStudent ? 'Отменить оплату' : 'Отметить оплату'}>
+                        <button
+                          type="button"
+                          className={`${styles.lessonStatusBadge} ${styles[`lessonPaymentBadge_${paymentTone}`]} ${styles.lessonPaymentButton}`}
+                          disabled={pendingPaymentIds.includes(lesson.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleMarkPaid(lesson.id, isPaidForStudent);
+                          }}
+                        >
+                          {paymentLabel}
+                        </button>
+                      </Tooltip>
                       {recurrenceLabel ? <span className={styles.lessonMetaBadge}>{recurrenceLabel}</span> : null}
                     </div>
                   </div>
@@ -461,42 +531,73 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
       return <div className={styles.tabEmpty}>Платежей пока нет.</div>;
     }
 
-    return (
-      <div className={styles.listStack}>
-        {paymentsOrdered.map((event) => {
-          const paymentStatus = formatPaymentStatusLabel(event);
-          const amountLabel =
-            typeof event.moneyAmount === 'number' && event.moneyAmount > 0
-              ? `${event.moneyAmount.toLocaleString('ru-RU')} ₽`
-              : `${event.lessonsDelta > 0 ? '+' : ''}${event.lessonsDelta} урок.`;
+    const groupedPayments = paymentsOrdered.reduce<Array<{ title: string; items: PaymentEvent[] }>>((groups, event) => {
+      const groupTitle = formatInTimeZone(event.createdAt, 'd MMMM', { locale: ru, timeZone });
+      const currentGroup = groups[groups.length - 1];
+      if (currentGroup?.title === groupTitle) {
+        currentGroup.items.push(event);
+        return groups;
+      }
+      groups.push({ title: groupTitle, items: [event] });
+      return groups;
+    }, []);
 
-          return (
-            <article key={event.id} className={styles.activityCard}>
-              <div className={styles.activityHeaderSimple}>
-                <div>
-                  <h3 className={styles.activityTitle}>{amountLabel}</h3>
-                  <p className={styles.activitySubtitle}>
-                    {formatPaymentEventLabel(event)} • {formatInTimeZone(event.createdAt, 'd MMMM yyyy', {
+    return (
+      <div className={styles.paymentsListStack}>
+        {groupedPayments.map((group) => (
+          <section key={group.title} className={styles.paymentGroup}>
+            <div className={styles.paymentGroupTitle}>{group.title}</div>
+            <div className={styles.paymentGroupList}>
+              {group.items.map((event) => {
+                const paymentStatus = getPaymentStatusMeta(event);
+                const lessonMeta = event.lesson?.startAt ? (
+                  <>
+                    <span className={styles.paymentMetaLabel}>Занятие:</span>{' '}
+                    {formatInTimeZone(event.lesson.startAt, 'd MMM yyyy, HH:mm', {
                       locale: ru,
                       timeZone,
                     })}
-                  </p>
-                </div>
-                <span
-                  className={`${styles.statusBadge} ${
-                    paymentStatus.tone === 'paid'
-                      ? styles.statusPaid
-                      : paymentStatus.tone === 'charge'
-                        ? styles.statusCharge
-                        : styles.statusPending
-                  }`}
-                >
-                  {paymentStatus.label}
-                </span>
-              </div>
-            </article>
-          );
-        })}
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.paymentMetaLabel}>Занятие:</span> Без привязки к занятию
+                  </>
+                );
+
+                return (
+                  <article key={event.id} className={`${styles.activityCard} ${styles.paymentEventCard}`}>
+                    <div className={styles.activityHeaderSimple}>
+                      <div className={styles.paymentEventMain}>
+                        <p className={styles.activitySubtitle}>
+                          {formatInTimeZone(event.createdAt, 'd MMMM yyyy, HH:mm', { locale: ru, timeZone })}
+                        </p>
+                        <h3 className={styles.activityTitle}>{getPaymentEventTitle(event)}</h3>
+                      </div>
+                      <span
+                        className={`${styles.statusBadge} ${styles.paymentEventStatusBadge} ${
+                          paymentStatus.tone === 'paid'
+                            ? styles.statusPaid
+                            : paymentStatus.tone === 'charge'
+                              ? styles.statusCharge
+                              : styles.statusPending
+                        }`}
+                      >
+                        {paymentStatus.label}
+                      </span>
+                    </div>
+                    <div className={styles.paymentEventFooter}>
+                      <div className={styles.paymentEventMeta}>
+                        <span>{lessonMeta}</span>
+                        {event.comment ? <span className={styles.paymentComment}>{event.comment}</span> : null}
+                      </div>
+                      <div className={styles.paymentEventValue}>{formatPaymentEventValue(event)}</div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     );
   };
@@ -557,12 +658,12 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     }
   };
 
-  const handleMarkPaid = async (lessonId: number) => {
+  const handleMarkPaid = async (lessonId: number, currentIsPaid = false) => {
     if (pendingPaymentIds.includes(lessonId)) return;
     setPendingPaymentIds((prev) => [...prev, lessonId]);
     setShouldAutoCloseDebt(true);
     try {
-      await onTogglePaid(lessonId, studentEntry.student.id);
+      await onTogglePaid(lessonId, studentEntry.student.id, { currentIsPaid });
     } finally {
       setPendingPaymentIds((prev) => prev.filter((id) => id !== lessonId));
     }
@@ -865,13 +966,26 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <div className={styles.heroStatLabel}>Средний балл</div>
                 </div>
               )}
+              <Tooltip content="Нажмите, чтобы изменить баланс">
+                <button
+                  type="button"
+                  className={styles.heroStatButton}
+                  onClick={onOpenBalanceTopup}
+                  aria-label={`Изменить баланс. Текущий баланс: ${studentEntry.link.balanceLessons}`}
+                >
+                  <div
+                    className={`${styles.heroStatValue} ${
+                      studentEntry.link.balanceLessons < 0 ? styles.heroStatDanger : styles.heroStatGreen
+                    }`}
+                  >
+                    {studentEntry.link.balanceLessons}
+                  </div>
+                  <div className={styles.heroStatLabel}>Занятия на балансе</div>
+                </button>
+              </Tooltip>
               <div>
                 <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>{profileStats.completedHomeworks}</div>
                 <div className={styles.heroStatLabel}>Домашек сдано</div>
-              </div>
-              <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatGreen}`}>{profileStats.attendanceRate}%</div>
-                <div className={styles.heroStatLabel}>Посещаемость</div>
               </div>
             </div>
           </section>
@@ -1017,63 +1131,6 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </div>
               </section>
 
-              <section className={styles.sideCard}>
-                <h3 className={styles.sideUpperTitle}>Быстрая статистика</h3>
-                <div className={styles.quickStatsList}>
-                  <div>
-                    <span>Пропущено занятий</span>
-                    <strong>{profileStats.missedLessons} из {profileStats.lessonsConducted}</strong>
-                  </div>
-                  <div>
-                    <span>Средняя оценка ДЗ</span>
-                    <strong>{profileStats.averageScore}/10</strong>
-                  </div>
-                  <div>
-                    <span>Выполнено домашек</span>
-                    <strong>{profileStats.completedHomeworks}/{profileStats.totalHomeworks}</strong>
-                  </div>
-                  <div>
-                    <span>Время на платформе</span>
-                    <strong>{profileStats.totalPlatformHours} часов</strong>
-                  </div>
-                  <div className={styles.quickStatsAccent}>
-                    <span>Следующая оплата</span>
-                    <strong>{profileStats.nextPaymentDateLabel}</strong>
-                  </div>
-                </div>
-              </section>
-
-              {/*
-              <section className={styles.sideCard}>
-                <div className={styles.sideCardHeader}>
-                  <div className={styles.sideIconWrap}>
-                    <FontAwesomeIcon icon={faChartLine} />
-                  </div>
-                  <div>
-                    <h3 className={styles.sideTitle}>Прогресс</h3>
-                    <p className={styles.sideSubtitle}>Последние 6 месяцев</p>
-                  </div>
-                </div>
-
-                <div className={styles.chartWrap}>
-                  <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.chartSvg} preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="studentsProgressGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#b9ff66" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#b9ff66" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <polygon points={chartGeometry.area} fill="url(#studentsProgressGradient)" />
-                    <polyline points={chartGeometry.line} fill="none" stroke="#b9ff66" strokeWidth="3" />
-                  </svg>
-                  <div className={styles.chartLabelsRow}>
-                    {progress.points.map((point) => (
-                      <span key={point.label}>{point.label}</span>
-                    ))}
-                  </div>
-                </div>
-              </section>
-              */}
             </div>
           </div>
         </div>
