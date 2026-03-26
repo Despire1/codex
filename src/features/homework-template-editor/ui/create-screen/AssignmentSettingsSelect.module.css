@@ -1,0 +1,146 @@
+.root {
+  width: 100%;
+}
+
+.triggerButton {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #0f172a;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.triggerButton:hover:not(:disabled) {
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 12px 26px -20px rgba(15, 23, 42, 0.4);
+  transform: translateY(-1px);
+}
+
+.triggerButton:focus-visible {
+  outline: none;
+  border-color: rgba(15, 23, 42, 0.42);
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.06);
+}
+
+.triggerButton:disabled {
+  cursor: not-allowed;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.triggerButtonOpen {
+  border-color: rgba(15, 23, 42, 0.3);
+}
+
+.triggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.triggerLabelFilled {
+  color: #0f172a;
+}
+
+.triggerLabelPlaceholder {
+  color: #94a3b8;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  color: #0f172a;
+}
+
+.popover {
+  min-width: min(320px, calc(100vw - 24px));
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  padding: 8px;
+}
+
+.optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.optionButton {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  color: #334155;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.optionButton:hover {
+  background: #f8fafc;
+}
+
+.optionButtonSelected {
+  background: linear-gradient(180deg, #eff6ff 0%, #eef2ff 100%);
+  color: #1d4ed8;
+}
+
+.optionLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.optionCheck {
+  opacity: 0;
+  color: #2563eb;
+  transition: opacity 0.16s ease;
+}
+
+.optionCheckVisible {
+  opacity: 1;
+}
+
+@media (max-width: 767px) {
+  .triggerButton {
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 11px 12px;
+  }
+
+  .popover {
+    min-width: min(280px, calc(100vw - 24px));
+    border-radius: 16px;
+  }
+}

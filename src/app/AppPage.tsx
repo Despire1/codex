@@ -25,7 +25,7 @@ import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
 import { HomeworkAssignModal } from '../features/homework-assign/ui/HomeworkAssignModal';
-import { type TeacherAssignmentCreatePayload, type TeacherHomeworkStudentOption } from '../widgets/homeworks/types';
+import { type TeacherAssignmentEditorPrefill, type TeacherHomeworkStudentOption } from '../widgets/homeworks/types';
 import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
@@ -166,6 +166,10 @@ const AppPageContent = () => {
     submitting: false,
     hasValidationErrors: false,
     draftSavedAtLabel: null,
+    showSecondaryAction: false,
+    secondaryActionLabel: 'Сохранить черновик',
+    primaryActionLabel: 'Создать шаблон',
+    primarySubmittingLabel: 'Сохраняю…',
   });
   const [homeworkAssignModalOpen, setHomeworkAssignModalOpen] = useState(false);
   const [homeworkAssignSubmitting, setHomeworkAssignSubmitting] = useState(false);
@@ -411,17 +415,25 @@ const AppPageContent = () => {
     activeTabByPath === 'dashboard' || activeTabByPath === 'schedule' || activeTabByPath === 'students';
   const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
 
+  const isTeacherAssignmentCreateRoute = !isStudentRole && /^\/homeworks\/new\/?$/.test(location.pathname);
+  const isTeacherAssignmentEditRoute = !isStudentRole && /^\/homeworks\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherHomeworkReviewRoute = !isStudentRole && /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
+  const isTeacherHomeworkEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute;
+  const isTeacherAnyHomeworkEditorRoute = isTeacherTemplateEditorRoute || isTeacherHomeworkEditorRoute;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
-  const desktopTopbarResolvedTitle = isTeacherTemplateEditorRoute
-    ? isTeacherTemplateEditRoute
-      ? 'Редактирование шаблона'
-      : 'Создание шаблона'
-    : desktopTopbarTitle;
+  const desktopTopbarResolvedTitle = isTeacherHomeworkEditorRoute
+    ? isTeacherAssignmentEditRoute
+      ? 'Редактирование домашнего задания'
+      : 'Создание домашнего задания'
+    : isTeacherTemplateEditorRoute
+      ? isTeacherTemplateEditRoute
+        ? 'Редактирование шаблона'
+        : 'Создание шаблона'
+      : desktopTopbarTitle;
   const desktopDateLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('ru-RU', {
@@ -432,15 +444,20 @@ const AppPageContent = () => {
       }).format(new Date()),
     [],
   );
-  const desktopTopbarResolvedSubtitle = isTeacherTemplateEditorRoute
-    ? templateCreateTopbarState.draftSavedAtLabel
-      ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
-      : isTeacherTemplateEditRoute
-        ? 'Обновите настройки и вопросы шаблона'
-        : 'Новое домашнее задание'
-    : desktopDateLabel;
-  const templateCreateActionLabel = isTeacherTemplateEditRoute ? 'Сохранить шаблон' : 'Создать шаблон';
-  const templateCreateSubmittingLabel = isTeacherTemplateEditRoute ? 'Сохраняю…' : 'Создаю…';
+  const desktopTopbarResolvedSubtitle = isTeacherHomeworkEditorRoute
+    ? isTeacherAssignmentEditRoute
+      ? 'Обновите контент и параметры выдачи'
+      : 'Соберите домашку и подготовьте её к отправке'
+    : isTeacherTemplateEditorRoute
+      ? templateCreateTopbarState.draftSavedAtLabel
+        ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
+        : isTeacherTemplateEditRoute
+          ? 'Обновите настройки и вопросы шаблона'
+          : 'Новое домашнее задание'
+      : desktopDateLabel;
+  const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать шаблон');
+  const editorPrimarySubmittingLabel =
+    templateCreateTopbarState.primarySubmittingLabel || (isTeacherAssignmentEditRoute ? 'Выдаю…' : 'Сохраняю…');
 
   useEffect(() => {
     return subscribeHomeworkTemplateCreateTopbarState((state) => {
@@ -506,46 +523,23 @@ const AppPageContent = () => {
   }, [homeworkAssignSubmitting]);
 
   const handleDashboardHomeworkAssignSubmit = useCallback(
-    async (payload: TeacherAssignmentCreatePayload) => {
+    async (payload: TeacherAssignmentEditorPrefill) => {
       if (!payload.studentId) {
         showToast({ message: 'Выберите ученика', variant: 'error' });
         return false;
       }
 
-      const status = payload.sendNow
-        ? 'SENT'
-        : payload.sendMode === 'AUTO_AFTER_LESSON_DONE'
-          ? 'SCHEDULED'
-          : 'DRAFT';
-
       setHomeworkAssignSubmitting(true);
-      try {
-        await api.createHomeworkAssignmentV2({
-          studentId: payload.studentId,
-          lessonId: payload.lessonId ?? undefined,
-          templateId: payload.templateId ?? undefined,
-          groupId: payload.groupId ?? undefined,
-          title: payload.title?.trim() || undefined,
-          sendMode: payload.sendMode,
-          status,
-          deadlineAt: payload.deadlineAt,
-        });
-        showToast({
-          message: payload.sendNow ? 'Домашка выдана ученику' : 'Домашка сохранена',
-          variant: 'success',
-        });
-        refreshDashboardSummaryIfActive();
-        return true;
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to create homework assignment from dashboard', error);
-        showToast({ message: 'Не удалось создать домашку', variant: 'error' });
-        return false;
-      } finally {
-        setHomeworkAssignSubmitting(false);
-      }
+      setHomeworkAssignModalOpen(false);
+      navigate('/homeworks/new', {
+        state: {
+          editorPrefill: payload,
+        },
+      });
+      setHomeworkAssignSubmitting(false);
+      return true;
     },
-    [refreshDashboardSummaryIfActive, showToast],
+    [navigate, showToast],
   );
 
   useEffect(() => {
@@ -1088,7 +1082,7 @@ const AppPageContent = () => {
 
   const onTopbarCreateAction = useCallback(() => {
     if (activeTab === 'homeworks') {
-      onDashboardOpenHomeworkAssign();
+      guardedNavigate(`${tabPathById.homeworks}/new`);
       return;
     }
     if (activeTab === 'students') {
@@ -1096,7 +1090,7 @@ const AppPageContent = () => {
       return;
     }
     onTopbarCreateLesson();
-  }, [activeTab, onDashboardAddStudent, onDashboardOpenHomeworkAssign, onTopbarCreateLesson]);
+  }, [activeTab, guardedNavigate, onDashboardAddStudent, onTopbarCreateLesson]);
 
   const dashboardRouteProps = useMemo(
     () => ({
@@ -1329,7 +1323,7 @@ const AppPageContent = () => {
                             subtitle={desktopTopbarResolvedSubtitle}
                             showCreateLesson={
                               hasTeacherAccess &&
-                              !isTeacherTemplateEditorRoute &&
+                              !isTeacherAnyHomeworkEditorRoute &&
                               (
                                 activeTab === 'dashboard' ||
                                 activeTab === 'homeworks' ||
@@ -1339,7 +1333,7 @@ const AppPageContent = () => {
                             }
                             createButtonLabel={
                               activeTab === 'homeworks'
-                                ? 'Выдать ДЗ'
+                                ? 'Создать ДЗ'
                                 : activeTab === 'students'
                                   ? 'Добавить ученика'
                                   : 'Новое занятие'
@@ -1347,17 +1341,18 @@ const AppPageContent = () => {
                             createButtonIconAccent={
                               activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
                             }
-                            showTemplateCreateActions={isTeacherTemplateEditorRoute}
-                            showTemplateSaveDraft={!isTeacherTemplateEditRoute}
-                            showBackButton={isTeacherTemplateEditorRoute || isStudentProfileRoute}
-                            onBack={() => guardedNavigate(isTeacherTemplateEditorRoute ? tabPathById.homeworks : tabPathById.students)}
+                            showEditorActions={isTeacherAnyHomeworkEditorRoute}
+                            showEditorSecondaryAction={templateCreateTopbarState.showSecondaryAction}
+                            showBackButton={isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
+                            onBack={() => guardedNavigate(isTeacherAnyHomeworkEditorRoute ? tabPathById.homeworks : tabPathById.students)}
                             backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
-                            onSaveDraft={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
-                            onCreateTemplate={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
-                            templateCreateSubmitting={templateCreateTopbarState.submitting}
-                            templateCreateSubmitDisabled={templateCreateTopbarState.hasValidationErrors}
-                            templateCreateActionLabel={templateCreateActionLabel}
-                            templateCreateSubmittingLabel={templateCreateSubmittingLabel}
+                            onEditorSecondaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
+                            onEditorPrimaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
+                            editorSubmitting={templateCreateTopbarState.submitting}
+                            editorPrimaryDisabled={templateCreateTopbarState.hasValidationErrors}
+                            editorSecondaryActionLabel={templateCreateTopbarState.secondaryActionLabel}
+                            editorPrimaryActionLabel={editorPrimaryActionLabel}
+                            editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}
                             onOpenNotifications={onOpenNotifications}
                             onCreateLesson={onTopbarCreateAction}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
@@ -1368,8 +1363,8 @@ const AppPageContent = () => {
                         ) : null}
 
                         <main
-                          className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
-                            isTeacherTemplateEditorRoute ? layoutStyles.contentNoScroll : ''
+                            className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
+                            isTeacherAnyHomeworkEditorRoute ? layoutStyles.contentNoScroll : ''
                           }`}
                         >
                           <AppRoutes

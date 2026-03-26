@@ -1,20 +1,25 @@
 import { FC, FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format } from 'date-fns';
-import { HomeworkTemplate, HomeworkGroupListItem, Lesson } from '../../../entities/types';
+import { HomeworkTemplate, HomeworkGroupListItem } from '../../../entities/types';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { api } from '../../../shared/api/client';
 import { useFocusTrap } from '../../../shared/lib/useFocusTrap';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
-import { formatInTimeZone, toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import {
   HomeworkChevronDownIcon,
   HomeworkCircleCheckIcon,
   HomeworkFileLinesIcon,
-  HomeworkPaperPlaneIcon,
+  HomeworkPlayIcon,
   HomeworkXMarkIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
-import { TeacherAssignmentCreatePayload, TeacherHomeworkStudentOption } from '../../../widgets/homeworks/types';
+import { TeacherAssignmentEditorPrefill, TeacherHomeworkStudentOption } from '../../../widgets/homeworks/types';
+import {
+  createQuickDeadlineValue,
+  resolveNextUpcomingLesson,
+  toLocalDateTimeValue,
+  toUtcIsoFromLocal,
+} from '../model/lib/assignmentStarter';
 import styles from './HomeworkAssignModal.module.css';
 
 interface HomeworkAssignModalProps {
@@ -28,21 +33,17 @@ interface HomeworkAssignModalProps {
   defaultLessonId?: number | null;
   defaultTemplateId?: number | null;
   defaultGroupId?: number | null;
-  onSubmit: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
+  onSubmit: (payload: TeacherAssignmentEditorPrefill) => Promise<boolean>;
   onClose: () => void;
   variant?: 'modal' | 'sheet';
 }
 
-type TemplateMode = 'FAVORITES' | 'NEW';
-type SendType = 'NOW' | 'AUTO_AFTER_LESSON';
-
 type AssignmentDraft = {
   studentId: number | null;
-  templateMode: TemplateMode;
   templateId: number | null;
   groupId: number | null;
   deadlineLocal: string;
-  sendType: SendType;
+  sendMode: TeacherAssignmentEditorPrefill['sendMode'];
   lessonId: number | null;
 };
 
@@ -116,24 +117,6 @@ const formatTemplateDuration = (minutes: number) => {
   return `${hours} ч ${restMinutes} мин`;
 };
 
-const createQuickDeadlineValue = (daysFromNow: number, timeZone: string) => {
-  const now = toZonedDate(new Date(), timeZone);
-  now.setDate(now.getDate() + daysFromNow);
-  now.setHours(20, 0, 0, 0);
-  return format(now, "yyyy-MM-dd'T'HH:mm");
-};
-
-const toLocalDateTimeValue = (iso: string, timeZone: string) =>
-  formatInTimeZone(iso, "yyyy-MM-dd'T'HH:mm", { timeZone });
-
-const toUtcIsoFromLocal = (value: string, timeZone: string) => {
-  const [datePart, timePart] = value.split('T');
-  if (!datePart || !timePart) return null;
-  const utcDate = toUtcDateFromTimeZone(datePart, timePart, timeZone);
-  if (Number.isNaN(utcDate.getTime())) return null;
-  return utcDate.toISOString();
-};
-
 const pickInitialStudentId = (students: TeacherHomeworkStudentOption[], defaultStudentId: number | null) => {
   const hasDefault =
     typeof defaultStudentId === 'number' && students.some((student) => student.id === defaultStudentId);
@@ -146,17 +129,6 @@ const pickInitialTemplateId = (templates: HomeworkTemplate[], defaultTemplateId:
     typeof defaultTemplateId === 'number' && templates.some((template) => template.id === defaultTemplateId);
   if (hasDefault) return defaultTemplateId;
   return templates[0]?.id ?? null;
-};
-
-const resolveNextUpcomingLesson = (lessons: Lesson[]) => {
-  const nowTs = Date.now();
-  return lessons
-    .filter((lesson) => {
-      if (lesson.status === 'CANCELED') return false;
-      const lessonTs = new Date(lesson.startAt).getTime();
-      return Number.isFinite(lessonTs) && lessonTs > nowTs;
-    })
-    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())[0] ?? null;
 };
 
 const buildInitialDraft = (params: {
@@ -177,11 +149,10 @@ const buildInitialDraft = (params: {
 
   return {
     studentId: initialStudentId,
-    templateMode: hasTemplates ? 'FAVORITES' : 'NEW',
     templateId: hasTemplates ? initialTemplateId : null,
     groupId: hasDefaultGroup ? params.defaultGroupId : null,
     deadlineLocal: '',
-    sendType: 'NOW',
+    sendMode: 'MANUAL',
     lessonId: typeof params.defaultLessonId === 'number' ? params.defaultLessonId : null,
   };
 };
@@ -238,14 +209,13 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   const [nextLesson, setNextLesson] = useState<NextLessonRef | null>(null);
 
   const selectedTemplate = useMemo(
-    () => (draft.templateMode === 'FAVORITES' && draft.templateId ? templatesById.get(draft.templateId) ?? null : null),
-    [draft.templateId, draft.templateMode, templatesById],
+    () => (draft.templateId ? templatesById.get(draft.templateId) ?? null : null),
+    [draft.templateId, templatesById],
   );
 
   const hasStudents = students.length > 0;
-  const requiresTemplate = draft.templateMode === 'FAVORITES' && sortedTemplates.length > 0;
-  const hasValidTemplate = !requiresTemplate || Boolean(draft.templateId && templatesById.has(draft.templateId));
-  const requiresLesson = draft.sendType === 'AUTO_AFTER_LESSON';
+  const hasValidTemplate = Boolean(draft.templateId && templatesById.has(draft.templateId));
+  const requiresLesson = draft.sendMode === 'AUTO_AFTER_LESSON_DONE';
   const hasValidLesson = !requiresLesson || Boolean(draft.lessonId);
   const isFormDisabled = submitting || loading;
   const canSubmit = hasStudents && Boolean(draft.studentId) && hasValidTemplate && hasValidLesson && !isFormDisabled;
@@ -293,11 +263,10 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
 
   useEffect(() => {
     if (!open) return;
-    if (draft.templateMode !== 'FAVORITES') return;
     if (draft.templateId && templatesById.has(draft.templateId)) return;
     const fallbackTemplateId = quickTemplates[0]?.id ?? sortedTemplates[0]?.id ?? null;
     setDraft((prev) => ({ ...prev, templateId: fallbackTemplateId }));
-  }, [draft.templateId, draft.templateMode, open, quickTemplates, sortedTemplates, templatesById]);
+  }, [draft.templateId, open, quickTemplates, sortedTemplates, templatesById]);
 
   const resolveNextLesson = useCallback(async (studentId: number) => {
     const requestId = requestIdRef.current + 1;
@@ -365,17 +334,14 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     event.preventDefault();
     if (!draft.studentId || !canSubmit) return;
 
-    const templateId = draft.templateMode === 'FAVORITES' ? draft.templateId : null;
     const deadlineAt = draft.deadlineLocal ? toUtcIsoFromLocal(draft.deadlineLocal, timeZone) : null;
-    const sendNow = draft.sendType === 'NOW';
 
     const success = await onSubmit({
       studentId: draft.studentId,
       lessonId: draft.lessonId,
-      templateId,
+      templateId: draft.templateId,
       groupId: draft.groupId,
-      sendMode: sendNow ? 'MANUAL' : 'AUTO_AFTER_LESSON_DONE',
-      sendNow,
+      sendMode: draft.sendMode,
       deadlineAt,
     });
 
@@ -389,12 +355,12 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
       className={`${styles.modal} ${variant === 'sheet' ? styles.sheetModal : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Выдать домашнее задание"
+      aria-label="Создать домашнее задание по шаблону"
       ref={containerRef}
     >
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.header}>
-            <h2 className={styles.title}>Выдать домашнее задание</h2>
+            <h2 className={styles.title}>Создать домашку по шаблону</h2>
             <button
               type="button"
               className={styles.closeButton}
@@ -447,109 +413,66 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
               <div className={styles.templateModeGrid}>
                 <button
                   type="button"
-                  className={`${styles.templateModeCard} ${draft.templateMode === 'FAVORITES' ? styles.templateModeCardActive : ''}`}
-                  onClick={() => {
-                    const fallbackTemplateId = draft.templateId ?? quickTemplates[0]?.id ?? sortedTemplates[0]?.id ?? null;
-                    setDraft((prev) => ({
-                      ...prev,
-                      templateMode: 'FAVORITES',
-                      templateId: fallbackTemplateId,
-                    }));
-                  }}
-                  disabled={!sortedTemplates.length || isFormDisabled}
+                  className={`${styles.templateModeCard} ${styles.templateModeCardActive}`}
+                  disabled
                 >
-                  {draft.templateMode === 'FAVORITES' ? (
-                    <span className={styles.templateModeIcon} aria-hidden>
-                      <HomeworkCircleCheckIcon size={16} />
-                    </span>
-                  ) : null}
-                  <span className={styles.templateModeTitle}>Из избранного</span>
-                  <span className={styles.templateModeHint}>Быстрый выбор из топ-5</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`${styles.templateModeCard} ${draft.templateMode === 'NEW' ? styles.templateModeCardActive : ''}`}
-                  onClick={() => {
-                    setDraft((prev) => ({
-                      ...prev,
-                      templateMode: 'NEW',
-                      templateId: null,
-                    }));
-                    setIsTemplatePickerOpen(false);
-                  }}
-                  disabled={isFormDisabled}
-                >
-                  {draft.templateMode === 'NEW' ? (
-                    <span className={styles.templateModeIcon} aria-hidden>
-                      <HomeworkCircleCheckIcon size={16} />
-                    </span>
-                  ) : null}
-                  <span className={styles.templateModeTitle}>Новое задание</span>
-                  <span className={styles.templateModeHint}>Создать с нуля</span>
+                  <span className={styles.templateModeIcon} aria-hidden>
+                    <HomeworkCircleCheckIcon size={16} />
+                  </span>
+                  <span className={styles.templateModeTitle}>Шаблон обязателен</span>
+                  <span className={styles.templateModeHint}>Сначала выбираем основу, потом донастраиваем в редакторе</span>
                 </button>
               </div>
 
-              {draft.templateMode === 'FAVORITES' ? (
-                <>
-                  <div className={styles.templatePreviewCard}>
-                    <div className={styles.templatePreviewLeft}>
-                      <span className={styles.templatePreviewIcon} aria-hidden>
-                        <HomeworkFileLinesIcon size={16} />
-                      </span>
-                      <div className={styles.templatePreviewText}>
-                        <div className={styles.templatePreviewTitle}>{selectedTemplate?.title ?? 'Шаблон не выбран'}</div>
-                        <div className={styles.templatePreviewMeta}>
-                          {selectedTemplate
-                            ? `${resolveTemplateCategory(selectedTemplate)} · ${formatTemplateDuration(estimateTemplateDuration(selectedTemplate))}`
-                            : 'Выберите шаблон из списка'}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.templateChangeButton}
-                      onClick={() => setIsTemplatePickerOpen((prev) => !prev)}
-                      disabled={!sortedTemplates.length || isFormDisabled}
-                    >
-                      Изменить
-                    </button>
-                  </div>
-
-                  {isTemplatePickerOpen ? (
-                    <div className={styles.templatePicker}>
-                      {sortedTemplates.map((template) => {
-                        const active = template.id === draft.templateId;
-                        return (
-                          <button
-                            key={template.id}
-                            type="button"
-                            className={`${styles.templatePickerOption} ${active ? styles.templatePickerOptionActive : ''}`}
-                            onClick={() => {
-                              setDraft((prev) => ({ ...prev, templateId: template.id }));
-                              setIsTemplatePickerOpen(false);
-                            }}
-                          >
-                            <span className={styles.templatePickerTitle}>{template.title}</span>
-                            <span className={styles.templatePickerMeta}>
-                              {resolveTemplateCategory(template)} · {formatTemplateDuration(estimateTemplateDuration(template))}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className={styles.templatePreviewCard}>
+              <div className={styles.templatePreviewCard}>
+                <div className={styles.templatePreviewLeft}>
+                  <span className={styles.templatePreviewIcon} aria-hidden>
+                    <HomeworkFileLinesIcon size={16} />
+                  </span>
                   <div className={styles.templatePreviewText}>
-                    <div className={styles.templatePreviewTitle}>Новое домашнее задание</div>
-                    <div className={styles.templatePreviewMeta}>Домашка будет создана без шаблона.</div>
+                    <div className={styles.templatePreviewTitle}>{selectedTemplate?.title ?? 'Шаблон не выбран'}</div>
+                    <div className={styles.templatePreviewMeta}>
+                      {selectedTemplate
+                        ? `${resolveTemplateCategory(selectedTemplate)} · ${formatTemplateDuration(estimateTemplateDuration(selectedTemplate))}`
+                        : 'Выберите шаблон из списка'}
+                    </div>
                   </div>
                 </div>
-              )}
+                <button
+                  type="button"
+                  className={styles.templateChangeButton}
+                  onClick={() => setIsTemplatePickerOpen((prev) => !prev)}
+                  disabled={!sortedTemplates.length || isFormDisabled}
+                >
+                  Изменить
+                </button>
+              </div>
 
-              {requiresTemplate && !hasValidTemplate ? (
+              {isTemplatePickerOpen ? (
+                <div className={styles.templatePicker}>
+                  {sortedTemplates.map((template) => {
+                    const active = template.id === draft.templateId;
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        className={`${styles.templatePickerOption} ${active ? styles.templatePickerOptionActive : ''}`}
+                        onClick={() => {
+                          setDraft((prev) => ({ ...prev, templateId: template.id }));
+                          setIsTemplatePickerOpen(false);
+                        }}
+                      >
+                        <span className={styles.templatePickerTitle}>{template.title}</span>
+                        <span className={styles.templatePickerMeta}>
+                          {resolveTemplateCategory(template)} · {formatTemplateDuration(estimateTemplateDuration(template))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {!hasValidTemplate ? (
                 <p className={styles.validationError}>Выберите шаблон для выдачи домашки.</p>
               ) : null}
             </section>
@@ -632,21 +555,21 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     <input
                       type="radio"
                       name="homework-assign-send-type"
-                      value="NOW"
-                      checked={draft.sendType === 'NOW'}
-                      onChange={() => setDraft((prev) => ({ ...prev, sendType: 'NOW' }))}
+                      value="MANUAL"
+                      checked={draft.sendMode === 'MANUAL'}
+                      onChange={() => setDraft((prev) => ({ ...prev, sendMode: 'MANUAL' }))}
                       disabled={isFormDisabled}
                     />
-                    <span>Отправить сейчас</span>
+                    <span>Вручную</span>
                   </label>
                   <label className={styles.radioRow}>
                     <input
                       type="radio"
                       name="homework-assign-send-type"
                       value="AUTO_AFTER_LESSON"
-                      checked={draft.sendType === 'AUTO_AFTER_LESSON'}
+                      checked={draft.sendMode === 'AUTO_AFTER_LESSON_DONE'}
                       onChange={() => {
-                        setDraft((prev) => ({ ...prev, sendType: 'AUTO_AFTER_LESSON' }));
+                        setDraft((prev) => ({ ...prev, sendMode: 'AUTO_AFTER_LESSON_DONE' }));
                         if (!draft.lessonId) {
                           void applyNextLesson();
                         }
@@ -669,8 +592,8 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
               Отмена
             </button>
             <button type="submit" className={styles.submitButton} disabled={!canSubmit}>
-              <span>{submitting ? 'Выдаю…' : loading ? 'Загружаю…' : 'Выдать'}</span>
-              <HomeworkPaperPlaneIcon size={12} className={styles.submitIcon} />
+              <span>{submitting ? 'Открываю редактор…' : loading ? 'Загружаю…' : 'Продолжить'}</span>
+              <HomeworkPlayIcon size={12} className={styles.submitIcon} />
             </button>
           </div>
         </form>

@@ -2,6 +2,10 @@ export interface HomeworkTemplateCreateTopbarState {
   submitting: boolean;
   hasValidationErrors: boolean;
   draftSavedAtLabel: string | null;
+  showSecondaryAction: boolean;
+  secondaryActionLabel: string;
+  primaryActionLabel: string;
+  primarySubmittingLabel: string;
 }
 
 type TopbarCommand = 'save' | 'submit';
@@ -27,6 +31,10 @@ export const clearHomeworkTemplateCreateTopbarState = () => {
         submitting: false,
         hasValidationErrors: false,
         draftSavedAtLabel: null,
+        showSecondaryAction: false,
+        secondaryActionLabel: 'Сохранить черновик',
+        primaryActionLabel: 'Создать шаблон',
+        primarySubmittingLabel: 'Сохраняю…',
       } as HomeworkTemplateCreateTopbarState,
     }),
   );

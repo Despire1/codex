@@ -21,17 +21,18 @@ interface TopbarProps {
   showCreateLesson: boolean;
   createButtonLabel?: string;
   createButtonIconAccent?: boolean;
-  showTemplateCreateActions?: boolean;
-  showTemplateSaveDraft?: boolean;
+  showEditorActions?: boolean;
+  showEditorSecondaryAction?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
   backButtonTooltip?: string;
-  onSaveDraft?: () => void;
-  onCreateTemplate?: () => void;
-  templateCreateSubmitting?: boolean;
-  templateCreateSubmitDisabled?: boolean;
-  templateCreateActionLabel?: string;
-  templateCreateSubmittingLabel?: string;
+  onEditorSecondaryAction?: () => void;
+  onEditorPrimaryAction?: () => void;
+  editorSubmitting?: boolean;
+  editorPrimaryDisabled?: boolean;
+  editorSecondaryActionLabel?: string;
+  editorPrimaryActionLabel?: string;
+  editorPrimarySubmittingLabel?: string;
   onOpenNotifications: () => void;
   onCreateLesson: () => void;
   profilePhotoUrl?: string | null;
@@ -47,17 +48,18 @@ export const Topbar: FC<TopbarProps> = ({
   showCreateLesson,
   createButtonLabel = 'Новое занятие',
   createButtonIconAccent = false,
-  showTemplateCreateActions = false,
-  showTemplateSaveDraft = true,
+  showEditorActions = false,
+  showEditorSecondaryAction = false,
   showBackButton = false,
   onBack,
   backButtonTooltip = 'Назад',
-  onSaveDraft,
-  onCreateTemplate,
-  templateCreateSubmitting = false,
-  templateCreateSubmitDisabled = false,
-  templateCreateActionLabel = 'Создать шаблон',
-  templateCreateSubmittingLabel = 'Сохраняю…',
+  onEditorSecondaryAction,
+  onEditorPrimaryAction,
+  editorSubmitting = false,
+  editorPrimaryDisabled = false,
+  editorSecondaryActionLabel = 'Сохранить черновик',
+  editorPrimaryActionLabel = 'Создать шаблон',
+  editorPrimarySubmittingLabel = 'Сохраняю…',
   onOpenNotifications,
   onCreateLesson,
   profilePhotoUrl,
@@ -87,22 +89,22 @@ export const Topbar: FC<TopbarProps> = ({
 
       <div
         className={`${styles.actions} ${
-          showTemplateCreateActions
+          showEditorActions
             ? styles.actionsTemplateMode
             : showCreateLesson
               ? styles.actionsCreateVisible
               : styles.actionsCreateHidden
         }`}
       >
-        {showTemplateCreateActions && showTemplateSaveDraft ? (
+        {showEditorActions && showEditorSecondaryAction ? (
           <button
             type="button"
             className={styles.templateSecondaryButton}
-            onClick={onSaveDraft}
-            disabled={templateCreateSubmitting}
+            onClick={onEditorSecondaryAction}
+            disabled={editorSubmitting}
           >
             <SaveOutlinedIcon width={16} height={16} />
-            <span>Сохранить черновик</span>
+            <span>{editorSecondaryActionLabel}</span>
           </button>
         ) : null}
 
@@ -151,15 +153,15 @@ export const Topbar: FC<TopbarProps> = ({
           <span className={styles.notificationDot} aria-hidden />
         </button>
 
-        {showTemplateCreateActions ? (
+        {showEditorActions ? (
           <button
             type="button"
             className={styles.templatePrimaryButton}
-            onClick={onCreateTemplate}
-            disabled={templateCreateSubmitting || templateCreateSubmitDisabled}
+            onClick={onEditorPrimaryAction}
+            disabled={editorSubmitting || editorPrimaryDisabled}
           >
             <DoneOutlinedIcon width={16} height={16} className={styles.templatePrimaryIcon} />
-            <span>{templateCreateSubmitting ? templateCreateSubmittingLabel : templateCreateActionLabel}</span>
+            <span>{editorSubmitting ? editorPrimarySubmittingLabel : editorPrimaryActionLabel}</span>
           </button>
         ) : (
           <div

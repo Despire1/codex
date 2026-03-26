@@ -100,6 +100,8 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
       <Route path={tabPathById.students} element={<StudentsSection {...students} />} />
       <Route path={`${tabPathById.students}/:studentId`} element={<StudentsSection {...students} />} />
       <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
+      <Route path={`${tabPathById.homeworks}/new`} element={<HomeworksSection {...homeworks} />} />
+      <Route path={`${tabPathById.homeworks}/:assignmentId/edit`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/templates/new`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/templates/:templateId/edit`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/review/:assignmentId`} element={<HomeworksSection {...homeworks} />} />

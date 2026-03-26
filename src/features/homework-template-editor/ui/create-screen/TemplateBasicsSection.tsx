@@ -10,6 +10,8 @@ import styles from './TemplateBasicsSection.module.css';
 const CATEGORY_OPTIONS = ['Грамматика', 'Лексика', 'Speaking', 'Listening', 'Writing', 'Reading'];
 
 interface TemplateBasicsSectionProps {
+  titleLabel?: string;
+  titlePlaceholder?: string;
   title: string;
   titleError?: string | null;
   titleValidationPath?: string;
@@ -27,6 +29,8 @@ interface TemplateBasicsSectionProps {
 }
 
 export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
+  titleLabel = 'Название шаблона',
+  titlePlaceholder = 'Например: Present Perfect Practice',
   title,
   titleError = null,
   titleValidationPath,
@@ -45,7 +49,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
   const [pendingTag, setPendingTag] = useState('');
 
   const resolvedCategory = useMemo(
-    () => (category && CATEGORY_OPTIONS.includes(category) ? category : CATEGORY_OPTIONS[0]),
+    () => (category && CATEGORY_OPTIONS.includes(category) ? category : ''),
     [category],
   );
 
@@ -74,13 +78,13 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
       <div className={styles.fields}>
         <label className={styles.fieldLabel}>
           <span className={styles.fieldLabelTitle}>
-            Название шаблона <span className={styles.requiredMark}>*</span>
+            {titleLabel} <span className={styles.requiredMark}>*</span>
           </span>
           <input
             type="text"
             ref={titleInputRef}
             className={`${styles.input} ${titleError ? styles.inputError : ''}`}
-            placeholder="Например: Present Perfect Practice"
+            placeholder={titlePlaceholder}
             value={title}
             onChange={(event) => onTitleChange(event.target.value)}
             data-validation-path={titleValidationPath}
@@ -114,6 +118,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                 value={resolvedCategory}
                 onChange={(event) => onCategoryChange(event.target.value)}
               >
+                <option value="">Без категории</option>
                 {CATEGORY_OPTIONS.map((option) => (
                   <option key={option} value={option}>
                     {option}

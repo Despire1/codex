@@ -129,16 +129,18 @@
 }
 
 .useButton {
-  width: 32px;
-  height: 32px;
   border: none;
   border-radius: 999px;
   background: #111827;
   color: #a3e635;
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   justify-content: center;
   cursor: pointer;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
   opacity: 0;
   transform: translateY(8px);
   pointer-events: none;

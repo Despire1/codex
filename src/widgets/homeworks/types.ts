@@ -11,7 +11,6 @@ import {
   HomeworkAssignmentProblemFilter,
   HomeworkAssignmentsSort,
   HomeworkAssignmentsSummary,
-  HomeworkAssignmentsTab,
 } from '../../shared/api/client';
 import { StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 
@@ -38,15 +37,13 @@ export type TeacherTemplateUpsertPayload = {
   blocks: HomeworkBlock[];
 };
 
-export type TeacherAssignmentCreatePayload = {
-  studentId: number;
+export type TeacherAssignmentEditorPrefill = {
+  studentId: number | null;
   lessonId?: number | null;
   templateId?: number | null;
   groupId?: number | null;
-  title?: string;
-  sendMode: HomeworkAssignment['sendMode'];
-  sendNow: boolean;
   deadlineAt: string | null;
+  sendMode: HomeworkAssignment['sendMode'];
 };
 
 export type TeacherAssignModalRequest = {
@@ -59,10 +56,10 @@ export type TeacherAssignModalRequest = {
 export type TeacherBulkAction = 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
 
 export type TeacherAssignmentsSummary = HomeworkAssignmentsSummary;
-export type TeacherHomeworkTab = HomeworkAssignmentsTab;
 export type TeacherHomeworkSort = HomeworkAssignmentsSort;
 export type TeacherHomeworkProblemFilter = HomeworkAssignmentProblemFilter;
 export type TeacherHomeworkGroupKey = `group_${number}` | 'ungrouped';
+export type TeacherHomeworkListFilter = 'all' | 'not_issued' | 'sent' | 'review' | 'closed';
 
 export interface TeacherHomeworksViewModel {
   assignments: HomeworkAssignment[];
@@ -74,7 +71,7 @@ export interface TeacherHomeworksViewModel {
   groupAssignmentsNextOffsetByKey: Partial<Record<TeacherHomeworkGroupKey, number | null>>;
   students: TeacherHomeworkStudentOption[];
   summary: TeacherAssignmentsSummary;
-  activeTab: TeacherHomeworkTab;
+  activeTab: TeacherHomeworkListFilter;
   searchQuery: string;
   sortBy: TeacherHomeworkSort;
   problemFilters: TeacherHomeworkProblemFilter[];
@@ -97,18 +94,16 @@ export interface TeacherHomeworksViewModel {
   reviewSubmissions: HomeworkSubmission[];
   reviewLoading: boolean;
   reviewSubmitting: boolean;
-  detailAssignment: HomeworkAssignment | null;
-  detailSubmissions: HomeworkSubmission[];
-  detailLoading: boolean;
   assignModalRequest: TeacherAssignModalRequest | null;
   homeworkActivityItems: ActivityFeedItem[];
   homeworkActivityLoading: boolean;
   homeworkActivityHasUnread: boolean;
-  onTabChange: (tab: TeacherHomeworkTab) => void;
+  onTabChange: (tab: TeacherHomeworkListFilter) => void;
   onSearchChange: (value: string) => void;
   onSortChange: (value: TeacherHomeworkSort) => void;
   onToggleProblemFilter: (filter: TeacherHomeworkProblemFilter) => void;
   onSelectedStudentIdChange: (studentId: number | null) => void;
+  onOpenCreateAssignmentScreen: () => void;
   onOpenCreateTemplateScreen: () => void;
   onOpenEditTemplateScreen: (templateId: number) => void;
   onCreateGroup: (payload: {
@@ -137,7 +132,7 @@ export interface TeacherHomeworksViewModel {
   onArchiveTemplate: (template: HomeworkTemplate) => Promise<void>;
   onRestoreTemplate: (template: HomeworkTemplate) => Promise<void>;
   onToggleTemplateFavorite: (template: HomeworkTemplate) => Promise<void>;
-  onCreateAssignment: (payload: TeacherAssignmentCreatePayload) => Promise<boolean>;
+  onCreateAssignment: (payload: TeacherAssignmentEditorPrefill) => Promise<boolean>;
   onSendAssignmentNow: (assignment: HomeworkAssignment) => Promise<void>;
   onRemindAssignment: (assignment: HomeworkAssignment) => Promise<void>;
   onDeleteAssignment: (assignment: HomeworkAssignment) => Promise<void>;
@@ -147,7 +142,6 @@ export interface TeacherHomeworksViewModel {
   onCloseReview: () => void;
   onStartReviewQueue: () => void;
   onOpenDetail: (assignment: HomeworkAssignment) => void;
-  onCloseDetail: () => void;
   onLoadMoreAssignments: () => void;
   onConsumeAssignModalRequest: () => void;
   onSubmitReview: (payload: {

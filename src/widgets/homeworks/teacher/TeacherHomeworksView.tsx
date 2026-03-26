@@ -17,7 +17,6 @@ import {
   HomeworkChevronDownIcon,
   HomeworkCircleExclamationIcon,
   HomeworkFilePdfIcon,
-  HomeworkFilterIcon,
   HomeworkFileLinesIcon,
   HomeworkFolderIcon,
   HomeworkGearIcon,
@@ -70,11 +69,10 @@ const MODE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
 
 const STATUS_TABS: Array<{ id: TeacherHomeworksViewModel['activeTab']; label: string }> = [
   { id: 'all', label: 'Все' },
-  { id: 'draft', label: 'Черновики' },
-  { id: 'scheduled', label: 'Запланировано' },
-  { id: 'in_progress', label: 'В работе' },
+  { id: 'not_issued', label: 'Не выдана' },
+  { id: 'sent', label: 'Выдана' },
   { id: 'review', label: 'На проверке' },
-  { id: 'closed', label: 'Закрыто' },
+  { id: 'closed', label: 'Завершено' },
 ];
 
 const SORT_LABELS: Array<{ id: TeacherHomeworksViewModel['sortBy']; label: string }> = [
@@ -207,6 +205,12 @@ const resolveStatusLabel = (assignment: HomeworkAssignment) => {
   return formatAssignmentStatus(assignment);
 };
 
+const resolveIssuanceLabel = (assignment: HomeworkAssignment) =>
+  assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED' ? 'Не выдана' : 'Выдана';
+
+const resolveIssuanceTone = (assignment: HomeworkAssignment) =>
+  assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED' ? 'draft' : 'sent';
+
 const resolveStatusIcon = (assignment: HomeworkAssignment) => {
   if (assignment.hasConfigError) return <HomeworkGearIcon size={12} className={styles.statusIcon} />;
   if (assignment.isOverdue || assignment.status === 'OVERDUE') {
@@ -257,9 +261,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   reviewSubmissions,
   reviewLoading,
   reviewSubmitting,
-  detailAssignment,
-  detailSubmissions,
-  detailLoading,
   assignModalRequest,
   homeworkActivityItems,
   homeworkActivityLoading,
@@ -268,6 +269,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onSearchChange,
   onSortChange,
   onSelectedStudentIdChange,
+  onOpenCreateAssignmentScreen,
   onOpenCreateTemplateScreen,
   onOpenEditTemplateScreen,
   onCreateGroup,
@@ -287,7 +289,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onCloseReview,
   onStartReviewQueue,
   onOpenDetail,
-  onCloseDetail,
   onLoadMoreAssignments,
   onConsumeAssignModalRequest,
   onSubmitReview,
@@ -299,7 +300,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isBulkPanelOpen, setIsBulkPanelOpen] = useState(false);
-  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('list');
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
   const [templateSearchQuery, setTemplateSearchQuery] = useState('');
@@ -329,9 +329,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const countsByTab = useMemo(
     () => ({
       all: summary.totalCount,
-      draft: summary.draftCount,
-      scheduled: summary.scheduledCount,
-      in_progress: summary.inProgressCount,
+      not_issued: summary.draftCount + summary.scheduledCount,
+      sent: summary.inProgressCount,
       review: summary.reviewCount,
       closed: summary.closedCount,
     }),
@@ -547,20 +546,35 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
       <section className={styles.workspace}>
         <div className={styles.topActionsRow}>
-          <div className={styles.modeTabsRow}>
-            {MODE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`${styles.modeTabButton} ${workspaceMode === tab.id ? styles.modeTabButtonActive : ''}`}
-                onClick={() => setWorkspaceMode(tab.id)}
-              >
-                {tab.id === 'groups' ? <HomeworkFolderIcon size={13} className={styles.inlineFaIcon} /> : null}
-                {tab.id === 'templates' ? <HomeworkLayerGroupIcon size={13} className={styles.inlineFaIcon} /> : null}
-                {tab.label}
-                {tab.id === 'list' ? <span className={styles.tabCounter}>{summary.totalCount}</span> : null}
-              </button>
-            ))}
+          <div className={styles.topSection}>
+            <div className={styles.modeTabsRow}>
+              {MODE_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`${styles.modeTabButton} ${workspaceMode === tab.id ? styles.modeTabButtonActive : ''}`}
+                  onClick={() => setWorkspaceMode(tab.id)}
+                >
+                  {tab.id === 'groups' ? <HomeworkFolderIcon size={13} className={styles.inlineFaIcon} /> : null}
+                  {tab.id === 'templates' ? <HomeworkLayerGroupIcon size={13} className={styles.inlineFaIcon} /> : null}
+                  {tab.label}
+                  {tab.id === 'list' ? <span className={styles.tabCounter}>{summary.totalCount}</span> : null}
+                </button>
+              ))}
+            </div>
+
+            {workspaceMode === 'list' ? (
+              <div className={styles.primaryActionRow}>
+                <button type="button" className={styles.primaryCreateButton} onClick={onOpenCreateAssignmentScreen}>
+                  <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
+                  <span>Создать домашнее задание</span>
+                </button>
+                <button type="button" className={styles.secondaryCreateButton} onClick={() => openAssignModal()}>
+                  <HomeworkFileLinesIcon size={12} className={styles.toolbarIcon} />
+                  <span>Выдать по шаблону</span>
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {workspaceMode === 'list' ? (
@@ -582,15 +596,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   onClick={() => setIsBulkPanelOpen((prev) => !prev)}
                 >
                   <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
-                </button>
-              </Tooltip>
-              <Tooltip content="Фильтры">
-                <button
-                  type="button"
-                  className={styles.toolIconButton}
-                  onClick={() => setIsAdvancedFiltersOpen((prev) => !prev)}
-                >
-                  <HomeworkFilterIcon size={14} className={styles.toolbarIcon} />
                 </button>
               </Tooltip>
               {canStartReviewQueue ? (
@@ -648,57 +653,55 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           </div>
         ) : null}
 
-        {isAdvancedFiltersOpen ? (
-          <div className={styles.advancedFiltersRow}>
-            <div className={styles.advancedFiltersControls}>
-              <label className={styles.inlineFilterGroup}>
-                <span className={styles.inlineFilterLabel}>Поиск:</span>
-                <input
-                  type="search"
-                  className={styles.inlineSearchInput}
-                  value={searchQuery}
-                  placeholder="Название, ученик, шаблон..."
-                  onChange={(event) => onSearchChange(event.target.value)}
-                />
-              </label>
+        <div className={styles.advancedFiltersRow}>
+          <div className={styles.advancedFiltersControls}>
+            <label className={styles.inlineFilterGroup}>
+              <span className={styles.inlineFilterLabel}>Поиск:</span>
+              <input
+                type="search"
+                className={styles.inlineSearchInput}
+                value={searchQuery}
+                placeholder="Название, ученик, шаблон..."
+                onChange={(event) => onSearchChange(event.target.value)}
+              />
+            </label>
 
-              <label className={styles.inlineFilterGroup}>
-                <span className={styles.inlineFilterLabel}>Ученик:</span>
-                <select
-                  className={styles.inlineFilterSelect}
-                  value={selectedStudentId ? String(selectedStudentId) : ''}
-                  onChange={(event) => onSelectedStudentIdChange(event.target.value ? Number(event.target.value) : null)}
-                  disabled={loadingStudents}
-                >
-                  <option value="">Все ученики</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <label className={styles.inlineFilterGroup}>
+              <span className={styles.inlineFilterLabel}>Ученик:</span>
+              <select
+                className={styles.inlineFilterSelect}
+                value={selectedStudentId ? String(selectedStudentId) : ''}
+                onChange={(event) => onSelectedStudentIdChange(event.target.value ? Number(event.target.value) : null)}
+                disabled={loadingStudents}
+              >
+                <option value="">Все ученики</option>
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              <label className={styles.inlineFilterGroup}>
-                <span className={styles.inlineFilterLabel}>Сортировка:</span>
-                <select
-                  className={styles.inlineFilterSelect}
-                  value={sortBy}
-                  onChange={(event) => onSortChange(event.target.value as TeacherHomeworksViewModel['sortBy'])}
-                >
-                  {SORT_LABELS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <button type="button" className={styles.refreshButton} onClick={onRefresh}>
-              Обновить
-            </button>
+            <label className={styles.inlineFilterGroup}>
+              <span className={styles.inlineFilterLabel}>Сортировка:</span>
+              <select
+                className={styles.inlineFilterSelect}
+                value={sortBy}
+                onChange={(event) => onSortChange(event.target.value as TeacherHomeworksViewModel['sortBy'])}
+              >
+                {SORT_LABELS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        ) : null}
+          <button type="button" className={styles.refreshButton} onClick={onRefresh}>
+            Обновить
+          </button>
+        </div>
 
         {assignmentsError ? <div className={styles.error}>{assignmentsError}</div> : null}
         {summaryError ? <div className={styles.error}>{summaryError}</div> : null}
@@ -763,7 +766,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               ) : assignments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={styles.emptyRow}>
-                    По текущим фильтрам задач нет
+                    Пока ничего не найдено. «Создать домашнее задание» открывает редактор с нуля, а «Выдать по шаблону» помогает быстро собрать черновик на основе шаблона.
                   </td>
                 </tr>
               ) : (
@@ -783,6 +786,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const statusIcon = resolveStatusIcon(assignment);
                   const isOverdueRow = problemBadges.hasOverdue;
                   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
+                  const isEditableAssignment = !shouldReview && !assignment.hasConfigError;
                   return (
                     <tr
                       key={assignment.id}
@@ -839,6 +843,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       </td>
                       <td>
                         <div className={styles.statusColumn}>
+                          <span className={`${styles.issuanceBadge} ${styles[`issuanceBadge_${resolveIssuanceTone(assignment)}`]}`}>
+                            {resolveIssuanceLabel(assignment)}
+                          </span>
                           <span
                             className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]} ${
                               statusIcon ? styles.statusBadgeWithIcon : ''
@@ -910,40 +917,42 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                             >
                               Исправить
                             </button>
-                          ) : isOverdueRow ? (
+                          ) : canSendNow ? (
                             <>
-                              <Tooltip content="Напомнить">
-                                <button
-                                  type="button"
-                                  className={styles.iconActionButton}
-                                  onClick={() => {
-                                    void onRemindAssignment(assignment);
-                                  }}
-                                  aria-label="Напомнить"
-                                >
-                                  <HomeworkBellRegularIcon size={13} className={styles.inlineFaIcon} />
-                                </button>
-                              </Tooltip>
+                              <button
+                                type="button"
+                                className={styles.sendNowButton}
+                                onClick={() => {
+                                  void onSendAssignmentNow(assignment);
+                                }}
+                              >
+                                Выдать
+                              </button>
                               <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
-                                Детали
+                                Открыть
                               </button>
                             </>
                           ) : (
                             <>
-                              {canSendNow ? (
-                                <button
-                                  type="button"
-                                  className={styles.sendNowButton}
-                                  onClick={() => {
-                                    void onSendAssignmentNow(assignment);
-                                  }}
-                                >
-                                  Отправить
+                              {(assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow) ? (
+                                <Tooltip content="Напомнить">
+                                  <button
+                                    type="button"
+                                    className={styles.iconActionButton}
+                                    onClick={() => {
+                                      void onRemindAssignment(assignment);
+                                    }}
+                                    aria-label="Напомнить"
+                                  >
+                                    <HomeworkBellRegularIcon size={13} className={styles.inlineFaIcon} />
+                                  </button>
+                                </Tooltip>
+                              ) : null}
+                              {isEditableAssignment ? (
+                                <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
+                                  Открыть
                                 </button>
                               ) : null}
-                              <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
-                                Детали
-                              </button>
                             </>
                           )}
                         </div>
@@ -998,7 +1007,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                     </div>
                     <div className={styles.mobileActions}>
                       <button type="button" className={controls.smallButton} onClick={() => onOpenDetail(assignment)}>
-                        Детали
+                        Открыть
                       </button>
                       {shouldReview ? (
                         <button type="button" className={styles.mobileReviewButton} onClick={() => onOpenReview(assignment)}>
@@ -1391,93 +1400,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         onClose={onCloseReview}
         onSubmitReview={onSubmitReview}
       />
-
-      <Modal open={Boolean(detailAssignment)} onClose={onCloseDetail} title="Детали домашнего задания">
-        {detailLoading ? (
-          <div className={styles.modalState}>Загрузка...</div>
-        ) : detailAssignment ? (
-          <div className={styles.detailLayout}>
-            <div className={styles.detailMeta}>Название: {detailAssignment.title}</div>
-            <div className={styles.detailMeta}>Ученик: {detailAssignment.studentName ?? studentsById.get(detailAssignment.studentId) ?? `#${detailAssignment.studentId}`}</div>
-            <div className={styles.detailMeta}>Статус: {formatAssignmentStatus(detailAssignment)}</div>
-            <div className={styles.detailMeta}>Дедлайн: {formatDateTime(detailAssignment.deadlineAt)}</div>
-            <div className={styles.detailMeta}>Отправлено: {formatDateTime(detailAssignment.sentAt)}</div>
-            <div className={styles.detailMeta}>Проверено: {formatDateTime(detailAssignment.reviewedAt)}</div>
-            <div className={styles.detailMeta}>Комментарий: {detailAssignment.teacherComment || '—'}</div>
-            <div className={styles.detailMeta}>Попыток: {detailSubmissions.length}</div>
-            <div className={styles.detailActions}>
-              {needsAssignmentReview(detailAssignment) ? (
-                <button
-                  type="button"
-                  className={styles.reviewButton}
-                  onClick={() => {
-                    onCloseDetail();
-                    onOpenReview(detailAssignment);
-                  }}
-                >
-                  Проверить
-                </button>
-              ) : null}
-              {(detailAssignment.status === 'DRAFT' || detailAssignment.status === 'SCHEDULED') ? (
-                <button
-                  type="button"
-                  className={styles.sendNowButton}
-                  onClick={() => {
-                    void onSendAssignmentNow(detailAssignment);
-                  }}
-                >
-                  Отправить
-                </button>
-              ) : null}
-              {!needsAssignmentReview(detailAssignment) ? (
-                <button
-                  type="button"
-                  className={styles.detailOutlinedButton}
-                  onClick={() => {
-                    void onRemindAssignment(detailAssignment);
-                  }}
-                >
-                  Напомнить
-                </button>
-              ) : null}
-              {detailAssignment.hasConfigError ? (
-                <button
-                  type="button"
-                  className={styles.fixButton}
-                  onClick={() => {
-                    void onFixConfigError(detailAssignment);
-                  }}
-                >
-                  Исправить
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={styles.deleteButton}
-                onClick={() => {
-                  void onDeleteAssignment(detailAssignment);
-                  onCloseDetail();
-                }}
-              >
-                Удалить
-              </button>
-            </div>
-            <div className={styles.submissionsList}>
-              {detailSubmissions.map((submission) => (
-                <article key={submission.id} className={styles.submissionCard}>
-                  <div>Попытка #{submission.attemptNo}</div>
-                  <div>Статус: {submission.status}</div>
-                  <div>Сдано: {formatDateTime(submission.submittedAt)}</div>
-                  <div>Комментарий: {submission.teacherComment || '—'}</div>
-                </article>
-              ))}
-              {detailSubmissions.length === 0 ? <div className={styles.modalState}>Ответов пока нет</div> : null}
-            </div>
-          </div>
-        ) : (
-          <div className={styles.modalState}>Нет данных</div>
-        )}
-      </Modal>
 
       <Modal
         open={isActivityModalOpen}

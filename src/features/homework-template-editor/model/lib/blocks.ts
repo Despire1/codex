@@ -1,4 +1,5 @@
 import {
+  HomeworkAssignment,
   HomeworkBlockMedia,
   HomeworkBlockStudentResponse,
   HomeworkBlockTest,
@@ -9,7 +10,10 @@ import {
   HomeworkTestQuestion,
   HomeworkTestQuestionType,
 } from '../../../../entities/types';
-import { HomeworkTemplateEditorDraft } from '../types';
+import {
+  HomeworkEditorDraft,
+  HomeworkTemplateEditorDraft,
+} from '../types';
 
 export const createHomeworkBlockId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -100,10 +104,92 @@ export const createInitialTemplateEditorDraft = (): HomeworkTemplateEditorDraft 
   blocks: [createTextBlock()],
 });
 
+export const createInitialHomeworkEditorDraft = (): HomeworkEditorDraft => ({
+  title: '',
+  blocks: [createTextBlock()],
+  assignment: {
+    studentId: null,
+    lessonId: null,
+    groupId: null,
+    deadlineAt: null,
+    sendMode: 'MANUAL',
+    sourceTemplateId: null,
+  },
+  template: {
+    tagsText: '',
+    subject: '',
+    level: '',
+  },
+});
+
 export const createTemplateEditorDraftFromTemplate = (template: HomeworkTemplate): HomeworkTemplateEditorDraft => ({
   title: template.title ?? '',
   tagsText: (template.tags ?? []).join(', '),
   subject: template.subject ?? '',
   level: template.level ?? '',
   blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createTextBlock()],
+});
+
+export const createHomeworkEditorDraftFromTemplate = (
+  template: HomeworkTemplate,
+  overrides?: Partial<HomeworkEditorDraft['assignment']>,
+): HomeworkEditorDraft => ({
+  title: template.title ?? '',
+  blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createTextBlock()],
+  assignment: {
+    ...createInitialHomeworkEditorDraft().assignment,
+    ...overrides,
+    sourceTemplateId: template.id,
+  },
+  template: {
+    tagsText: (template.tags ?? []).join(', '),
+    subject: template.subject ?? '',
+    level: template.level ?? '',
+  },
+});
+
+export const createHomeworkEditorDraftFromAssignment = (
+  assignment: HomeworkAssignment,
+  template?: HomeworkTemplate | null,
+): HomeworkEditorDraft => ({
+  title: assignment.title ?? '',
+  blocks:
+    Array.isArray(assignment.contentSnapshot) && assignment.contentSnapshot.length
+      ? assignment.contentSnapshot
+      : [createTextBlock()],
+  assignment: {
+    studentId: assignment.studentId,
+    lessonId: assignment.lessonId ?? null,
+    groupId: assignment.groupId ?? null,
+    deadlineAt: assignment.deadlineAt ?? null,
+    sendMode: assignment.sendMode,
+    sourceTemplateId: assignment.templateId ?? null,
+  },
+  template: {
+    tagsText: (template?.tags ?? []).join(', '),
+    subject: template?.subject ?? '',
+    level: template?.level ?? '',
+  },
+});
+
+export const projectHomeworkEditorToTemplateDraft = (draft: HomeworkEditorDraft): HomeworkTemplateEditorDraft => ({
+  title: draft.title,
+  tagsText: draft.template.tagsText,
+  subject: draft.template.subject,
+  level: draft.template.level,
+  blocks: draft.blocks,
+});
+
+export const applyTemplateDraftToHomeworkEditorDraft = (
+  currentDraft: HomeworkEditorDraft,
+  templateDraft: HomeworkTemplateEditorDraft,
+): HomeworkEditorDraft => ({
+  ...currentDraft,
+  title: templateDraft.title,
+  blocks: templateDraft.blocks,
+  template: {
+    tagsText: templateDraft.tagsText,
+    subject: templateDraft.subject,
+    level: templateDraft.level,
+  },
 });

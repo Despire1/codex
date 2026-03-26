@@ -10,30 +10,49 @@ import styles from './CreateTemplateHeader.module.css';
 
 interface CreateTemplateHeaderProps {
   mode: 'create' | 'edit';
+  variant: 'template' | 'assignment';
   submitting: boolean;
   hasValidationErrors: boolean;
   draftSavedAtLabel: string | null;
+  showSecondaryAction: boolean;
+  secondaryActionLabel: string;
+  primaryActionLabel: string;
+  primarySubmittingLabel: string;
   onBack: () => void;
-  onSaveDraft: () => void;
-  onSubmit: () => void;
+  onSecondaryAction: () => void;
+  onPrimaryAction: () => void;
 }
 
 export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
   mode,
+  variant,
   submitting,
   hasValidationErrors,
   draftSavedAtLabel,
+  showSecondaryAction,
+  secondaryActionLabel,
+  primaryActionLabel,
+  primarySubmittingLabel,
   onBack,
-  onSaveDraft,
-  onSubmit,
+  onSecondaryAction,
+  onPrimaryAction,
 }) => {
   const isEditMode = mode === 'edit';
-  const title = isEditMode ? 'Редактирование шаблона' : 'Создание шаблона';
+  const title =
+    variant === 'assignment'
+      ? isEditMode
+        ? 'Редактирование домашнего задания'
+        : 'Создание домашнего задания'
+      : isEditMode
+        ? 'Редактирование шаблона'
+        : 'Создание шаблона';
   const subtitle = draftSavedAtLabel
     ? `Черновик сохранен: ${draftSavedAtLabel}`
-    : isEditMode
-      ? 'Обновите настройки и вопросы шаблона'
-      : 'Новое домашнее задание';
+    : variant === 'assignment'
+      ? 'Настройте домашку и выберите способ выдачи'
+      : isEditMode
+        ? 'Обновите настройки и вопросы шаблона'
+        : 'Новое домашнее задание';
 
   return (
     <header className={styles.header}>
@@ -55,10 +74,10 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
       </div>
 
       <div className={styles.actions}>
-        {mode === 'create' ? (
-          <button type="button" className={styles.ghostButton} onClick={onSaveDraft} disabled={submitting}>
+        {showSecondaryAction ? (
+          <button type="button" className={styles.ghostButton} onClick={onSecondaryAction} disabled={submitting}>
             <HomeworkBookmarkRegularIcon size={14} />
-            <span>Сохранить черновик</span>
+            <span>{secondaryActionLabel}</span>
           </button>
         ) : null}
 
@@ -71,10 +90,10 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
           type="button"
           className={styles.submitButton}
           disabled={submitting || hasValidationErrors}
-          onClick={onSubmit}
+          onClick={onPrimaryAction}
         >
           <HomeworkCheckIcon size={14} className={styles.submitIcon} />
-          <span>{submitting ? (isEditMode ? 'Сохраняю…' : 'Создаю…') : isEditMode ? 'Сохранить шаблон' : 'Создать шаблон'}</span>
+          <span>{submitting ? primarySubmittingLabel : primaryActionLabel}</span>
         </button>
       </div>
     </header>

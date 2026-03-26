@@ -70,6 +70,46 @@
   padding: 24px 24px 0;
 }
 
+.topSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.primaryActionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primaryCreateButton,
+.secondaryCreateButton {
+  border-radius: 16px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.primaryCreateButton {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  box-shadow: 0 14px 30px -24px rgba(17, 24, 39, 0.85);
+}
+
+.secondaryCreateButton {
+  border: 1px solid #dbe3ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f172a;
+}
+
 .tabsRow,
 .modeTabsRow {
   display: flex;
@@ -643,6 +683,27 @@
   align-items: flex-start;
 }
 
+.issuanceBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.issuanceBadge_draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.issuanceBadge_sent {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .statusBadge {
   display: inline-flex;
   align-items: center;
@@ -920,11 +981,12 @@
 }
 
 .sendNowButton {
-  border: 1px solid var(--color-slate-200);
-  border-radius: 12px;
+  border: 1px solid #111827;
+  border-radius: 999px;
   padding: 8px 14px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: #111827;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -1995,6 +2057,15 @@
     width: 100%;
     flex-wrap: wrap;
     padding: 10px 14px 14px;
+  }
+
+  .topActionsRow {
+    flex-direction: column;
+  }
+
+  .topSection,
+  .primaryActionRow {
+    width: 100%;
   }
 
   .advancedFiltersControls {

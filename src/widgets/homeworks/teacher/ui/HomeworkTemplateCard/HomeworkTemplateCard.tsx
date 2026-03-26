@@ -97,6 +97,7 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
           aria-label={`Использовать шаблон "${template.title}"`}
         >
           <HomeworkPlusIcon size={12} />
+          <span>Создать домашку</span>
         </button>
       </div>
     </article>
