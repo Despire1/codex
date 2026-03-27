@@ -10,6 +10,13 @@ import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/ti
 import { useIsMobile } from '../shared/lib/useIsMobile';
 import { useIsDesktop } from '../shared/lib/useIsDesktop';
 import { trackEvent } from '../shared/lib/analytics';
+import {
+  getPwaNotificationPermission,
+  markPwaNotificationPromptSeen,
+  requestPwaNotificationPermission,
+  shouldPromptForPwaNotifications,
+  showPwaTestNotification,
+} from '../shared/lib/pwaNotifications';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar, type TopbarCreateMenuItem } from '../widgets/layout/Topbar';
 import { Sidebar } from '../widgets/layout/Sidebar';
@@ -765,9 +772,93 @@ const AppPageContent = () => {
     [track],
   );
 
+  const requestPwaNotifications = useCallback(
+    async (source: 'launch' | 'bell') => {
+      const permission = getPwaNotificationPermission();
+
+      if (permission === 'unsupported') {
+        showToast({
+          message: 'На этом устройстве браузерные уведомления пока не поддерживаются.',
+          variant: 'error',
+        });
+        return false;
+      }
+
+      let nextPermission: ReturnType<typeof getPwaNotificationPermission> = permission;
+      if (nextPermission === 'default') {
+        nextPermission = await requestPwaNotificationPermission();
+      }
+
+      if (nextPermission === 'denied') {
+        showToast({
+          message: 'Уведомления отключены в Safari. Разрешите их в настройках сайта.',
+          variant: 'error',
+        });
+        return false;
+      }
+
+      if (nextPermission !== 'granted') {
+        showToast({
+          message: 'Не удалось включить уведомления на этом устройстве.',
+          variant: 'error',
+        });
+        return false;
+      }
+
+      const result = await showPwaTestNotification();
+      if (!result.ok) {
+        showToast({
+          message:
+            result.reason === 'permission'
+              ? 'Сначала разрешите уведомления для TeacherBot.'
+              : 'Не удалось отправить тестовое уведомление.',
+          variant: 'error',
+        });
+        return false;
+      }
+
+      showToast({
+        message:
+          source === 'bell'
+            ? 'Тестовое уведомление отправлено на это устройство.'
+            : 'Уведомления включены. Отправили тестовое уведомление.',
+        variant: 'success',
+      });
+      return true;
+    },
+    [showToast],
+  );
+
+  const hasOpenedPwaNotificationsPromptRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasAccess || !isMobile) return;
+    if (hasOpenedPwaNotificationsPromptRef.current) return;
+    if (!shouldPromptForPwaNotifications()) return;
+
+    hasOpenedPwaNotificationsPromptRef.current = true;
+    markPwaNotificationPromptSeen();
+
+    openConfirmDialog({
+      title: 'Включить уведомления?',
+      message:
+        'TeacherBot сможет присылать напоминания и важные события прямо на телефон. Разрешить уведомления для этого приложения?',
+      confirmText: 'Включить',
+      cancelText: 'Позже',
+      onConfirm: async () => {
+        await requestPwaNotifications('launch');
+      },
+    });
+  }, [hasAccess, isMobile, openConfirmDialog, requestPwaNotifications]);
+
   const onOpenNotifications = useCallback(() => {
+    if (isMobile && activeTabByPath === 'dashboard') {
+      void requestPwaNotifications('bell');
+      return;
+    }
+
     guardedNavigate('/settings/notifications');
-  }, [guardedNavigate]);
+  }, [activeTabByPath, guardedNavigate, isMobile, requestPwaNotifications]);
 
   const sidebarItems = useMemo(() => buildSidebarNavItems(availableTabs), [availableTabs]);
   const homeworksBadgeCount = useMemo(() => {
