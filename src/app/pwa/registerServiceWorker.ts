@@ -1,12 +1,4 @@
-type IOSNavigator = Navigator & {
-  standalone?: boolean;
-};
-
-const isStandaloneDisplay = () => {
-  if (typeof window === 'undefined') return false;
-  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
-  return (window.navigator as IOSNavigator).standalone === true;
-};
+import { isStandaloneDisplayMode } from '@/shared/lib/pwa';
 
 export const applyDisplayModeAttributes = () => {
   if (typeof document === 'undefined') return;
@@ -14,7 +6,7 @@ export const applyDisplayModeAttributes = () => {
   const root = document.documentElement;
   const body = document.body;
   const update = () => {
-    const standalone = isStandaloneDisplay();
+    const standalone = isStandaloneDisplayMode();
     root.classList.toggle('display-standalone', standalone);
     body.classList.toggle('display-standalone', standalone);
   };

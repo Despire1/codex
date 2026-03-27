@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { isAppleStandaloneWebApp } from './pwa';
 
 type Location = {
   pathname: string;
@@ -29,6 +30,8 @@ type RouteProps = {
 };
 
 type RouteParams = Record<string, string>;
+
+type RouterMode = 'history' | 'hash';
 
 export type BlockNavigationTx = {
   retry: () => void;
@@ -53,6 +56,53 @@ const normalizePath = (path: string) => {
   }
   return withLeading;
 };
+
+const getRouterMode = (): RouterMode => (isAppleStandaloneWebApp() ? 'hash' : 'history');
+
+const parseHashLocation = (hash: string): Pick<Location, 'pathname' | 'search'> | null => {
+  if (!hash) return null;
+
+  const value = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!value.startsWith('/')) return null;
+
+  const questionMarkIndex = value.indexOf('?');
+  const pathname = questionMarkIndex >= 0 ? value.slice(0, questionMarkIndex) : value;
+  const search = questionMarkIndex >= 0 ? value.slice(questionMarkIndex) : '';
+
+  return {
+    pathname: normalizePath(pathname),
+    search,
+  };
+};
+
+const readWindowLocation = (state: unknown): Location => {
+  if (getRouterMode() === 'hash') {
+    const hashLocation = parseHashLocation(window.location.hash);
+    if (hashLocation) {
+      return {
+        ...hashLocation,
+        state,
+      };
+    }
+  }
+
+  return {
+    pathname: normalizePath(window.location.pathname),
+    search: window.location.search,
+    state,
+  };
+};
+
+const buildHistoryTarget = (location: Pick<Location, 'pathname' | 'search'>) =>
+  `${location.pathname}${location.search}`;
+
+const buildHashTarget = (location: Pick<Location, 'pathname' | 'search'>) => {
+  const basePathname = normalizePath(window.location.pathname);
+  return `${basePathname}#${buildHistoryTarget(location)}`;
+};
+
+const buildNavigationTarget = (location: Pick<Location, 'pathname' | 'search'>) =>
+  getRouterMode() === 'hash' ? buildHashTarget(location) : buildHistoryTarget(location);
 
 const splitPathSegments = (path: string) => normalizePath(path).split('/').filter(Boolean);
 
@@ -98,11 +148,7 @@ const matchPath = (routePath: string, currentPath: string): { params: RouteParam
 };
 
 export const BrowserRouter = ({ children }: PropsWithChildren) => {
-  const [location, setLocation] = useState<Location>(() => ({
-    pathname: normalizePath(window.location.pathname),
-    search: window.location.search,
-    state: window.history.state ?? null,
-  }));
+  const [location, setLocation] = useState<Location>(() => readWindowLocation(window.history.state ?? null));
   const locationRef = useRef(location);
   const blockerRef = useRef<BlockNavigationHandler | null>(null);
   const allowNextPopRef = useRef(false);
@@ -119,7 +165,7 @@ export const BrowserRouter = ({ children }: PropsWithChildren) => {
         replace?: boolean;
       },
     ) => {
-      const target = `${nextLocation.pathname}${nextLocation.search}`;
+      const target = buildNavigationTarget(nextLocation);
       if (options?.replace) {
         window.history.replaceState(nextLocation.state, '', target);
       } else {
@@ -163,11 +209,7 @@ export const BrowserRouter = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      const nextLocation = {
-        pathname: normalizePath(window.location.pathname),
-        search: window.location.search,
-        state: event.state ?? null,
-      };
+      const nextLocation = readWindowLocation(event.state ?? null);
 
       if (allowNextPopRef.current) {
         allowNextPopRef.current = false;
@@ -185,7 +227,7 @@ export const BrowserRouter = ({ children }: PropsWithChildren) => {
       window.history.pushState(
         currentLocation.state ?? null,
         '',
-        `${currentLocation.pathname}${currentLocation.search}`,
+        buildNavigationTarget(currentLocation),
       );
       blocker({
         retry: () => {
