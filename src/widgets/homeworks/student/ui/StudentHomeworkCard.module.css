@@ -302,8 +302,13 @@
 }
 
 @media (max-width: 860px) {
+  .card {
+    border-radius: 1.75rem;
+  }
+
   .body {
-    padding: 16px;
+    padding: 18px;
+    gap: 14px;
   }
 
   .headerRow {
@@ -311,18 +316,79 @@
     gap: 12px;
   }
 
+  .statusBadge,
+  .subjectBadge,
+  .scoreBadge {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .description {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
   .deadlineWrap {
+    width: 100%;
+    border-radius: 14px;
+    background: #f8fafc;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
     text-align: left;
     min-width: 0;
+  }
+
+  .deadlinePrimary {
+    font-size: 14px;
+  }
+
+  .deadlineSecondary {
+    margin-top: 0;
+    text-align: right;
+  }
+
+  .progressCard,
+  .infoCard {
+    padding: 12px;
   }
 
   .footerRow {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+    padding-top: 12px;
+  }
+
+  .metaRow {
+    gap: 10px;
+  }
+
+  .metaItem,
+  .metaItemAccent {
+    font-size: 13px;
   }
 
   .actionButton {
+    min-height: 44px;
     justify-content: center;
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .deadlineWrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deadlineSecondary {
+    text-align: left;
   }
 }

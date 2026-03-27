@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { HomeworkCheckIcon, HomeworkChevronDownIcon } from '../../../../shared/ui/icons/HomeworkFaIcons';
 import styles from './AssignmentSettingsSelect.module.css';
@@ -6,6 +6,8 @@ import styles from './AssignmentSettingsSelect.module.css';
 export type AssignmentSettingsSelectOption = {
   value: string;
   label: string;
+  description?: string;
+  icon?: ReactNode;
 };
 
 interface AssignmentSettingsSelectProps {
@@ -15,6 +17,7 @@ interface AssignmentSettingsSelectProps {
   placeholder: string;
   ariaLabel: string;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
@@ -24,6 +27,7 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
   placeholder,
   ariaLabel,
   disabled = false,
+  compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -48,7 +52,7 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
       trigger={
         <button
           type="button"
-          className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''}`}
+          className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''} ${compact ? styles.triggerButtonCompact : ''}`}
           onClick={() => {
             if (disabled) return;
             setIsOpen((prev) => !prev);
@@ -58,8 +62,11 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
           aria-label={ariaLabel}
           disabled={disabled}
         >
-          <span className={`${styles.triggerLabel} ${selectedOption ? styles.triggerLabelFilled : styles.triggerLabelPlaceholder}`}>
-            {selectedOption?.label ?? placeholder}
+          <span className={styles.triggerContent}>
+            {selectedOption?.icon ? <span className={styles.triggerIcon}>{selectedOption.icon}</span> : null}
+            <span className={`${styles.triggerLabel} ${selectedOption ? styles.triggerLabelFilled : styles.triggerLabelPlaceholder}`}>
+              {selectedOption?.label ?? placeholder}
+            </span>
           </span>
           <HomeworkChevronDownIcon size={12} className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />
         </button>
@@ -81,7 +88,13 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
                 setIsOpen(false);
               }}
             >
-              <span className={styles.optionLabel}>{option.label}</span>
+              <span className={styles.optionContent}>
+                {option.icon ? <span className={styles.optionIcon}>{option.icon}</span> : null}
+                <span className={styles.optionText}>
+                  <span className={styles.optionLabel}>{option.label}</span>
+                  {option.description ? <span className={styles.optionDescription}>{option.description}</span> : null}
+                </span>
+              </span>
               <HomeworkCheckIcon size={11} className={`${styles.optionCheck} ${isSelected ? styles.optionCheckVisible : ''}`} />
             </button>
           );

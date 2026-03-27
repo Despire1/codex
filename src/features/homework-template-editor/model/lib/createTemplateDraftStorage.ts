@@ -1,5 +1,5 @@
 import { HomeworkBlockTest } from '../../../../entities/types';
-import { HomeworkTemplateEditorDraft } from '../types';
+import { HomeworkEditorTaskType, HomeworkTemplateEditorDraft } from '../types';
 
 export interface StoredCreateTemplateDraft {
   draft: HomeworkTemplateEditorDraft;
@@ -20,12 +20,21 @@ export const CREATE_TEMPLATE_DRAFT_STORAGE_KEY = 'homework_template_create_scree
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isHomeworkEditorTaskType = (value: unknown): value is HomeworkEditorTaskType =>
+  value === 'TEST' ||
+  value === 'WRITTEN' ||
+  value === 'ORAL' ||
+  value === 'FILE' ||
+  value === 'COMBO' ||
+  value === 'EXTERNAL';
+
 const toDraft = (value: unknown): HomeworkTemplateEditorDraft | null => {
   if (!isRecord(value)) return null;
   const title = typeof value.title === 'string' ? value.title : '';
   const tagsText = typeof value.tagsText === 'string' ? value.tagsText : '';
   const subject = typeof value.subject === 'string' ? value.subject : '';
   const level = typeof value.level === 'string' ? value.level : '';
+  const selectedType = isHomeworkEditorTaskType(value.selectedType) ? value.selectedType : 'TEST';
   const blocks = Array.isArray(value.blocks)
     ? (value.blocks.filter((item) => isRecord(item)) as unknown as HomeworkTemplateEditorDraft['blocks'])
     : [];
@@ -35,6 +44,7 @@ const toDraft = (value: unknown): HomeworkTemplateEditorDraft | null => {
     tagsText,
     subject,
     level,
+    selectedType,
     blocks,
   };
 };

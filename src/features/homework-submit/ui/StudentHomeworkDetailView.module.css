@@ -255,6 +255,9 @@
   color: inherit;
   border-radius: 10px;
   padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -719,69 +722,6 @@
 .matchingLabel {
   color: #0f172a;
   font-size: 14px;
-  font-weight: 600;
-}
-
-.orderingList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.orderingItem {
-  border: 2px solid #e2e8f0;
-  border-radius: 14px;
-  background: #fff;
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  gap: 10px;
-}
-
-.orderingItemDragging {
-  border-color: #5b8def;
-  background: #f8fbff;
-}
-
-.orderingIndex {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: #ffe4e6;
-  color: #9f1239;
-  font-size: 12px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.orderingDragHandle {
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #94a3b8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-}
-
-.orderingDragHandle:hover {
-  color: #475569;
-}
-
-.orderingDragHandle:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.orderingText {
-  font-size: 14px;
-  color: #0f172a;
   font-weight: 600;
 }
 
@@ -1556,9 +1496,19 @@
 }
 
 @media (max-width: 859px) {
+  .screen {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
   .topbar {
     padding: 12px 14px;
     flex-wrap: wrap;
+  }
+
+  .topbarLeft {
+    width: 100%;
   }
 
   .mobileMenuButton {
@@ -1567,23 +1517,43 @@
 
   .titleCluster {
     gap: 10px;
+    align-items: flex-start;
   }
 
   .pageTitle {
     font-size: 20px;
+    white-space: normal;
   }
 
   .topbarActions {
     width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .timerPill,
+  .readonlyBadge {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .headerDraftButton,
+  .headerSubmitButton,
+  .headerStartButton,
+  .readonlyBadge {
+    font-size: 13px;
+    padding: 9px 12px;
   }
 
   .headerDraftButton,
   .headerSubmitButton,
   .headerStartButton {
-    font-size: 13px;
-    padding: 9px 12px;
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
   }
 
   .assignmentHero {
@@ -1604,6 +1574,19 @@
 
   .heroTitle {
     font-size: 24px;
+  }
+
+  .heroStatCard {
+    padding: 10px;
+  }
+
+  .notice {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .noticeAction {
+    width: 100%;
   }
 
   .questionCard,
@@ -1650,12 +1633,59 @@
     padding: 10px;
   }
 
+  .topbar {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .backCircleButton,
+  .mobileMenuButton {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .pageSubtitle {
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
   .heroStatsGrid {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .heroTitle {
+    font-size: 22px;
+  }
+
+  .heroDescription {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .heroStatValue {
+    font-size: 24px;
   }
 
   .timerValue {
     font-size: 38px;
+  }
+
+  .questionCard,
+  .progressCard,
+  .timerCard,
+  .helpCard,
+  .materialsCard,
+  .deadlineCard,
+  .submitSection {
+    border-radius: 18px;
+    padding: 14px;
   }
 
   .optionCard {
@@ -1674,6 +1704,7 @@
 
   .questionHeader {
     gap: 10px;
+    flex-direction: column;
   }
 
   .fillWordInput {
@@ -1681,15 +1712,35 @@
     max-width: 130px;
   }
 
-  .orderingItem {
-    grid-template-columns: auto 1fr;
+  .uploadControls {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
-  .orderingDragHandle {
-    display: none;
+  .uploadButton,
+  .recordButton,
+  .cancelRecordButton,
+  .stopRecordButton,
+  .lightButton,
+  .bottomSubmitButton,
+  .bottomStartButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .attachmentRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .removeButton {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .answerTable {
-    min-width: 420px;
+    min-width: 360px;
   }
 }

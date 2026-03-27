@@ -320,6 +320,17 @@
 
 @media (max-width: 767px) {
   .kpiGrid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(230px, 82vw);
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -4px 6px;
+    padding: 0 4px 6px;
+    scroll-snap-type: x proximity;
+  }
+
+  .kpiGrid::-webkit-scrollbar {
     display: none;
   }
 
@@ -327,6 +338,7 @@
     min-height: 136px;
     padding: 12px;
     border-radius: 18px;
+    scroll-snap-align: start;
   }
 
   .cardHiddenOnMobile {

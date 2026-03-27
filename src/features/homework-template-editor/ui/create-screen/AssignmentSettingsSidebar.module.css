@@ -56,10 +56,10 @@
 }
 
 .datePickerField :global(button) {
-  min-height: 48px;
-  border-radius: 16px;
+  min-height: 38px;
+  border-radius: 999px;
   border-color: rgba(148, 163, 184, 0.24);
-  padding: 12px 14px;
+  padding: 7px 12px;
   box-shadow: none;
 }
 
@@ -73,38 +73,35 @@
   box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.06);
 }
 
-.radioGrid {
-  display: grid;
-  gap: 10px;
+.autoSendBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.radioCard {
+.autoSendToggle {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  background: rgba(240, 253, 244, 0.72);
   padding: 12px 14px;
 }
 
-.radioCard input {
-  margin-top: 3px;
-}
-
-.radioMeta {
+.autoSendMeta {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.radioMeta strong {
+.autoSendMeta strong {
   font-size: 14px;
   line-height: 1.2;
   color: #0f172a;
 }
 
-.radioMeta span {
+.autoSendMeta span {
   font-size: 12px;
   line-height: 1.45;
   color: #64748b;
@@ -117,7 +114,6 @@
 }
 
 .quickButton,
-.previewButton,
 .saveTemplateButton {
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 14px;
@@ -134,7 +130,6 @@
 }
 
 .quickButton:hover,
-.previewButton:hover,
 .saveTemplateButton:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 26px -20px rgba(15, 23, 42, 0.5);
@@ -144,6 +139,68 @@
 .saveTemplateButton {
   width: 100%;
   justify-content: center;
+}
+
+.previewCard {
+  background: linear-gradient(140deg, #111827 0%, #1f2937 100%);
+  border-radius: 28px;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.14);
+  padding: 20px;
+  color: #fff;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.previewHeader h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.previewIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #bfdbfe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewCard p {
+  margin: 12px 0;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.previewCard button {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.18s ease, opacity 0.18s ease;
+}
+
+.previewCard button:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.previewCard button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .inlineInfo {
@@ -173,5 +230,83 @@
 @media (max-width: 1023px) {
   .card {
     border-radius: 20px;
+  }
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    gap: 12px;
+  }
+
+  .card,
+  .previewCard {
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
+  }
+
+  .cardIcon {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .cardTitle {
+    font-size: 15px;
+  }
+
+  .cardSubtitle {
+    font-size: 12px;
+  }
+
+  .field {
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .datePickerField :global(button) {
+    min-height: 44px;
+    border-radius: 16px;
+  }
+
+  .actionsRow {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .quickButton,
+  .saveTemplateButton {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .autoSendToggle {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .previewHeader h3 {
+    font-size: 17px;
+  }
+
+  .previewCard p {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .previewCard button {
+    min-height: 44px;
+    border-radius: 14px;
+  }
+
+  .validationBlock {
+    padding: 12px;
+    border-radius: 14px;
   }
 }

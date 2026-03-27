@@ -307,15 +307,77 @@
 }
 
 @media (max-width: 760px) {
+  .section {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .sectionHeader {
+    align-items: flex-start;
+    margin-bottom: 18px;
+  }
+
   .materialCard {
     display: grid;
     grid-template-columns: auto 1fr;
+    align-items: flex-start;
     gap: 12px;
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .materialTitle,
+  .materialMeta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: initial;
   }
 
   .materialActions {
     grid-column: 1 / -1;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .actionButton {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .uploadArea {
+    padding: 24px 16px;
+    border-radius: 20px;
+  }
+
+  .uploadIconWrap {
+    width: 54px;
+    height: 54px;
+  }
+
+  .uploadArea strong {
+    font-size: 17px;
+    line-height: 1.2;
+  }
+
+  .uploadButton {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .linkRow {
+    grid-template-columns: 1fr;
+  }
+
+  .linkInput {
+    font-size: 16px;
+  }
+
+  .linkAddButton {
+    min-height: 44px;
+    justify-content: center;
   }
 }
 

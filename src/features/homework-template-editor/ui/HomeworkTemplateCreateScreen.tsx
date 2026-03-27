@@ -1,8 +1,7 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HomeworkGroupListItem } from '../../../entities/types';
 import { HomeworkEditorDraft, HomeworkEditorVariant } from '../model/types';
 import {
-  applyCreateTemplateType,
   buildTemplateCreateStats,
   detectCreateTemplateType,
   ensurePrimaryMediaBlock,
@@ -42,7 +41,6 @@ import { useValidationSession } from '../../../shared/lib/form-validation/useVal
 import { useIsDesktop } from '../../../shared/lib/useIsDesktop';
 import { CreateTemplateHeader } from './create-screen/CreateTemplateHeader';
 import { TemplateBasicsSection } from './create-screen/TemplateBasicsSection';
-import { TemplateTypeSection } from './create-screen/TemplateTypeSection';
 import { TemplateQuestionsSection } from './create-screen/TemplateQuestionsSection';
 import { TemplateMaterialsSection } from './create-screen/TemplateMaterialsSection';
 import { TemplateSettingsSidebar } from './create-screen/TemplateSettingsSidebar';
@@ -107,7 +105,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   const isDesktop = useIsDesktop();
   const templateDraft = useMemo(() => projectHomeworkEditorToTemplateDraft(draft), [draft]);
 
-  const selectedType = useMemo(() => detectCreateTemplateType(draft.blocks), [draft.blocks]);
+  const selectedType = useMemo(
+    () => draft.template.selectedType || detectCreateTemplateType(draft.blocks),
+    [draft.blocks, draft.template.selectedType],
+  );
   const description = useMemo(() => getPrimaryTextContent(draft.blocks), [draft.blocks]);
   const validation = useMemo(() => validateTemplateDraft(templateDraft), [templateDraft]);
   const mergedIssues = useMemo(() => {
@@ -264,13 +265,6 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     [draft],
   );
 
-  const ensureTestBlock = () => {
-    const ensured = ensurePrimaryTestBlock(draft.blocks);
-    if (ensured.blocks === draft.blocks) return;
-    const withSettings = writeTemplateQuizSettings(ensured.blocks, quizSettings);
-    updateBlocks(withSettings);
-  };
-
   const updatePrimaryTestBlock = (nextBlock: NonNullable<typeof primaryTestEntry>['block']) => {
     const ensured = ensurePrimaryTestBlock(draft.blocks);
     const replaced = ensured.blocks.map((block, index) => (index === ensured.index ? nextBlock : block));
@@ -292,9 +286,9 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   };
 
   const handleTemplateTypeSelect = (type: ReturnType<typeof detectCreateTemplateType>) => {
-    const nextBlocks = applyCreateTemplateType(draft.blocks, type);
-    const withSettings = writeTemplateQuizSettings(nextBlocks, quizSettings);
-    updateBlocks(withSettings);
+    updateTemplateContext({
+      selectedType: type,
+    });
   };
 
   const handleQuizSettingsChange = (nextSettings: TemplateQuizSettings) => {
@@ -378,9 +372,9 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     void runValidatedAction('submit');
   }, [runValidatedAction]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const showSecondaryAction = variant === 'assignment' || mode === 'create';
-    const secondaryActionLabel = variant === 'assignment' ? 'Сохранить' : 'Сохранить черновик';
+    const secondaryActionLabel = variant === 'assignment' ? 'Сохранить черновик' : 'Сохранить черновик';
     const primaryActionLabel =
       variant === 'assignment'
         ? 'Выдать'
@@ -418,6 +412,30 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     };
   }, [handlePrimaryAction, handleSecondaryAction]);
 
+  const shouldInlineAssignmentSidebar = !isDesktop && variant === 'assignment';
+  const assignmentSidebar =
+    variant === 'assignment' ? (
+      <AssignmentSettingsSidebar
+        assignment={draft.assignment}
+        students={students}
+        groups={groups}
+        disabled={submitting}
+        studentLocked={lockAssignmentStudent}
+        saveAsTemplateSubmitting={saveAsTemplateSubmitting}
+        validationErrors={submitAttempted ? [...assignmentValidationMessages, ...visibleValidationErrorMessages] : []}
+        onChange={(assignment) =>
+          updateDraft({
+            ...draft,
+            assignment,
+          })
+        }
+        onOpenPreview={() => setPreviewOpen(true)}
+        onSaveAsTemplate={() => {
+          void onSaveAsTemplate?.();
+        }}
+      />
+    ) : null;
+
   return (
     <section className={styles.page}>
       {!isDesktop ? (
@@ -428,7 +446,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           hasValidationErrors={hasVisibleErrors || showAssignmentValidationErrors}
           draftSavedAtLabel={variant === 'template' && mode === 'create' ? draftSavedAtLabel : null}
           showSecondaryAction={variant === 'assignment' || mode === 'create'}
-          secondaryActionLabel={variant === 'assignment' ? 'Сохранить' : 'Сохранить черновик'}
+          secondaryActionLabel="Сохранить черновик"
           primaryActionLabel={
             variant === 'assignment'
               ? 'Выдать'
@@ -499,54 +517,39 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
                 tagsText: stringifyTags(nextTags),
               });
             }}
+            selectedType={selectedType}
+            onTypeChange={handleTemplateTypeSelect}
           />
 
-          <TemplateTypeSection selectedType={selectedType} onSelectType={handleTemplateTypeSelect} />
+          {shouldInlineAssignmentSidebar ? assignmentSidebar : null}
 
           <TemplateQuestionsSection
             testBlock={primaryTestEntry?.block ?? null}
             testBlockPath={testBlockPath}
             getIssueForPath={getIssueForPath}
             onFieldEdit={handleFieldEdit}
-            onEnsureTestBlock={ensureTestBlock}
             onTestBlockChange={updatePrimaryTestBlock}
           />
 
           <TemplateMaterialsSection mediaBlock={mediaBlock} onMediaBlockChange={updatePrimaryMediaBlock} />
         </div>
 
-        <aside className={styles.sidebarColumn}>
-          {variant === 'assignment' ? (
-            <AssignmentSettingsSidebar
-              assignment={draft.assignment}
-              students={students}
-              groups={groups}
-              disabled={submitting}
-              studentLocked={lockAssignmentStudent}
-              saveAsTemplateSubmitting={saveAsTemplateSubmitting}
-              validationErrors={submitAttempted ? [...assignmentValidationMessages, ...visibleValidationErrorMessages] : []}
-              onChange={(assignment) =>
-                updateDraft({
-                  ...draft,
-                  assignment,
-                })
-              }
-              onOpenPreview={() => setPreviewOpen(true)}
-              onSaveAsTemplate={() => {
-                void onSaveAsTemplate?.();
-              }}
-            />
-          ) : (
-            <TemplateSettingsSidebar
-              settings={quizSettings}
-              stats={stats}
-              validationErrors={validationErrorMessages}
-              validationWarnings={validationWarningMessages}
-              onOpenPreview={() => setPreviewOpen(true)}
-              onSettingsChange={handleQuizSettingsChange}
-            />
-          )}
-        </aside>
+        {variant !== 'assignment' || !shouldInlineAssignmentSidebar ? (
+          <aside className={styles.sidebarColumn}>
+            {variant === 'assignment' ? (
+              assignmentSidebar
+            ) : (
+              <TemplateSettingsSidebar
+                settings={quizSettings}
+                stats={stats}
+                validationErrors={validationErrorMessages}
+                validationWarnings={validationWarningMessages}
+                onOpenPreview={() => setPreviewOpen(true)}
+                onSettingsChange={handleQuizSettingsChange}
+              />
+            )}
+          </aside>
+        ) : null}
       </div>
 
       <TemplatePreviewModal open={isPreviewOpen} draft={templateDraft} onClose={() => setPreviewOpen(false)} />

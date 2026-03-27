@@ -12,6 +12,7 @@ import {
 } from '../../icons/MaterialIcons';
 import { Avatar } from '../../shared/ui/Avatar/Avatar';
 import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
+import { TopbarCreateMenu, type TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -21,6 +22,7 @@ interface TopbarProps {
   showCreateLesson: boolean;
   createButtonLabel?: string;
   createButtonIconAccent?: boolean;
+  createMenuItems?: TopbarCreateMenuItem[];
   showEditorActions?: boolean;
   showEditorSecondaryAction?: boolean;
   showBackButton?: boolean;
@@ -41,6 +43,8 @@ interface TopbarProps {
   onScheduleViewChange?: (view: 'month' | 'week' | 'day') => void;
 }
 
+export type { TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
+
 export const Topbar: FC<TopbarProps> = ({
   teacher,
   title,
@@ -48,6 +52,7 @@ export const Topbar: FC<TopbarProps> = ({
   showCreateLesson,
   createButtonLabel = 'Новое занятие',
   createButtonIconAccent = false,
+  createMenuItems,
   showEditorActions = false,
   showEditorSecondaryAction = false,
   showBackButton = false,
@@ -96,18 +101,6 @@ export const Topbar: FC<TopbarProps> = ({
               : styles.actionsCreateHidden
         }`}
       >
-        {showEditorActions && showEditorSecondaryAction ? (
-          <button
-            type="button"
-            className={styles.templateSecondaryButton}
-            onClick={onEditorSecondaryAction}
-            disabled={editorSubmitting}
-          >
-            <SaveOutlinedIcon width={16} height={16} />
-            <span>{editorSecondaryActionLabel}</span>
-          </button>
-        ) : null}
-
         {showScheduleViewToggle ? (
           <div className={styles.viewToggleGroup} role="tablist" aria-label="Вид календаря">
             <button
@@ -143,46 +136,83 @@ export const Topbar: FC<TopbarProps> = ({
           </div>
         ) : null}
 
-        <button
-          type="button"
-          className={styles.iconButton}
-          aria-label="Открыть уведомления"
-          onClick={onOpenNotifications}
-        >
-          <NotificationsNoneOutlinedIcon width={20} height={20} />
-          <span className={styles.notificationDot} aria-hidden />
-        </button>
-
         {showEditorActions ? (
-          <button
-            type="button"
-            className={styles.templatePrimaryButton}
-            onClick={onEditorPrimaryAction}
-            disabled={editorSubmitting || editorPrimaryDisabled}
-          >
-            <DoneOutlinedIcon width={16} height={16} className={styles.templatePrimaryIcon} />
-            <span>{editorSubmitting ? editorPrimarySubmittingLabel : editorPrimaryActionLabel}</span>
-          </button>
-        ) : (
-          <div
-            className={`${styles.createButtonSlot} ${showCreateLesson ? styles.createButtonSlotVisible : styles.createButtonSlotHidden}`}
-          >
+          <>
             <button
               type="button"
-              className={`${styles.createButton} ${showCreateLesson ? styles.createButtonVisible : styles.createButtonHidden}`}
-              onClick={onCreateLesson}
-              disabled={!showCreateLesson}
-              tabIndex={showCreateLesson ? undefined : -1}
-              aria-hidden={!showCreateLesson}
+              className={styles.iconButton}
+              aria-label="Открыть уведомления"
+              onClick={onOpenNotifications}
             >
-              <AddOutlinedIcon
-                width={18}
-                height={18}
-                className={createButtonIconAccent ? styles.createButtonIconAccent : undefined}
-              />
-              <span>{createButtonLabel}</span>
+              <NotificationsNoneOutlinedIcon width={20} height={20} />
+              <span className={styles.notificationDot} aria-hidden />
             </button>
-          </div>
+
+            {showEditorSecondaryAction ? (
+              <button
+                type="button"
+                className={styles.templateSecondaryButton}
+                onClick={onEditorSecondaryAction}
+                disabled={editorSubmitting}
+              >
+                <SaveOutlinedIcon width={16} height={16} />
+                <span>{editorSecondaryActionLabel}</span>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className={styles.templatePrimaryButton}
+              onClick={onEditorPrimaryAction}
+              disabled={editorSubmitting || editorPrimaryDisabled}
+            >
+              <DoneOutlinedIcon width={16} height={16} className={styles.templatePrimaryIcon} />
+              <span>{editorSubmitting ? editorPrimarySubmittingLabel : editorPrimaryActionLabel}</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label="Открыть уведомления"
+              onClick={onOpenNotifications}
+            >
+              <NotificationsNoneOutlinedIcon width={20} height={20} />
+              <span className={styles.notificationDot} aria-hidden />
+            </button>
+
+            <div
+              className={`${styles.createButtonSlot} ${showCreateLesson ? styles.createButtonSlotVisible : styles.createButtonSlotHidden}`}
+            >
+              {createMenuItems?.length ? (
+                <TopbarCreateMenu
+                  label={createButtonLabel}
+                  items={createMenuItems}
+                  triggerClassName={`${styles.createButton} ${showCreateLesson ? styles.createButtonVisible : styles.createButtonHidden}`}
+                  triggerHiddenClassName={styles.createButtonHidden}
+                  iconAccentClassName={createButtonIconAccent ? styles.createButtonIconAccent : undefined}
+                  disabled={!showCreateLesson}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.createButton} ${showCreateLesson ? styles.createButtonVisible : styles.createButtonHidden}`}
+                  onClick={onCreateLesson}
+                  disabled={!showCreateLesson}
+                  tabIndex={showCreateLesson ? undefined : -1}
+                  aria-hidden={!showCreateLesson}
+                >
+                  <AddOutlinedIcon
+                    width={18}
+                    height={18}
+                    className={createButtonIconAccent ? styles.createButtonIconAccent : undefined}
+                  />
+                  <span>{createButtonLabel}</span>
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         <div className={styles.profile}>

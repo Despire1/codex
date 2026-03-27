@@ -15,20 +15,18 @@ import {
   HomeworkBookmarkRegularIcon,
   HomeworkBoltIcon,
   HomeworkChevronDownIcon,
-  HomeworkCircleExclamationIcon,
   HomeworkFilePdfIcon,
   HomeworkFileLinesIcon,
   HomeworkFolderIcon,
-  HomeworkGearIcon,
   HomeworkLayerGroupIcon,
   HomeworkLinkIcon,
   HomeworkListCheckIcon,
+  HomeworkMagnifyingGlassIcon,
   HomeworkMicrophoneIcon,
   HomeworkPenIcon,
   HomeworkPenToSquareIcon,
   HomeworkPlusIcon,
   HomeworkRobotIcon,
-  HomeworkRotateRightIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
 import {
   AutoCheckBadge,
@@ -58,6 +56,8 @@ import { GroupIconView } from './model/lib/groupIconView';
 import { GroupEditorModal } from './ui/GroupEditorModal/GroupEditorModal';
 import { HomeworkTemplateCard } from './ui/HomeworkTemplateCard/HomeworkTemplateCard';
 import { TeacherHomeworksKpiSection } from './ui/TeacherHomeworksKpiSection';
+import { HomeworkListFiltersPopover } from './ui/HomeworkListFiltersPopover/HomeworkListFiltersPopover';
+import { TopbarCreateMenu } from '../../layout/ui/TopbarCreateMenu/TopbarCreateMenu';
 
 type WorkspaceMode = 'list' | 'groups' | 'templates';
 
@@ -206,21 +206,18 @@ const resolveStatusLabel = (assignment: HomeworkAssignment) => {
 };
 
 const resolveIssuanceLabel = (assignment: HomeworkAssignment) =>
-  assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED' ? 'Не выдана' : 'Выдана';
+  assignment.status === 'REVIEWED'
+    ? 'Проверено'
+    : assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED'
+      ? 'Не выдана'
+      : 'Выдана';
 
 const resolveIssuanceTone = (assignment: HomeworkAssignment) =>
-  assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED' ? 'draft' : 'sent';
-
-const resolveStatusIcon = (assignment: HomeworkAssignment) => {
-  if (assignment.hasConfigError) return <HomeworkGearIcon size={12} className={styles.statusIcon} />;
-  if (assignment.isOverdue || assignment.status === 'OVERDUE') {
-    return <HomeworkCircleExclamationIcon size={12} className={styles.statusIcon} />;
-  }
-  if (assignment.status === 'RETURNED') {
-    return <HomeworkRotateRightIcon size={12} className={styles.statusIcon} />;
-  }
-  return null;
-};
+  assignment.status === 'REVIEWED'
+    ? 'reviewed'
+    : assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED'
+      ? 'draft'
+      : 'sent';
 
 const toGroupEditorDraft = (group: HomeworkGroupListItem): GroupEditorDraft => ({
   title: group.title,
@@ -292,7 +289,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onLoadMoreAssignments,
   onConsumeAssignModalRequest,
   onSubmitReview,
-  onRefresh,
   onLoadHomeworkActivity,
   onMarkHomeworkActivitySeen,
 }) => {
@@ -389,6 +385,26 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const savedCreateDraft = useMemo(() => loadStoredCreateTemplateDraftSummary(), []);
 
   const allSelected = assignments.length > 0 && selectedIds.length === assignments.length;
+  const createMenuItems = [
+    {
+      id: 'create_assignment',
+      label: 'Создать домашнее задание',
+      description: 'Открыть редактор и собрать задание с нуля.',
+      onSelect: onOpenCreateAssignmentScreen,
+    },
+    {
+      id: 'assign_homework',
+      label: 'Отправить домашнее задание',
+      description: 'Быстро выдать домашку ученику по шаблону или черновику.',
+      onSelect: () => openAssignModal(),
+    },
+    {
+      id: 'create_template',
+      label: 'Создать шаблон',
+      description: 'Подготовить заготовку, чтобы потом выдавать задания быстрее.',
+      onSelect: onOpenCreateTemplateScreen,
+    },
+  ];
 
   useEffect(() => {
     setAssignDefaults((prev) => ({ ...prev, studentId: selectedStudentId }));
@@ -563,22 +579,36 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               ))}
             </div>
 
-            {workspaceMode === 'list' ? (
-              <div className={styles.primaryActionRow}>
-                <button type="button" className={styles.primaryCreateButton} onClick={onOpenCreateAssignmentScreen}>
-                  <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
-                  <span>Создать домашнее задание</span>
-                </button>
-                <button type="button" className={styles.secondaryCreateButton} onClick={() => openAssignModal()}>
-                  <HomeworkFileLinesIcon size={12} className={styles.toolbarIcon} />
-                  <span>Выдать по шаблону</span>
-                </button>
-              </div>
-            ) : null}
           </div>
 
           {workspaceMode === 'list' ? (
             <div className={styles.actionsRow}>
+              <label className={styles.toolbarSearch}>
+                <HomeworkMagnifyingGlassIcon size={12} className={styles.toolbarSearchIcon} />
+                <input
+                  type="search"
+                  className={styles.toolbarSearchInput}
+                  value={searchQuery}
+                  placeholder="Поиск по заданию, ученику или шаблону"
+                  onChange={(event) => onSearchChange(event.target.value)}
+                />
+              </label>
+              <HomeworkListFiltersPopover
+                sortBy={sortBy}
+                selectedStudentId={selectedStudentId}
+                students={students}
+                loadingStudents={loadingStudents}
+                sortOptions={SORT_LABELS}
+                onSortChange={onSortChange}
+                onSelectedStudentIdChange={onSelectedStudentIdChange}
+              />
+              <div className={styles.mobileCreateMenu}>
+                <TopbarCreateMenu
+                  label="Добавить"
+                  items={createMenuItems}
+                  triggerClassName={styles.mobileCreateMenuButton}
+                />
+              </div>
               <Tooltip content="События">
                 <button
                   type="button"
@@ -653,56 +683,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           </div>
         ) : null}
 
-        <div className={styles.advancedFiltersRow}>
-          <div className={styles.advancedFiltersControls}>
-            <label className={styles.inlineFilterGroup}>
-              <span className={styles.inlineFilterLabel}>Поиск:</span>
-              <input
-                type="search"
-                className={styles.inlineSearchInput}
-                value={searchQuery}
-                placeholder="Название, ученик, шаблон..."
-                onChange={(event) => onSearchChange(event.target.value)}
-              />
-            </label>
-
-            <label className={styles.inlineFilterGroup}>
-              <span className={styles.inlineFilterLabel}>Ученик:</span>
-              <select
-                className={styles.inlineFilterSelect}
-                value={selectedStudentId ? String(selectedStudentId) : ''}
-                onChange={(event) => onSelectedStudentIdChange(event.target.value ? Number(event.target.value) : null)}
-                disabled={loadingStudents}
-              >
-                <option value="">Все ученики</option>
-                {students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={styles.inlineFilterGroup}>
-              <span className={styles.inlineFilterLabel}>Сортировка:</span>
-              <select
-                className={styles.inlineFilterSelect}
-                value={sortBy}
-                onChange={(event) => onSortChange(event.target.value as TeacherHomeworksViewModel['sortBy'])}
-              >
-                {SORT_LABELS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <button type="button" className={styles.refreshButton} onClick={onRefresh}>
-            Обновить
-          </button>
-        </div>
-
         {assignmentsError ? <div className={styles.error}>{assignmentsError}</div> : null}
         {summaryError ? <div className={styles.error}>{summaryError}</div> : null}
         {studentsError ? <div className={styles.error}>{studentsError}</div> : null}
@@ -766,7 +746,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               ) : assignments.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={styles.emptyRow}>
-                    Пока ничего не найдено. «Создать домашнее задание» открывает редактор с нуля, а «Выдать по шаблону» помогает быстро собрать черновик на основе шаблона.
+                    Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить» в верхнем хедере, чтобы создать задание, выдать домашку или собрать новый шаблон.
                   </td>
                 </tr>
               ) : (
@@ -778,12 +758,10 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const studentInitials = getStudentInitials(studentLabel);
                   const studentAvatarColor = resolveAssignmentStudentAvatarColor(assignment);
                   const studentAvatarTextColor = resolveAssignmentStudentAvatarTextColor(studentAvatarColor);
-                  const statusTone = resolveStatusTone(assignment);
                   const shouldReview = needsAssignmentReview(assignment);
                   const responseVisual = resolveResponseVisual(assignment);
                   const responseText = responseVisual.kind === 'empty' ? responseVisual.emptyText || responseMeta : '';
                   const shouldShowEmptyResponse = responseText === 'Нет ответа';
-                  const statusIcon = resolveStatusIcon(assignment);
                   const isOverdueRow = problemBadges.hasOverdue;
                   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
                   const isEditableAssignment = !shouldReview && !assignment.hasConfigError;
@@ -845,14 +823,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         <div className={styles.statusColumn}>
                           <span className={`${styles.issuanceBadge} ${styles[`issuanceBadge_${resolveIssuanceTone(assignment)}`]}`}>
                             {resolveIssuanceLabel(assignment)}
-                          </span>
-                          <span
-                            className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]} ${
-                              statusIcon ? styles.statusBadgeWithIcon : ''
-                            }`}
-                          >
-                            {statusIcon}
-                            {resolveStatusLabel(assignment)}
                           </span>
                         </div>
                       </td>
@@ -969,12 +939,32 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           {loadingAssignments
             ? ASSIGNMENT_SKELETON_ROWS.map((index) => (
                 <article key={`mobile_skeleton_${index}`} className={`${styles.mobileCard} ${styles.mobileSkeletonCard}`} aria-hidden>
-                  <div className={styles.mobileTop}>
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
+                  <div className={styles.mobileCardHeader}>
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonCheck}`} />
                     <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonBadge}`} />
                   </div>
-                  <div className={styles.assignmentMeta}>
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
+                  <div className={styles.mobileStudent}>
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonAvatar}`} />
+                    <div className={styles.mobileStudentMain}>
+                      <div className={styles.mobileTop}>
+                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
+                        <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonBadge}`} />
+                      </div>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
+                    </div>
+                  </div>
+                  <div className={styles.mobileMetaGrid}>
+                    <div className={styles.mobileMetaCard}>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
+                    </div>
+                    <div className={styles.mobileMetaCard}>
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
+                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
+                    </div>
+                  </div>
+                  <div className={styles.mobileSubmeta}>
+                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
                     <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
                   </div>
                   <div className={styles.mobileActions}>
@@ -983,11 +973,29 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   </div>
                 </article>
               ))
-            : assignments.map((assignment) => {
+            : assignments.length === 0 ? (
+                <div className={styles.mobileEmptyState}>
+                  Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить», чтобы создать новое задание.
+                </div>
+              ) : assignments.map((assignment) => {
                 const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
+                const responseMeta = resolveAssignmentResponseMeta(assignment);
                 const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
+                const studentInitials = getStudentInitials(studentLabel);
+                const studentAvatarColor = resolveAssignmentStudentAvatarColor(assignment);
+                const studentAvatarTextColor = resolveAssignmentStudentAvatarTextColor(studentAvatarColor);
                 const statusTone = resolveStatusTone(assignment);
                 const shouldReview = needsAssignmentReview(assignment);
+                const problemBadges = resolveAssignmentProblemBadges(assignment);
+                const responseVisual = resolveResponseVisual(assignment);
+                const isSelected = selectedIds.includes(assignment.id);
+                const isOverdueRow = problemBadges.hasOverdue;
+                const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
+                const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
+                const shouldShowPrimaryOpen = !shouldReview && !assignment.hasConfigError && !canSendNow;
+                const shouldShowOpenAsSecondary = shouldReview || assignment.hasConfigError || canSendNow;
+                const hasLessonMeta = Boolean(assignment.lessonId);
+                const hasTemplateMeta = Boolean(assignment.templateTitle);
                 return (
                   <article
                     key={`mobile_${assignment.id}`}
@@ -995,29 +1003,172 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       assignment.hasConfigError ? styles.rowConfigError : ''
                     }`}
                   >
-                    <div className={styles.mobileTop}>
-                      <div className={styles.assignmentTitle}>{assignment.title}</div>
-                      <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
-                        {formatAssignmentStatus(assignment)}
-                      </span>
+                    <div className={styles.mobileCardHeader}>
+                      <div className={styles.mobileBadgeRow}>
+                        <span className={`${styles.issuanceBadge} ${styles[`issuanceBadge_${resolveIssuanceTone(assignment)}`]}`}>
+                          {resolveIssuanceLabel(assignment)}
+                        </span>
+                        <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
+                          {formatAssignmentStatus(assignment)}
+                        </span>
+                      </div>
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={(event) =>
+                          setSelectedIds((prev) =>
+                            event.target.checked ? [...prev, assignment.id] : prev.filter((id) => id !== assignment.id),
+                          )
+                        }
+                        aria-label={`Выбрать ${assignment.title}`}
+                      />
                     </div>
-                    <div className={styles.assignmentMeta}>
-                      <span>{studentLabel}</span>
-                      <span>{deadlineMeta.primary}</span>
+
+                    <div className={styles.mobileStudent}>
+                      <div className={styles.studentAvatarWrap}>
+                        <div
+                          className={styles.studentAvatar}
+                          style={{ background: studentAvatarColor, color: studentAvatarTextColor }}
+                        >
+                          {studentInitials}
+                        </div>
+                        {assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' ? (
+                          <span className={styles.studentOnlineDot} aria-hidden />
+                        ) : null}
+                      </div>
+
+                      <div className={styles.mobileStudentMain}>
+                        <div className={styles.assignmentTitle}>{assignment.title}</div>
+                        <div className={styles.mobileStudentLabel}>{studentLabel}</div>
+                        {problemBadges.hasOverdue || problemBadges.hasReturned || problemBadges.hasConfigError ? (
+                          <div className={styles.problemBadges}>
+                            {problemBadges.hasOverdue ? <span className={styles.problemDanger}>Просрочено</span> : null}
+                            {problemBadges.hasReturned ? <span className={styles.problemWarn}>На доработке</span> : null}
+                            {problemBadges.hasConfigError ? <span className={styles.problemDanger}>Ошибка настройки</span> : null}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
+
+                    <div className={styles.mobileMetaGrid}>
+                      <div className={styles.mobileMetaCard}>
+                        <span className={styles.mobileMetaLabel}>Дедлайн</span>
+                        <span className={styles.mobileMetaValue}>{deadlineMeta.primary}</span>
+                        <span
+                          className={`${styles.mobileMetaHint} ${
+                            deadlineMeta.tone === 'danger' ? styles.mobileMetaHintDanger : ''
+                          }`}
+                        >
+                          {deadlineMeta.secondary}
+                        </span>
+                      </div>
+
+                      <div className={styles.mobileMetaCard}>
+                        <span className={styles.mobileMetaLabel}>Ответ</span>
+                        {responseVisual.kind === 'empty' ? (
+                          <span className={styles.mobileResponseText}>{responseVisual.emptyText || responseMeta}</span>
+                        ) : (
+                          <div className={styles.mobileResponseRow}>
+                            <div className={styles.responseIcons}>
+                              {(responseVisual.icons ?? []).map((icon) => (
+                                <span
+                                  key={`${assignment.id}_mobile_${icon.id}`}
+                                  className={`${styles.responseIconChip} ${styles[`responseIconChip_${icon.tone}`]}`}
+                                >
+                                  {icon.kind === 'text' ? <HomeworkAlignLeftIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'file' ? <HomeworkFilePdfIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'voice' ? <HomeworkMicrophoneIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                  {icon.kind === 'test' ? <HomeworkListCheckIcon size={12} className={styles.inlineFaIcon} /> : null}
+                                </span>
+                              ))}
+                            </div>
+                            {responseVisual.autoCheckBadge ? (
+                              <span
+                                className={`${styles.responseAutoBadge} ${
+                                  styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
+                                }`}
+                              >
+                                <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
+                                <span>{responseVisual.autoCheckBadge.label}</span>
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {hasLessonMeta || hasTemplateMeta ? (
+                      <div className={styles.mobileSubmeta}>
+                        {hasLessonMeta ? (
+                          <span className={styles.lessonMeta}>
+                            <HomeworkLinkIcon size={10} className={styles.lessonMetaIcon} />
+                            <span>Урок #{assignment.lessonId}</span>
+                          </span>
+                        ) : null}
+                        {hasTemplateMeta ? <span>Шаблон: {assignment.templateTitle}</span> : null}
+                      </div>
+                    ) : null}
+
                     <div className={styles.mobileActions}>
-                      <button type="button" className={controls.smallButton} onClick={() => onOpenDetail(assignment)}>
-                        Открыть
-                      </button>
                       {shouldReview ? (
-                        <button type="button" className={styles.mobileReviewButton} onClick={() => onOpenReview(assignment)}>
+                        <button
+                          type="button"
+                          className={`${styles.reviewButton} ${styles.mobileActionButton}`}
+                          onClick={() => onOpenReview(assignment)}
+                        >
                           Проверить
                         </button>
                       ) : null}
-                      {!shouldReview ? (
+
+                      {assignment.hasConfigError ? (
                         <button
                           type="button"
-                          className={controls.smallButton}
+                          className={`${styles.fixButton} ${styles.mobileActionButton}`}
+                          onClick={() => {
+                            void onFixConfigError(assignment);
+                          }}
+                        >
+                          Исправить
+                        </button>
+                      ) : null}
+
+                      {canSendNow ? (
+                        <button
+                          type="button"
+                          className={`${styles.sendNowButton} ${styles.mobileActionButton}`}
+                          onClick={() => {
+                            void onSendAssignmentNow(assignment);
+                          }}
+                        >
+                          Выдать
+                        </button>
+                      ) : null}
+
+                      {shouldShowPrimaryOpen ? (
+                        <button
+                          type="button"
+                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton} ${
+                            shouldShowRemind ? '' : styles.mobileActionFull
+                          }`}
+                          onClick={() => onOpenDetail(assignment)}
+                        >
+                          Открыть
+                        </button>
+                      ) : null}
+
+                      {shouldShowOpenAsSecondary ? (
+                        <button
+                          type="button"
+                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton}`}
+                          onClick={() => onOpenDetail(assignment)}
+                        >
+                          Открыть
+                        </button>
+                      ) : null}
+
+                      {!shouldReview && shouldShowRemind && !assignment.hasConfigError && !canSendNow ? (
+                        <button
+                          type="button"
+                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton}`}
                           onClick={() => {
                             void onRemindAssignment(assignment);
                           }}

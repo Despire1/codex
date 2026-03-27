@@ -80,10 +80,10 @@
 }
 
 .ghostButton {
-  border: none;
-  background: transparent;
-  color: var(--color-gray-500);
-  padding: 9px 12px;
+  border: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  padding: 10px 16px;
   border-radius: 16px;
   display: inline-flex;
   align-items: center;
@@ -91,10 +91,11 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--shadow-slate-900-06);
 }
 
 .ghostButton:hover {
-  background: var(--color-gray-100);
+  background: var(--color-gray-50);
 }
 
 .ghostButton:disabled {
@@ -175,23 +176,57 @@
 }
 
 @media (max-width: 767px) {
-  .menuButton {
-    display: inline-flex;
+  .header {
+    padding: 12px;
+    gap: 12px;
+    border-radius: 18px;
+  }
+
+  .menuButton,
+  .bellButton {
+    display: none;
+  }
+
+  .leftGroup {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .titleGroup {
+    align-items: flex-start;
+  }
+
+  .backButton {
+    width: 34px;
+    height: 34px;
   }
 
   .title {
-    font-size: 22px;
+    font-size: 20px;
+    line-height: 1.1;
   }
 
-  .ghostButton span {
-    display: none;
+  .subtitle {
+    margin-top: 4px;
+    line-height: 1.4;
   }
 
+  .actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .ghostButton,
   .submitButton {
-    padding: 10px 12px;
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    padding: 11px 14px;
   }
 
   .submitButton span {
-    display: none;
+    display: inline;
   }
 }

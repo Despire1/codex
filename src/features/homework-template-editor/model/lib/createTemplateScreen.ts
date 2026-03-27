@@ -15,7 +15,7 @@ import {
   HomeworkTemplateQuizSettings,
   readHomeworkTemplateQuizSettingsFromBlocks,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
-import { HomeworkTemplateEditorDraft } from '../types';
+import { HomeworkEditorTaskType, HomeworkTemplateEditorDraft } from '../types';
 import {
   createMediaBlock,
   createHomeworkBlockId,
@@ -26,7 +26,7 @@ import {
 } from './blocks';
 import { createAttachmentFromUrl as createAttachmentFromUrlInternal } from './templateMaterials';
 
-export type CreateTemplateType = 'TEST' | 'WRITTEN' | 'ORAL' | 'FILE' | 'COMBO' | 'EXTERNAL';
+export type CreateTemplateType = HomeworkEditorTaskType;
 
 export type CreateQuestionKind =
   | 'CHOICE'

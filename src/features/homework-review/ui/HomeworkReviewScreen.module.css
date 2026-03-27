@@ -705,20 +705,137 @@
 }
 
 @media (max-width: 900px) {
+  .screen {
+    gap: 12px;
+  }
+
   .header {
     flex-direction: column;
     align-items: stretch;
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .headerMain {
+    align-items: flex-start;
+  }
+
+  .headerTitle {
+    font-size: 20px;
   }
 
   .headerActions {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .studentCardHeader {
     flex-direction: column;
   }
 
+  .statusPill {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .secondaryHeaderButton,
+  .primaryHeaderButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .content {
+    gap: 14px;
+    padding-right: 0;
+  }
+
+  .summaryColumn {
+    order: -1;
+  }
+
+  .studentCard,
+  .questionCard,
+  .feedbackCard,
+  .summaryCard {
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .currentScoreCard {
+    width: 100%;
+  }
+
   .answerPanel {
     grid-template-columns: 1fr;
+  }
+
+  .feedbackActions {
+    flex-direction: column-reverse;
+  }
+
+  .feedbackActions .secondaryButton,
+  .feedbackActions .primaryButton,
+  .stateActions .secondaryButton,
+  .stateActions .primaryButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .screen {
+    gap: 10px;
+  }
+
+  .stateCard {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .stateActions {
+    flex-direction: column;
+  }
+
+  .header {
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .backButton {
+    width: 34px;
+    height: 34px;
+  }
+
+  .headerTitle {
+    font-size: 18px;
+  }
+
+  .studentName {
+    font-size: 20px;
+  }
+
+  .currentScoreValue {
+    font-size: 30px;
+  }
+
+  .questionHeader {
+    flex-direction: column;
+  }
+
+  .questionTopMeta {
+    flex-wrap: wrap;
+  }
+
+  .summaryScoreValue {
+    font-size: 36px;
+  }
+
+  .scoreControls {
+    flex-wrap: wrap;
+  }
+
+  .scoreInput {
+    flex: 1 1 110px;
   }
 }

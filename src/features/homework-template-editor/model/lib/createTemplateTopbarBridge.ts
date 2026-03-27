@@ -32,9 +32,9 @@ export const clearHomeworkTemplateCreateTopbarState = () => {
         hasValidationErrors: false,
         draftSavedAtLabel: null,
         showSecondaryAction: false,
-        secondaryActionLabel: 'Сохранить черновик',
-        primaryActionLabel: 'Создать шаблон',
-        primarySubmittingLabel: 'Сохраняю…',
+        secondaryActionLabel: '',
+        primaryActionLabel: '',
+        primarySubmittingLabel: '',
       } as HomeworkTemplateCreateTopbarState,
     }),
   );

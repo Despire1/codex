@@ -12,14 +12,16 @@
 }
 
 .loadMoreButton {
+  min-height: 44px;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #ffffff;
   color: #334155;
-  padding: 10px 16px;
+  padding: 10px 18px;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
 }
 
 .loadMoreButton:disabled {
@@ -31,5 +33,14 @@
   .page {
     gap: 14px;
     padding: 2px 0 12px;
+  }
+
+  .loadMoreWrap {
+    width: 100%;
+  }
+
+  .loadMoreButton {
+    width: 100%;
+    justify-content: center;
   }
 }

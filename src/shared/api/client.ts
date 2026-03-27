@@ -97,6 +97,12 @@ export type SessionUser = {
   photoUrl?: string | null;
 };
 
+export type TelegramBrowserAuthConfig = {
+  enabled: boolean;
+  botUsername: string | null;
+  reason?: 'missing_bot_token' | 'missing_bot_username';
+};
+
 export type DashboardSummary = {
   studentsCount: number;
   lessonsCount: number;
@@ -290,6 +296,7 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 
 export const api = {
+  getTelegramBrowserAuthConfig: () => apiFetch<TelegramBrowserAuthConfig>('/auth/telegram/browser-config'),
   telegramWebappAuth: (payload: { initData: string }) =>
     apiFetch<{ user: unknown; session?: { expiresAt: string }; isNewUser?: boolean }>('/auth/telegram/webapp', {
       method: 'POST',

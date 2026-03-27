@@ -36,6 +36,7 @@ import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
 import { canStudentEditSubmission, getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
 import { resolveHomeworkStorageUrl, uploadFileToHomeworkStorage } from '../model/upload';
+import { StudentOrderingQuestion } from './StudentOrderingQuestion';
 
 export type StudentHomeworkSubmitPayload = {
   answerText: string | null;
@@ -365,9 +366,6 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const [recordingLevel, setRecordingLevel] = useState(0);
   const [recordingSamples, setRecordingSamples] = useState<number[]>([]);
   const [recordingDurationMs, setRecordingDurationMs] = useState(0);
-  const [orderingDragState, setOrderingDragState] = useState<{ questionId: string; sourceIndex: number } | null>(
-    null,
-  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
@@ -1049,60 +1047,14 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         ? deterministicShuffle(baseItems, `${question.id}_ordering`).map((item) => item.id)
         : itemIds;
       const selectedOrder = isValidSelectedOrder ? selectedOrderRaw : initialOrder;
-      const itemById = new Map(baseItems.map((item) => [item.id, item] as const));
 
       return (
-        <div className={styles.orderingList}>
-          {selectedOrder.map((itemId, itemIndex) => {
-            const item = itemById.get(itemId);
-            if (!item) return null;
-            return (
-              <div
-                key={item.id}
-                className={`${styles.orderingItem} ${
-                  orderingDragState?.questionId === question.id && orderingDragState.sourceIndex === itemIndex
-                    ? styles.orderingItemDragging
-                    : ''
-                }`}
-                onDragOver={(event) => {
-                  if (!canEditTest || !orderingDragState || orderingDragState.questionId !== question.id) return;
-                  event.preventDefault();
-                }}
-                onDrop={(event) => {
-                  if (!canEditTest || !orderingDragState || orderingDragState.questionId !== question.id) return;
-                  event.preventDefault();
-                  if (orderingDragState.sourceIndex === itemIndex) {
-                    setOrderingDragState(null);
-                    return;
-                  }
-                  const nextOrder = [...selectedOrder];
-                  const [movedItemId] = nextOrder.splice(orderingDragState.sourceIndex, 1);
-                  nextOrder.splice(itemIndex, 0, movedItemId);
-                  setQuestionAnswer(question.id, nextOrder);
-                  setOrderingDragState(null);
-                }}
-              >
-                <span className={styles.orderingIndex}>{itemIndex + 1}</span>
-                <button
-                  type="button"
-                  className={styles.orderingDragHandle}
-                  draggable={canEditTest}
-                  disabled={!canEditTest}
-                  onDragStart={(event) => {
-                    if (!canEditTest) return;
-                    event.dataTransfer.effectAllowed = 'move';
-                    setOrderingDragState({ questionId: question.id, sourceIndex: itemIndex });
-                  }}
-                  onDragEnd={() => setOrderingDragState(null)}
-                  aria-label={`Перетащить шаг ${itemIndex + 1}`}
-                >
-                  <FontAwesomeIcon icon={faBars} />
-                </button>
-                <span className={styles.orderingText}>{item.text}</span>
-              </div>
-            );
-          })}
-        </div>
+        <StudentOrderingQuestion
+          items={baseItems}
+          selectedOrder={selectedOrder}
+          canEdit={canEditTest}
+          onChange={(nextOrder) => setQuestionAnswer(question.id, nextOrder)}
+        />
       );
     }
 

@@ -101,6 +101,7 @@ export const createInitialTemplateEditorDraft = (): HomeworkTemplateEditorDraft 
   tagsText: '',
   subject: '',
   level: '',
+  selectedType: 'TEST',
   blocks: [createTextBlock()],
 });
 
@@ -119,6 +120,7 @@ export const createInitialHomeworkEditorDraft = (): HomeworkEditorDraft => ({
     tagsText: '',
     subject: '',
     level: '',
+    selectedType: 'TEST',
   },
 });
 
@@ -127,6 +129,7 @@ export const createTemplateEditorDraftFromTemplate = (template: HomeworkTemplate
   tagsText: (template.tags ?? []).join(', '),
   subject: template.subject ?? '',
   level: template.level ?? '',
+  selectedType: 'TEST',
   blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createTextBlock()],
 });
 
@@ -145,6 +148,7 @@ export const createHomeworkEditorDraftFromTemplate = (
     tagsText: (template.tags ?? []).join(', '),
     subject: template.subject ?? '',
     level: template.level ?? '',
+    selectedType: 'TEST',
   },
 });
 
@@ -169,6 +173,7 @@ export const createHomeworkEditorDraftFromAssignment = (
     tagsText: (template?.tags ?? []).join(', '),
     subject: template?.subject ?? '',
     level: template?.level ?? '',
+    selectedType: 'TEST',
   },
 });
 
@@ -177,6 +182,7 @@ export const projectHomeworkEditorToTemplateDraft = (draft: HomeworkEditorDraft)
   tagsText: draft.template.tagsText,
   subject: draft.template.subject,
   level: draft.template.level,
+  selectedType: draft.template.selectedType,
   blocks: draft.blocks,
 });
 
@@ -191,5 +197,6 @@ export const applyTemplateDraftToHomeworkEditorDraft = (
     tagsText: templateDraft.tagsText,
     subject: templateDraft.subject,
     level: templateDraft.level,
+    selectedType: templateDraft.selectedType,
   },
 });

@@ -708,6 +708,47 @@
 }
 
 @media (max-width: 860px) {
+  .dropdownWrap {
+    width: 100%;
+  }
+
+  .addQuestionButton {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .dropdown {
+    position: static;
+    top: auto;
+    right: auto;
+    left: auto;
+    width: 100%;
+    margin-top: 8px;
+    max-height: min(60vh, 440px);
+    overflow-y: auto;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+  }
+
+  .questionCard {
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .questionHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .questionHeaderLeft {
+    justify-content: space-between;
+  }
+
+  .questionActions {
+    align-self: flex-end;
+  }
+
   .choiceOptionRow {
     grid-template-columns: 1fr;
   }
@@ -720,7 +761,83 @@
     grid-template-columns: 1fr;
   }
 
+  .questionFooter {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .pointsField {
+    margin-left: 0;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .tableToolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tableToolbarButton {
+    justify-content: center;
+  }
+
   .sortableRow {
     grid-template-columns: auto 1fr auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .section {
+    padding: 18px;
+  }
+
+  .sectionHeader {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .sectionSubtitle {
+    margin-top: 6px;
+    line-height: 1.45;
+  }
+
+  .questionPrompt,
+  .choiceInput,
+  .tableCellInput,
+  .tableHeaderInput,
+  .pointsInput {
+    font-size: 16px;
+  }
+
+  .dragHandleButton,
+  .iconButton {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+  }
+
+  .dragHandleButton:hover {
+    color: var(--color-slate-700);
+    border-color: var(--color-slate-300);
+  }
+
+  .questionIndex {
+    line-height: 1.35;
+  }
+
+  .editorTable {
+    min-width: 520px;
+  }
+
+  .bottomAddButton {
+    min-height: 48px;
+  }
+
+  .summary {
+    text-align: center;
+    font-size: 13px;
   }
 }

@@ -1,4 +1,5 @@
 import { FC } from 'react';
+import { TelegramBrowserLogin } from '../../telegram';
 import styles from './SessionFallback.module.css';
 
 interface SessionFallbackProps {
@@ -29,11 +30,19 @@ export const SessionFallback: FC<SessionFallbackProps> = ({ state }) => {
           </>
         ) : (
           <>
-            <h1>Доступ только через Telegram</h1>
-            <p>
-              Откройте Mini App в Telegram и авторизуйтесь. Для входа на компьютере используйте одноразовую ссылку из
-              Mini App.
+            <span className={styles.badge}>Telegram Login</span>
+            <h1>Войдите через Telegram</h1>
+            <p className={styles.lead}>
+              Кабинет можно открыть не только внутри Mini App. Если вы зашли по обычной ссылке в браузере, авторизуйтесь
+              через Telegram прямо здесь.
             </p>
+            <TelegramBrowserLogin />
+            <div className={styles.noteBlock}>
+              <p>
+                Если удобнее, вы по-прежнему можете открыть приложение внутри Telegram Mini App и работать как раньше.
+              </p>
+              <p>Одноразовая ссылка из Mini App тоже остаётся запасным способом входа на компьютере.</p>
+            </div>
           </>
         )}
       </div>

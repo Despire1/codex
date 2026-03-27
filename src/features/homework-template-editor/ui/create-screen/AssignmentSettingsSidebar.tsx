@@ -1,6 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HomeworkGroupListItem, Lesson } from '../../../../entities/types';
 import { api } from '../../../../shared/api/client';
+import { Checkbox } from '../../../../shared/ui/Checkbox';
 import { DatePickerField } from '../../../../shared/ui/DatePickerField';
 import { useTimeZone } from '../../../../shared/lib/timezoneContext';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
@@ -14,7 +15,6 @@ import {
 import { HomeworkEditorAssignmentContext } from '../../model/types';
 import {
   createQuickDeadlineValue,
-  resolveNextUpcomingLesson,
   toLocalDateTimeValue,
   toUtcIsoFromLocal,
 } from '../../../homework-assign/model/lib/assignmentStarter';
@@ -39,7 +39,7 @@ interface AssignmentSettingsSidebarProps {
   onSaveAsTemplate: () => void;
 }
 
-type NextLessonRef = Pick<Lesson, 'id' | 'startAt'>;
+type FutureLessonRef = Pick<Lesson, 'id' | 'startAt' | 'durationMinutes'>;
 
 export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
   assignment,
@@ -56,7 +56,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
   const timeZone = useTimeZone();
   const requestIdRef = useRef(0);
   const [isResolvingNextLesson, setIsResolvingNextLesson] = useState(false);
-  const [nextLesson, setNextLesson] = useState<NextLessonRef | null>(null);
+  const [futureLessons, setFutureLessons] = useState<FutureLessonRef[]>([]);
 
   const assignmentGroups = useMemo(
     () =>
@@ -89,15 +89,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
     return toLocalDateTimeValue(assignment.deadlineAt, timeZone);
   }, [assignment.deadlineAt, timeZone]);
 
-  const selectedLessonLabel = useMemo(() => {
-    if (!assignment.lessonId) return null;
-    if (nextLesson?.id === assignment.lessonId) {
-      return `Следующий урок: ${formatInTimeZone(nextLesson.startAt, 'd MMM, HH:mm', { timeZone })}`;
-    }
-    return `Привязка к уроку #${assignment.lessonId}`;
-  }, [assignment.lessonId, nextLesson, timeZone]);
-
-  const resolveStudentLessons = useCallback(async (studentId: number) => {
+  const resolveFutureLessons = useCallback(async (studentId: number) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     setIsResolvingNextLesson(true);
@@ -107,24 +99,27 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
         status: 'not_completed',
         sort: 'asc',
       });
-      if (requestIdRef.current !== requestId) return null;
+      if (requestIdRef.current !== requestId) return [];
 
-      const lesson = resolveNextUpcomingLesson(response.items);
-      if (!lesson) {
-        setNextLesson(null);
-        return null;
-      }
+      const nowTs = Date.now();
+      const nextLessons = response.items
+        .filter((lesson) => {
+          if (lesson.status === 'CANCELED') return false;
+          const lessonTs = new Date(lesson.startAt).getTime();
+          return Number.isFinite(lessonTs) && lessonTs > nowTs;
+        })
+        .map((lesson) => ({
+          id: lesson.id,
+          startAt: lesson.startAt,
+          durationMinutes: lesson.durationMinutes,
+        }));
 
-      const ref = {
-        id: lesson.id,
-        startAt: lesson.startAt,
-      };
-      setNextLesson(ref);
-      return ref;
+      setFutureLessons(nextLessons);
+      return nextLessons;
     } catch {
-      if (requestIdRef.current !== requestId) return null;
-      setNextLesson(null);
-      return null;
+      if (requestIdRef.current !== requestId) return [];
+      setFutureLessons([]);
+      return [];
     } finally {
       if (requestIdRef.current === requestId) {
         setIsResolvingNextLesson(false);
@@ -134,43 +129,51 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
 
   useEffect(() => {
     if (!assignment.studentId) {
-      setNextLesson(null);
+      setFutureLessons([]);
       return;
     }
-    void resolveStudentLessons(assignment.studentId);
-  }, [assignment.studentId, resolveStudentLessons]);
+    void resolveFutureLessons(assignment.studentId);
+  }, [assignment.studentId, resolveFutureLessons]);
+
+  const futureLessonOptions = useMemo(
+    () =>
+      futureLessons.map((lesson) => ({
+        value: String(lesson.id),
+        label: formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { timeZone }),
+        description:
+          lesson.durationMinutes > 0
+            ? `${lesson.durationMinutes} мин`
+            : undefined,
+      })),
+    [futureLessons, timeZone],
+  );
+
+  const autoSendEnabled = assignment.sendMode === 'AUTO_AFTER_LESSON_DONE';
+  const selectedLesson = useMemo(
+    () => futureLessons.find((lesson) => lesson.id === assignment.lessonId) ?? null,
+    [futureLessons, assignment.lessonId],
+  );
 
   useEffect(() => {
     if (isResolvingNextLesson) return;
     if (assignment.sendMode !== 'AUTO_AFTER_LESSON_DONE') return;
-    if (nextLesson) return;
-
-    onChange({
-      ...assignment,
-      sendMode: 'MANUAL',
-      lessonId: null,
-    });
-  }, [assignment, isResolvingNextLesson, nextLesson, onChange]);
-
-  const canUseNextLesson = Boolean(nextLesson);
-
-  const applyNextLesson = useCallback(async () => {
-    if (!assignment.studentId) return;
-    const lesson = await resolveStudentLessons(assignment.studentId);
-    if (!lesson) {
+    if (futureLessons.length === 0) {
       onChange({
         ...assignment,
+        sendMode: 'MANUAL',
         lessonId: null,
       });
       return;
     }
-
+    if (selectedLesson) return;
+    const firstLesson = futureLessons[0];
+    if (!firstLesson) return;
     onChange({
       ...assignment,
-      lessonId: lesson.id,
-      deadlineAt: lesson.startAt,
+      lessonId: firstLesson.id,
+      deadlineAt: firstLesson.startAt,
     });
-  }, [assignment, onChange, resolveStudentLessons]);
+  }, [assignment, futureLessons, isResolvingNextLesson, onChange, selectedLesson]);
 
   return (
     <div className={styles.sidebar}>
@@ -193,10 +196,12 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             placeholder="Выберите ученика…"
             ariaLabel="Выбор ученика для домашнего задания"
             disabled={disabled || studentLocked || students.length === 0}
+            compact
             onChange={(nextValue) =>
               onChange({
                 ...assignment,
                 studentId: nextValue ? Number(nextValue) : null,
+                sendMode: 'MANUAL',
                 lessonId: null,
               })
             }
@@ -211,6 +216,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             placeholder="Без группы"
             ariaLabel="Выбор группы для домашнего задания"
             disabled={disabled}
+            compact
             onChange={(nextValue) =>
               onChange({
                 ...assignment,
@@ -251,69 +257,69 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           >
             +2 дня
           </button>
-          {canUseNextLesson ? (
-            <button
-              type="button"
-              className={styles.quickButton}
-              onClick={() => {
-                void applyNextLesson();
-              }}
-              disabled={disabled || isResolvingNextLesson}
-            >
-              {isResolvingNextLesson ? 'Ищем урок…' : 'След. урок'}
-            </button>
-          ) : null}
         </div>
 
-        {selectedLessonLabel ? <p className={styles.inlineInfo}>{selectedLessonLabel}</p> : null}
+        {futureLessons.length > 0 ? (
+          <div className={styles.autoSendBlock}>
+            <label className={styles.autoSendToggle}>
+              <Checkbox
+                checked={autoSendEnabled}
+                disabled={disabled || isResolvingNextLesson}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  if (!checked) {
+                    onChange({
+                      ...assignment,
+                      sendMode: 'MANUAL',
+                      lessonId: null,
+                    });
+                    return;
+                  }
 
-        <div className={styles.field}>
-          Способ отправки
-          <div className={styles.radioGrid}>
-            <label className={styles.radioCard}>
-              <input
-                type="radio"
-                name="assignment-send-mode"
-                checked={assignment.sendMode === 'MANUAL'}
-                onChange={() =>
+                  const lesson = selectedLesson ?? futureLessons[0] ?? null;
                   onChange({
                     ...assignment,
-                    sendMode: 'MANUAL',
-                  })
-                }
-                disabled={disabled}
+                    sendMode: 'AUTO_AFTER_LESSON_DONE',
+                    lessonId: lesson?.id ?? null,
+                    deadlineAt: lesson?.startAt ?? assignment.deadlineAt,
+                  });
+                }}
               />
-              <span className={styles.radioMeta}>
-                <strong>Вручную</strong>
-                <span>«Сохранить» оставит домашку невыданной, «Выдать» отправит сразу.</span>
+              <span className={styles.autoSendMeta}>
+                <strong>Отправить автоматически после урока</strong>
+                <span>Домашка уйдёт ученику сразу после завершения выбранного урока.</span>
               </span>
             </label>
 
-            {canUseNextLesson ? (
-              <label className={styles.radioCard}>
-                <input
-                  type="radio"
-                  name="assignment-send-mode"
-                  checked={assignment.sendMode === 'AUTO_AFTER_LESSON_DONE'}
-                  onChange={() => {
+            {autoSendEnabled ? (
+              <label className={styles.field}>
+                Урок для авто-отправки
+                <AssignmentSettingsSelect
+                  value={assignment.lessonId ? String(assignment.lessonId) : ''}
+                  options={futureLessonOptions}
+                  placeholder={isResolvingNextLesson ? 'Загружаем уроки…' : 'Выберите урок'}
+                  ariaLabel="Выбор урока для автоматической отправки домашнего задания"
+                  disabled={disabled || isResolvingNextLesson || futureLessonOptions.length === 0}
+                  compact
+                  onChange={(nextValue) => {
+                    const lesson = futureLessons.find((item) => String(item.id) === nextValue) ?? null;
                     onChange({
                       ...assignment,
                       sendMode: 'AUTO_AFTER_LESSON_DONE',
+                      lessonId: lesson?.id ?? null,
+                      deadlineAt: lesson?.startAt ?? assignment.deadlineAt,
                     });
-                    if (!assignment.lessonId) {
-                      void applyNextLesson();
-                    }
                   }}
-                  disabled={disabled}
                 />
-                <span className={styles.radioMeta}>
-                  <strong>Авто после урока</strong>
-                  <span>При сохранении домашка станет запланированной и уйдёт после завершения урока.</span>
-                </span>
+                {selectedLesson ? (
+                  <p className={styles.inlineInfo}>
+                    Выдача сработает после урока {formatInTimeZone(selectedLesson.startAt, 'd MMM, HH:mm', { timeZone })}.
+                  </p>
+                ) : null}
               </label>
             ) : null}
           </div>
-        </div>
+        ) : null}
 
         {validationErrors.length > 0 ? (
           <div className={styles.validationBlock}>
@@ -324,6 +330,20 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
         ) : null}
       </section>
 
+      <section className={styles.previewCard}>
+        <div className={styles.previewHeader}>
+          <span className={styles.previewIcon}>
+            <HomeworkPlayIcon size={14} />
+          </span>
+          <h3>Предпросмотр</h3>
+        </div>
+        <p>Посмотрите, как домашнее задание будет выглядеть для ученика перед отправкой.</p>
+        <button type="button" onClick={onOpenPreview} disabled={disabled}>
+          <HomeworkPlayIcon size={12} />
+          Открыть предпросмотр
+        </button>
+      </section>
+
       <section className={styles.card}>
         <div className={styles.cardHeader}>
           <span className={styles.cardIcon}>
@@ -331,15 +351,8 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           </span>
           <div>
             <h2 className={styles.cardTitle}>Дополнительные действия</h2>
-            <p className={styles.cardSubtitle}>Сохраните удачную домашку как шаблон или проверьте предпросмотр.</p>
+            <p className={styles.cardSubtitle}>Сохраните удачную домашку как шаблон, чтобы быстро использовать её повторно.</p>
           </div>
-        </div>
-
-        <div className={styles.actionsRow}>
-          <button type="button" className={styles.previewButton} onClick={onOpenPreview}>
-            <HomeworkPlayIcon size={12} />
-            Предпросмотр
-          </button>
         </div>
 
         <button
@@ -365,7 +378,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           <div>
             <h2 className={styles.cardTitle}>Что произойдёт дальше</h2>
             <p className={styles.cardSubtitle}>
-              «Сохранить» оставит домашку в работе у преподавателя. «Выдать» сразу отправит ученику текущую версию.
+              «Сохранить черновик» оставит домашку в работе у преподавателя. «Выдать» сразу отправит ученику текущую версию.
             </p>
           </div>
         </div>

@@ -41,8 +41,17 @@
 }
 
 @media (max-width: 1200px) {
+  .page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
   .contentGrid {
     grid-template-columns: 1fr;
+    flex: none;
+    gap: 12px;
+    overflow: visible;
     overflow-y: auto;
   }
 
@@ -51,5 +60,20 @@
     height: auto;
     overflow: visible;
     padding-right: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    gap: 10px;
+  }
+
+  .contentGrid {
+    gap: 10px;
+  }
+
+  .mainColumn,
+  .sidebarColumn {
+    padding-bottom: 12px;
   }
 }

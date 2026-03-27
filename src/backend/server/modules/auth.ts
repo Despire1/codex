@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { User } from '@prisma/client';
 import prisma from '../../prismaClient';
 import { buildCookie, getRequestIp, isLocalhostRequest, isSecureRequest, parseCookies } from '../lib/http';
 
@@ -20,6 +21,24 @@ type AuthServiceConfig = {
 type VerifyTelegramInitDataResult =
   | { ok: true; params: URLSearchParams }
   | { ok: false; reason: 'signature_invalid' };
+
+type VerifyTelegramLoginDataResult =
+  | { ok: true; params: URLSearchParams }
+  | { ok: false; reason: 'signature_invalid' };
+
+type SyncTelegramAuthUserPayload = {
+  telegramUserId: bigint;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  photoUrl?: string | null;
+  authDate: number;
+  replaySkewSec: number;
+};
+
+type SyncTelegramAuthUserResult =
+  | { ok: true; user: User; isNewUser: boolean }
+  | { ok: false; reason: 'auth_date_expired' };
 
 export const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -50,6 +69,70 @@ export const verifyTelegramInitData = (initData: string, botToken: string): Veri
     return { ok: false, reason: 'signature_invalid' } as const;
   }
   return { ok: true, params } as const;
+};
+
+export const verifyTelegramLoginData = (
+  rawParams: URLSearchParams,
+  botToken: string,
+): VerifyTelegramLoginDataResult => {
+  if (!botToken) {
+    return { ok: false, reason: 'signature_invalid' } as const;
+  }
+
+  const params = new URLSearchParams(rawParams);
+  const hash = params.get('hash');
+  if (!hash) {
+    return { ok: false, reason: 'signature_invalid' } as const;
+  }
+
+  params.delete('hash');
+  const dataCheckString = Array.from(params.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+  const secretKey = crypto.createHash('sha256').update(botToken).digest();
+  const expectedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  const expectedBuffer = Buffer.from(expectedHash, 'hex');
+  const actualBuffer = Buffer.from(hash, 'hex');
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return { ok: false, reason: 'signature_invalid' } as const;
+  }
+  if (!crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+    return { ok: false, reason: 'signature_invalid' } as const;
+  }
+
+  return { ok: true, params } as const;
+};
+
+export const syncTelegramAuthUser = async (
+  payload: SyncTelegramAuthUserPayload,
+): Promise<SyncTelegramAuthUserResult> => {
+  const existingUser = await prisma.user.findUnique({ where: { telegramUserId: payload.telegramUserId } });
+  if (existingUser?.lastAuthDate && payload.authDate + payload.replaySkewSec < existingUser.lastAuthDate) {
+    return { ok: false, reason: 'auth_date_expired' } as const;
+  }
+
+  const userData = {
+    username: payload.username ?? null,
+    firstName: payload.firstName ?? null,
+    lastName: payload.lastName ?? null,
+    photoUrl: payload.photoUrl ?? null,
+    lastAuthDate: payload.authDate,
+  };
+
+  const user = existingUser
+    ? await prisma.user.update({
+        where: { id: existingUser.id },
+        data: userData,
+      })
+    : await prisma.user.create({
+        data: {
+          telegramUserId: payload.telegramUserId,
+          ...userData,
+        },
+      });
+
+  return { ok: true, user, isNewUser: !existingUser } as const;
 };
 
 const ensureLocalDevUser = async (localDevUser: LocalDevUserConfig) => {

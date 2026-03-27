@@ -1,8 +1,8 @@
-import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { HomeworkBlockTest, HomeworkTestQuestion, HomeworkTestTableConfig } from '../../../../entities/types';
 import { pathToKey } from '../../../../shared/lib/form-validation/path';
 import { FormValidationIssue, FormValidationPath } from '../../../../shared/lib/form-validation/types';
-import { createHomeworkBlockId } from '../../model/lib/blocks';
+import { createHomeworkBlockId, createTestBlock } from '../../model/lib/blocks';
 import {
   CreateQuestionKind,
   createQuestionByKind,
@@ -37,7 +37,6 @@ interface TemplateQuestionsSectionProps {
   testBlockPath: FormValidationPath | null;
   getIssueForPath: (path: FormValidationPath) => FormValidationIssue | null;
   onFieldEdit: (path: FormValidationPath) => void;
-  onEnsureTestBlock: () => void;
   onTestBlockChange: (nextBlock: HomeworkBlockTest) => void;
 }
 
@@ -284,12 +283,12 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   testBlockPath,
   getIssueForPath,
   onFieldEdit,
-  onEnsureTestBlock,
   onTestBlockChange,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dragQuestionIndex, setDragQuestionIndex] = useState<number | null>(null);
   const [dragOrderingState, setDragOrderingState] = useState<{ questionId: string; itemIndex: number } | null>(null);
+  const dropdownWrapRef = useRef<HTMLDivElement | null>(null);
 
   const questions = testBlock?.questions ?? [];
   const questionsRootPath: FormValidationPath = [...(testBlockPath ?? ['blocks', 0]), 'questions'];
@@ -361,8 +360,15 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   };
 
   const addQuestion = (kind: CreateQuestionKind) => {
+    const nextQuestion = enforceQuestionInvariants(createQuestionByKind(kind));
+
     if (!testBlock) {
-      onEnsureTestBlock();
+      const nextBlock = createTestBlock();
+      onFieldEdit(questionsRootPath);
+      onTestBlockChange({
+        ...nextBlock,
+        questions: [nextQuestion],
+      });
       setDropdownOpen(false);
       return;
     }
@@ -370,10 +376,25 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
     onFieldEdit(questionsRootPath);
     onTestBlockChange({
       ...testBlock,
-      questions: [...testBlock.questions, enforceQuestionInvariants(createQuestionByKind(kind))],
+      questions: [...testBlock.questions, nextQuestion],
     });
     setDropdownOpen(false);
   };
+
+  useEffect(() => {
+    if (!dropdownOpen) return undefined;
+
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (dropdownWrapRef.current?.contains(target)) return;
+      setDropdownOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+    };
+  }, [dropdownOpen]);
 
   const removeQuestion = (questionIndex: number) => {
     if (!testBlock) return;
@@ -1227,17 +1248,12 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
           <h2 className={styles.sectionTitle}>Вопросы</h2>
           <p className={styles.sectionSubtitle}>Добавьте вопросы для теста</p>
         </div>
-        <div className={styles.dropdownWrap}>
+        <div ref={dropdownWrapRef} className={styles.dropdownWrap}>
           <button
             id="add-question-btn"
             type="button"
             className={styles.addQuestionButton}
-            onClick={() => {
-              if (!testBlock) {
-                onEnsureTestBlock();
-              }
-              setDropdownOpen((prev) => !prev);
-            }}
+            onClick={() => setDropdownOpen((prev) => !prev)}
           >
             <HomeworkPlusIcon size={12} />
             <span>Добавить вопрос</span>

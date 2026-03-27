@@ -25,6 +25,7 @@ import {
   resolveStudentHomeworkReferenceStatusMeta,
   resolveStudentHomeworkReferenceTypeMeta,
 } from '../model/lib/referencePresentation';
+import { StudentHomeworkCard } from './StudentHomeworkCard';
 import styles from './StudentHomeworkTableSection.module.css';
 
 type StudentHomeworkTableSectionProps = {
@@ -35,6 +36,8 @@ type StudentHomeworkTableSectionProps = {
 };
 
 type HomeworkTaskIconTone = 'danger' | 'green' | 'amber' | 'blue' | 'purple' | 'slate';
+
+const MOBILE_SKELETON_ITEMS = Array.from({ length: 4 }, (_, index) => index);
 
 const resolveTaskIconMeta = (
   assignment: HomeworkAssignment,
@@ -199,6 +202,45 @@ export const StudentHomeworkTableSection: FC<StudentHomeworkTableSectionProps> =
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className={styles.mobileList}>
+        {loading
+          ? MOBILE_SKELETON_ITEMS.map((index) => (
+              <article key={`student_mobile_skeleton_${index}`} className={styles.mobileSkeletonCard} aria-hidden="true">
+                <div className={styles.mobileSkeletonHeader}>
+                  <span className={styles.mobileSkeletonBadge} />
+                  <span className={styles.mobileSkeletonScore} />
+                </div>
+                <span className={styles.mobileSkeletonTitle} />
+                <span className={styles.mobileSkeletonText} />
+                <span className={`${styles.mobileSkeletonText} ${styles.mobileSkeletonTextShort}`} />
+                <div className={styles.mobileSkeletonFooter}>
+                  <span className={styles.mobileSkeletonMeta} />
+                  <span className={styles.mobileSkeletonButton} />
+                </div>
+              </article>
+            ))
+          : null}
+
+        {!loading && assignments.length === 0 ? (
+          <div className={styles.mobileEmptyState}>
+            <p>По выбранным фильтрам ничего не найдено.</p>
+            <button type="button" onClick={onRefresh}>
+              Обновить список
+            </button>
+          </div>
+        ) : null}
+
+        {!loading
+          ? assignments.map((assignment) => (
+              <StudentHomeworkCard
+                key={`student_mobile_assignment_${assignment.id}`}
+                assignment={assignment}
+                onOpen={onOpenAssignment}
+              />
+            ))
+          : null}
       </div>
     </section>
   );

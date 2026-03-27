@@ -112,6 +112,7 @@ const API_KEEP_ALIVE_TIMEOUT_MS = parseServerTimeout(
   120_000,
 );
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
+const TELEGRAM_BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME ?? '').trim().replace(/^@+/, '');
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
 const TELEGRAM_REPLAY_SKEW_SEC = Number(process.env.TELEGRAM_REPLAY_SKEW_SEC ?? 60);
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -136,8 +137,10 @@ const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120)
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
 const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
 const TRANSFER_REDIRECT_URL = process.env.TRANSFER_REDIRECT_URL ?? '/dashboard';
+const TELEGRAM_BROWSER_REDIRECT_URL = process.env.TELEGRAM_BROWSER_REDIRECT_URL ?? '/dashboard';
 const SESSION_COOKIE_NAME = 'session_id';
 const RATE_LIMIT_WEBAPP_PER_MIN = Number(process.env.RATE_LIMIT_WEBAPP_PER_MIN ?? 30);
+const RATE_LIMIT_BROWSER_LOGIN_PER_MIN = Number(process.env.RATE_LIMIT_BROWSER_LOGIN_PER_MIN ?? 20);
 const RATE_LIMIT_TRANSFER_CREATE_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_PER_MIN ?? 3);
 const RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN ?? 10);
 const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN ?? 10);
@@ -178,12 +181,16 @@ const authTransferHandlers = createAuthTransferHandlers({
   rateLimitTransferConsumeTokenPerMin: RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN,
 });
 const authSessionHandlers = createAuthSessionHandlers({
+  appBaseUrl: process.env.APP_BASE_URL ?? '',
   createSession,
   sessionCookieName: SESSION_COOKIE_NAME,
   telegramBotToken: TELEGRAM_BOT_TOKEN,
+  telegramBotUsername: TELEGRAM_BOT_USERNAME,
   telegramInitDataTtlSec: TELEGRAM_INITDATA_TTL_SEC,
   telegramReplaySkewSec: TELEGRAM_REPLAY_SKEW_SEC,
+  telegramBrowserRedirectUrl: TELEGRAM_BROWSER_REDIRECT_URL,
   rateLimitWebappPerMin: RATE_LIMIT_WEBAPP_PER_MIN,
+  rateLimitBrowserLoginPerMin: RATE_LIMIT_BROWSER_LOGIN_PER_MIN,
 });
 let isLessonAutomationRunning = false;
 const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {

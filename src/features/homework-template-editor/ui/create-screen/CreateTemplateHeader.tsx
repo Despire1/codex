@@ -52,7 +52,7 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
       ? 'Настройте домашку и выберите способ выдачи'
       : isEditMode
         ? 'Обновите настройки и вопросы шаблона'
-        : 'Новое домашнее задание';
+        : 'Новый шаблон домашнего задания';
 
   return (
     <header className={styles.header}>
@@ -74,17 +74,17 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
       </div>
 
       <div className={styles.actions}>
+        <button type="button" className={styles.bellButton} aria-label="Уведомления">
+          <HomeworkBellRegularIcon size={15} />
+          <span className={styles.bellDot} />
+        </button>
+
         {showSecondaryAction ? (
           <button type="button" className={styles.ghostButton} onClick={onSecondaryAction} disabled={submitting}>
             <HomeworkBookmarkRegularIcon size={14} />
             <span>{secondaryActionLabel}</span>
           </button>
         ) : null}
-
-        <button type="button" className={styles.bellButton} aria-label="Уведомления">
-          <HomeworkBellRegularIcon size={15} />
-          <span className={styles.bellDot} />
-        </button>
 
         <button
           type="button"

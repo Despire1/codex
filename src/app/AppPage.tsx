@@ -11,7 +11,7 @@ import { useIsMobile } from '../shared/lib/useIsMobile';
 import { useIsDesktop } from '../shared/lib/useIsDesktop';
 import { trackEvent } from '../shared/lib/analytics';
 import layoutStyles from './styles/layout.module.css';
-import { Topbar } from '../widgets/layout/Topbar';
+import { Topbar, type TopbarCreateMenuItem } from '../widgets/layout/Topbar';
 import { Sidebar } from '../widgets/layout/Sidebar';
 import { buildSidebarNavItems, type SidebarNavItem } from '../widgets/layout/model/navigation';
 import { MobileBottomTabs } from '../widgets/layout/mobile/MobileBottomTabs';
@@ -167,9 +167,9 @@ const AppPageContent = () => {
     hasValidationErrors: false,
     draftSavedAtLabel: null,
     showSecondaryAction: false,
-    secondaryActionLabel: 'Сохранить черновик',
-    primaryActionLabel: 'Создать шаблон',
-    primarySubmittingLabel: 'Сохраняю…',
+    secondaryActionLabel: '',
+    primaryActionLabel: '',
+    primarySubmittingLabel: '',
   });
   const [homeworkAssignModalOpen, setHomeworkAssignModalOpen] = useState(false);
   const [homeworkAssignSubmitting, setHomeworkAssignSubmitting] = useState(false);
@@ -453,11 +453,18 @@ const AppPageContent = () => {
         ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
         : isTeacherTemplateEditRoute
           ? 'Обновите настройки и вопросы шаблона'
-          : 'Новое домашнее задание'
+          : 'Новый шаблон домашнего задания'
       : desktopDateLabel;
-  const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать шаблон');
+  const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (
+    isTeacherHomeworkEditorRoute
+      ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать ДЗ')
+      : 'Создать шаблон'
+  );
+  const editorSecondaryActionLabel = templateCreateTopbarState.secondaryActionLabel || 'Сохранить черновик';
+  const showEditorSecondaryAction =
+    templateCreateTopbarState.showSecondaryAction || isTeacherHomeworkEditorRoute || isTeacherTemplateCreateRoute;
   const editorPrimarySubmittingLabel =
-    templateCreateTopbarState.primarySubmittingLabel || (isTeacherAssignmentEditRoute ? 'Выдаю…' : 'Сохраняю…');
+    templateCreateTopbarState.primarySubmittingLabel || (isTeacherHomeworkEditorRoute ? 'Выдаю…' : 'Сохраняю…');
 
   useEffect(() => {
     return subscribeHomeworkTemplateCreateTopbarState((state) => {
@@ -1092,6 +1099,30 @@ const AppPageContent = () => {
     onTopbarCreateLesson();
   }, [activeTab, guardedNavigate, onDashboardAddStudent, onTopbarCreateLesson]);
 
+  const homeworkTopbarCreateMenuItems = useMemo<TopbarCreateMenuItem[]>(
+    () => [
+      {
+        id: 'create_assignment',
+        label: 'Создать домашнее задание',
+        description: 'Открыть редактор и собрать задание с нуля.',
+        onSelect: () => guardedNavigate(`${tabPathById.homeworks}/new`),
+      },
+      {
+        id: 'assign_homework',
+        label: 'Отправить домашнее задание',
+        description: 'Быстро выдать домашку ученику по шаблону или черновику.',
+        onSelect: () => openDashboardHomeworkAssignModal(),
+      },
+      {
+        id: 'create_template',
+        label: 'Создать шаблон',
+        description: 'Подготовить заготовку, чтобы потом выдавать задания быстрее.',
+        onSelect: () => guardedNavigate(`${tabPathById.homeworks}/templates/new`),
+      },
+    ],
+    [guardedNavigate, openDashboardHomeworkAssignModal],
+  );
+
   const dashboardRouteProps = useMemo(
     () => ({
       teacher,
@@ -1333,7 +1364,7 @@ const AppPageContent = () => {
                             }
                             createButtonLabel={
                               activeTab === 'homeworks'
-                                ? 'Создать ДЗ'
+                                ? 'Добавить'
                                 : activeTab === 'students'
                                   ? 'Добавить ученика'
                                   : 'Новое занятие'
@@ -1341,8 +1372,9 @@ const AppPageContent = () => {
                             createButtonIconAccent={
                               activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
                             }
+                            createMenuItems={activeTab === 'homeworks' ? homeworkTopbarCreateMenuItems : undefined}
                             showEditorActions={isTeacherAnyHomeworkEditorRoute}
-                            showEditorSecondaryAction={templateCreateTopbarState.showSecondaryAction}
+                            showEditorSecondaryAction={showEditorSecondaryAction}
                             showBackButton={isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
                             onBack={() => guardedNavigate(isTeacherAnyHomeworkEditorRoute ? tabPathById.homeworks : tabPathById.students)}
                             backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
@@ -1350,7 +1382,7 @@ const AppPageContent = () => {
                             onEditorPrimaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
                             editorSubmitting={templateCreateTopbarState.submitting}
                             editorPrimaryDisabled={templateCreateTopbarState.hasValidationErrors}
-                            editorSecondaryActionLabel={templateCreateTopbarState.secondaryActionLabel}
+                            editorSecondaryActionLabel={editorSecondaryActionLabel}
                             editorPrimaryActionLabel={editorPrimaryActionLabel}
                             editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}
                             onOpenNotifications={onOpenNotifications}
