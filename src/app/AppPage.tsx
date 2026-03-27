@@ -14,8 +14,9 @@ import {
   getPwaNotificationPermission,
   markPwaNotificationPromptSeen,
   requestPwaNotificationPermission,
+  sendPwaTestNotification,
   shouldPromptForPwaNotifications,
-  showPwaTestNotification,
+  syncPwaPushSubscription,
 } from '../shared/lib/pwaNotifications';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar, type TopbarCreateMenuItem } from '../widgets/layout/Topbar';
@@ -805,13 +806,18 @@ const AppPageContent = () => {
         return false;
       }
 
-      const result = await showPwaTestNotification();
+      const result = await sendPwaTestNotification();
+      const failureReason = 'reason' in result ? result.reason : null;
       if (!result.ok) {
         showToast({
           message:
-            result.reason === 'permission'
+            failureReason === 'permission'
               ? 'Сначала разрешите уведомления для TeacherBot.'
-              : 'Не удалось отправить тестовое уведомление.',
+              : failureReason === 'subscription'
+                ? 'Не удалось подключить это устройство к push-уведомлениям.'
+                : failureReason === 'unsupported'
+                  ? 'На этом устройстве push-уведомления пока не поддерживаются.'
+                  : 'Не удалось отправить тестовое уведомление.',
           variant: 'error',
         });
         return false;
@@ -819,9 +825,13 @@ const AppPageContent = () => {
 
       showToast({
         message:
-          source === 'bell'
-            ? 'Тестовое уведомление отправлено на это устройство.'
-            : 'Уведомления включены. Отправили тестовое уведомление.',
+          result.transport === 'push'
+            ? source === 'bell'
+              ? 'Тестовый push отправлен на это устройство.'
+              : 'Уведомления включены. Отправили тестовый push.'
+            : source === 'bell'
+              ? 'Локальное уведомление отправлено. Серверный push пока не настроен.'
+              : 'Разрешение включено. Локальное уведомление работает, серверный push ещё не настроен.',
         variant: 'success',
       });
       return true;
@@ -830,6 +840,7 @@ const AppPageContent = () => {
   );
 
   const hasOpenedPwaNotificationsPromptRef = useRef(false);
+  const hasSyncedPwaSubscriptionRef = useRef(false);
 
   useEffect(() => {
     if (!hasAccess || !isMobile) return;
@@ -850,6 +861,15 @@ const AppPageContent = () => {
       },
     });
   }, [hasAccess, isMobile, openConfirmDialog, requestPwaNotifications]);
+
+  useEffect(() => {
+    if (!hasAccess || !isMobile) return;
+    if (hasSyncedPwaSubscriptionRef.current) return;
+    if (getPwaNotificationPermission() !== 'granted') return;
+
+    hasSyncedPwaSubscriptionRef.current = true;
+    void syncPwaPushSubscription().catch(() => undefined);
+  }, [hasAccess, isMobile]);
 
   const onOpenNotifications = useCallback(() => {
     if (isMobile && activeTabByPath === 'dashboard') {

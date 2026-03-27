@@ -25,3 +25,4 @@ export const isAppleStandaloneWebApp = () => {
   return isAppleMobileDevice && isStandaloneDisplayMode();
 };
 
+export const getPwaRouteMode = () => (isAppleStandaloneWebApp() ? 'hash' : 'history');

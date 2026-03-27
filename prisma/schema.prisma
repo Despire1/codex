@@ -443,6 +443,7 @@ model User {
   updatedAt       DateTime        @default(now()) @updatedAt
   sessions        Session[]
   transferTokens  TransferToken[]
+  webPushSubscriptions WebPushSubscription[]
 }
 
 model NotificationLog {
@@ -518,6 +519,26 @@ enum PaymentReminderSource {
 
 enum NotificationChannel {
   TELEGRAM
+  PWA_PUSH
+}
+
+model WebPushSubscription {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  endpoint      String   @unique
+  p256dh        String
+  auth          String
+  routeMode     String   @default("history")
+  userAgent     String?
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastErrorText String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Session {

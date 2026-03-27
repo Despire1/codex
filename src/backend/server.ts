@@ -54,7 +54,24 @@ import {
   sendTeacherOnboardingNudge,
   sendTeacherPaymentReminderNotice,
 } from './notificationService';
+import {
+  createNotificationLogEntry,
+  finalizeNotificationLogEntry,
+  resolveNotificationChannelDedupeKey,
+  summarizeNotificationChannelDelivery,
+  type NotificationChannelDeliveryResult,
+} from './notificationLogService';
 import { resolveStudentTelegramId } from './studentContacts';
+import {
+  buildWebPushTextNotificationPayload,
+  getWebPushPublicConfig,
+  hasWebPushSubscriptionsForStudent,
+  isWebPushConfigured,
+  sendWebPushToStudent,
+  sendWebPushToUser,
+  upsertWebPushSubscription,
+  deleteWebPushSubscription,
+} from './webPushService';
 import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
 import { logActivityEvent } from './activityFeedService';
 import {
@@ -86,6 +103,7 @@ import { tryHandleAuthRoutes } from './server/routes/authRoutes';
 import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
 import { tryHandleHomeworkRoutesV2 } from './server/routes/homeworkRoutesV2';
 import { tryHandleNotificationRoutes } from './server/routes/notificationRoutes';
+import { tryHandlePwaPushRoutes } from './server/routes/pwaPushRoutes';
 import { tryHandleSessionRoutes } from './server/routes/sessionRoutes';
 import { tryHandleActivityFeedRoutes } from './server/routes/activityFeedRoutes';
 import { tryHandleStudentRoutes } from './server/routes/studentRoutes';
@@ -908,6 +926,69 @@ const getNotificationChannelStatus = () => ({
   configured: Boolean(TELEGRAM_BOT_TOKEN),
   reason: TELEGRAM_BOT_TOKEN ? undefined : 'missing_token',
 });
+
+const getPwaPushConfig = () => getWebPushPublicConfig();
+
+const savePwaPushSubscription = async (
+  user: User,
+  req: IncomingMessage,
+  body: {
+    subscription: {
+      endpoint: string;
+      expirationTime?: number | null;
+      keys: {
+        p256dh: string;
+        auth: string;
+      };
+    };
+    routeMode: 'history' | 'hash';
+    userAgent?: string | null;
+  },
+) => {
+  const subscription = await upsertWebPushSubscription(user.id, {
+    subscription: body.subscription,
+    routeMode: body.routeMode,
+    userAgent: body.userAgent ?? req.headers['user-agent'] ?? null,
+  });
+
+  return {
+    status: 'ok' as const,
+    endpoint: subscription.endpoint,
+  };
+};
+
+const removePwaPushSubscription = async (user: User, body: { endpoint: string }) => {
+  await deleteWebPushSubscription(user.id, body.endpoint);
+  return {
+    status: 'ok' as const,
+    endpoint: body.endpoint,
+  };
+};
+
+const sendPwaPushTest = async (user: User) => {
+  const result = await sendWebPushToUser(user.id, {
+    title: 'Тестовое уведомление TeacherBot',
+    body: 'TeacherBot подключен. Уведомления на этом устройстве работают.',
+    path: '/dashboard',
+    tag: 'teacherbot-pwa-test',
+  });
+
+  if (result.status === 'sent') {
+    return { status: 'sent' as const };
+  }
+
+  if (result.status === 'skipped') {
+    return {
+      status: 'skipped' as const,
+      reason: result.reason,
+    };
+  }
+
+  return {
+    status: 'failed' as const,
+    error: result.error,
+  };
+};
 
 const listNotificationTestRecipients = async (user: User, _type: NotificationTestTemplateType) => {
   const teacher = await ensureTeacher(user);
@@ -2816,66 +2897,42 @@ const buildHomeworkNotificationText = (
   return `⚠️ Просрочена домашка: ${assignment.title}\nДедлайн был: ${deadlineLabel}`;
 };
 
-const createNotificationLogEntry = async (payload: {
+const deliverHomeworkNotificationChannel = async (payload: {
+  channel: 'TELEGRAM' | 'PWA_PUSH';
+  enabled: boolean;
   teacherId: bigint;
-  studentId?: number | null;
+  studentId: number;
   type: string;
   dedupeKey?: string | null;
-}) => {
-  const normalizedDedupeKey =
-    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0
-      ? payload.dedupeKey.trim()
-      : null;
+  send: () => Promise<void>;
+}): Promise<NotificationChannelDeliveryResult> => {
+  if (!payload.enabled) {
+    return { channel: payload.channel, status: 'skipped' };
+  }
 
-  if (normalizedDedupeKey) {
-    const existing = await prisma.notificationLog.findUnique({
-      where: { dedupeKey: normalizedDedupeKey },
-    });
-    if (existing) {
-      return null;
-    }
+  const log = await createNotificationLogEntry({
+    teacherId: payload.teacherId,
+    studentId: payload.studentId,
+    lessonId: null,
+    type: payload.type,
+    source: null,
+    channel: payload.channel,
+    scheduledFor: null,
+    dedupeKey: resolveNotificationChannelDedupeKey(payload.dedupeKey, payload.channel),
+  });
+  if (!log) {
+    return { channel: payload.channel, status: 'skipped' };
   }
 
   try {
-    return await prisma.notificationLog.create({
-      data: {
-        teacherId: payload.teacherId,
-        studentId: payload.studentId ?? null,
-        lessonId: null,
-        type: payload.type,
-        source: null,
-        channel: 'TELEGRAM',
-        scheduledFor: null,
-        status: 'PENDING',
-        dedupeKey: normalizedDedupeKey,
-      },
-    });
+    await payload.send();
+    await finalizeNotificationLogEntry(log.id, { status: 'SENT' });
+    return { channel: payload.channel, status: 'sent' };
   } catch (error) {
-    const prismaError = error as { code?: string; message?: string; meta?: { target?: unknown } } | null;
-    const uniqueTarget = prismaError?.meta?.target;
-    const uniqueByDedupeKey =
-      prismaError?.code === 'P2002' &&
-      (Array.isArray(uniqueTarget)
-        ? uniqueTarget.includes('dedupeKey')
-        : typeof prismaError?.message === 'string' && prismaError.message.includes('dedupeKey'));
-    const isForeignKeyConflict = prismaError?.code === 'P2003';
-
-    if (uniqueByDedupeKey || isForeignKeyConflict) {
-      return null;
-    }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLogEntry(log.id, { status: 'FAILED', errorText: message });
+    return { channel: payload.channel, status: 'failed', error: message };
   }
-};
-
-const finalizeNotificationLogEntry = async (logId: number, payload: { status: 'SENT' | 'FAILED'; errorText?: string }) => {
-  await prisma.notificationLog.update({
-    where: { id: logId },
-    data: {
-      status: payload.status,
-      sentAt: payload.status === 'SENT' ? new Date() : null,
-      errorText: payload.errorText ?? null,
-    },
-  });
 };
 
 const sendHomeworkNotificationToStudent = async (payload: {
@@ -2888,25 +2945,44 @@ const sendHomeworkNotificationToStudent = async (payload: {
   const student = await prisma.student.findUnique({ where: { id: payload.studentId } });
   if (!student) return { status: 'skipped' as const };
   const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) return { status: 'skipped' as const };
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(payload.studentId));
+  const telegramEnabled = Boolean(TELEGRAM_BOT_TOKEN && telegramId);
+  if (!telegramEnabled && !pwaEnabled) return { status: 'skipped' as const };
 
-  const log = await createNotificationLogEntry({
-    teacherId: payload.teacherId,
-    studentId: payload.studentId,
-    type: payload.type,
-    dedupeKey: payload.dedupeKey ?? null,
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text: payload.text,
+    defaultTitle: 'TeacherBot',
+    path: '/homeworks',
+    tag: `homework-${payload.type.toLowerCase()}-${payload.studentId}`,
   });
-  if (!log) return { status: 'skipped' as const };
 
-  try {
-    await sendNotificationTelegramMessage(telegramId, payload.text);
-    await finalizeNotificationLogEntry(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLogEntry(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
+  const results = await Promise.all([
+    deliverHomeworkNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: telegramEnabled,
+      teacherId: payload.teacherId,
+      studentId: payload.studentId,
+      type: payload.type,
+      dedupeKey: payload.dedupeKey ?? null,
+      send: () => sendNotificationTelegramMessage(telegramId as bigint, payload.text),
+    }),
+    deliverHomeworkNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId: payload.teacherId,
+      studentId: payload.studentId,
+      type: payload.type,
+      dedupeKey: payload.dedupeKey ?? null,
+      send: async () => {
+        const result = await sendWebPushToStudent(payload.studentId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+
+  return summarizeNotificationChannelDelivery(results);
 };
 
 const resolveHomeworkFallbackDeadline = (now: Date, timeZone?: string | null) => {
@@ -5718,7 +5794,8 @@ const remindLessonPayment = async (
     throw new Error('Ученик не найден');
   }
   const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) {
+  const hasPwaPush = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(resolvedStudentId));
+  if (!telegramId && !hasPwaPush) {
     throw new Error('student_not_activated');
   }
 
@@ -8065,6 +8142,23 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const requireApiUser = () => apiUser as User;
     if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser) && role !== 'STUDENT') {
       return sendJson(res, 403, { message: 'subscription_required' });
+    }
+
+    if (
+      await tryHandlePwaPushRoutes({
+        req,
+        res,
+        pathname,
+        requireApiUser,
+        handlers: {
+          getPwaPushConfig,
+          savePwaPushSubscription,
+          removePwaPushSubscription,
+          sendPwaPushTest,
+        },
+      })
+    ) {
+      return;
     }
 
     if (

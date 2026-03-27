@@ -36,6 +36,14 @@ import {
 } from '../../entities/types';
 import { FormValidationIssue } from '../lib/form-validation/types';
 import { type OnboardingReminderTemplate } from '../lib/onboardingReminder';
+import type {
+  DeletePwaPushSubscriptionPayload,
+  DeletePwaPushSubscriptionResponse,
+  PwaPushConfigResponse,
+  SavePwaPushSubscriptionPayload,
+  SavePwaPushSubscriptionResponse,
+  SendPwaPushTestResponse,
+} from '../lib/pwaPush';
 
 type SettingsPayload = Pick<
   Teacher,
@@ -403,6 +411,22 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getNotificationChannelStatus: () => apiFetch<NotificationChannelStatus>('/api/notifications/channel-status'),
+  getPwaPushConfig: () => apiFetch<PwaPushConfigResponse>('/api/pwa-push/config'),
+  savePwaPushSubscription: (payload: SavePwaPushSubscriptionPayload) =>
+    apiFetch<SavePwaPushSubscriptionResponse>('/api/pwa-push/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  removePwaPushSubscription: (payload: DeletePwaPushSubscriptionPayload) =>
+    apiFetch<DeletePwaPushSubscriptionResponse>('/api/pwa-push/subscriptions', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
+  sendPwaPushTest: () =>
+    apiFetch<SendPwaPushTestResponse>('/api/pwa-push/test', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   listNotificationTestRecipients: (type: NotificationTestSendPayload['type']) => {
     const params = new URLSearchParams({ type });
     return apiFetch<{ students: NotificationTestRecipient[] }>(

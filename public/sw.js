@@ -2,6 +2,22 @@ const APP_SHELL_CACHE = 'politdev-app-shell-v1';
 const STATIC_CACHE = 'politdev-static-v1';
 const APP_SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/pwa-icon.svg', '/apple-touch-icon.png'];
 
+const resolveAssetUrl = (path) => {
+  if (typeof path !== 'string' || !path.trim()) return undefined;
+  return new URL(path, self.location.origin).toString();
+};
+
+const resolveTargetUrl = (path, routeMode) => {
+  const normalizedPath =
+    typeof path === 'string' && path.trim() ? (path.startsWith('/') ? path : `/${path}`) : '/dashboard';
+
+  if (routeMode === 'hash') {
+    return `${self.location.origin}/#${normalizedPath}`;
+  }
+
+  return `${self.location.origin}${normalizedPath}`;
+};
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -73,13 +89,38 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data?.json() ?? {};
+  } catch {
+    payload = {};
+  }
+
+  const title =
+    typeof payload.title === 'string' && payload.title.trim() ? payload.title : 'TeacherBot';
+  const body = typeof payload.body === 'string' && payload.body.trim() ? payload.body : undefined;
+  const routeMode = payload.routeMode === 'hash' ? 'hash' : 'history';
+  const targetUrl = resolveTargetUrl(payload.path, routeMode);
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag: typeof payload.tag === 'string' ? payload.tag : undefined,
+      icon: resolveAssetUrl(payload.iconPath) ?? resolveAssetUrl('/apple-touch-icon.png'),
+      badge: resolveAssetUrl(payload.badgePath) ?? resolveAssetUrl('/apple-touch-icon.png'),
+      data: { url: targetUrl },
+    }),
+  );
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const targetUrl = event.notification?.data?.url || `${self.location.origin}/dashboard`;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
       const matchingClient = clients.find((client) => {
         try {
           return new URL(client.url).origin === self.location.origin;
@@ -89,6 +130,14 @@ self.addEventListener('notificationclick', (event) => {
       });
 
       if (matchingClient) {
+        if (typeof matchingClient.navigate === 'function') {
+          try {
+            await matchingClient.navigate(targetUrl);
+          } catch {
+            // Keep focus fallback if navigation is not available.
+          }
+        }
+
         return matchingClient.focus();
       }
 

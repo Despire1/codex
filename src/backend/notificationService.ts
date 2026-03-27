@@ -1,7 +1,23 @@
 import { addDays, addMinutes, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
+import {
+  createNotificationLogEntry,
+  finalizeNotificationLogEntry,
+  resolveNotificationChannelDedupeKey,
+  summarizeNotificationChannelDelivery,
+  type NotificationChannelDeliveryResult,
+  type NotificationLogChannel,
+} from './notificationLogService';
 import { resolveStudentTelegramId } from './studentContacts';
+import {
+  buildWebPushTextNotificationPayload,
+  hasWebPushSubscriptionsForStudent,
+  hasWebPushSubscriptionsForTeacher,
+  isWebPushConfigured,
+  sendWebPushToStudent,
+  sendWebPushToTeacher,
+} from './webPushService';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
 import {
   DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
@@ -246,78 +262,52 @@ const buildTeacherDailySummaryMessage = ({
   return sections.join('\n');
 };
 
-const createNotificationLog = async (payload: {
+const isTelegramUnreachableError = (message: string) => {
+  const normalized = message.toLowerCase();
+  return normalized.includes('chat not found') || normalized.includes('blocked by the user');
+};
+
+const deliverNotificationChannel = async (payload: {
+  channel: NotificationLogChannel;
+  enabled: boolean;
   teacherId: bigint;
   studentId?: number | null;
   lessonId?: number | null;
   type: NotificationType;
   source?: 'AUTO' | 'MANUAL' | null;
-  channel?: 'TELEGRAM' | null;
   scheduledFor?: Date | null;
   dedupeKey?: string | null;
-  }) => {
-  const normalizedDedupeKey =
-    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0
-      ? payload.dedupeKey.trim()
-      : null;
+  send: () => Promise<void>;
+  onFailure?: (message: string) => Promise<void> | void;
+}): Promise<NotificationChannelDeliveryResult> => {
+  if (!payload.enabled) {
+    return { channel: payload.channel, status: 'skipped' };
+  }
+
+  const log = await createNotificationLogEntry({
+    teacherId: payload.teacherId,
+    studentId: payload.studentId ?? null,
+    lessonId: payload.lessonId ?? null,
+    type: payload.type,
+    source: payload.source ?? null,
+    channel: payload.channel,
+    scheduledFor: payload.scheduledFor ?? null,
+    dedupeKey: resolveNotificationChannelDedupeKey(payload.dedupeKey, payload.channel),
+  });
+  if (!log) {
+    return { channel: payload.channel, status: 'skipped' };
+  }
 
   try {
-    const teacherExists = await prisma.teacher.findUnique({
-      where: { chatId: payload.teacherId },
-      select: { chatId: true },
-    });
-    if (!teacherExists) return null;
-
-    if (normalizedDedupeKey) {
-      const existing = await prisma.notificationLog.findUnique({
-        where: { dedupeKey: normalizedDedupeKey },
-      });
-      if (existing) return null;
-    }
-
-    return await prisma.notificationLog.create({
-      data: {
-        teacherId: payload.teacherId,
-        studentId: payload.studentId ?? null,
-        lessonId: payload.lessonId ?? null,
-        type: payload.type,
-        source: payload.source ?? null,
-        channel: payload.channel ?? 'TELEGRAM',
-        scheduledFor: payload.scheduledFor ?? null,
-        status: 'PENDING',
-        dedupeKey: normalizedDedupeKey,
-      },
-    });
+    await payload.send();
+    await finalizeNotificationLogEntry(log.id, { status: 'SENT' });
+    return { channel: payload.channel, status: 'sent' };
   } catch (error) {
-    const prismaError = error as { code?: string; meta?: { target?: unknown } } | null;
-    const uniqueTarget = prismaError?.meta?.target;
-    const isDedupeConflict =
-      prismaError?.code === 'P2002' &&
-      (Array.isArray(uniqueTarget)
-        ? uniqueTarget.includes('dedupeKey')
-        : error instanceof Error && error.message.includes('dedupeKey'));
-    const isForeignKeyConflict = prismaError?.code === 'P2003';
-    if (isDedupeConflict || isForeignKeyConflict) {
-      return null;
-    }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    await finalizeNotificationLogEntry(log.id, { status: 'FAILED', errorText: message });
+    await payload.onFailure?.(message);
+    return { channel: payload.channel, status: 'failed', error: message };
   }
-};
-
-const finalizeNotificationLog = async (logId: number, payload: { status: 'SENT' | 'FAILED'; errorText?: string }) => {
-  return prisma.notificationLog.update({
-    where: { id: logId },
-    data: {
-      status: payload.status,
-      sentAt: payload.status === 'SENT' ? new Date() : null,
-      errorText: payload.errorText ?? null,
-    },
-  });
-};
-
-const isTelegramUnreachableError = (message: string) => {
-  const normalized = message.toLowerCase();
-  return normalized.includes('chat not found') || normalized.includes('blocked by the user');
 };
 
 export const sendTeacherLessonReminder = async ({
@@ -338,16 +328,6 @@ export const sendTeacherLessonReminder = async ({
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, include: { student: true } });
   if (!lesson || lesson.teacherId !== teacherId) return { status: 'skipped' as const };
 
-  const log = await createNotificationLog({
-    teacherId,
-    studentId: lesson.studentId,
-    lessonId,
-    type: 'TEACHER_LESSON_REMINDER',
-    scheduledFor,
-    dedupeKey,
-  });
-  if (!log) return { status: 'skipped' as const };
-
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId, studentId: lesson.studentId } },
   });
@@ -361,16 +341,45 @@ export const sendTeacherLessonReminder = async ({
     target: 'teacher',
     minutesBefore,
   });
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text,
+    defaultTitle: 'Напоминание о занятии',
+    path: '/schedule',
+    tag: `teacher-lesson-reminder-${lessonId}`,
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
 
-  try {
-    await sendTelegramMessage(teacher.chatId, text);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: Boolean(TELEGRAM_BOT_TOKEN),
+      teacherId,
+      studentId: lesson.studentId,
+      lessonId,
+      type: 'TEACHER_LESSON_REMINDER',
+      scheduledFor,
+      dedupeKey,
+      send: () => sendTelegramMessage(teacher.chatId, text),
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId,
+      studentId: lesson.studentId,
+      lessonId,
+      type: 'TEACHER_LESSON_REMINDER',
+      scheduledFor,
+      dedupeKey,
+      send: async () => {
+        const result = await sendWebPushToTeacher(teacherId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+
+  return summarizeNotificationChannelDelivery(results);
 };
 
 export const sendStudentLessonReminder = async ({
@@ -393,17 +402,6 @@ export const sendStudentLessonReminder = async ({
   if (!teacher?.studentNotificationsEnabled) return { status: 'skipped' as const };
   if (!student) return { status: 'skipped' as const };
   const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) return { status: 'skipped' as const };
-
-  const log = await createNotificationLog({
-    teacherId: lesson.teacherId,
-    studentId,
-    lessonId,
-    type: 'STUDENT_LESSON_REMINDER',
-    scheduledFor,
-    dedupeKey,
-  });
-  if (!log) return { status: 'skipped' as const };
 
   const link = await prisma.teacherStudent.findUnique({
     where: { teacherId_studentId: { teacherId: lesson.teacherId, studentId } },
@@ -428,19 +426,52 @@ export const sendStudentLessonReminder = async ({
     STUDENT_LESSON_TEMPLATE_VARIABLES,
   );
   const normalizedText = normalizeNotificationText(text);
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text: normalizedText,
+    defaultTitle: 'Скоро занятие',
+    path: '/schedule',
+    tag: `student-lesson-reminder-${lessonId}`,
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
+  const telegramEnabled = Boolean(TELEGRAM_BOT_TOKEN && telegramId);
+  if (!telegramEnabled && !pwaEnabled) return { status: 'skipped' as const };
 
-  try {
-    await sendTelegramMessage(telegramId, normalizedText);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    if (isTelegramUnreachableError(message)) {
-      await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
-    }
-    return { status: 'failed' as const, error: message };
-  }
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: telegramEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'STUDENT_LESSON_REMINDER',
+      scheduledFor,
+      dedupeKey,
+      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      onFailure: async (message) => {
+        if (isTelegramUnreachableError(message)) {
+          await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
+        }
+      },
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'STUDENT_LESSON_REMINDER',
+      scheduledFor,
+      dedupeKey,
+      send: async () => {
+        const result = await sendWebPushToStudent(studentId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+
+  return summarizeNotificationChannelDelivery(results);
 };
 
 export const sendStudentLessonReminderManual = async ({
@@ -465,38 +496,64 @@ export const sendStudentLessonReminderManual = async ({
     return { status: 'skipped' as const, reason: 'student_not_found' as const };
   }
   const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) {
-    return { status: 'skipped' as const, reason: 'student_not_activated' as const };
-  }
 
   const normalizedText = normalizeNotificationText(text);
   if (!normalizedText) {
     return { status: 'skipped' as const, reason: 'empty_text' as const };
   }
 
-  const log = await createNotificationLog({
-    teacherId: lesson.teacherId,
-    studentId,
-    lessonId,
-    type: 'STUDENT_LESSON_REMINDER',
-    source: 'MANUAL',
-    scheduledFor,
-    dedupeKey,
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text: normalizedText,
+    defaultTitle: 'Напоминание о занятии',
+    path: '/schedule',
+    tag: `student-lesson-manual-${lessonId}`,
   });
-  if (!log) return { status: 'skipped' as const, reason: 'deduped' as const };
-
-  try {
-    await sendTelegramMessage(telegramId, normalizedText);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    if (isTelegramUnreachableError(message)) {
-      await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
-    }
-    return { status: 'failed' as const, error: message };
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
+  const telegramEnabled = Boolean(TELEGRAM_BOT_TOKEN && telegramId);
+  if (!telegramEnabled && !pwaEnabled) {
+    return { status: 'skipped' as const, reason: 'student_not_activated' as const };
   }
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: telegramEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'STUDENT_LESSON_REMINDER',
+      source: 'MANUAL',
+      scheduledFor,
+      dedupeKey,
+      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      onFailure: async (message) => {
+        if (isTelegramUnreachableError(message)) {
+          await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
+        }
+      },
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'STUDENT_LESSON_REMINDER',
+      source: 'MANUAL',
+      scheduledFor,
+      dedupeKey,
+      send: async () => {
+        const result = await sendWebPushToStudent(studentId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+  const summary = summarizeNotificationChannelDelivery(results);
+  if (summary.status === 'skipped') {
+    return { status: 'skipped' as const, reason: 'deduped' as const };
+  }
+  return summary;
 };
 
 export const sendTeacherOnboardingNudge = async ({
@@ -506,25 +563,39 @@ export const sendTeacherOnboardingNudge = async ({
   teacherId: bigint;
   scheduledFor?: Date;
 }) => {
-  const log = await createNotificationLog({
-    teacherId,
-    type: 'TEACHER_ONBOARDING_NUDGE',
-    scheduledFor: scheduledFor ?? null,
-  });
-  if (!log) return { status: 'skipped' as const };
-
   const text =
     'Привет! Быстрый совет: добавь одного ученика — и дальше будет гораздо проще вести занятия и оплаты. Это займёт пару минут.';
-
-  try {
-    await sendTelegramWebAppMessage(teacherId, text);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text,
+    defaultTitle: 'TeacherBot',
+    path: '/dashboard',
+    tag: 'teacher-onboarding-nudge',
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_WEBAPP_URL),
+      teacherId,
+      type: 'TEACHER_ONBOARDING_NUDGE',
+      scheduledFor: scheduledFor ?? null,
+      send: () => sendTelegramWebAppMessage(teacherId, text),
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId,
+      type: 'TEACHER_ONBOARDING_NUDGE',
+      scheduledFor: scheduledFor ?? null,
+      send: async () => {
+        const result = await sendWebPushToTeacher(teacherId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+  return summarizeNotificationChannelDelivery(results);
 };
 
 export const sendTeacherDailySummary = async ({
@@ -549,14 +620,6 @@ export const sendTeacherDailySummary = async ({
   if (type === 'TEACHER_DAILY_SUMMARY' && !teacher.dailySummaryEnabled) return { status: 'skipped' as const };
   if (type === 'TEACHER_TOMORROW_SUMMARY' && !teacher.tomorrowSummaryEnabled) return { status: 'skipped' as const };
 
-  const log = await createNotificationLog({
-    teacherId,
-    type,
-    scheduledFor,
-    dedupeKey,
-  });
-  if (!log) return { status: 'skipped' as const };
-
   const text = buildTeacherDailySummaryMessage({
     scope: type === 'TEACHER_DAILY_SUMMARY' ? 'today' : 'tomorrow',
     summaryDate,
@@ -564,16 +627,41 @@ export const sendTeacherDailySummary = async ({
     unpaidLessons,
     timeZone: teacher.timezone,
   });
-
-  try {
-    await sendTelegramMessage(teacher.chatId, text);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text,
+    defaultTitle: type === 'TEACHER_DAILY_SUMMARY' ? 'Сводка на сегодня' : 'Сводка на завтра',
+    path: '/dashboard',
+    tag: `${type.toLowerCase()}-${formatInTimeZone(summaryDate, 'yyyy-MM-dd', {
+      timeZone: resolveTimeZone(teacher.timezone),
+    })}`,
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: Boolean(TELEGRAM_BOT_TOKEN),
+      teacherId,
+      type,
+      scheduledFor,
+      dedupeKey,
+      send: () => sendTelegramMessage(teacher.chatId, text),
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId,
+      type,
+      scheduledFor,
+      dedupeKey,
+      send: async () => {
+        const result = await sendWebPushToTeacher(teacherId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+  return summarizeNotificationChannelDelivery(results);
 };
 
 export const sendStudentPaymentReminder = async ({
@@ -596,17 +684,6 @@ export const sendStudentPaymentReminder = async ({
   const student = await prisma.student.findUnique({ where: { id: studentId } });
   if (!teacher || !student) return { status: 'skipped' as const };
   const telegramId = await resolveStudentTelegramId(student);
-  if (!telegramId) return { status: 'skipped' as const };
-
-  const log = await createNotificationLog({
-    teacherId: lesson.teacherId,
-    studentId,
-    lessonId,
-    type: 'PAYMENT_REMINDER_STUDENT',
-    source,
-    channel: 'TELEGRAM',
-  });
-  if (!log) return { status: 'skipped' as const };
 
   const priceSnapshot =
     typeof participant.price === 'number' && participant.price > 0
@@ -638,19 +715,48 @@ export const sendStudentPaymentReminder = async ({
     STUDENT_PAYMENT_TEMPLATE_VARIABLES,
   );
   const normalizedText = normalizeNotificationText(text);
-
-  try {
-    await sendTelegramMessage(telegramId, normalizedText);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    if (isTelegramUnreachableError(message)) {
-      await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
-    }
-    return { status: 'failed' as const, error: message };
-  }
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text: normalizedText,
+    defaultTitle: 'Напоминание об оплате',
+    path: '/schedule',
+    tag: `payment-reminder-${lessonId}-${studentId}`,
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
+  const telegramEnabled = Boolean(TELEGRAM_BOT_TOKEN && telegramId);
+  if (!telegramEnabled && !pwaEnabled) return { status: 'skipped' as const };
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: telegramEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'PAYMENT_REMINDER_STUDENT',
+      source,
+      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      onFailure: async (message) => {
+        if (isTelegramUnreachableError(message)) {
+          await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
+        }
+      },
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId: lesson.teacherId,
+      studentId,
+      lessonId,
+      type: 'PAYMENT_REMINDER_STUDENT',
+      source,
+      send: async () => {
+        const result = await sendWebPushToStudent(studentId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+  return summarizeNotificationChannelDelivery(results);
 };
 
 export const sendTeacherPaymentReminderNotice = async ({
@@ -674,30 +780,45 @@ export const sendTeacherPaymentReminderNotice = async ({
   });
   const studentName = link?.customName?.trim() || student.username?.trim() || 'ученик';
 
-  const log = await createNotificationLog({
-    teacherId,
-    studentId,
-    lessonId,
-    type: 'PAYMENT_REMINDER_TEACHER',
-    source,
-    channel: 'TELEGRAM',
-  });
-  if (!log) return { status: 'skipped' as const };
-
   const text = buildTeacherPaymentReminderMessage({
     studentName,
     startAt: lesson.startAt,
     timeZone: teacher.timezone,
     source,
   });
-
-  try {
-    await sendTelegramMessage(teacher.chatId, text);
-    await finalizeNotificationLog(log.id, { status: 'SENT' });
-    return { status: 'sent' as const };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await finalizeNotificationLog(log.id, { status: 'FAILED', errorText: message });
-    return { status: 'failed' as const, error: message };
-  }
+  const pwaPayload = buildWebPushTextNotificationPayload({
+    text,
+    defaultTitle: 'Напоминание отправлено',
+    path: '/schedule',
+    tag: `teacher-payment-reminder-${lessonId}-${studentId}`,
+  });
+  const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
+  const results = await Promise.all([
+    deliverNotificationChannel({
+      channel: 'TELEGRAM',
+      enabled: Boolean(TELEGRAM_BOT_TOKEN),
+      teacherId,
+      studentId,
+      lessonId,
+      type: 'PAYMENT_REMINDER_TEACHER',
+      source,
+      send: () => sendTelegramMessage(teacher.chatId, text),
+    }),
+    deliverNotificationChannel({
+      channel: 'PWA_PUSH',
+      enabled: pwaEnabled,
+      teacherId,
+      studentId,
+      lessonId,
+      type: 'PAYMENT_REMINDER_TEACHER',
+      source,
+      send: async () => {
+        const result = await sendWebPushToTeacher(teacherId, pwaPayload);
+        if (result.status !== 'sent') {
+          throw new Error(result.error ?? result.reason ?? 'pwa_push_failed');
+        }
+      },
+    }),
+  ]);
+  return summarizeNotificationChannelDelivery(results);
 };
