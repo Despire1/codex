@@ -6,7 +6,6 @@ import type {
   PwaPushSubscriptionPayload,
   WebPushNotificationPayload,
 } from '../shared/lib/pwaPush';
-import webPush from 'web-push';
 
 const WEB_PUSH_PUBLIC_KEY = (process.env.WEB_PUSH_PUBLIC_KEY ?? '').trim();
 const WEB_PUSH_PRIVATE_KEY = (process.env.WEB_PUSH_PRIVATE_KEY ?? '').trim();
@@ -14,7 +13,24 @@ const WEB_PUSH_SUBJECT = (process.env.WEB_PUSH_SUBJECT ?? '').trim();
 const DEFAULT_NOTIFICATION_ICON_PATH = '/apple-touch-icon.png';
 const DEFAULT_NOTIFICATION_PATH = '/dashboard';
 
+type WebPushRuntime = {
+  setVapidDetails: (subject: string, publicKey: string, privateKey: string) => void;
+  sendNotification: (
+    subscription: {
+      endpoint: string;
+      keys: {
+        p256dh: string;
+        auth: string;
+      };
+    },
+    payload?: string,
+  ) => Promise<unknown>;
+};
+
 let hasConfiguredWebPush = false;
+let webPushRuntime: WebPushRuntime | null | undefined;
+let webPushRuntimePromise: Promise<WebPushRuntime | null> | null = null;
+let hasLoggedMissingWebPushPackage = false;
 
 const getWebPushConfigReason = (): PwaPushConfigResponse['reason'] | undefined => {
   if (!WEB_PUSH_PUBLIC_KEY) return 'missing_public_key';
@@ -23,16 +39,52 @@ const getWebPushConfigReason = (): PwaPushConfigResponse['reason'] | undefined =
   return undefined;
 };
 
-const ensureWebPushConfigured = () => {
+const isWebPushConfigurationValid = () => {
   const reason = getWebPushConfigReason();
   if (reason) return false;
+  return true;
+};
+
+const loadWebPushRuntime = async (): Promise<WebPushRuntime | null> => {
+  if (webPushRuntime !== undefined) {
+    return webPushRuntime;
+  }
+
+  if (!webPushRuntimePromise) {
+    webPushRuntimePromise = import('web-push')
+      .then((module) => {
+        const runtime = (module.default ?? module) as WebPushRuntime;
+        webPushRuntime = runtime;
+        return runtime;
+      })
+      .catch((error) => {
+        webPushRuntime = null;
+        if (!hasLoggedMissingWebPushPackage) {
+          hasLoggedMissingWebPushPackage = true;
+          console.warn('web-push package is unavailable. PWA push channel disabled.', error);
+        }
+        return null;
+      })
+      .finally(() => {
+        webPushRuntimePromise = null;
+      });
+  }
+
+  return webPushRuntimePromise;
+};
+
+const ensureWebPushRuntimeConfigured = async () => {
+  if (!isWebPushConfigurationValid()) return null;
+
+  const runtime = await loadWebPushRuntime();
+  if (!runtime) return null;
 
   if (!hasConfiguredWebPush) {
-    webPush.setVapidDetails(WEB_PUSH_SUBJECT, WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY);
+    runtime.setVapidDetails(WEB_PUSH_SUBJECT, WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY);
     hasConfiguredWebPush = true;
   }
 
-  return true;
+  return runtime;
 };
 
 const normalizeRouteMode = (routeMode?: string | null): PwaPushRouteMode =>
@@ -126,7 +178,7 @@ export const getWebPushPublicConfig = (): PwaPushConfigResponse => {
   };
 };
 
-export const isWebPushConfigured = () => ensureWebPushConfigured();
+export const isWebPushConfigured = () => isWebPushConfigurationValid();
 
 export const upsertWebPushSubscription = async (
   userId: number,
@@ -186,7 +238,8 @@ export const hasWebPushSubscriptionsForStudent = async (studentId: number) => {
 };
 
 export const sendWebPushToUser = async (userId: number, payload: WebPushNotificationPayload) => {
-  if (!ensureWebPushConfigured()) {
+  const runtime = await ensureWebPushRuntimeConfigured();
+  if (!runtime) {
     return {
       status: 'skipped' as const,
       reason: 'not_configured' as const,
@@ -219,7 +272,7 @@ export const sendWebPushToUser = async (userId: number, payload: WebPushNotifica
       );
 
       try {
-        await webPush.sendNotification(
+        await runtime.sendNotification(
           {
             endpoint: subscription.endpoint,
             keys: {

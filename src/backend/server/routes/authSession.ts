@@ -237,6 +237,7 @@ export const createAuthSessionHandlers = (config: AuthSessionHandlersConfig) => 
       'Set-Cookie',
       buildCookie(config.sessionCookieName, '', {
         maxAgeSeconds: 0,
+        expiresAt: new Date(0),
         secure: isSecureRequest(req),
       }),
     );

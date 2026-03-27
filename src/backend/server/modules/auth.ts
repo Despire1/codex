@@ -14,6 +14,7 @@ type LocalDevUserConfig = {
 type AuthServiceConfig = {
   sessionCookieName: string;
   sessionTtlMinutes: number;
+  sessionRenewThresholdMinutes: number;
   localAuthBypass: boolean;
   localDevUser: LocalDevUserConfig;
 };
@@ -43,6 +44,42 @@ type SyncTelegramAuthUserResult =
 export const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 
 export const randomToken = (lengthBytes = 32) => crypto.randomBytes(lengthBytes).toString('base64url');
+
+const DEFAULT_SESSION_TTL_MINUTES = 43_200;
+const MIN_SESSION_TTL_MINUTES = 10_080;
+const MAX_SESSION_TTL_MINUTES = 129_600;
+const DEFAULT_SESSION_RENEW_THRESHOLD_MINUTES = 10_080;
+const MIN_SESSION_RENEW_THRESHOLD_MINUTES = 1_440;
+
+type SessionWithUser = {
+  id: number;
+  expiresAt: Date;
+  ip: string | null;
+  userAgent: string | null;
+  user: User;
+};
+
+const normalizeSessionTtlMinutes = (rawMinutes: number) => {
+  if (!Number.isFinite(rawMinutes)) return DEFAULT_SESSION_TTL_MINUTES;
+  const normalized = Math.trunc(rawMinutes);
+  return Math.min(Math.max(normalized, MIN_SESSION_TTL_MINUTES), MAX_SESSION_TTL_MINUTES);
+};
+
+const normalizeSessionRenewThresholdMinutes = (rawMinutes: number, sessionTtlMinutes: number) => {
+  const fallback = Math.min(
+    DEFAULT_SESSION_RENEW_THRESHOLD_MINUTES,
+    Math.max(MIN_SESSION_RENEW_THRESHOLD_MINUTES, Math.floor(sessionTtlMinutes / 4)),
+  );
+  if (!Number.isFinite(rawMinutes)) {
+    return Math.min(fallback, Math.max(60, sessionTtlMinutes - 60));
+  }
+
+  const normalized = Math.trunc(rawMinutes);
+  return Math.min(
+    Math.max(normalized, MIN_SESSION_RENEW_THRESHOLD_MINUTES),
+    Math.max(60, sessionTtlMinutes - 60),
+  );
+};
 
 export const verifyTelegramInitData = (initData: string, botToken: string): VerifyTelegramInitDataResult => {
   if (!botToken) {
@@ -159,11 +196,84 @@ const ensureLocalDevUser = async (localDevUser: LocalDevUserConfig) => {
 };
 
 export const createAuthService = (config: AuthServiceConfig) => {
+  const sessionTtlMinutes = normalizeSessionTtlMinutes(config.sessionTtlMinutes);
+  const sessionRenewThresholdMinutes = normalizeSessionRenewThresholdMinutes(
+    config.sessionRenewThresholdMinutes,
+    sessionTtlMinutes,
+  );
+
+  const appendSetCookie = (res: ServerResponse, cookie: string) => {
+    const existing = res.getHeader('Set-Cookie');
+    if (!existing) {
+      res.setHeader('Set-Cookie', cookie);
+      return;
+    }
+    if (Array.isArray(existing)) {
+      res.setHeader('Set-Cookie', [...existing, cookie]);
+      return;
+    }
+    res.setHeader('Set-Cookie', [String(existing), cookie]);
+  };
+
+  const setSessionCookie = (req: IncomingMessage, res: ServerResponse, token: string, expiresAt: Date) => {
+    appendSetCookie(
+      res,
+      buildCookie(config.sessionCookieName, token, {
+        maxAgeSeconds: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
+        expiresAt,
+        secure: isSecureRequest(req),
+      }),
+    );
+  };
+
+  const clearSessionCookie = (req: IncomingMessage, res: ServerResponse) => {
+    appendSetCookie(
+      res,
+      buildCookie(config.sessionCookieName, '', {
+        maxAgeSeconds: 0,
+        expiresAt: new Date(0),
+        secure: isSecureRequest(req),
+      }),
+    );
+  };
+
+  const findActiveSession = async (tokenHash: string) => {
+    const now = new Date();
+    return prisma.session.findFirst({
+      where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
+      include: { user: true },
+    });
+  };
+
+  const renewSessionIfNeeded = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    token: string,
+    session: SessionWithUser,
+  ) => {
+    const remainingMs = session.expiresAt.getTime() - Date.now();
+    if (remainingMs > sessionRenewThresholdMinutes * 60_000) {
+      return session;
+    }
+
+    const expiresAt = new Date(Date.now() + sessionTtlMinutes * 60_000);
+    const renewedSession = await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        expiresAt,
+        ip: getRequestIp(req) || session.ip,
+        userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : session.userAgent,
+      },
+      include: { user: true },
+    });
+    setSessionCookie(req, res, token, expiresAt);
+    return renewedSession;
+  };
+
   const createSession = async (userId: number, req: IncomingMessage, res: ServerResponse) => {
-    const ttlMinutes = Number.isFinite(config.sessionTtlMinutes) ? config.sessionTtlMinutes : 1440;
     const token = randomToken(32);
     const tokenHash = hashToken(token);
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    const expiresAt = new Date(Date.now() + sessionTtlMinutes * 60_000);
     await prisma.session.create({
       data: {
         userId,
@@ -173,13 +283,7 @@ export const createAuthService = (config: AuthServiceConfig) => {
         userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
       },
     });
-    res.setHeader(
-      'Set-Cookie',
-      buildCookie(config.sessionCookieName, token, {
-        maxAgeSeconds: ttlMinutes * 60,
-        secure: isSecureRequest(req),
-      }),
-    );
+    setSessionCookie(req, res, token, expiresAt);
     return { expiresAt };
   };
 
@@ -188,17 +292,22 @@ export const createAuthService = (config: AuthServiceConfig) => {
     const token = cookies[config.sessionCookieName];
     if (!token) return null;
     const tokenHash = hashToken(token);
-    const now = new Date();
-    const session = await prisma.session.findFirst({
-      where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
-      include: { user: true },
-    });
+    const session = await findActiveSession(tokenHash);
     return session?.user ?? null;
   };
 
   const resolveSessionUser = async (req: IncomingMessage, res: ServerResponse) => {
-    const sessionUser = await getSessionUser(req);
-    if (sessionUser) return sessionUser;
+    const cookies = parseCookies(req.headers.cookie);
+    const token = cookies[config.sessionCookieName];
+    if (token) {
+      const tokenHash = hashToken(token);
+      const session = await findActiveSession(tokenHash);
+      if (session) {
+        const activeSession = await renewSessionIfNeeded(req, res, token, session);
+        return activeSession.user;
+      }
+      clearSessionCookie(req, res);
+    }
     if (!config.localAuthBypass || !isLocalhostRequest(req)) return null;
     const localUser = await ensureLocalDevUser(config.localDevUser);
     await createSession(localUser.id, req, res);

@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 type BuildCookieOptions = {
   maxAgeSeconds?: number;
+  expiresAt?: Date;
   secure?: boolean;
 };
 
@@ -116,6 +117,9 @@ export const buildCookie = (name: string, value: string, options: BuildCookieOpt
   }
   if (options.maxAgeSeconds !== undefined) {
     segments.push(`Max-Age=${options.maxAgeSeconds}`);
+  }
+  if (options.expiresAt instanceof Date && !Number.isNaN(options.expiresAt.getTime())) {
+    segments.push(`Expires=${options.expiresAt.toUTCString()}`);
   }
   return segments.join('; ');
 };

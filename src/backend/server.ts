@@ -150,7 +150,8 @@ const LOCAL_DEV_TELEGRAM_ID = (() => {
 const LOCAL_DEV_USERNAME = process.env.LOCAL_DEV_USERNAME ?? 'local_teacher';
 const LOCAL_DEV_FIRST_NAME = process.env.LOCAL_DEV_FIRST_NAME ?? 'Local';
 const LOCAL_DEV_LAST_NAME = process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher';
-const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 1440);
+const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 43_200);
+const SESSION_RENEW_THRESHOLD_MINUTES = Number(process.env.SESSION_RENEW_THRESHOLD_MINUTES ?? 10_080);
 const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
 const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
 const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
@@ -174,6 +175,7 @@ const securityConfig = createSecurityConfig();
 const authService = createAuthService({
   sessionCookieName: SESSION_COOKIE_NAME,
   sessionTtlMinutes: SESSION_TTL_MINUTES,
+  sessionRenewThresholdMinutes: SESSION_RENEW_THRESHOLD_MINUTES,
   localAuthBypass: LOCAL_AUTH_BYPASS,
   localDevUser: {
     telegramUserId: LOCAL_DEV_TELEGRAM_ID,
