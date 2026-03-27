@@ -1,7 +1,7 @@
 {
-  "name": "PolitDev Teacher",
-  "short_name": "PolitDev",
-  "description": "Расписание, ученики и домашние задания в формате полноценного веб-приложения.",
+  "name": "TeacherBot",
+  "short_name": "TeacherBot",
+  "description": "TeacherBot: расписание, ученики и домашние задания в формате полноценного веб-приложения.",
   "lang": "ru",
   "start_url": "/dashboard",
   "scope": "/",
@@ -11,6 +11,12 @@
   "theme_color": "#5b8def",
   "orientation": "portrait",
   "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "/pwa-icon.svg",
       "sizes": "any",

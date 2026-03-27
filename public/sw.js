@@ -1,6 +1,6 @@
 const APP_SHELL_CACHE = 'politdev-app-shell-v1';
 const STATIC_CACHE = 'politdev-static-v1';
-const APP_SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/pwa-icon.svg'];
+const APP_SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/pwa-icon.svg', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
