@@ -90,6 +90,7 @@ cp .env.example .env
 И заполните минимум эти переменные:
 - `DATABASE_URL="postgresql://teacherbot_user:password@localhost:5432/teacherbot?schema=public"`
 - `TELEGRAM_BOT_TOKEN="..."`
+- `TELEGRAM_BOT_USERNAME="my_teacher_bot"`
 - `TELEGRAM_WEBAPP_URL="https://your-domain.com"`
 - `TELEGRAM_ONBOARDING_FULLSCREEN_PHOTO_URL="https://your-domain.com/assets/onboarding-fullscreen.png"`
 - `APP_BASE_URL="https://your-domain.com"`
@@ -186,6 +187,7 @@ server {
    ```
 2. Откройте `.env` и заполните:
    - `TELEGRAM_BOT_TOKEN` — токен из BotFather.
+   - `TELEGRAM_BOT_USERNAME` — username бота без `@`, нужен для входа через Telegram в обычном браузере.
    - `TELEGRAM_WEBAPP_URL` — публичный HTTPS URL вашего фронтенда.
    - `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` — данные магазина YooKassa для генерации ссылки оплаты подписки.
    - `YOOKASSA_RETURN_URL` — URL возврата после оплаты (страница “успех/ошибка”).
@@ -225,6 +227,7 @@ npm run bot
 ### Примечания
 - Telegram Mini App требует HTTPS URL.
 - Авторизация внутри Mini App работает через `/auth/telegram/webapp`.
+- Вход в обычном браузере работает через Telegram Login Widget и требует заполненный `TELEGRAM_BOT_USERNAME`.
 - Если URL меняется, обновите `TELEGRAM_WEBAPP_URL` и перезапустите `npm run bot`.
 
 ## Диагностика ошибки 500 при `/api/bootstrap`

@@ -1,0 +1,21 @@
+{
+  "name": "PolitDev Teacher",
+  "short_name": "PolitDev",
+  "description": "Расписание, ученики и домашние задания в формате полноценного веб-приложения.",
+  "lang": "ru",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "background_color": "#f8fafc",
+  "theme_color": "#5b8def",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
