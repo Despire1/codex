@@ -36,6 +36,11 @@ import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
 import { canStudentEditSubmission, getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
 import { resolveHomeworkStorageUrl, uploadFileToHomeworkStorage } from '../model/upload';
+import {
+  clearStoredStudentHomeworkSubmissionDraft,
+  loadStoredStudentHomeworkSubmissionDraft,
+  saveStoredStudentHomeworkSubmissionDraft,
+} from '../model/lib/submissionDraftStorage';
 import { StudentOrderingQuestion } from './StudentOrderingQuestion';
 
 export type StudentHomeworkSubmitPayload = {
@@ -56,6 +61,10 @@ interface StudentHomeworkDetailViewProps {
   onRefresh: () => void;
   onStartAttempt: () => Promise<boolean>;
   onSubmitPayload: (payload: StudentHomeworkSubmitPayload) => Promise<boolean>;
+  preview?: {
+    enabled: boolean;
+    onFinish: () => void;
+  };
 }
 
 type QuestionCardModel =
@@ -306,7 +315,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   onRefresh,
   onStartAttempt,
   onSubmitPayload,
+  preview,
 }) => {
+  const isPreview = preview?.enabled === true;
   const [nowTs, setNowTs] = useState(() => Date.now());
   const latestSubmission = useMemo(() => getLatestSubmission(submissions), [submissions]);
   const latestDraftSubmission = useMemo(
@@ -319,7 +330,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         })[0] ?? null,
     [submissions],
   );
-  const canEdit = assignment ? canStudentEditSubmission(assignment) : false;
+  const canEdit = assignment ? (isPreview ? true : canStudentEditSubmission(assignment)) : false;
   const responseConfig = useMemo(
     () => (assignment ? resolveAssignmentResponseConfig(assignment) : null),
     [assignment],
@@ -377,16 +388,54 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const recordingStartedAtRef = useRef<number | null>(null);
   const recordingDurationIntervalRef = useRef<number | null>(null);
+  const previewObjectUrlsRef = useRef<Set<string>>(new Set());
+  const hasSkippedPersistedSubmissionAutoSaveRef = useRef(false);
 
   const questionRefs = useRef<Record<string, HTMLElement | null>>({});
   const handledTimeoutAttemptKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setAnswerText(latestSubmission?.answerText ?? '');
-    setAttachments(latestSubmission?.attachments ?? []);
-    setVoice(latestSubmission?.voice ?? []);
-    setTestAnswers((latestSubmission?.testAnswers as Record<string, unknown>) ?? {});
-  }, [assignment?.id, latestSubmission?.id]);
+    hasSkippedPersistedSubmissionAutoSaveRef.current = false;
+    if (!assignment) {
+      setAnswerText('');
+      setAttachments([]);
+      setVoice([]);
+      setTestAnswers({});
+      return;
+    }
+
+    const storedDraft = !isPreview
+      ? loadStoredStudentHomeworkSubmissionDraft(assignment.id, assignment.updatedAt)
+      : null;
+    setAnswerText(storedDraft?.answerText ?? latestSubmission?.answerText ?? '');
+    setAttachments(storedDraft?.attachments ?? latestSubmission?.attachments ?? []);
+    setVoice(storedDraft?.voice ?? latestSubmission?.voice ?? []);
+    setTestAnswers(storedDraft?.testAnswers ?? ((latestSubmission?.testAnswers as Record<string, unknown>) ?? {}));
+  }, [assignment, assignment?.id, isPreview, latestSubmission?.id, latestSubmission?.answerText, latestSubmission?.attachments, latestSubmission?.testAnswers, latestSubmission?.voice]);
+
+  useEffect(() => {
+    if (isPreview || !assignment) return;
+    if (!hasSkippedPersistedSubmissionAutoSaveRef.current) {
+      hasSkippedPersistedSubmissionAutoSaveRef.current = true;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveStoredStudentHomeworkSubmissionDraft({
+        assignmentId: assignment.id,
+        assignmentUpdatedAt: assignment.updatedAt,
+        answerText,
+        attachments,
+        voice,
+        testAnswers,
+        savedAt: new Date().toISOString(),
+      });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [answerText, assignment, attachments, isPreview, testAnswers, voice]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -396,6 +445,48 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       window.clearInterval(timerId);
     };
   }, []);
+
+  const registerPreviewObjectUrl = (value: string) => {
+    if (!isPreview || !value.startsWith('blob:')) return;
+    previewObjectUrlsRef.current.add(value);
+  };
+
+  const revokePreviewObjectUrl = (value: string) => {
+    if (!isPreview || !value.startsWith('blob:')) return;
+    if (!previewObjectUrlsRef.current.has(value)) return;
+    URL.revokeObjectURL(value);
+    previewObjectUrlsRef.current.delete(value);
+  };
+
+  const createPreviewAttachment = (file: File): HomeworkAttachment => {
+    const objectUrl = URL.createObjectURL(file);
+    registerPreviewObjectUrl(objectUrl);
+    return {
+      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      fileName: file.name,
+      size: file.size,
+      url: objectUrl,
+      status: 'ready',
+    };
+  };
+
+  const removeAttachmentEntry = (entryId: string) => {
+    setAttachments((prev) => {
+      const entry = prev.find((item) => item.id === entryId);
+      if (entry) revokePreviewObjectUrl(entry.url);
+      return prev.filter((item) => item.id !== entryId);
+    });
+  };
+
+  const removeVoiceEntry = (entryId: string) => {
+    setVoice((prev) => {
+      const entry = prev.find((item) => item.id === entryId);
+      if (entry) revokePreviewObjectUrl(entry.url);
+      return prev.filter((item) => item.id !== entryId);
+    });
+  };
 
   const clearRecordingDurationTicker = () => {
     if (recordingDurationIntervalRef.current !== null) {
@@ -419,6 +510,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   useEffect(() => {
     return () => {
+      previewObjectUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      previewObjectUrlsRef.current.clear();
       clearRecordingDurationTicker();
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -500,6 +595,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     if (!files || !files.length || !canInteractWithAttempt || !canUploadAttachments) return;
 
     setLocalError(null);
+    if (isPreview) {
+      const previewAttachments = Array.from(files).map((file) => createPreviewAttachment(file));
+      setAttachments((prev) => [...prev, ...previewAttachments]);
+      return;
+    }
     setUploading(true);
     try {
       const uploaded = await Promise.all(
@@ -560,9 +660,14 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
         if (shouldSkipUpload || blob.size === 0) return;
         try {
-          setUploading(true);
           const fileBaseName = `voice-${Date.now()}.${extension}`;
           const file = new File([blob], fileBaseName, { type: normalizedMimeType });
+          if (isPreview) {
+            const previewAttachment = createPreviewAttachment(file);
+            setVoice((prev) => [...prev, previewAttachment]);
+            return;
+          }
+          setUploading(true);
           const uploaded = await uploadFileToHomeworkStorage(file, 'homework-student-voice');
           setVoice((prev) => [...prev, uploaded]);
         } catch (error) {
@@ -619,6 +724,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const handleSubmit = async (submit: boolean) => {
     if (!assignment || !canEdit) return;
+    if (isPreview && submit) {
+      preview?.onFinish();
+      return;
+    }
     if (requiresTimedAttemptStart) {
       setLocalError('Сначала нажмите «Начать», чтобы запустить таймер.');
       return;
@@ -649,7 +758,23 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       submit,
     };
 
-    await onSubmitPayload(payload);
+    const success = await onSubmitPayload(payload);
+    if (!success || isPreview) return;
+
+    if (submit) {
+      clearStoredStudentHomeworkSubmissionDraft(assignment.id);
+      return;
+    }
+
+    saveStoredStudentHomeworkSubmissionDraft({
+      assignmentId: assignment.id,
+      assignmentUpdatedAt: assignment.updatedAt,
+      answerText,
+      attachments,
+      voice,
+      testAnswers,
+      savedAt: new Date().toISOString(),
+    });
   };
 
   useEffect(() => {
@@ -816,7 +941,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const passingScorePercent = quizSettings.passingScorePercent;
   const attemptsLabel = quizSettings.attemptsLimit === null ? '∞' : String(quizSettings.attemptsLimit);
 
-  const submitButtonLabel = assignment?.status === 'RETURNED' ? 'Пересдать' : 'Отправить';
+  const submitButtonLabel = isPreview
+    ? 'Завершить предпросмотр'
+    : assignment?.status === 'RETURNED'
+      ? 'Пересдать'
+      : 'Отправить';
 
   const tips = useMemo(() => {
     const list: Array<{ title: string; text: string }> = [];
@@ -850,8 +979,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
     return list.slice(0, 3);
   }, [assignment?.teacherComment, latestSubmission]);
-
-  const showTestOnlyNotice = Boolean(responseConfig?.hasTest && !responseConfig.allowsAnyManualResponse);
+  const showHelpCard = false;
 
   const registerQuestionRef = (questionId: string) => (node: HTMLElement | null) => {
     questionRefs.current[questionId] = node;
@@ -1193,9 +1321,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
               <FontAwesomeIcon icon={faArrowLeft} />
             </button>
             <div className={styles.titleBlock}>
-              <h1 className={styles.pageTitle}>{assignment.title}</h1>
+              <h1 className={styles.pageTitle}>{isPreview ? `Предпросмотр: ${assignment.title}` : assignment.title}</h1>
               <p className={styles.pageSubtitle}>
-                {ASSIGNMENT_STATUS_LABELS[assignment.status]} • ~{estimatedMinutes} минут
+                {isPreview ? 'Предпросмотр для учителя' : ASSIGNMENT_STATUS_LABELS[assignment.status]} • ~{estimatedMinutes} минут
               </p>
             </div>
           </div>
@@ -1209,30 +1337,40 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
           {canEdit ? (
             requiresTimedAttemptStart ? (
-              <button
-                type="button"
-                className={styles.headerStartButton}
-                disabled={startingAttempt || submitting || uploading}
-                onClick={() => {
-                  void handleStartTimedAttempt();
-                }}
-              >
-                <FontAwesomeIcon icon={faPlay} />
-                <span>{startingAttempt ? 'Запускаем...' : 'Начать'}</span>
-              </button>
-            ) : (
               <>
                 <button
                   type="button"
-                  className={styles.headerDraftButton}
-                  disabled={submitting || uploading || !canInteractWithAttempt}
+                  className={styles.headerStartButton}
+                  disabled={startingAttempt || submitting || uploading}
                   onClick={() => {
-                    void handleSubmit(false);
+                    void handleStartTimedAttempt();
                   }}
                 >
-                  <FontAwesomeIcon icon={farBookmark} />
-                  <span>Сохранить черновик</span>
+                  <FontAwesomeIcon icon={faPlay} />
+                  <span>{startingAttempt ? 'Запускаем...' : 'Начать'}</span>
                 </button>
+                {isPreview ? (
+                  <button type="button" className={styles.headerDraftButton} onClick={preview?.onFinish}>
+                    <FontAwesomeIcon icon={faCircleCheck} />
+                    <span>Завершить предпросмотр</span>
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {!isPreview ? (
+                  <button
+                    type="button"
+                    className={styles.headerDraftButton}
+                    disabled={submitting || uploading || !canInteractWithAttempt}
+                    onClick={() => {
+                      void handleSubmit(false);
+                    }}
+                  >
+                    <FontAwesomeIcon icon={farBookmark} />
+                    <span>Сохранить черновик</span>
+                  </button>
+                ) : null}
 
                 <button
                   type="button"
@@ -1299,8 +1437,12 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             <div className={styles.assignmentHeroHeader}>
               <div className={styles.assignmentHeroContent}>
                 <div className={styles.heroChips}>
-                  <span className={styles.heroChipPrimary}>Домашка</span>
-                  <span className={styles.heroChipSecondary}>{ASSIGNMENT_STATUS_LABELS[assignment.status]}</span>
+                  <span className={`${styles.heroChipPrimary} ${isPreview ? styles.heroChipPreview : ''}`}>
+                    {isPreview ? 'Предпросмотр' : 'Домашка'}
+                  </span>
+                  <span className={styles.heroChipSecondary}>
+                    {isPreview ? 'Так увидит ученик' : ASSIGNMENT_STATUS_LABELS[assignment.status]}
+                  </span>
                 </div>
                 <h2 className={styles.heroTitle}>Задание: {assignment.title}</h2>
                 <p className={styles.heroDescription}>{assignmentDescription}</p>
@@ -1344,12 +1486,6 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
               </div>
             </div>
           </section>
-
-          {showTestOnlyNotice ? (
-            <div className={`${styles.notice} ${styles.noticeInfo}`}>
-              Эту домашку нужно сдать через тестовые вопросы. Дополнительный текст или файлы не требуются.
-            </div>
-          ) : null}
 
           <div className={styles.mainGrid}>
             <div className={styles.questionsColumn}>
@@ -1479,7 +1615,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                             <button
                               type="button"
                               className={styles.removeButton}
-                              onClick={() => setAttachments((prev) => prev.filter((entry) => entry.id !== item.id))}
+                              onClick={() => removeAttachmentEntry(item.id)}
                             >
                               Удалить
                             </button>
@@ -1569,7 +1705,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                             <button
                               type="button"
                               className={styles.removeButton}
-                              onClick={() => setVoice((prev) => prev.filter((entry) => entry.id !== item.id))}
+                              onClick={() => removeVoiceEntry(item.id)}
                             >
                               Удалить
                             </button>
@@ -1584,24 +1720,36 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
               <section className={styles.submitSection}>
                 <div className={styles.submitSectionContent}>
-                  <h3 className={styles.submitSectionTitle}>Готовы отправить?</h3>
+                  <h3 className={styles.submitSectionTitle}>
+                    {isPreview ? 'Готовы завершить предпросмотр?' : 'Готовы отправить?'}
+                  </h3>
                   <p className={styles.submitSectionText}>
-                    Проверьте все ответы перед отправкой. До истечения времени можно вернуться к любому вопросу.
+                    {isPreview
+                      ? 'Можно пройти задание целиком, проверить вопросы и навигацию. Никакие ответы в этом режиме не отправляются ученику или преподавателю.'
+                      : 'Проверьте все ответы перед отправкой. До истечения времени можно вернуться к любому вопросу.'}
                   </p>
                 </div>
                 {canEdit ? (
                   requiresTimedAttemptStart ? (
-                    <button
-                      type="button"
-                      className={styles.bottomStartButton}
-                      disabled={startingAttempt || submitting || uploading}
-                      onClick={() => {
-                        void handleStartTimedAttempt();
-                      }}
-                    >
-                      <FontAwesomeIcon icon={faPlay} />
-                      <span>{startingAttempt ? 'Запускаем...' : 'Начать попытку'}</span>
-                    </button>
+                    <div className={styles.submitSectionActions}>
+                      <button
+                        type="button"
+                        className={styles.bottomStartButton}
+                        disabled={startingAttempt || submitting || uploading}
+                        onClick={() => {
+                          void handleStartTimedAttempt();
+                        }}
+                      >
+                        <FontAwesomeIcon icon={faPlay} />
+                        <span>{startingAttempt ? 'Запускаем...' : 'Начать попытку'}</span>
+                      </button>
+                      {isPreview ? (
+                        <button type="button" className={styles.bottomPreviewButton} onClick={preview?.onFinish}>
+                          <FontAwesomeIcon icon={faCircleCheck} />
+                          <span>Завершить предпросмотр</span>
+                        </button>
+                      ) : null}
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -1612,7 +1760,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                       }}
                     >
                       <FontAwesomeIcon icon={faPaperPlane} />
-                      <span>{submitButtonLabel} задание</span>
+                      <span>{isPreview ? submitButtonLabel : `${submitButtonLabel} задание`}</span>
                     </button>
                   )
                 ) : (
@@ -1691,23 +1839,25 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                 </div>
               </section>
 
-              <section className={styles.helpCard}>
-                <div className={styles.sidebarTitleRow}>
-                  <div className={styles.helpIconWrap}>
-                    <FontAwesomeIcon icon={faLightbulb} />
-                  </div>
-                  <h3 className={styles.sidebarTitle}>Подсказки</h3>
-                </div>
-
-                <div className={styles.tipList}>
-                  {tips.map((tip, index) => (
-                    <div key={`${tip.title}_${index}`} className={styles.tipItem}>
-                      <p className={styles.tipKicker}>{tip.title}</p>
-                      <p className={styles.tipText}>{tip.text}</p>
+              {showHelpCard ? (
+                <section className={styles.helpCard}>
+                  <div className={styles.sidebarTitleRow}>
+                    <div className={styles.helpIconWrap}>
+                      <FontAwesomeIcon icon={faLightbulb} />
                     </div>
-                  ))}
-                </div>
-              </section>
+                    <h3 className={styles.sidebarTitle}>Подсказки</h3>
+                  </div>
+
+                  <div className={styles.tipList}>
+                    {tips.map((tip, index) => (
+                      <div key={`${tip.title}_${index}`} className={styles.tipItem}>
+                        <p className={styles.tipKicker}>{tip.title}</p>
+                        <p className={styles.tipText}>{tip.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {materialAttachments.length > 0 ? (
                 <section className={styles.materialsCard}>

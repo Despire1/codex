@@ -1,4 +1,4 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 export type UnsavedChangesEntry = {
   isDirty: boolean;
@@ -22,12 +22,15 @@ type UnsavedChangesContextValue = {
   setEntry: (key: string, entry: UnsavedChangesEntry) => void;
   clearEntry: (key: string) => void;
   getActiveEntry: () => ActiveUnsavedEntry | null;
+  requestNavigationBypass: () => void;
+  consumeNavigationBypass: () => boolean;
 };
 
 const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(null);
 
 export const UnsavedChangesProvider = ({ children }: PropsWithChildren) => {
   const [entries, setEntries] = useState<Record<string, UnsavedChangesEntry>>({});
+  const navigationBypassCountRef = useRef(0);
 
   const setEntry = useCallback((key: string, entry: UnsavedChangesEntry) => {
     setEntries((prev) => ({ ...prev, [key]: entry }));
@@ -49,6 +52,18 @@ export const UnsavedChangesProvider = ({ children }: PropsWithChildren) => {
     return { key, entry };
   }, [entries]);
 
+  const requestNavigationBypass = useCallback(() => {
+    navigationBypassCountRef.current += 1;
+  }, []);
+
+  const consumeNavigationBypass = useCallback(() => {
+    if (navigationBypassCountRef.current <= 0) {
+      return false;
+    }
+    navigationBypassCountRef.current -= 1;
+    return true;
+  }, []);
+
   const hasUnsavedChanges = useMemo(() => Object.values(entries).some((entry) => entry.isDirty), [entries]);
 
   useEffect(() => {
@@ -62,8 +77,22 @@ export const UnsavedChangesProvider = ({ children }: PropsWithChildren) => {
   }, [hasUnsavedChanges]);
 
   const value = useMemo<UnsavedChangesContextValue>(
-    () => ({ hasUnsavedChanges, setEntry, clearEntry, getActiveEntry }),
-    [clearEntry, getActiveEntry, hasUnsavedChanges, setEntry],
+    () => ({
+      hasUnsavedChanges,
+      setEntry,
+      clearEntry,
+      getActiveEntry,
+      requestNavigationBypass,
+      consumeNavigationBypass,
+    }),
+    [
+      clearEntry,
+      consumeNavigationBypass,
+      getActiveEntry,
+      hasUnsavedChanges,
+      requestNavigationBypass,
+      setEntry,
+    ],
   );
 
   return <UnsavedChangesContext.Provider value={value}>{children}</UnsavedChangesContext.Provider>;

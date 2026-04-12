@@ -3,7 +3,7 @@ import { getPwaRouteMode, isStandaloneDisplayMode } from './pwa';
 import type { PwaPushSubscriptionPayload } from './pwaPush';
 
 const NOTIFICATION_PROMPT_SEEN_KEY = 'teacherbot_pwa_notifications_prompt_seen_v1';
-const TEST_NOTIFICATION_TAG = 'teacherbot-pwa-test';
+const TEST_NOTIFICATION_TAG_PREFIX = 'teacherbot-pwa-test';
 
 export type PwaNotificationPermission = NotificationPermission | 'unsupported';
 
@@ -23,6 +23,8 @@ const getNotificationAssetUrl = (pathname: string) => {
   if (typeof window === 'undefined') return pathname;
   return new URL(pathname, window.location.origin).toString();
 };
+
+const buildTestNotificationTag = () => `${TEST_NOTIFICATION_TAG_PREFIX}-${Date.now()}`;
 
 const urlBase64ToUint8Array = (value: string) => {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
@@ -113,7 +115,7 @@ export const showPwaTestNotification = async () => {
     body: 'TeacherBot подключен. Уведомления на этом устройстве работают.',
     icon,
     badge: icon,
-    tag: TEST_NOTIFICATION_TAG,
+    tag: buildTestNotificationTag(),
     requireInteraction: false,
     data: { url: targetUrl },
   };
@@ -126,6 +128,57 @@ export const showPwaTestNotification = async () => {
 
   new Notification('Тестовое уведомление TeacherBot', options);
   return { ok: true as const };
+};
+
+const getReadyServiceWorkerRegistration = async () => {
+  const registration = await navigator.serviceWorker.ready.catch(() => null);
+  if (!registration || !('pushManager' in registration)) {
+    return null;
+  }
+
+  return registration;
+};
+
+const ensureSavedPushSubscription = async (forceRefresh = false): Promise<PwaPushSubscriptionPayload | null> => {
+  const config = await api.getPwaPushConfig();
+  if (!config.enabled || !config.publicKey) {
+    return null;
+  }
+
+  const registration = await getReadyServiceWorkerRegistration();
+  if (!registration) {
+    throw new Error('push_manager_unavailable');
+  }
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (forceRefresh && subscription) {
+    const payload = serializePushSubscription(subscription);
+    if (payload) {
+      await api.removePwaPushSubscription({ endpoint: payload.endpoint }).catch(() => undefined);
+    }
+    await subscription.unsubscribe().catch(() => undefined);
+    subscription = null;
+  }
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+    });
+  }
+
+  const payload = serializePushSubscription(subscription);
+  if (!payload) {
+    return null;
+  }
+
+  await api.savePwaPushSubscription({
+    subscription: payload,
+    routeMode: getPwaRouteMode(),
+    userAgent: navigator.userAgent ?? '',
+  });
+
+  return payload;
 };
 
 export const ensurePwaNotificationChannel = async (): Promise<PwaNotificationChannelResult> => {
@@ -146,30 +199,11 @@ export const ensurePwaNotificationChannel = async (): Promise<PwaNotificationCha
     };
   }
 
-  const registration = await navigator.serviceWorker.ready.catch(() => null);
-  if (!registration || !('pushManager' in registration)) {
-    return { ok: false, reason: 'subscription' };
-  }
-
   try {
-    let subscription = await registration.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(config.publicKey),
-      });
-    }
-
-    const payload = serializePushSubscription(subscription);
+    const payload = await ensureSavedPushSubscription();
     if (!payload) {
       return { ok: false, reason: 'subscription' };
     }
-
-    await api.savePwaPushSubscription({
-      subscription: payload,
-      routeMode: getPwaRouteMode(),
-      userAgent: navigator.userAgent ?? '',
-    });
 
     return {
       ok: true,
@@ -195,9 +229,33 @@ export const sendPwaTestNotification = async (): Promise<PwaNotificationChannelR
   if (!channel.ok) return channel;
 
   if (channel.transport === 'push') {
-    const result = await api.sendPwaPushTest();
+    const sendServerTest = async () => api.sendPwaPushTest();
+    let result = await sendServerTest();
     if (result.status === 'sent') {
       return channel;
+    }
+
+    if (result.reason === 'no_subscription' || result.status === 'failed') {
+      try {
+        const refreshedPayload = await ensureSavedPushSubscription(true);
+        if (!refreshedPayload) {
+          return {
+            ok: false,
+            reason: 'subscription',
+          };
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          reason: 'server',
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      result = await sendServerTest();
+      if (result.status === 'sent') {
+        return channel;
+      }
     }
 
     if (result.status === 'failed') {

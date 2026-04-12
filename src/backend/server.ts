@@ -15,6 +15,11 @@ import type {
   LessonSeriesScope,
   PaymentCancelBehavior,
 } from '../entities/types';
+import {
+  canCancelHomeworkAssignmentIssueByStatus,
+  hasRealHomeworkSubmissionStatus,
+  isHomeworkAssignmentVisibleToStudent,
+} from '../entities/homework-assignment/model/lib/assignmentIssuance';
 import { resolveHomeworkAttemptTimerConfig } from '../entities/homework-template/model/lib/quizSettings';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
@@ -968,11 +973,12 @@ const removePwaPushSubscription = async (user: User, body: { endpoint: string })
 };
 
 const sendPwaPushTest = async (user: User) => {
+  const testTag = `teacherbot-pwa-test-${Date.now()}`;
   const result = await sendWebPushToUser(user.id, {
     title: 'Тестовое уведомление TeacherBot',
     body: 'TeacherBot подключен. Уведомления на этом устройстве работают.',
     path: '/dashboard',
-    tag: 'teacherbot-pwa-test',
+    tag: testTag,
   });
 
   if (result.status === 'sent') {
@@ -1815,6 +1821,7 @@ const createPaymentEvent = async (tx: any, payload: any) => {
 
 type HomeworkV2NotificationKind =
   | 'ASSIGNED'
+  | 'UNISSUED'
   | 'REVIEWED'
   | 'RETURNED'
   | 'REMINDER_24H'
@@ -2889,6 +2896,7 @@ const buildHomeworkNotificationText = (
 ) => {
   const deadlineLabel = formatHomeworkDeadlineLabel(assignment.deadlineAt ?? null, timeZone);
   if (kind === 'ASSIGNED') return `📚 Новая домашка: ${assignment.title}\nДедлайн: ${deadlineLabel}`;
+  if (kind === 'UNISSUED') return `↩️ Домашка отозвана: ${assignment.title}\nДомашнее задание отозвано.`;
   if (kind === 'REVIEWED') return `✅ Домашка проверена: ${assignment.title}\nИтог доступен в приложении.`;
   if (kind === 'RETURNED')
     return `🛠 Домашка возвращена на доработку: ${assignment.title}\nКомментарий: ${assignment.teacherComment ?? '—'}`;
@@ -6653,6 +6661,114 @@ const remindHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
   };
 };
 
+const cancelHomeworkAssignmentIssueV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      student: {
+        select: { username: true },
+      },
+      lesson: {
+        select: { startAt: true },
+      },
+      template: {
+        select: { title: true },
+      },
+      group: {
+        select: { id: true, title: true },
+      },
+    },
+  });
+  if (!assignment) throw createHttpError('Домашка не найдена', 404);
+  if (assignment.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+
+  const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
+  if (!canCancelHomeworkAssignmentIssueByStatus(assignmentStatus)) {
+    throw createHttpError('Отменить выдачу можно только у выданной или запланированной домашки.', 409);
+  }
+
+  const submissions = await (prisma as any).homeworkSubmission.findMany({
+    where: { assignmentId },
+    select: { id: true, status: true },
+  });
+  const hasRealSubmissions = submissions.some((submission: { status: unknown }) =>
+    hasRealHomeworkSubmissionStatus(normalizeHomeworkSubmissionStatus(submission.status)),
+  );
+  if (hasRealSubmissions) {
+    throw createHttpError('Нельзя отменить выдачу, когда ученик уже отправил ответ.', 409);
+  }
+
+  await (prisma as any).$transaction([
+    (prisma as any).homeworkSubmission.deleteMany({
+      where: { assignmentId, status: 'DRAFT' },
+    }),
+    (prisma as any).homeworkAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        status: 'DRAFT',
+        sentAt: null,
+        reminder24hSentAt: null,
+        reminderMorningSentAt: null,
+        reminder3hSentAt: null,
+        overdueReminderCount: 0,
+        lastOverdueReminderAt: null,
+        updatedAt: new Date(),
+      },
+    }),
+  ]);
+
+  const refreshedAssignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      student: {
+        select: { username: true },
+      },
+      lesson: {
+        select: { startAt: true },
+      },
+      template: {
+        select: { title: true },
+      },
+      group: {
+        select: { id: true, title: true },
+      },
+    },
+  });
+  if (!refreshedAssignment) throw createHttpError('Домашка не найдена', 404);
+
+  await sendHomeworkNotificationToStudent({
+    teacherId: teacher.chatId,
+    studentId: refreshedAssignment.studentId,
+    type: 'HOMEWORK_UNISSUED',
+    dedupeKey: `HOMEWORK_UNISSUED:${refreshedAssignment.id}:${Date.now()}`,
+    text: buildHomeworkNotificationText('UNISSUED', refreshedAssignment, teacher.timezone),
+  });
+
+  await safeLogActivityEvent({
+    teacherId: teacher.chatId,
+    studentId: refreshedAssignment.studentId,
+    category: 'HOMEWORK',
+    action: 'UPDATE',
+    status: 'SUCCESS',
+    source: 'USER',
+    title: 'Выдача домашки отменена',
+    details: `Assignment #${refreshedAssignment.id}`,
+    payload: { assignmentId: refreshedAssignment.id, previousStatus: assignmentStatus, nextStatus: 'DRAFT' },
+  });
+
+  const [assignmentWithSubmissionMeta] = await attachLatestSubmissionMetaToAssignments([refreshedAssignment]);
+  const [assignmentWithDisplayMeta] = await attachAssignmentDisplayMeta(
+    teacher.chatId,
+    [assignmentWithSubmissionMeta],
+    new Date(),
+  );
+
+  return {
+    assignment: serializeHomeworkAssignmentV2(assignmentWithDisplayMeta),
+  };
+};
+
 const deleteHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
   const teacher = await ensureTeacher(user);
   const existing = await (prisma as any).homeworkAssignment.findUnique({
@@ -6966,6 +7082,9 @@ const createHomeworkSubmissionV2 = async (
   }
 
   const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
+  if (role === 'STUDENT' && !isHomeworkAssignmentVisibleToStudent(assignmentStatus)) {
+    throw createHttpError('Домашка недоступна', 404);
+  }
 
   let targetAttempt = latest?.attemptNo ?? 1;
   let mode: 'create' | 'update' = 'create';
@@ -7171,6 +7290,9 @@ const getStudentHomeworkAssignmentDetailV2 = async (
     },
   });
   if (!assignment) throw new Error('Домашка не найдена');
+  if (!isHomeworkAssignmentVisibleToStudent(normalizeHomeworkAssignmentStatus(assignment.status))) {
+    throw createHttpError('Домашка не найдена', 404);
+  }
 
   let submissions = await (prisma as any).homeworkSubmission.findMany({
     where: { assignmentId },
@@ -8286,6 +8408,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           updateHomeworkAssignmentV2,
           deleteHomeworkAssignmentV2,
           remindHomeworkAssignmentV2,
+          cancelHomeworkAssignmentIssueV2,
           listHomeworkSubmissionsV2,
           createHomeworkSubmissionV2,
           openHomeworkReviewSessionV2,

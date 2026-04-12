@@ -135,7 +135,7 @@ export const resolveAssignmentDeadlineMeta = (assignment: HomeworkAssignment, no
   if (!assignment.deadlineAt) {
     return {
       primary: 'Без дедлайна',
-      secondary: assignment.status === 'SCHEDULED' ? 'Будет отправлено позже' : 'Срок не ограничен',
+      secondary: '',
       tone: 'muted' as const,
     };
   }
@@ -150,7 +150,9 @@ export const resolveAssignmentDeadlineMeta = (assignment: HomeworkAssignment, no
   const tomorrow = new Date(todayStart);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const isOverdue = Boolean(assignment.isOverdue);
+  const isOverdue =
+    deadline.getTime() < now.getTime() &&
+    (Boolean(assignment.isOverdue) || assignment.status === 'OVERDUE');
   if (isOverdue) {
     return {
       primary: dateFormatter.format(deadline),
@@ -162,7 +164,7 @@ export const resolveAssignmentDeadlineMeta = (assignment: HomeworkAssignment, no
   if (deadline >= todayStart && deadline <= todayEnd) {
     return {
       primary: `Сегодня, ${deadline.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
-      secondary: 'Срок сегодня',
+      secondary: '',
       tone: 'today' as const,
     };
   }
@@ -170,14 +172,14 @@ export const resolveAssignmentDeadlineMeta = (assignment: HomeworkAssignment, no
   if (isSameDay(deadline, tomorrow)) {
     return {
       primary: `Завтра, ${deadline.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
-      secondary: 'Срок завтра',
+      secondary: '',
       tone: 'normal' as const,
     };
   }
 
   return {
     primary: dateFormatter.format(deadline),
-    secondary: 'В сроке',
+    secondary: '',
     tone: 'normal' as const,
   };
 };

@@ -897,6 +897,10 @@ export const api = {
       `/api/v2/homework/assignments/${assignmentId}/remind`,
       { method: 'POST' },
     ),
+  cancelHomeworkAssignmentIssueV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}/cancel-issue`, {
+      method: 'POST',
+    }),
   deleteHomeworkAssignmentV2: (assignmentId: number) =>
     apiFetch<{ deletedId: number }>(`/api/v2/homework/assignments/${assignmentId}`, {
       method: 'DELETE',

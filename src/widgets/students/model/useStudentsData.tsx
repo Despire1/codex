@@ -27,6 +27,7 @@ import { isVisibleLesson } from '../../../entities/lesson/lib/lessonMutationGuar
 import { StudentTabId } from '../types';
 
 const PAYMENT_REMINDERS_PAGE_SIZE = 10;
+const STUDENT_HOMEWORKS_PAGE_SIZE = 15;
 const STUDENT_LESSONS_PAGE_SIZE = 10;
 
 const mergePaymentReminders = (current: PaymentReminderLog[], incoming: PaymentReminderLog[]) => {
@@ -68,6 +69,7 @@ export type StudentsDataContextValue = {
   studentHomeworks: Homework[];
   studentHomeworkHasMore: boolean;
   studentHomeworkLoading: boolean;
+  studentHomeworkLoadingMore: boolean;
   loadStudentHomeworks: (options?: LoadStudentHomeworksOptions) => Promise<void>;
   loadMoreStudentHomeworks: () => void;
   studentLessons: Lesson[];
@@ -128,8 +130,11 @@ export const useStudentsDataInternal = ({
   paymentDate,
 }: StudentsDataConfig): StudentsDataContextValue => {
   const [studentHomeworks, setStudentHomeworks] = useState<Homework[]>([]);
+  const [studentHomeworksStudentId, setStudentHomeworksStudentId] = useState<number | null>(null);
   const [studentHomeworkHasMore, setStudentHomeworkHasMore] = useState(false);
   const [studentHomeworkLoading, setStudentHomeworkLoading] = useState(false);
+  const [studentHomeworkLoadingMore, setStudentHomeworkLoadingMore] = useState(false);
+  const [studentHomeworkNextOffset, setStudentHomeworkNextOffset] = useState<number | null>(null);
   const [studentLessons, setStudentLessons] = useState<Lesson[]>([]);
   const [studentLessonsHasMore, setStudentLessonsHasMore] = useState(false);
   const [studentLessonsNextOffset, setStudentLessonsNextOffset] = useState<number | null>(null);
@@ -153,6 +158,8 @@ export const useStudentsDataInternal = ({
   >({});
   const lessonLoadRequestId = useRef(0);
   const lessonSummaryLoadRequestId = useRef(0);
+  const homeworkLoadRequestId = useRef(0);
+  const homeworkRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const lessonRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const lessonSummaryRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
   const paymentFilterRef = useRef(paymentFilter);
@@ -178,38 +185,86 @@ export const useStudentsDataInternal = ({
     async (options?: LoadStudentHomeworksOptions) => {
       if (!hasAccess) {
         setStudentHomeworks([]);
+        setStudentHomeworksStudentId(null);
         setStudentHomeworkHasMore(false);
+        setStudentHomeworkNextOffset(null);
         return;
       }
       const targetStudentId = options?.studentIdOverride ?? selectedStudentId;
       if (!targetStudentId) {
         setStudentHomeworks([]);
+        setStudentHomeworksStudentId(null);
         setStudentHomeworkHasMore(false);
+        setStudentHomeworkNextOffset(null);
         return;
       }
       const offset = options?.offset ?? 0;
       const append = options?.append ?? false;
-      setStudentHomeworkLoading(true);
+      const requestKey = JSON.stringify({
+        studentId: targetStudentId,
+        filter: homeworkFilter,
+        offset,
+        limit: STUDENT_HOMEWORKS_PAGE_SIZE,
+      });
+
+      if (homeworkRequestRef.current?.key === requestKey) {
+        return homeworkRequestRef.current.promise;
+      }
+
+      const requestId = homeworkLoadRequestId.current + 1;
+      homeworkLoadRequestId.current = requestId;
+      const promise = (async () => {
+        if (append) {
+          setStudentHomeworkLoadingMore(true);
+        } else {
+          if (studentHomeworksStudentId !== targetStudentId) {
+            setStudentHomeworks([]);
+            setStudentHomeworkHasMore(false);
+            setStudentHomeworkNextOffset(null);
+          }
+          setStudentHomeworksStudentId(targetStudentId);
+          setStudentHomeworkLoading(true);
+        }
+        try {
+          const data = await api.listStudentHomeworks(targetStudentId, {
+            filter: homeworkFilter,
+            limit: STUDENT_HOMEWORKS_PAGE_SIZE,
+            offset,
+          });
+          if (homeworkLoadRequestId.current !== requestId) return;
+          const normalizedHomeworks = data.items.map((homework) => normalizeHomework(homework, timeZone));
+          setStudentHomeworkHasMore(data.nextOffset !== null);
+          setStudentHomeworkNextOffset(data.nextOffset);
+          setStudentHomeworksStudentId(targetStudentId);
+          setStudentHomeworks((prev) =>
+            append
+              ? [...prev, ...normalizedHomeworks.filter((homework) => !prev.some((item) => item.id === homework.id))]
+              : normalizedHomeworks,
+          );
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load student homeworks', error);
+        } finally {
+          if (homeworkLoadRequestId.current === requestId) {
+            if (append) {
+              setStudentHomeworkLoadingMore(false);
+            } else {
+              setStudentHomeworkLoading(false);
+            }
+          }
+        }
+      })();
+
+      homeworkRequestRef.current = { key: requestKey, promise };
       try {
-        const data = await api.listStudentHomeworks(targetStudentId, {
-          filter: homeworkFilter,
-          limit: 15,
-          offset,
-        });
-        setStudentHomeworkHasMore(data.nextOffset !== null);
-        setStudentHomeworks((prev) =>
-          append
-            ? [...prev, ...data.items.map((homework) => normalizeHomework(homework, timeZone))]
-            : data.items.map((homework) => normalizeHomework(homework, timeZone)),
-        );
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load student homeworks', error);
+        await promise;
       } finally {
-        setStudentHomeworkLoading(false);
+        if (homeworkRequestRef.current?.key === requestKey) {
+          homeworkRequestRef.current = null;
+        }
       }
     },
-    [hasAccess, homeworkFilter, selectedStudentId, timeZone],
+    [hasAccess, homeworkFilter, selectedStudentId, studentHomeworksStudentId, timeZone],
   );
 
   const loadStudentLessons = useCallback(
@@ -389,9 +444,16 @@ export const useStudentsDataInternal = ({
   );
 
   const loadMoreStudentHomeworks = useCallback(() => {
-    if (studentHomeworkLoading || !studentHomeworkHasMore) return;
-    void loadStudentHomeworks({ offset: studentHomeworks.length, append: true });
-  }, [loadStudentHomeworks, studentHomeworkHasMore, studentHomeworkLoading, studentHomeworks.length]);
+    if (studentHomeworkLoading || studentHomeworkLoadingMore || !studentHomeworkHasMore) return;
+    if (typeof studentHomeworkNextOffset !== 'number') return;
+    void loadStudentHomeworks({ offset: studentHomeworkNextOffset, append: true });
+  }, [
+    loadStudentHomeworks,
+    studentHomeworkHasMore,
+    studentHomeworkLoading,
+    studentHomeworkLoadingMore,
+    studentHomeworkNextOffset,
+  ]);
 
   const loadMoreStudentLessons = useCallback(() => {
     if (studentLessonLoading || studentLessonLoadingMore || !studentLessonsHasMore) return;
@@ -499,6 +561,14 @@ export const useStudentsDataInternal = ({
   ]);
 
   const clearStudentData = useCallback((studentId: number) => {
+    if (studentHomeworksStudentId === studentId) {
+      setStudentHomeworks([]);
+      setStudentHomeworksStudentId(null);
+      setStudentHomeworkHasMore(false);
+      setStudentHomeworkLoading(false);
+      setStudentHomeworkLoadingMore(false);
+      setStudentHomeworkNextOffset(null);
+    }
     setStudentUnpaidLessonsByStudent((prev) => {
       if (!prev[studentId]) return prev;
       const next = { ...prev };
@@ -553,13 +623,14 @@ export const useStudentsDataInternal = ({
       delete next[studentId];
       return next;
     });
-  }, []);
+  }, [studentHomeworksStudentId]);
 
   return useMemo(
     () => ({
       studentHomeworks,
       studentHomeworkHasMore,
       studentHomeworkLoading,
+      studentHomeworkLoadingMore,
       loadStudentHomeworks,
       loadMoreStudentHomeworks,
       studentLessons,
@@ -607,6 +678,7 @@ export const useStudentsDataInternal = ({
       studentDebtTotal,
       studentHomeworkHasMore,
       studentHomeworkLoading,
+      studentHomeworkLoadingMore,
       studentHomeworks,
       studentLessonLoading,
       studentLessonLoadingMore,

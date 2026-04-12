@@ -2,11 +2,18 @@
   width: 100%;
 }
 
+.triggerShell {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .triggerButton {
   width: 100%;
   min-height: 48px;
   border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 16px;
+  border-radius: 14px;
   background: #fff;
   padding: 12px 14px;
   display: inline-flex;
@@ -43,9 +50,20 @@
   border-color: rgba(15, 23, 42, 0.3);
 }
 
+.triggerButtonInvalid {
+  border-color: var(--color-red-500);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+}
+
+.triggerButtonInvalid:hover:not(:disabled),
+.triggerButtonInvalid:focus-visible {
+  border-color: var(--color-red-600);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
 .triggerButtonCompact {
   min-height: 38px;
-  border-radius: 999px;
+  border-radius: 14px;
   padding: 7px 12px;
 }
 
@@ -55,6 +73,38 @@
 
 .triggerButtonCompact .triggerIcon {
   color: #475569;
+}
+
+.clearButton {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #fff;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.clearButton:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.clearButton:focus-visible {
+  outline: none;
+  border-color: rgba(15, 23, 42, 0.3);
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.06);
 }
 
 .triggerContent {
@@ -115,6 +165,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: min(320px, calc(100vh - 120px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 }
 
 .optionButton {
@@ -212,8 +266,13 @@
 
   .triggerButtonCompact {
     min-height: 44px;
-    border-radius: 16px;
+    border-radius: 14px;
     padding: 11px 12px;
+  }
+
+  .clearButton {
+    width: 36px;
+    height: 36px;
   }
 
   .triggerButtonCompact .triggerLabel {
@@ -223,5 +282,9 @@
   .popover {
     min-width: min(280px, calc(100vw - 24px));
     border-radius: 16px;
+  }
+
+  .optionsList {
+    max-height: min(300px, calc(100vh - 140px));
   }
 }

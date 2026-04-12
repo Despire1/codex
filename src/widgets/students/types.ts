@@ -1,6 +1,7 @@
 import { HomeworkAttachment, HomeworkStatus, Student, TeacherStudent } from '../../entities/types';
 
 export type SelectedStudent = Student & { link: TeacherStudent };
+export type StudentListViewMode = 'standard' | 'compact';
 
 export interface HomeworkDraft {
   text: string;

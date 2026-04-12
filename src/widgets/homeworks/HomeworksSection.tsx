@@ -1,5 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 import {
   ActivityFeedItem,
   HomeworkAssignment,
@@ -8,10 +9,13 @@ import {
   HomeworkSubmission,
   HomeworkTemplate,
 } from '../../entities/types';
+import { canCancelHomeworkAssignmentIssue } from '../../entities/homework-assignment/model/lib/assignmentIssuance';
 import { getLatestSubmission } from '../../entities/homework-submission/model/lib/submissionState';
 import { api, HomeworkAssignmentBucket, isApiRequestError } from '../../shared/api/client';
 import { useUnsavedChanges } from '../../shared/lib/unsavedChanges';
 import { useToast } from '../../shared/lib/toast';
+import { useTimeZone } from '../../shared/lib/timezoneContext';
+import { toZonedDate } from '../../shared/lib/timezoneDates';
 import { StudentHomeworkDetailView, StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 import {
   createHomeworkEditorDraftFromAssignment,
@@ -21,10 +25,21 @@ import {
 } from '../../features/homework-template-editor/model/lib/blocks';
 import { HomeworkEditorDraft } from '../../features/homework-template-editor/model/types';
 import {
+  buildHomeworkEditorDraftStorageKey,
+  clearStoredHomeworkEditorDraft,
+  loadStoredHomeworkEditorDraft,
+  saveStoredHomeworkEditorDraft,
+} from '../../features/homework-template-editor/model/lib/homeworkEditorDraftStorage';
+import {
+  areHomeworkEditorDraftsEqual,
+  hasHomeworkEditorContent,
+} from '../../features/homework-template-editor/model/lib/homeworkEditorDirty';
+import {
   HomeworkTemplateCreateScreen,
   HomeworkTemplateCreateSubmitResult,
 } from '../../features/homework-template-editor/ui/HomeworkTemplateCreateScreen';
 import { HomeworkReviewScreen } from '../../features/homework-review/ui/HomeworkReviewScreen';
+import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { StudentHomeworksView } from './student/StudentHomeworksView';
 import { TeacherHomeworksView } from './teacher/TeacherHomeworksView';
 import {
@@ -60,6 +75,7 @@ type HomeworkEditorNavigationState = {
 const TEACHER_PAGE_SIZE = 10;
 const STUDENT_PAGE_SIZE = 20;
 const REVIEW_UNSAVED_ENTRY_KEY = 'homeworks-review';
+const ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY = 'homeworks-assignment-editor';
 const REVIEW_DRAFT_STORAGE_PREFIX = 'homework-review-draft-v1';
 
 const buildReviewDraftStorageKey = (assignmentId: number, submissionId: number) =>
@@ -165,11 +181,41 @@ const resolveTeacherListQuery = (
   return { tab: 'all' };
 };
 
+const mergeHomeworkTemplate = (items: HomeworkTemplate[], nextTemplate: HomeworkTemplate) => [
+  nextTemplate,
+  ...items.filter((template) => template.id !== nextTemplate.id),
+];
+
+const resolveAssignmentPersistedStatus = (params: {
+  action: 'save' | 'submit';
+  mode: 'create' | 'edit';
+  currentStatus: HomeworkAssignment['status'] | null;
+  sendMode: HomeworkAssignment['sendMode'];
+}): HomeworkAssignment['status'] => {
+  const { action, mode, currentStatus, sendMode } = params;
+
+  if (mode === 'create') {
+    if (action === 'save') return 'DRAFT';
+    return sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
+  }
+
+  if (action === 'submit') {
+    return 'SENT';
+  }
+
+  if (currentStatus === 'DRAFT' || currentStatus === 'SCHEDULED' || currentStatus === null) {
+    return sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
+  }
+
+  return currentStatus;
+};
+
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const { showToast } = useToast();
-  const { setEntry, clearEntry } = useUnsavedChanges();
+  const { setEntry, clearEntry, requestNavigationBypass } = useUnsavedChanges();
   const navigate = useNavigate();
   const location = useLocation();
+  const timeZone = useTimeZone();
   const { assignmentId: assignmentIdParam } = useParams<{ assignmentId?: string }>();
   const assignmentId = assignmentIdParam ? Number(assignmentIdParam) : Number.NaN;
   const hasStudentAssignmentId = mode === 'student' && Number.isFinite(assignmentId) && assignmentId > 0;
@@ -198,6 +244,26 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     Number.isFinite(editingTemplateId) &&
     editingTemplateId > 0;
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
+  const teacherTemplateListPath = '/homeworks?view=templates';
+  const templateEditorDraftStorageKey = isTeacherTemplateEditRoute && editingTemplateId
+    ? buildHomeworkEditorDraftStorageKey({
+        variant: 'template',
+        mode: 'edit',
+        entityId: editingTemplateId,
+      })
+    : null;
+  const assignmentEditorDraftStorageKey = isTeacherAssignmentEditRoute && editingAssignmentId
+    ? buildHomeworkEditorDraftStorageKey({
+        variant: 'assignment',
+        mode: 'edit',
+        entityId: editingAssignmentId,
+      })
+    : isTeacherAssignmentCreateRoute
+      ? buildHomeworkEditorDraftStorageKey({
+          variant: 'assignment',
+          mode: 'create',
+        })
+      : null;
 
   const [templates, setTemplates] = useState<HomeworkTemplate[]>([]);
   const [groups, setGroups] = useState<HomeworkGroupListItem[]>([]);
@@ -271,10 +337,17 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const [templateEditorLoading, setTemplateEditorLoading] = useState(false);
   const [templateEditorError, setTemplateEditorError] = useState<string | null>(null);
   const [assignmentEditorDraft, setAssignmentEditorDraft] = useState<HomeworkEditorDraft>(createInitialHomeworkEditorDraft());
+  const [assignmentEditorInitialDraft, setAssignmentEditorInitialDraft] = useState<HomeworkEditorDraft>(
+    createInitialHomeworkEditorDraft(),
+  );
   const [assignmentEditorLoading, setAssignmentEditorLoading] = useState(false);
   const [assignmentEditorError, setAssignmentEditorError] = useState<string | null>(null);
   const [assignmentEditorOriginalStatus, setAssignmentEditorOriginalStatus] = useState<HomeworkAssignment['status'] | null>(null);
+  const [assignmentEditorServerAssignment, setAssignmentEditorServerAssignment] = useState<HomeworkAssignment | null>(null);
   const [savingAssignmentAsTemplate, setSavingAssignmentAsTemplate] = useState(false);
+  const [pendingAssignmentTemplate, setPendingAssignmentTemplate] = useState<HomeworkTemplate | null>(null);
+  const [cancelIssueAssignment, setCancelIssueAssignment] = useState<HomeworkAssignment | null>(null);
+  const [cancelIssueSubmitting, setCancelIssueSubmitting] = useState(false);
 
   const [studentDetailAssignment, setStudentDetailAssignment] = useState<HomeworkAssignment | null>(null);
   const [studentDetailSubmissions, setStudentDetailSubmissions] = useState<HomeworkSubmission[]>([]);
@@ -284,6 +357,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const [teacherInitialized, setTeacherInitialized] = useState(false);
   const teacherInitStartedRef = useRef(false);
+  const hasSkippedTemplateEditorAutoSaveRef = useRef(false);
+  const hasSkippedAssignmentEditorAutoSaveRef = useRef(false);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -305,6 +380,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   }, [isTeacherTemplateCreateRoute, isTeacherTemplateEditorRoute, mode]);
 
   useEffect(() => {
+    hasSkippedTemplateEditorAutoSaveRef.current = false;
+  }, [templateEditorDraftStorageKey]);
+
+  useEffect(() => {
+    hasSkippedAssignmentEditorAutoSaveRef.current = false;
+  }, [assignmentEditorDraftStorageKey]);
+
+  useEffect(() => {
     if (mode !== 'teacher') return;
     if (!isTeacherTemplateEditRoute || editingTemplateId === null) {
       return;
@@ -312,7 +395,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
     const existingTemplate = templates.find((template) => template.id === editingTemplateId);
     if (existingTemplate) {
-      setTemplateEditorDraft(createHomeworkEditorDraftFromTemplate(existingTemplate));
+      const nextDraft = createHomeworkEditorDraftFromTemplate(existingTemplate);
+      const storedDraft = templateEditorDraftStorageKey
+        ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
+        : null;
+      setTemplateEditorDraft(storedDraft?.draft ?? nextDraft);
       setTemplateEditorError(null);
       setTemplateEditorLoading(false);
       return;
@@ -332,7 +419,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           setTemplateEditorError('Шаблон не найден');
           return;
         }
-        setTemplateEditorDraft(createHomeworkEditorDraftFromTemplate(targetTemplate));
+        const nextDraft = createHomeworkEditorDraftFromTemplate(targetTemplate);
+        const storedDraft = templateEditorDraftStorageKey
+          ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
+          : null;
+        setTemplateEditorDraft(storedDraft?.draft ?? nextDraft);
       })
       .catch((error) => {
         // eslint-disable-next-line no-console
@@ -348,7 +439,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     return () => {
       isCancelled = true;
     };
-  }, [editingTemplateId, isTeacherTemplateEditRoute, mode, templates]);
+  }, [editingTemplateId, isTeacherTemplateEditRoute, mode, templateEditorDraftStorageKey, templates]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
@@ -385,8 +476,13 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
               sourceTemplateId: prefill?.templateId ?? null,
             },
           };
-      setAssignmentEditorDraft(nextDraft);
+      const storedDraft = assignmentEditorDraftStorageKey
+        ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
+        : null;
+      setAssignmentEditorInitialDraft(nextDraft);
+      setAssignmentEditorDraft(storedDraft?.draft ?? nextDraft);
       setAssignmentEditorOriginalStatus(null);
+      setAssignmentEditorServerAssignment(null);
       setAssignmentEditorError(null);
       setAssignmentEditorLoading(false);
     };
@@ -425,11 +521,19 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     return () => {
       isCancelled = true;
     };
-  }, [isTeacherAssignmentCreateRoute, isTeacherAssignmentEditRoute, location.state, mode, templates]);
+  }, [
+    assignmentEditorDraftStorageKey,
+    isTeacherAssignmentCreateRoute,
+    isTeacherAssignmentEditRoute,
+    location.state,
+    mode,
+    templates,
+  ]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
     if (!isTeacherAssignmentEditRoute || editingAssignmentId === null) {
+      setAssignmentEditorServerAssignment(null);
       return;
     }
 
@@ -454,8 +558,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           relatedTemplate = templatesResponse.items.find((template) => template.id === assignment.templateId) ?? null;
         }
 
-        setAssignmentEditorDraft(createHomeworkEditorDraftFromAssignment(assignment, relatedTemplate));
+        const nextDraft = createHomeworkEditorDraftFromAssignment(assignment, relatedTemplate);
+        const storedDraft = assignmentEditorDraftStorageKey
+          ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
+          : null;
+        setAssignmentEditorInitialDraft(nextDraft);
+        setAssignmentEditorDraft(storedDraft?.draft ?? nextDraft);
         setAssignmentEditorOriginalStatus(assignment.status);
+        setAssignmentEditorServerAssignment(response.assignment);
       })
       .catch((error) => {
         // eslint-disable-next-line no-console
@@ -471,7 +581,146 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     return () => {
       isCancelled = true;
     };
-  }, [editingAssignmentId, isTeacherAssignmentEditRoute, mode, templates]);
+  }, [
+    assignmentEditorDraftStorageKey,
+    editingAssignmentId,
+    isTeacherAssignmentEditRoute,
+    mode,
+    templates,
+  ]);
+
+  const assignmentEditorHasUnsavedChanges = useMemo(
+    () =>
+      isTeacherAssignmentEditorRoute &&
+      !areHomeworkEditorDraftsEqual(assignmentEditorDraft, assignmentEditorInitialDraft),
+    [assignmentEditorDraft, assignmentEditorInitialDraft, isTeacherAssignmentEditorRoute],
+  );
+
+  const assignmentCanIssueNow = useMemo(
+    () =>
+      isTeacherAssignmentEditRoute &&
+      assignmentEditorOriginalStatus === 'DRAFT' &&
+      assignmentEditorDraft.assignment.sendMode === 'MANUAL' &&
+      !assignmentEditorHasUnsavedChanges,
+    [
+      assignmentEditorDraft.assignment.sendMode,
+      assignmentEditorHasUnsavedChanges,
+      assignmentEditorOriginalStatus,
+      isTeacherAssignmentEditRoute,
+    ],
+  );
+
+  const assignmentPrimaryActionMode = useMemo<'create' | 'save' | 'issue'>(() => {
+    if (!isTeacherAssignmentEditRoute) {
+      return 'create';
+    }
+    if (assignmentEditorHasUnsavedChanges) {
+      return 'save';
+    }
+    return assignmentCanIssueNow ? 'issue' : 'save';
+  }, [assignmentCanIssueNow, assignmentEditorHasUnsavedChanges, isTeacherAssignmentEditRoute]);
+
+  const assignmentPrimaryActionDisabled = useMemo(
+    () => assignmentPrimaryActionMode === 'save' && !assignmentEditorHasUnsavedChanges,
+    [assignmentEditorHasUnsavedChanges, assignmentPrimaryActionMode],
+  );
+  const assignmentCanCancelIssue = useMemo(
+    () =>
+      isTeacherAssignmentEditRoute &&
+      !assignmentEditorHasUnsavedChanges &&
+      assignmentEditorServerAssignment !== null &&
+      canCancelHomeworkAssignmentIssue(assignmentEditorServerAssignment),
+    [
+      assignmentEditorHasUnsavedChanges,
+      assignmentEditorServerAssignment,
+      isTeacherAssignmentEditRoute,
+    ],
+  );
+
+  const saveAssignmentEditorDraftLocally = useCallback(async () => {
+    if (assignmentEditorDraftStorageKey) {
+      saveStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey, {
+        draft: assignmentEditorDraft,
+        savedAt: new Date().toISOString(),
+      });
+    }
+    showToast({ message: 'Черновик сохранён', variant: 'success' });
+    return true;
+  }, [assignmentEditorDraft, assignmentEditorDraftStorageKey, showToast]);
+
+  useEffect(() => {
+    if (mode !== 'teacher' || !isTeacherAssignmentEditorRoute) {
+      clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
+      return;
+    }
+
+    setEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY, {
+      isDirty: assignmentEditorHasUnsavedChanges,
+      title: 'Сохранить изменения перед выходом?',
+      message: 'У вас есть несохранённые изменения в домашнем задании. Сохранить их как черновик перед выходом?',
+      confirmText: 'Сохранить',
+      cancelText: 'Выйти без сохранения',
+      onSave: saveAssignmentEditorDraftLocally,
+      onDiscard: () => {
+        if (assignmentEditorDraftStorageKey) {
+          clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
+        }
+      },
+      onSaveErrorMessage: 'Не удалось сохранить черновик',
+    });
+
+    return () => {
+      clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
+    };
+  }, [
+    assignmentEditorDraftStorageKey,
+    assignmentEditorHasUnsavedChanges,
+    clearEntry,
+    isTeacherAssignmentEditorRoute,
+    mode,
+    saveAssignmentEditorDraftLocally,
+    setEntry,
+  ]);
+
+  useEffect(() => {
+    if (mode !== 'teacher') return;
+    if (!templateEditorDraftStorageKey || !isTeacherTemplateEditRoute) return;
+    if (!hasSkippedTemplateEditorAutoSaveRef.current) {
+      hasSkippedTemplateEditorAutoSaveRef.current = true;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveStoredHomeworkEditorDraft(templateEditorDraftStorageKey, {
+        draft: templateEditorDraft,
+        savedAt: new Date().toISOString(),
+      });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isTeacherTemplateEditRoute, mode, templateEditorDraft, templateEditorDraftStorageKey]);
+
+  useEffect(() => {
+    if (mode !== 'teacher') return;
+    if (!assignmentEditorDraftStorageKey || !isTeacherAssignmentEditorRoute) return;
+    if (!hasSkippedAssignmentEditorAutoSaveRef.current) {
+      hasSkippedAssignmentEditorAutoSaveRef.current = true;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey, {
+        draft: assignmentEditorDraft,
+        savedAt: new Date().toISOString(),
+      });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [assignmentEditorDraft, assignmentEditorDraftStorageKey, isTeacherAssignmentEditorRoute, mode]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
@@ -1036,6 +1285,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         level: payload.level ?? null,
         blocks: payload.blocks,
       });
+      if (templateEditorDraftStorageKey) {
+        clearStoredHomeworkEditorDraft(templateEditorDraftStorageKey);
+      }
       showToast({ message: 'Шаблон обновлен', variant: 'success' });
       await loadTeacherTemplates();
       return { success: true };
@@ -1053,6 +1305,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     loadTeacherTemplates,
     resolveTemplateSubmitFailure,
     showToast,
+    templateEditorDraftStorageKey,
     templateEditorDraft,
   ]);
 
@@ -1256,15 +1509,68 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     [navigate],
   );
 
-  const resolveAssignmentSaveTargetTab = useCallback(
-    (status: HomeworkAssignment['status']): TeacherHomeworkListFilter => {
-      if (status === 'SENT') return 'sent';
-      if (status === 'SUBMITTED' || status === 'IN_REVIEW') return 'review';
-      if (status === 'REVIEWED') return 'closed';
-      return 'not_issued';
-    },
+  const buildAssignmentDraftFromTemplate = useCallback(
+    (template: HomeworkTemplate, assignmentContext: HomeworkEditorDraft['assignment']) =>
+      createHomeworkEditorDraftFromTemplate(template, {
+        studentId: assignmentContext.studentId ?? null,
+        lessonId: assignmentContext.lessonId ?? null,
+        groupId: assignmentContext.groupId ?? null,
+        deadlineAt: assignmentContext.deadlineAt ?? null,
+        sendMode: assignmentContext.sendMode,
+      }),
     [],
   );
+
+  const applyAssignmentTemplate = useCallback(
+    (template: HomeworkTemplate) => {
+      setAssignmentEditorDraft((currentDraft) => buildAssignmentDraftFromTemplate(template, currentDraft.assignment));
+    },
+    [buildAssignmentDraftFromTemplate],
+  );
+
+  const handleAssignmentTemplateSelect = useCallback(
+    (templateId: number | null) => {
+      if (templateId === null) {
+        setPendingAssignmentTemplate(null);
+        setAssignmentEditorDraft((currentDraft) => ({
+          ...currentDraft,
+          assignment: {
+            ...currentDraft.assignment,
+            sourceTemplateId: null,
+          },
+        }));
+        return;
+      }
+
+      if (assignmentEditorDraft.assignment.sourceTemplateId === templateId) {
+        return;
+      }
+
+      const nextTemplate = templates.find((template) => template.id === templateId) ?? null;
+      if (!nextTemplate) {
+        showToast({ message: 'Шаблон не найден', variant: 'error' });
+        return;
+      }
+
+      if (hasHomeworkEditorContent(assignmentEditorDraft)) {
+        setPendingAssignmentTemplate(nextTemplate);
+        return;
+      }
+
+      applyAssignmentTemplate(nextTemplate);
+    },
+    [applyAssignmentTemplate, assignmentEditorDraft, showToast, templates],
+  );
+
+  const handleConfirmAssignmentTemplateReplace = useCallback(async () => {
+    if (!pendingAssignmentTemplate) return;
+    applyAssignmentTemplate(pendingAssignmentTemplate);
+    setPendingAssignmentTemplate(null);
+  }, [applyAssignmentTemplate, pendingAssignmentTemplate]);
+
+  const handleCancelAssignmentTemplateReplace = useCallback(async () => {
+    setPendingAssignmentTemplate(null);
+  }, []);
 
   const handleSubmitAssignmentFromScreen = useCallback(
     async (action: 'save' | 'submit'): Promise<HomeworkTemplateCreateSubmitResult> => {
@@ -1273,32 +1579,56 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         return { success: false };
       }
 
-      const nextStatus =
-        action === 'submit'
-          ? 'SENT'
-          : assignmentEditorOriginalStatus && assignmentEditorOriginalStatus !== 'DRAFT' && assignmentEditorOriginalStatus !== 'SCHEDULED'
-            ? assignmentEditorOriginalStatus
-            : assignmentEditorDraft.assignment.sendMode === 'AUTO_AFTER_LESSON_DONE'
-              ? 'SCHEDULED'
-              : 'DRAFT';
-      const targetTab = resolveAssignmentSaveTargetTab(nextStatus);
-      const targetStudentId = assignmentEditorDraft.assignment.studentId;
+      const editorMode = isTeacherAssignmentEditRoute ? 'edit' : 'create';
+      const nextStatus = resolveAssignmentPersistedStatus({
+        action,
+        mode: editorMode,
+        currentStatus: assignmentEditorOriginalStatus,
+        sendMode: assignmentEditorDraft.assignment.sendMode,
+      });
 
       setSubmittingAssignment(true);
       try {
         if (isTeacherAssignmentEditRoute && editingAssignmentId) {
-          await api.updateHomeworkAssignmentV2(editingAssignmentId, {
+          const response = await api.updateHomeworkAssignmentV2(editingAssignmentId, {
             title: assignmentEditorDraft.title.trim(),
             lessonId: assignmentEditorDraft.assignment.lessonId,
             templateId: assignmentEditorDraft.assignment.sourceTemplateId,
             groupId: assignmentEditorDraft.assignment.groupId,
             sendMode: assignmentEditorDraft.assignment.sendMode,
             status: nextStatus,
+            sentAt: action === 'submit' ? new Date().toISOString() : null,
             deadlineAt: assignmentEditorDraft.assignment.deadlineAt,
             contentSnapshot: assignmentEditorDraft.blocks,
           });
-        } else {
-          await api.createHomeworkAssignmentV2({
+          setAssignmentEditorInitialDraft(assignmentEditorDraft);
+          setAssignmentEditorOriginalStatus(response.assignment.status);
+          setAssignmentEditorServerAssignment(response.assignment);
+
+          void Promise.allSettled([
+            fetchTeacherAssignments({ offset: 0, append: false }),
+            loadTeacherSummary(),
+            loadTeacherGroups(),
+          ]);
+
+          showToast({
+            message:
+              action === 'submit'
+                ? 'Домашка выдана ученику'
+                : nextStatus === 'SCHEDULED'
+                  ? 'Домашка сохранена и будет выдана после урока'
+                  : 'Изменения сохранены',
+            variant: 'success',
+          });
+
+          if (assignmentEditorDraftStorageKey) {
+            clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
+          }
+          clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
+          return { success: true, closeOnSuccess: false };
+        }
+
+        const response = await api.createHomeworkAssignmentV2({
             studentId: assignmentEditorDraft.assignment.studentId,
             lessonId: assignmentEditorDraft.assignment.lessonId ?? undefined,
             templateId: assignmentEditorDraft.assignment.sourceTemplateId ?? undefined,
@@ -1309,33 +1639,34 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
             deadlineAt: assignmentEditorDraft.assignment.deadlineAt,
             contentSnapshot: assignmentEditorDraft.blocks,
           });
+
+        if (assignmentEditorDraftStorageKey) {
+          clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
         }
+        clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
 
         showToast({
           message:
-            action === 'submit'
-              ? 'Домашка выдана ученику'
-              : nextStatus === 'SCHEDULED'
-                ? 'Домашка сохранена как запланированная'
-                : 'Домашка сохранена',
+            nextStatus === 'SCHEDULED'
+              ? 'Домашка создана и будет выдана после урока'
+              : 'Домашка создана',
           variant: 'success',
         });
 
-        setActiveTab(targetTab);
-        setSelectedStudentId(targetStudentId);
-        await Promise.all([
-          fetchTeacherAssignments({
-            offset: 0,
-            append: false,
-            tab: targetTab,
-            studentId: targetStudentId,
-          }),
-          loadTeacherSummary(targetStudentId),
+        setAssignmentEditorInitialDraft(assignmentEditorDraft);
+        setAssignmentEditorOriginalStatus(response.assignment.status);
+        setAssignmentEditorServerAssignment(response.assignment);
+
+        void Promise.allSettled([
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
           loadTeacherGroups(),
         ]);
-        resetGroupAssignmentsState();
 
-        return { success: true };
+        requestNavigationBypass();
+        navigate(`/homeworks/${response.assignment.id}/edit`, { replace: true });
+
+        return { success: true, closeOnSuccess: false };
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to save homework assignment from editor', error);
@@ -1349,12 +1680,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       assignmentEditorDraft,
       assignmentEditorOriginalStatus,
       editingAssignmentId,
+      assignmentEditorDraftStorageKey,
       fetchTeacherAssignments,
       isTeacherAssignmentEditRoute,
       loadTeacherGroups,
       loadTeacherSummary,
-      resetGroupAssignmentsState,
-      resolveAssignmentSaveTargetTab,
+      clearEntry,
+      navigate,
+      requestNavigationBypass,
       showToast,
     ],
   );
@@ -1363,15 +1696,22 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     const payload = buildTemplateUpsertPayload(assignmentEditorDraft);
     setSavingAssignmentAsTemplate(true);
     try {
-      await api.createHomeworkTemplateV2({
+      const response = await api.createHomeworkTemplateV2({
         title: payload.title.trim(),
         tags: payload.tags,
         subject: payload.subject ?? null,
         level: payload.level ?? null,
         blocks: payload.blocks,
       });
+      setTemplates((currentTemplates) => mergeHomeworkTemplate(currentTemplates, response.template));
+      setAssignmentEditorDraft((currentDraft) => ({
+        ...currentDraft,
+        assignment: {
+          ...currentDraft.assignment,
+          sourceTemplateId: response.template.id,
+        },
+      }));
       showToast({ message: 'Шаблон сохранён', variant: 'success' });
-      await loadTeacherTemplates();
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to save assignment as template', error);
@@ -1379,7 +1719,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     } finally {
       setSavingAssignmentAsTemplate(false);
     }
-  }, [assignmentEditorDraft, buildTemplateUpsertPayload, loadTeacherTemplates, showToast]);
+  }, [assignmentEditorDraft, buildTemplateUpsertPayload, showToast]);
 
   const handleSendAssignmentNow = useCallback(
     async (assignment: HomeworkAssignment) => {
@@ -1399,6 +1739,55 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     [fetchTeacherAssignments, loadTeacherSummary, showToast],
   );
 
+  const handleCancelAssignmentIssue = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      setCancelIssueAssignment(assignment);
+    },
+    [],
+  );
+
+  const handleConfirmCancelAssignmentIssue = useCallback(async () => {
+    if (!cancelIssueAssignment || cancelIssueSubmitting) return;
+    setCancelIssueSubmitting(true);
+    try {
+      const response = await api.cancelHomeworkAssignmentIssueV2(cancelIssueAssignment.id);
+      if (isTeacherAssignmentEditRoute && editingAssignmentId === cancelIssueAssignment.id) {
+        setAssignmentEditorOriginalStatus(response.assignment.status);
+        setAssignmentEditorServerAssignment(response.assignment);
+      }
+      setCancelIssueAssignment(null);
+      showToast({ message: 'Выдача домашки отменена', variant: 'success' });
+      await Promise.all([
+        fetchTeacherAssignments({ offset: 0, append: false }),
+        loadTeacherSummary(),
+        loadTeacherGroups(),
+      ]);
+      resetGroupAssignmentsState();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to cancel assignment issue', error);
+      showToast({
+        message:
+          isApiRequestError(error) && typeof error.message === 'string' && error.message
+            ? error.message
+            : 'Не удалось отменить выдачу домашки',
+        variant: 'error',
+      });
+    } finally {
+      setCancelIssueSubmitting(false);
+    }
+  }, [
+    cancelIssueAssignment,
+    cancelIssueSubmitting,
+    editingAssignmentId,
+    fetchTeacherAssignments,
+    isTeacherAssignmentEditRoute,
+    loadTeacherGroups,
+    loadTeacherSummary,
+    resetGroupAssignmentsState,
+    showToast,
+  ]);
+
   const handleRemindAssignment = useCallback(
     async (assignment: HomeworkAssignment) => {
       try {
@@ -1416,6 +1805,48 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       }
     },
     [fetchTeacherAssignments, loadTeacherActivityUnread, showToast],
+  );
+
+  const handleOpenStudentProfile = useCallback(
+    (studentId: number) => {
+      setSelectedStudentId(studentId);
+      navigate(`/students/${studentId}`);
+    },
+    [navigate],
+  );
+
+  const handleOpenAssignmentLessonDay = useCallback(
+    (assignment: HomeworkAssignment) => {
+      if (!assignment.lessonStartAt) return;
+      const lessonDay = format(toZonedDate(assignment.lessonStartAt, timeZone), 'yyyy-MM-dd');
+      navigate(`/schedule?date=${lessonDay}&view=day`);
+    },
+    [navigate, timeZone],
+  );
+
+  const handleUpdateAssignmentDeadline = useCallback(
+    async (assignment: HomeworkAssignment, deadlineAt: string | null) => {
+      try {
+        const response = await api.updateHomeworkAssignmentV2(assignment.id, { deadlineAt });
+        if (isTeacherAssignmentEditRoute && editingAssignmentId === assignment.id) {
+          setAssignmentEditorOriginalStatus(response.assignment.status);
+          setAssignmentEditorServerAssignment(response.assignment);
+        }
+        showToast({ message: deadlineAt ? 'Дедлайн обновлён' : 'Дедлайн убран', variant: 'success' });
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to update assignment deadline', error);
+        showToast({ message: 'Не удалось обновить дедлайн', variant: 'error' });
+      }
+    },
+    [
+      editingAssignmentId,
+      fetchTeacherAssignments,
+      isTeacherAssignmentEditRoute,
+      loadTeacherSummary,
+      showToast,
+    ],
   );
 
   const handleDeleteAssignment = useCallback(
@@ -1739,7 +2170,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         onToggleTemplateFavorite={handleToggleTemplateFavorite}
         onCreateAssignment={handleCreateAssignment}
         onSendAssignmentNow={handleSendAssignmentNow}
+        onCancelAssignmentIssue={handleCancelAssignmentIssue}
         onRemindAssignment={handleRemindAssignment}
+        onOpenStudentProfile={handleOpenStudentProfile}
+        onOpenLessonDay={handleOpenAssignmentLessonDay}
+        onUpdateAssignmentDeadline={handleUpdateAssignmentDeadline}
         onDeleteAssignment={handleDeleteAssignment}
         onFixConfigError={handleFixConfigError}
         onBulkAction={handleBulkAction}
@@ -1794,6 +2229,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleArchiveTemplate,
       handleRestoreTemplate,
       handleBulkAction,
+      handleCancelAssignmentIssue,
       handleCreateAssignment,
       handleCreateGroup,
       handleDeleteAssignment,
@@ -1801,6 +2237,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleDuplicateTemplate,
       handleFixConfigError,
       handleOpenDetail,
+      handleOpenAssignmentLessonDay,
+      handleOpenStudentProfile,
       handleOpenReview,
       handleRebindAssignmentGroup,
       handleRebindAssignmentsGroup,
@@ -1809,6 +2247,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleStartReviewQueue,
       handleSubmitReview,
       handleToggleTemplateFavorite,
+      handleUpdateAssignmentDeadline,
       handleUpdateGroup,
       hasMoreAssignments,
       groupAssignmentsByKey,
@@ -1854,29 +2293,55 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     ],
   );
 
+  const cancelIssueDialog = (
+    <DialogModal
+      open={cancelIssueAssignment !== null}
+      title="Отменить выдачу домашнего задания?"
+      description={
+        cancelIssueAssignment
+          ? `Домашка «${cancelIssueAssignment.title}» исчезнет у ученика, черновые ответы будут очищены, а ученик получит уведомление об отмене выдачи.`
+          : ''
+      }
+      confirmText={cancelIssueSubmitting ? 'Отменяю…' : 'Отменить выдачу'}
+      cancelText="Оставить как есть"
+      onClose={() => {
+        if (cancelIssueSubmitting) return;
+        setCancelIssueAssignment(null);
+      }}
+      onConfirm={handleConfirmCancelAssignmentIssue}
+      onCancel={() => {
+        if (cancelIssueSubmitting) return;
+        setCancelIssueAssignment(null);
+      }}
+    />
+  );
+
   if (mode === 'teacher') {
     if (hasTeacherReviewAssignmentId) {
       return (
-        <HomeworkReviewScreen
-          assignment={reviewAssignment}
-          submissions={reviewSubmissions}
-          initialDraft={reviewInitialDraft}
-          loading={reviewLoading}
-          requestError={reviewError}
-          submitting={reviewSubmitting}
-          onBack={() => {
-            navigate('/homeworks');
-          }}
-          onDraftChange={(draft, meta) => {
-            setReviewCurrentDraft(draft);
-            setReviewHasUnsavedDraft(meta.isDirty);
-          }}
-          onRefresh={() => {
-            if (!Number.isFinite(assignmentId) || assignmentId <= 0) return;
-            void loadTeacherReviewData(assignmentId);
-          }}
-          onSubmitReview={handleSubmitReview}
-        />
+        <>
+          <HomeworkReviewScreen
+            assignment={reviewAssignment}
+            submissions={reviewSubmissions}
+            initialDraft={reviewInitialDraft}
+            loading={reviewLoading}
+            requestError={reviewError}
+            submitting={reviewSubmitting}
+            onBack={() => {
+              navigate('/homeworks');
+            }}
+            onDraftChange={(draft, meta) => {
+              setReviewCurrentDraft(draft);
+              setReviewHasUnsavedDraft(meta.isDirty);
+            }}
+            onRefresh={() => {
+              if (!Number.isFinite(assignmentId) || assignmentId <= 0) return;
+              void loadTeacherReviewData(assignmentId);
+            }}
+            onSubmitReview={handleSubmitReview}
+          />
+          {cancelIssueDialog}
+        </>
       );
     }
 
@@ -1897,20 +2362,48 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       }
 
       return (
-        <HomeworkTemplateCreateScreen
-          variant="assignment"
-          mode={isTeacherAssignmentEditRoute ? 'edit' : 'create'}
-          draft={assignmentEditorDraft}
-          submitting={submittingAssignment}
-          saveAsTemplateSubmitting={savingAssignmentAsTemplate}
-          students={students}
-          groups={groups}
-          lockAssignmentStudent={isTeacherAssignmentEditRoute}
-          onDraftChange={setAssignmentEditorDraft}
-          onSubmit={handleSubmitAssignmentFromScreen}
-          onSaveAsTemplate={handleSaveAssignmentAsTemplate}
-          onBack={() => navigate('/homeworks')}
-        />
+        <>
+          <HomeworkTemplateCreateScreen
+            variant="assignment"
+            mode={isTeacherAssignmentEditRoute ? 'edit' : 'create'}
+            draft={assignmentEditorDraft}
+            submitting={submittingAssignment}
+            saveAsTemplateSubmitting={savingAssignmentAsTemplate}
+            students={students}
+            groups={groups}
+            templates={templates}
+            lockAssignmentStudent={isTeacherAssignmentEditRoute}
+            assignmentPrimaryActionMode={assignmentPrimaryActionMode}
+            assignmentPrimaryActionDisabled={assignmentPrimaryActionDisabled}
+            showCancelIssueAction={assignmentCanCancelIssue}
+            cancelIssueSubmitting={cancelIssueSubmitting && cancelIssueAssignment?.id === editingAssignmentId}
+            onDraftChange={setAssignmentEditorDraft}
+            onSubmit={handleSubmitAssignmentFromScreen}
+            onSaveAsTemplate={handleSaveAssignmentAsTemplate}
+            onAssignmentTemplateSelect={handleAssignmentTemplateSelect}
+            onCancelIssue={async () => {
+              if (!assignmentEditorServerAssignment) return;
+              await handleCancelAssignmentIssue(assignmentEditorServerAssignment);
+            }}
+            onBack={() => navigate('/homeworks')}
+          />
+
+          <DialogModal
+            open={pendingAssignmentTemplate !== null}
+            title="Заменить содержимое домашнего задания?"
+            description={
+              pendingAssignmentTemplate
+                ? `Шаблон «${pendingAssignmentTemplate.title}» полностью заменит текущее название, вопросы, материалы и настройки задания.`
+                : ''
+            }
+            confirmText="Применить шаблон"
+            cancelText="Отмена"
+            onClose={() => setPendingAssignmentTemplate(null)}
+            onConfirm={handleConfirmAssignmentTemplateReplace}
+            onCancel={handleCancelAssignmentTemplateReplace}
+          />
+          {cancelIssueDialog}
+        </>
       );
     }
 
@@ -1923,7 +2416,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         return (
           <section>
             <p>{templateEditorError}</p>
-            <button type="button" onClick={() => navigate('/homeworks')}>
+            <button type="button" onClick={() => navigate(teacherTemplateListPath)}>
               Назад
             </button>
           </section>
@@ -1931,23 +2424,31 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       }
 
       return (
-        <HomeworkTemplateCreateScreen
-          mode={isTeacherTemplateEditRoute ? 'edit' : 'create'}
-          variant="template"
-          draft={templateEditorDraft}
-          submitting={submittingTemplate}
-          onDraftChange={setTemplateEditorDraft}
-          onSubmit={(action) => {
-            if (action === 'save') {
-              return Promise.resolve({ success: true });
-            }
-            return isTeacherTemplateEditRoute ? handleUpdateTemplateFromScreen() : handleCreateTemplateFromScreen();
-          }}
-          onBack={() => navigate('/homeworks')}
-        />
+        <>
+          <HomeworkTemplateCreateScreen
+            mode={isTeacherTemplateEditRoute ? 'edit' : 'create'}
+            variant="template"
+            draft={templateEditorDraft}
+            submitting={submittingTemplate}
+            onDraftChange={setTemplateEditorDraft}
+            onSubmit={(action) => {
+              if (action === 'save') {
+                return Promise.resolve({ success: true });
+              }
+              return isTeacherTemplateEditRoute ? handleUpdateTemplateFromScreen() : handleCreateTemplateFromScreen();
+            }}
+            onBack={() => navigate(teacherTemplateListPath)}
+          />
+          {cancelIssueDialog}
+        </>
       );
     }
-    return teacherView;
+    return (
+      <>
+        {teacherView}
+        {cancelIssueDialog}
+      </>
+    );
   }
 
   if (hasStudentAssignmentId) {

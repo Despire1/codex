@@ -1,6 +1,6 @@
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Lesson, StudentListItem, Teacher } from '../../entities/types';
+import { HomeworkAssignment, Lesson, StudentListItem, Teacher } from '../../entities/types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useSelectedStudent } from '@/entities/student/model/selectedStudent';
 import {
@@ -11,7 +11,6 @@ import {
 import { useTimeZone } from '@/shared/lib/timezoneContext';
 import { api } from '@/shared/api/client';
 import { useStudentsData } from './model/useStudentsData';
-import { useStudentsHomework } from './model/useStudentsHomework';
 import { useStudentsActions } from './model/useStudentsActions';
 import { useStudentsList } from './model/useStudentsList';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
@@ -21,6 +20,7 @@ import { StudentsReferenceProfileView } from './components/reference/StudentsRef
 import { BalanceTopupModal } from './components/BalanceTopupModal';
 import styles from './StudentsSectionReference.module.css';
 import { tabPathById } from '@/app/tabs';
+import { useToast } from '@/shared/lib/toast';
 
 interface StudentsSectionProps {
   hasAccess: boolean;
@@ -32,6 +32,7 @@ interface StudentsSectionProps {
 }
 
 type ProfileTabId = 'homework' | 'lessons' | 'payments';
+const STUDENT_PROFILE_HOMEWORK_PAGE_SIZE = 15;
 
 const resolveTabFromSearch = (search: string): ProfileTabId => {
   const params = new URLSearchParams(search);
@@ -47,6 +48,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const { studentId: routeStudentIdParam } = useParams<{ studentId?: string }>();
   const timeZone = useTimeZone();
   const isMobile = useIsMobile(900);
@@ -55,9 +57,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     useStudentsActions();
 
   const {
-    studentHomeworks,
-    studentHomeworkLoading,
-    loadStudentHomeworks,
     studentLessons,
     studentLessonsHasMore,
     studentLessonsSummary,
@@ -73,8 +72,6 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     refreshPayments,
     refreshPaymentReminders,
   } = useStudentsData();
-
-  const { remindHomeworkById } = useStudentsHomework();
   const { openCreateLessonForStudent, remindLessonPayment, togglePaid } = useLessonActions();
   const routeStudentId = (() => {
     const value = Number(routeStudentIdParam);
@@ -102,10 +99,18 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const [routeStudentEntry, setRouteStudentEntry] = useState<StudentListItem | null>(null);
   const [routeStudentEntryLoading, setRouteStudentEntryLoading] = useState(false);
   const [isBalanceTopupOpen, setIsBalanceTopupOpen] = useState(false);
+  const [profileHomeworkAssignments, setProfileHomeworkAssignments] = useState<HomeworkAssignment[]>([]);
+  const [profileHomeworkAssignmentsStudentId, setProfileHomeworkAssignmentsStudentId] = useState<number | null>(null);
+  const [profileHomeworkAssignmentsLoading, setProfileHomeworkAssignmentsLoading] = useState(false);
+  const [profileHomeworkAssignmentsLoadingMore, setProfileHomeworkAssignmentsLoadingMore] = useState(false);
+  const [profileHomeworkAssignmentsHasMore, setProfileHomeworkAssignmentsHasMore] = useState(false);
+  const [profileHomeworkAssignmentsNextOffset, setProfileHomeworkAssignmentsNextOffset] = useState<number | null>(null);
   const isProfileOpen = routeStudentId !== null;
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const homeworkAssignmentsRequestIdRef = useRef(0);
+  const homeworkAssignmentsRequestRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
   useEffect(() => {
     if (!hasAccess) return;
@@ -206,13 +211,93 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     onActiveTabChange?.(activeTab);
   }, [activeTab, isProfileOpen, onActiveTabChange]);
 
+  const loadProfileHomeworkAssignments = useCallback(
+    async (options?: { studentIdOverride?: number | null; offset?: number; append?: boolean }) => {
+      const targetStudentId = options?.studentIdOverride ?? routeStudentId ?? selectedStudentId;
+      if (!targetStudentId) {
+        setProfileHomeworkAssignments([]);
+        setProfileHomeworkAssignmentsStudentId(null);
+        setProfileHomeworkAssignmentsHasMore(false);
+        setProfileHomeworkAssignmentsNextOffset(null);
+        return;
+      }
+
+      const offset = options?.offset ?? 0;
+      const append = Boolean(options?.append);
+      const requestKey = JSON.stringify({
+        studentId: targetStudentId,
+        offset,
+        limit: STUDENT_PROFILE_HOMEWORK_PAGE_SIZE,
+      });
+
+      if (homeworkAssignmentsRequestRef.current?.key === requestKey) {
+        return homeworkAssignmentsRequestRef.current.promise;
+      }
+
+      const requestId = homeworkAssignmentsRequestIdRef.current + 1;
+      homeworkAssignmentsRequestIdRef.current = requestId;
+      const promise = (async () => {
+        if (append) {
+          setProfileHomeworkAssignmentsLoadingMore(true);
+        } else {
+          if (profileHomeworkAssignmentsStudentId !== targetStudentId) {
+            setProfileHomeworkAssignments([]);
+            setProfileHomeworkAssignmentsHasMore(false);
+            setProfileHomeworkAssignmentsNextOffset(null);
+          }
+          setProfileHomeworkAssignmentsStudentId(targetStudentId);
+          setProfileHomeworkAssignmentsLoading(true);
+        }
+
+        try {
+          const response = await api.listHomeworkAssignmentsV2({
+            studentId: targetStudentId,
+            limit: STUDENT_PROFILE_HOMEWORK_PAGE_SIZE,
+            offset,
+            sort: 'created',
+          });
+          if (homeworkAssignmentsRequestIdRef.current !== requestId) return;
+
+          setProfileHomeworkAssignmentsStudentId(targetStudentId);
+          setProfileHomeworkAssignmentsHasMore(response.nextOffset !== null);
+          setProfileHomeworkAssignmentsNextOffset(response.nextOffset);
+          setProfileHomeworkAssignments((prev) =>
+            append
+              ? [...prev, ...response.items.filter((assignment) => !prev.some((item) => item.id === assignment.id))]
+              : response.items,
+          );
+        } catch (error) {
+          console.error('Failed to load profile homework assignments', error);
+        } finally {
+          if (homeworkAssignmentsRequestIdRef.current === requestId) {
+            if (append) {
+              setProfileHomeworkAssignmentsLoadingMore(false);
+            } else {
+              setProfileHomeworkAssignmentsLoading(false);
+            }
+          }
+        }
+      })();
+
+      homeworkAssignmentsRequestRef.current = { key: requestKey, promise };
+      try {
+        await promise;
+      } finally {
+        if (homeworkAssignmentsRequestRef.current?.key === requestKey) {
+          homeworkAssignmentsRequestRef.current = null;
+        }
+      }
+    },
+    [profileHomeworkAssignmentsStudentId, routeStudentId, selectedStudentId],
+  );
+
   useEffect(() => {
     const profileStudentId = routeStudentId ?? selectedStudentId;
     if (!profileStudentId || !isProfileOpen) return;
     void loadStudentUnpaidLessons({ studentIdOverride: profileStudentId });
 
     if (activeTab === 'homework') {
-      void loadStudentHomeworks({ studentIdOverride: profileStudentId });
+      void loadProfileHomeworkAssignments({ studentIdOverride: profileStudentId });
       return;
     }
 
@@ -228,7 +313,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   }, [
     activeTab,
     isProfileOpen,
-    loadStudentHomeworks,
+    loadProfileHomeworkAssignments,
     loadStudentLessons,
     loadStudentUnpaidLessons,
     refreshPaymentReminders,
@@ -236,6 +321,39 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     routeStudentId,
     selectedStudentId,
   ]);
+
+  const loadMoreProfileHomeworkAssignments = useCallback(() => {
+    if (profileHomeworkAssignmentsLoading || profileHomeworkAssignmentsLoadingMore || !profileHomeworkAssignmentsHasMore) {
+      return;
+    }
+    if (typeof profileHomeworkAssignmentsNextOffset !== 'number') return;
+    void loadProfileHomeworkAssignments({
+      offset: profileHomeworkAssignmentsNextOffset,
+      append: true,
+    });
+  }, [
+    loadProfileHomeworkAssignments,
+    profileHomeworkAssignmentsHasMore,
+    profileHomeworkAssignmentsLoading,
+    profileHomeworkAssignmentsLoadingMore,
+    profileHomeworkAssignmentsNextOffset,
+  ]);
+
+  const handleRemindHomeworkAssignment = useCallback(
+    async (assignmentId: number) => {
+      try {
+        const response = await api.remindHomeworkAssignmentV2(assignmentId);
+        setProfileHomeworkAssignments((prev) =>
+          prev.map((assignment) => (assignment.id === assignmentId ? response.assignment : assignment)),
+        );
+        showToast({ message: 'Напоминание отправлено', variant: 'success' });
+      } catch (error) {
+        console.error('Failed to remind homework assignment', error);
+        showToast({ message: 'Не удалось отправить напоминание', variant: 'error' });
+      }
+    },
+    [showToast],
+  );
 
   const selectedStudentEntry = useMemo(
     () => {
@@ -410,8 +528,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
       ) : (
         <StudentsReferenceProfileView
           studentEntry={selectedStudentEntry}
-          studentHomeworks={studentHomeworks}
-          studentHomeworksLoading={studentHomeworkLoading}
+          studentHomeworkAssignments={profileHomeworkAssignments}
+          studentHomeworkAssignmentsLoading={profileHomeworkAssignmentsLoading}
+          studentHomeworkAssignmentsHasMore={profileHomeworkAssignmentsHasMore}
+          studentHomeworkAssignmentsLoadingMore={profileHomeworkAssignmentsLoadingMore}
           studentLessons={studentLessons}
           studentLessonsHasMore={studentLessonsHasMore}
           studentLessonsLoading={studentLessonLoading}
@@ -420,6 +540,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           studentDebtItems={studentDebtItems}
           payments={payments}
           paymentsLoading={paymentsLoading}
+          onLoadMoreHomeworks={loadMoreProfileHomeworkAssignments}
           onLoadMoreLessons={loadMoreStudentLessons}
           onCreateStudentNote={handleCreateStudentNote}
           onUpdateStudentNote={handleUpdateStudentNote}
@@ -435,8 +556,8 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onWriteToStudent={handleWriteToStudent}
           onRemindLessonPayment={remindLessonPayment}
           onTogglePaid={togglePaid}
-          onRemindHomework={(homeworkId) => {
-            void remindHomeworkById(homeworkId);
+          onRemindHomework={(assignmentId) => {
+            void handleRemindHomeworkAssignment(assignmentId);
           }}
           timeZone={timeZone}
         />

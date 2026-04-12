@@ -13,6 +13,7 @@ interface CreateTemplateHeaderProps {
   variant: 'template' | 'assignment';
   submitting: boolean;
   hasValidationErrors: boolean;
+  primaryActionDisabled?: boolean;
   draftSavedAtLabel: string | null;
   showSecondaryAction: boolean;
   secondaryActionLabel: string;
@@ -28,6 +29,7 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
   variant,
   submitting,
   hasValidationErrors,
+  primaryActionDisabled = false,
   draftSavedAtLabel,
   showSecondaryAction,
   secondaryActionLabel,
@@ -89,7 +91,7 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
         <button
           type="button"
           className={styles.submitButton}
-          disabled={submitting || hasValidationErrors}
+          disabled={submitting || hasValidationErrors || primaryActionDisabled}
           onClick={onPrimaryAction}
         >
           <HomeworkCheckIcon size={14} className={styles.submitIcon} />

@@ -144,7 +144,7 @@ const AppPageContent = () => {
   const location = useLocation();
   const blockNavigation = useBlockNavigation();
   const { showToast } = useToast();
-  const { getActiveEntry, clearEntry } = useUnsavedChanges();
+  const { getActiveEntry, clearEntry, requestNavigationBypass, consumeNavigationBypass } = useUnsavedChanges();
   const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
   const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
@@ -173,6 +173,7 @@ const AppPageContent = () => {
   const [templateCreateTopbarState, setTemplateCreateTopbarState] = useState<HomeworkTemplateCreateTopbarState>({
     submitting: false,
     hasValidationErrors: false,
+    primaryActionDisabled: false,
     draftSavedAtLabel: null,
     showSecondaryAction: false,
     secondaryActionLabel: '',
@@ -219,6 +220,7 @@ const AppPageContent = () => {
 
   const studentCardFilters = useStudentCardFiltersInternal();
   const isStudentProfileRoute = !isStudentRole && /^\/students\/\d+\/?$/.test(location.pathname);
+  const effectiveStudentHomeworkFilter = isStudentProfileRoute ? 'all' : studentCardFilters.homeworkFilter;
   const effectiveStudentLessonPaymentFilter = isStudentProfileRoute ? 'all' : studentCardFilters.lessonPaymentFilter;
   const effectiveStudentLessonStatusFilter = isStudentProfileRoute ? 'all' : studentCardFilters.lessonStatusFilter;
   const effectiveStudentLessonSortOrder = isStudentProfileRoute ? 'asc' : studentCardFilters.lessonSortOrder;
@@ -231,7 +233,7 @@ const AppPageContent = () => {
     timeZone: resolvedTimeZone,
     selectedStudentId,
     studentActiveTab,
-    homeworkFilter: studentCardFilters.homeworkFilter,
+    homeworkFilter: effectiveStudentHomeworkFilter,
     lessonPaymentFilter: effectiveStudentLessonPaymentFilter,
     lessonStatusFilter: effectiveStudentLessonStatusFilter,
     lessonDateRange: effectiveStudentLessonDateRange,
@@ -300,12 +302,12 @@ const AppPageContent = () => {
 
       showUnsavedChangesDialog(active, {
         onProceed: () => {
-          skipNextBlockRef.current = true;
+          requestNavigationBypass();
           navigate(to, options);
         },
       });
     },
-    [getActiveEntry, navigate, showUnsavedChangesDialog],
+    [getActiveEntry, navigate, requestNavigationBypass, showUnsavedChangesDialog],
   );
   const blockDialogOpenRef = useRef(false);
   const skipNextBlockRef = useRef(false);
@@ -316,7 +318,7 @@ const AppPageContent = () => {
     if (!hasUnsavedChanges) return undefined;
 
     const unblock = blockNavigation((tx: NavigationBlockTx) => {
-      if (skipNextBlockRef.current) {
+      if (skipNextBlockRef.current || consumeNavigationBypass()) {
         skipNextBlockRef.current = false;
         tx.retry();
         return;
@@ -345,7 +347,7 @@ const AppPageContent = () => {
       blockDialogOpenRef.current = false;
       unblock();
     };
-  }, [blockNavigation, getActiveEntry, hasUnsavedChanges, showUnsavedChangesDialog]);
+  }, [blockNavigation, consumeNavigationBypass, getActiveEntry, hasUnsavedChanges, showUnsavedChangesDialog]);
 
   const navigateToStudents = useCallback(() => {
     guardedNavigate(tabPathById.students);
@@ -431,6 +433,9 @@ const AppPageContent = () => {
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
   const isTeacherHomeworkEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute;
   const isTeacherAnyHomeworkEditorRoute = isTeacherTemplateEditorRoute || isTeacherHomeworkEditorRoute;
+  const teacherHomeworkEditorBackPath = isTeacherTemplateEditorRoute
+    ? `${tabPathById.homeworks}?view=templates`
+    : tabPathById.homeworks;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
   const desktopTopbarResolvedTitle = isTeacherHomeworkEditorRoute
@@ -465,14 +470,20 @@ const AppPageContent = () => {
       : desktopDateLabel;
   const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (
     isTeacherHomeworkEditorRoute
-      ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать ДЗ')
+      ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать')
       : 'Создать шаблон'
   );
   const editorSecondaryActionLabel = templateCreateTopbarState.secondaryActionLabel || 'Сохранить черновик';
   const showEditorSecondaryAction =
     templateCreateTopbarState.showSecondaryAction || isTeacherHomeworkEditorRoute || isTeacherTemplateCreateRoute;
   const editorPrimarySubmittingLabel =
-    templateCreateTopbarState.primarySubmittingLabel || (isTeacherHomeworkEditorRoute ? 'Выдаю…' : 'Сохраняю…');
+    templateCreateTopbarState.primarySubmittingLabel || (
+      isTeacherHomeworkEditorRoute
+        ? (isTeacherAssignmentEditRoute ? 'Выдаю…' : 'Создаю…')
+        : 'Сохраняю…'
+    );
+  const editorPrimaryDisabled =
+    templateCreateTopbarState.hasValidationErrors || templateCreateTopbarState.primaryActionDisabled;
 
   useEffect(() => {
     return subscribeHomeworkTemplateCreateTopbarState((state) => {
@@ -1487,12 +1498,16 @@ const AppPageContent = () => {
                             showEditorActions={isTeacherAnyHomeworkEditorRoute}
                             showEditorSecondaryAction={showEditorSecondaryAction}
                             showBackButton={isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
-                            onBack={() => guardedNavigate(isTeacherAnyHomeworkEditorRoute ? tabPathById.homeworks : tabPathById.students)}
+                            onBack={() =>
+                              guardedNavigate(
+                                isTeacherAnyHomeworkEditorRoute ? teacherHomeworkEditorBackPath : tabPathById.students,
+                              )
+                            }
                             backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
                             onEditorSecondaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
                             onEditorPrimaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
                             editorSubmitting={templateCreateTopbarState.submitting}
-                            editorPrimaryDisabled={templateCreateTopbarState.hasValidationErrors}
+                            editorPrimaryDisabled={editorPrimaryDisabled}
                             editorSecondaryActionLabel={editorSecondaryActionLabel}
                             editorPrimaryActionLabel={editorPrimaryActionLabel}
                             editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}

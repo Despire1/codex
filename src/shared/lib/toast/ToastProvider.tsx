@@ -18,7 +18,7 @@ interface ToastState {
   onAction?: () => void;
 }
 
-const DEFAULT_DURATION_MS = 2000;
+const DEFAULT_DURATION_MS = 4000;
 const TRANSITION_DURATION_MS = 300;
 
 const defaultIcons: Record<ToastVariant, ReactNode> = {

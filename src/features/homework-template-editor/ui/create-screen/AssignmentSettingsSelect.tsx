@@ -1,6 +1,10 @@
 import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
-import { HomeworkCheckIcon, HomeworkChevronDownIcon } from '../../../../shared/ui/icons/HomeworkFaIcons';
+import {
+  HomeworkCheckIcon,
+  HomeworkChevronDownIcon,
+  HomeworkXMarkIcon,
+} from '../../../../shared/ui/icons/HomeworkFaIcons';
 import styles from './AssignmentSettingsSelect.module.css';
 
 export type AssignmentSettingsSelectOption = {
@@ -18,6 +22,9 @@ interface AssignmentSettingsSelectProps {
   ariaLabel: string;
   disabled?: boolean;
   compact?: boolean;
+  allowClear?: boolean;
+  invalid?: boolean;
+  validationPath?: string;
 }
 
 export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
@@ -28,6 +35,9 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
   ariaLabel,
   disabled = false,
   compact = false,
+  allowClear = false,
+  invalid = false,
+  validationPath,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -50,26 +60,45 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
       offset={10}
       rootClassName={styles.root}
       trigger={
-        <button
-          type="button"
-          className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''} ${compact ? styles.triggerButtonCompact : ''}`}
-          onClick={() => {
-            if (disabled) return;
-            setIsOpen((prev) => !prev);
-          }}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          aria-label={ariaLabel}
-          disabled={disabled}
-        >
-          <span className={styles.triggerContent}>
-            {selectedOption?.icon ? <span className={styles.triggerIcon}>{selectedOption.icon}</span> : null}
-            <span className={`${styles.triggerLabel} ${selectedOption ? styles.triggerLabelFilled : styles.triggerLabelPlaceholder}`}>
-              {selectedOption?.label ?? placeholder}
+        <div className={styles.triggerShell}>
+          <button
+            type="button"
+            className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''} ${compact ? styles.triggerButtonCompact : ''} ${invalid ? styles.triggerButtonInvalid : ''}`}
+            onClick={() => {
+              if (disabled) return;
+              setIsOpen((prev) => !prev);
+            }}
+            aria-haspopup="listbox"
+            aria-expanded={isOpen}
+            aria-label={ariaLabel}
+            aria-invalid={invalid}
+            disabled={disabled}
+            data-validation-path={validationPath}
+          >
+            <span className={styles.triggerContent}>
+              {selectedOption?.icon ? <span className={styles.triggerIcon}>{selectedOption.icon}</span> : null}
+              <span className={`${styles.triggerLabel} ${selectedOption ? styles.triggerLabelFilled : styles.triggerLabelPlaceholder}`}>
+                {selectedOption?.label ?? placeholder}
+              </span>
             </span>
-          </span>
-          <HomeworkChevronDownIcon size={12} className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />
-        </button>
+            <HomeworkChevronDownIcon size={12} className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`} />
+          </button>
+          {allowClear && value && !disabled ? (
+            <button
+              type="button"
+              className={styles.clearButton}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onChange('');
+                setIsOpen(false);
+              }}
+              aria-label="Сбросить выбранное значение"
+            >
+              <HomeworkXMarkIcon size={10} />
+            </button>
+          ) : null}
+        </div>
       }
       className={styles.popover}
     >

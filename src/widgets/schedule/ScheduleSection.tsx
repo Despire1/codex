@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type CSSProperties,
 } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AddOutlinedIcon,
   CalendarMonthIcon,
@@ -19,7 +20,7 @@ import {
   MeetingLinkIcon,
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
-import { Lesson, LinkedStudent } from '../../entities/types';
+import { HomeworkAssignment, Lesson, LinkedStudent } from '../../entities/types';
 import { getLessonColorVars } from '../../shared/lib/lessonColors';
 import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
@@ -122,6 +123,8 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   autoConfirmLessons,
   weekendWeekdays,
 }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const timeZone = useTimeZone();
   const { showToast } = useToast();
   const {
@@ -171,6 +174,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const drawerDragOffsetRef = useRef(0);
   const drawerDragRafRef = useRef<number | null>(null);
   const mobileWeekKeyRef = useRef<string | null>(null);
+  const [selectedDayHomeworkAssignmentsByLessonId, setSelectedDayHomeworkAssignmentsByLessonId] = useState<
+    Record<number, HomeworkAssignment[]>
+  >({});
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -214,6 +220,21 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     if (selectedMonthDay === undefined) return;
     setInternalSelectedMonthDay(selectedMonthDay);
   }, [selectedMonthDay]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const targetDate = searchParams.get('date');
+    if (!targetDate) return;
+    const parsedDate = toUtcDateFromDate(targetDate, timeZone);
+    if (Number.isNaN(parsedDate.getTime())) return;
+    const zonedDate = toZonedDate(parsedDate, timeZone);
+    setDayViewDate(zonedDate);
+    setSelectedMonthDay(targetDate);
+    if (searchParams.get('view') === 'day') {
+      setScheduleView('day');
+    }
+  }, [location.search, setDayViewDate, setScheduleView, setSelectedMonthDay, timeZone]);
+
   const isMobileMonthView = scheduleView === 'month' && isMobileViewport;
   const isMobileWeekView = scheduleView === 'week' && isMobileViewport;
 
@@ -842,19 +863,87 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     );
   };
 
+  const selectedDayLessons = useMemo(
+    () =>
+      effectiveSelectedMonthDay
+        ? (lessonsByDay[effectiveSelectedMonthDay] ?? [])
+            .slice()
+            .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+        : [],
+    [effectiveSelectedMonthDay, lessonsByDay],
+  );
+
+  const selectedDayLessonIdsKey = useMemo(
+    () => selectedDayLessons.map((lesson) => lesson.id).join(','),
+    [selectedDayLessons],
+  );
+
+  const selectedDayNotes = useMemo(
+    () => getNotesForDay(effectiveSelectedMonthDay),
+    [effectiveSelectedMonthDay, getNotesForDay],
+  );
+
+  const selectedDayDate = useMemo(
+    () =>
+      effectiveSelectedMonthDay
+        ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
+        : null,
+    [effectiveSelectedMonthDay, timeZone],
+  );
+
+  useEffect(() => {
+    if (scheduleView !== 'month' || activeDayPanelTab !== 'lessons') return;
+
+    if (selectedDayLessons.length === 0) {
+      setSelectedDayHomeworkAssignmentsByLessonId({});
+      return;
+    }
+
+    let isCancelled = false;
+    setSelectedDayHomeworkAssignmentsByLessonId({});
+
+    const loadLessonAssignments = async (lessonId: number) => {
+      try {
+        const items: HomeworkAssignment[] = [];
+        let nextOffset: number | null = 0;
+
+        while (nextOffset !== null) {
+          const response = await api.listHomeworkAssignmentsV2({
+            lessonId,
+            limit: 50,
+            offset: nextOffset,
+            sort: 'updated',
+          });
+
+          items.push(...response.items);
+          nextOffset = response.nextOffset;
+        }
+
+        return { lessonId, items };
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load homework assignments for lesson', error);
+        return { lessonId, items: [] as HomeworkAssignment[] };
+      }
+    };
+
+    void Promise.all(selectedDayLessons.map((lesson) => loadLessonAssignments(lesson.id))).then((results) => {
+      if (isCancelled) return;
+
+      setSelectedDayHomeworkAssignmentsByLessonId(
+        Object.fromEntries(results.map(({ lessonId, items }) => [lessonId, items])),
+      );
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeDayPanelTab, scheduleView, selectedDayLessonIdsKey, selectedDayLessons]);
+
 
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
     const monthLabel = format(selectedMonth, 'LLLL yyyy', { locale: ru });
-    const selectedDayLessons = effectiveSelectedMonthDay
-      ? (lessonsByDay[effectiveSelectedMonthDay] ?? [])
-          .slice()
-          .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
-      : [];
-    const selectedDayNotes = getNotesForDay(effectiveSelectedMonthDay);
-    const selectedDayDate = effectiveSelectedMonthDay
-      ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
-      : null;
     const selectedDayIsWeekend = selectedDayDate ? isWeekendDate(selectedDayDate) : false;
     const selectedDayNotesCount = selectedDayNotes.length;
 
@@ -994,17 +1083,18 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         key={lesson.id}
                         lesson={lesson}
                         linkedStudentsById={linkedStudentsById}
+                        homeworkAssignments={selectedDayHomeworkAssignmentsByLessonId[lesson.id] ?? []}
                         timeZone={timeZone}
                         isActionsOpen={dayPanelActionsLessonId === lesson.id}
                         onOpenActions={() => setDayPanelActionsLessonId(lesson.id)}
                         onCloseActions={() => setDayPanelActionsLessonId((current) => (current === lesson.id ? null : current))}
+                        onOpenHomeworkAssignment={(assignment) => {
+                          setDayPanelActionsLessonId(null);
+                          navigate(`/homeworks/${assignment.id}/edit`);
+                        }}
                         onEdit={() => {
                           setDayPanelActionsLessonId(null);
                           startEditLesson(lesson);
-                        }}
-                        onTogglePaid={(studentId) => {
-                          setDayPanelActionsLessonId(null);
-                          void togglePaid(lesson.id, studentId);
                         }}
                         onDelete={() => {
                           setDayPanelActionsLessonId(null);

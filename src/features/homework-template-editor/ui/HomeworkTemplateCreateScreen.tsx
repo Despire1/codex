@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HomeworkGroupListItem } from '../../../entities/types';
+import { HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
 import { HomeworkEditorDraft, HomeworkEditorVariant } from '../model/types';
 import {
   buildTemplateCreateStats,
@@ -46,11 +46,13 @@ import { TemplateMaterialsSection } from './create-screen/TemplateMaterialsSecti
 import { TemplateSettingsSidebar } from './create-screen/TemplateSettingsSidebar';
 import { TemplatePreviewModal } from './create-screen/TemplatePreviewModal';
 import { AssignmentSettingsSidebar } from './create-screen/AssignmentSettingsSidebar';
+import { AssignmentPreviewScreen } from './create-screen/AssignmentPreviewScreen';
 import styles from './HomeworkTemplateCreateScreen.module.css';
 
 export interface HomeworkTemplateCreateSubmitResult {
   success: boolean;
   issues?: FormValidationIssue[];
+  closeOnSuccess?: boolean;
 }
 
 interface HomeworkTemplateCreateScreenProps {
@@ -61,10 +63,17 @@ interface HomeworkTemplateCreateScreenProps {
   saveAsTemplateSubmitting?: boolean;
   students?: Array<{ id: number; name: string }>;
   groups?: HomeworkGroupListItem[];
+  templates?: HomeworkTemplate[];
   lockAssignmentStudent?: boolean;
+  assignmentPrimaryActionMode?: 'create' | 'save' | 'issue';
+  assignmentPrimaryActionDisabled?: boolean;
+  showCancelIssueAction?: boolean;
+  cancelIssueSubmitting?: boolean;
   onDraftChange: (draft: HomeworkEditorDraft) => void;
   onSubmit: (action: 'save' | 'submit') => Promise<HomeworkTemplateCreateSubmitResult>;
   onSaveAsTemplate?: () => Promise<void>;
+  onAssignmentTemplateSelect?: (templateId: number | null) => void;
+  onCancelIssue?: () => Promise<void>;
   onBack: () => void;
 }
 
@@ -89,13 +98,21 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   saveAsTemplateSubmitting = false,
   students = [],
   groups = [],
+  templates = [],
   lockAssignmentStudent = false,
+  assignmentPrimaryActionMode = 'create',
+  assignmentPrimaryActionDisabled = false,
+  showCancelIssueAction = false,
+  cancelIssueSubmitting = false,
   onDraftChange,
   onSubmit,
   onSaveAsTemplate,
+  onAssignmentTemplateSelect,
+  onCancelIssue,
   onBack,
 }) => {
   const hasRestoredDraftRef = useRef(false);
+  const hasSkippedTemplateAutoSaveRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [activeSubmitAction, setActiveSubmitAction] = useState<'save' | 'submit' | null>(null);
   const [quizSettings, setQuizSettings] = useState<TemplateQuizSettings>(() => readTemplateQuizSettings(draft.blocks));
@@ -143,30 +160,62 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     () => Array.from(new Set(validationErrorIssues.map((issue) => issue.message))),
     [validationErrorIssues],
   );
-  const visibleValidationErrorMessages = useMemo(
-    () => Array.from(new Set(visibleErrorIssues.map((issue) => issue.message))),
-    [visibleErrorIssues],
-  );
   const validationWarningMessages = useMemo(
     () => Array.from(new Set(validationWarningIssues.map((issue) => issue.message))),
     [validationWarningIssues],
   );
-  const assignmentValidationMessages = useMemo(() => {
-    if (variant !== 'assignment') return [];
-    const messages: string[] = [];
+  const assignmentValidationIssues = useMemo(() => {
+    if (variant !== 'assignment') return [] as Array<{ path: FormValidationPath; message: string }>;
+    const issues: Array<{ path: FormValidationPath; message: string }> = [];
     if (!draft.assignment.studentId) {
-      messages.push('Выберите ученика.');
+      issues.push({
+        path: ['assignment', 'studentId'],
+        message: 'Выберите ученика.',
+      });
     }
     if (draft.assignment.sendMode === 'AUTO_AFTER_LESSON_DONE' && !draft.assignment.lessonId) {
-      messages.push('Для авто-отправки нужен ближайший урок.');
+      issues.push({
+        path: ['assignment', 'lessonId'],
+        message: 'Для авто-отправки нужен ближайший урок.',
+      });
     }
-    return messages;
+    return issues;
   }, [draft.assignment, variant]);
-  const hasAssignmentValidationErrors = assignmentValidationMessages.length > 0;
+  const hasAssignmentValidationErrors = assignmentValidationIssues.length > 0;
   const showAssignmentValidationErrors = submitAttempted && hasAssignmentValidationErrors;
   const tags = useMemo(() => parseTagsText(templateDraft.tagsText), [templateDraft.tagsText]);
   const estimatedMinutes = useMemo(() => extractEstimatedMinutes(templateDraft.level), [templateDraft.level]);
   const stats = useMemo(() => buildTemplateCreateStats(templateDraft, quizSettings), [quizSettings, templateDraft]);
+  const assignmentGroupOptions = useMemo(
+    () => [
+      { value: '', label: 'Без группы' },
+      ...groups
+        .filter((group) => !group.isArchived && !group.isUngrouped && group.id !== null)
+        .sort((left, right) => {
+          if (left.sortOrder !== right.sortOrder) {
+            return left.sortOrder - right.sortOrder;
+          }
+          return left.title.localeCompare(right.title, 'ru');
+        })
+        .map((group) => ({
+          value: String(group.id),
+          label: group.title,
+        })),
+    ],
+    [groups],
+  );
+  const assignmentTemplateOptions = useMemo(
+    () =>
+      templates
+        .filter((template) => !template.isArchived || template.id === draft.assignment.sourceTemplateId)
+        .sort((left, right) => left.title.localeCompare(right.title, 'ru'))
+        .map((template) => ({
+          value: String(template.id),
+          label: template.title,
+          description: template.isArchived ? 'Архивный шаблон' : undefined,
+        })),
+    [draft.assignment.sourceTemplateId, templates],
+  );
 
   const primaryTestEntry = useMemo(() => getPrimaryTestBlockEntry(draft.blocks), [draft.blocks]);
   const primaryMediaEntry = useMemo(() => getPrimaryMediaBlockEntry(draft.blocks), [draft.blocks]);
@@ -186,6 +235,15 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       },
     [primaryMediaEntry],
   );
+  const previewQuestionsCount = useMemo(
+    () =>
+      draft.blocks.reduce((sum, block) => {
+        if (block.type !== 'TEST') return sum;
+        return sum + (block.questions?.length ?? 0);
+      }, 0),
+    [draft.blocks],
+  );
+  const previewDisabled = previewQuestionsCount === 0;
 
   const focusPathInput = useCallback((path: FormValidationPath | null | undefined) => {
     if (!path || typeof document === 'undefined') return;
@@ -310,10 +368,33 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     setDraftSavedAtLabel(formatStoredDraftTimeLabel(now));
   }, [mode, quizSettings, templateDraft, variant]);
 
+  useEffect(() => {
+    if (mode !== 'create' || variant !== 'template') return;
+    if (!hasSkippedTemplateAutoSaveRef.current) {
+      hasSkippedTemplateAutoSaveRef.current = true;
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const now = new Date().toISOString();
+      saveStoredCreateTemplateDraft({
+        draft: templateDraft,
+        quizSettings: quizSettings as unknown as Record<string, unknown>,
+        savedAt: now,
+      });
+      setDraftSavedAtLabel(formatStoredDraftTimeLabel(now));
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [mode, quizSettings, templateDraft, variant]);
+
   const runValidatedAction = useCallback(async (action: 'save' | 'submit') => {
     markSubmitAttempt();
 
     if (hasAssignmentValidationErrors) {
+      window.requestAnimationFrame(() => focusPathInput(assignmentValidationIssues[0]?.path));
       return;
     }
 
@@ -344,11 +425,14 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         clearStoredCreateTemplateDraft();
         setDraftSavedAtLabel(null);
       }
-      onBack();
+      if (result.closeOnSuccess ?? true) {
+        onBack();
+      }
     } finally {
       setActiveSubmitAction(null);
     }
   }, [
+    assignmentValidationIssues,
     focusPathInput,
     hasAssignmentValidationErrors,
     markSubmitAttempt,
@@ -369,15 +453,32 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   }, [handleSaveDraft, runValidatedAction, variant]);
 
   const handlePrimaryAction = useCallback(() => {
+    if (variant === 'assignment' && assignmentPrimaryActionMode === 'save') {
+      void runValidatedAction('save');
+      return;
+    }
     void runValidatedAction('submit');
-  }, [runValidatedAction]);
+  }, [assignmentPrimaryActionMode, runValidatedAction, variant]);
+
+  const assignmentPrimaryActionLabel =
+    assignmentPrimaryActionMode === 'create'
+      ? 'Создать'
+      : assignmentPrimaryActionMode === 'save'
+        ? 'Сохранить изменения'
+        : 'Выдать';
+  const assignmentPrimarySubmittingLabel =
+    assignmentPrimaryActionMode === 'create'
+      ? 'Создаю…'
+      : assignmentPrimaryActionMode === 'save'
+        ? 'Сохраняю…'
+        : 'Выдаю…';
 
   useLayoutEffect(() => {
     const showSecondaryAction = variant === 'assignment' || mode === 'create';
     const secondaryActionLabel = variant === 'assignment' ? 'Сохранить черновик' : 'Сохранить черновик';
     const primaryActionLabel =
       variant === 'assignment'
-        ? 'Выдать'
+        ? assignmentPrimaryActionLabel
         : mode === 'edit'
           ? 'Сохранить шаблон'
           : 'Создать шаблон';
@@ -385,20 +486,32 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       activeSubmitAction === 'save'
         ? 'Сохраняю…'
         : variant === 'assignment'
-          ? 'Выдаю…'
+          ? assignmentPrimarySubmittingLabel
           : mode === 'edit'
             ? 'Сохраняю…'
             : 'Создаю…';
     publishHomeworkTemplateCreateTopbarState({
       submitting,
       hasValidationErrors: hasVisibleErrors || showAssignmentValidationErrors,
+      primaryActionDisabled: assignmentPrimaryActionDisabled,
       draftSavedAtLabel: variant === 'template' && mode === 'create' ? draftSavedAtLabel : null,
       showSecondaryAction,
       secondaryActionLabel,
       primaryActionLabel,
       primarySubmittingLabel,
     });
-  }, [activeSubmitAction, draftSavedAtLabel, hasAssignmentValidationErrors, hasVisibleErrors, mode, submitting, variant]);
+  }, [
+    activeSubmitAction,
+    assignmentPrimaryActionLabel,
+    assignmentPrimaryActionDisabled,
+    assignmentPrimarySubmittingLabel,
+    draftSavedAtLabel,
+    hasAssignmentValidationErrors,
+    hasVisibleErrors,
+    mode,
+    submitting,
+    variant,
+  ]);
 
   useEffect(() => {
     const unsubscribeSave = subscribeHomeworkTemplateCreateTopbarCommand('save', handleSecondaryAction);
@@ -408,9 +521,14 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     return () => {
       unsubscribeSave();
       unsubscribeSubmit();
-      clearHomeworkTemplateCreateTopbarState();
     };
   }, [handlePrimaryAction, handleSecondaryAction]);
+
+  useEffect(() => {
+    return () => {
+      clearHomeworkTemplateCreateTopbarState();
+    };
+  }, []);
 
   const shouldInlineAssignmentSidebar = !isDesktop && variant === 'assignment';
   const assignmentSidebar =
@@ -418,38 +536,56 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       <AssignmentSettingsSidebar
         assignment={draft.assignment}
         students={students}
-        groups={groups}
         disabled={submitting}
         studentLocked={lockAssignmentStudent}
+        previewDisabled={previewDisabled}
         saveAsTemplateSubmitting={saveAsTemplateSubmitting}
-        validationErrors={submitAttempted ? [...assignmentValidationMessages, ...visibleValidationErrorMessages] : []}
+        showCancelIssueAction={showCancelIssueAction}
+        cancelIssueSubmitting={cancelIssueSubmitting}
+        studentError={
+          submitAttempted
+            ? assignmentValidationIssues.find((issue) => pathToKey(issue.path) === 'assignment.studentId')?.message ?? null
+            : null
+        }
+        lessonError={
+          submitAttempted
+            ? assignmentValidationIssues.find((issue) => pathToKey(issue.path) === 'assignment.lessonId')?.message ?? null
+            : null
+        }
         onChange={(assignment) =>
           updateDraft({
             ...draft,
             assignment,
           })
         }
-        onOpenPreview={() => setPreviewOpen(true)}
+        onOpenPreview={() => {
+          if (previewDisabled) return;
+          setPreviewOpen(true);
+        }}
         onSaveAsTemplate={() => {
           void onSaveAsTemplate?.();
+        }}
+        onCancelIssue={() => {
+          void onCancelIssue?.();
         }}
       />
     ) : null;
 
   return (
     <section className={styles.page}>
-      {!isDesktop ? (
+      {!isDesktop && !(variant === 'assignment' && isPreviewOpen) ? (
         <CreateTemplateHeader
           variant={variant}
           mode={mode}
           submitting={submitting}
           hasValidationErrors={hasVisibleErrors || showAssignmentValidationErrors}
+          primaryActionDisabled={assignmentPrimaryActionDisabled}
           draftSavedAtLabel={variant === 'template' && mode === 'create' ? draftSavedAtLabel : null}
           showSecondaryAction={variant === 'assignment' || mode === 'create'}
           secondaryActionLabel="Сохранить черновик"
           primaryActionLabel={
             variant === 'assignment'
-              ? 'Выдать'
+              ? assignmentPrimaryActionLabel
               : mode === 'edit'
                 ? 'Сохранить шаблон'
                 : 'Создать шаблон'
@@ -458,7 +594,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
             activeSubmitAction === 'save'
               ? 'Сохраняю…'
               : variant === 'assignment'
-                ? 'Выдаю…'
+                ? assignmentPrimarySubmittingLabel
                 : mode === 'edit'
                   ? 'Сохраняю…'
                   : 'Создаю…'
@@ -518,6 +654,33 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
               });
             }}
             selectedType={selectedType}
+            assignmentTemplateId={draft.assignment.sourceTemplateId ? String(draft.assignment.sourceTemplateId) : ''}
+            assignmentTemplateOptions={variant === 'assignment' ? assignmentTemplateOptions : undefined}
+            onAssignmentTemplateChange={
+              variant === 'assignment' && onAssignmentTemplateSelect
+                ? (value) => {
+                    if (!value) {
+                      onAssignmentTemplateSelect(null);
+                      return;
+                    }
+                    onAssignmentTemplateSelect(Number(value));
+                  }
+                : undefined
+            }
+            assignmentGroupId={draft.assignment.groupId ? String(draft.assignment.groupId) : ''}
+            assignmentGroupOptions={variant === 'assignment' ? assignmentGroupOptions : undefined}
+            onAssignmentGroupChange={
+              variant === 'assignment'
+                ? (value) =>
+                    updateDraft({
+                      ...draft,
+                      assignment: {
+                        ...draft.assignment,
+                        groupId: value ? Number(value) : null,
+                      },
+                    })
+                : undefined
+            }
             onTypeChange={handleTemplateTypeSelect}
           />
 
@@ -552,7 +715,14 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         ) : null}
       </div>
 
-      <TemplatePreviewModal open={isPreviewOpen} draft={templateDraft} onClose={() => setPreviewOpen(false)} />
+      {variant === 'assignment' && isPreviewOpen ? (
+        <div className={styles.previewOverlay}>
+          <AssignmentPreviewScreen draft={draft} students={students} groups={groups} onClose={() => setPreviewOpen(false)} />
+        </div>
+      ) : null}
+      {variant !== 'assignment' ? (
+        <TemplatePreviewModal open={isPreviewOpen} draft={templateDraft} onClose={() => setPreviewOpen(false)} />
+      ) : null}
     </section>
   );
 };

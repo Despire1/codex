@@ -24,6 +24,10 @@ type WebPushRuntime = {
       };
     },
     payload?: string,
+    options?: {
+      TTL?: number;
+      urgency?: 'very-low' | 'low' | 'normal' | 'high';
+    },
   ) => Promise<unknown>;
 };
 
@@ -281,6 +285,10 @@ export const sendWebPushToUser = async (userId: number, payload: WebPushNotifica
             },
           },
           JSON.stringify(notificationPayload),
+          {
+            TTL: 60 * 5,
+            urgency: 'high',
+          },
         );
         await markSubscriptionSuccess(subscription.id);
         return { status: 'sent' as const };

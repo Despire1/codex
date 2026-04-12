@@ -1,0 +1,81 @@
+.card {
+  border: 1px solid #edf1f7;
+  border-radius: 28px;
+  background: #ffffff;
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #111827;
+}
+
+.goalCard {
+  position: relative;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.goalCard:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.goalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goalBody {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.goalIconWrap {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #4f46e5;
+}
+
+.goalIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.goalContent {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

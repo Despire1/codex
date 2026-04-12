@@ -1,6 +1,7 @@
 export interface HomeworkTemplateCreateTopbarState {
   submitting: boolean;
   hasValidationErrors: boolean;
+  primaryActionDisabled: boolean;
   draftSavedAtLabel: string | null;
   showSecondaryAction: boolean;
   secondaryActionLabel: string;
@@ -27,12 +28,13 @@ export const clearHomeworkTemplateCreateTopbarState = () => {
   if (!host) return;
   host.dispatchEvent(
     new CustomEvent(TOPBAR_STATE_EVENT, {
-      detail: {
-        submitting: false,
-        hasValidationErrors: false,
-        draftSavedAtLabel: null,
-        showSecondaryAction: false,
-        secondaryActionLabel: '',
+        detail: {
+          submitting: false,
+          hasValidationErrors: false,
+          primaryActionDisabled: false,
+          draftSavedAtLabel: null,
+          showSecondaryAction: false,
+          secondaryActionLabel: '',
         primaryActionLabel: '',
         primarySubmittingLabel: '',
       } as HomeworkTemplateCreateTopbarState,

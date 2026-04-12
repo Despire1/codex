@@ -1,5 +1,6 @@
 import {
   HomeworkAssignment,
+  HomeworkBlock,
   HomeworkBlockMedia,
   HomeworkBlockStudentResponse,
   HomeworkBlockTest,
@@ -12,6 +13,7 @@ import {
 } from '../../../../entities/types';
 import {
   HomeworkEditorDraft,
+  HomeworkEditorTaskType,
   HomeworkTemplateEditorDraft,
 } from '../types';
 
@@ -124,12 +126,48 @@ export const createInitialHomeworkEditorDraft = (): HomeworkEditorDraft => ({
   },
 });
 
+const inferHomeworkEditorTaskType = (blocks: HomeworkBlock[]): HomeworkEditorTaskType => {
+  const hasTest = blocks.some((block) => block.type === 'TEST');
+  const hasMedia = blocks.some((block) => block.type === 'MEDIA');
+  const responseBlock = blocks.find(
+    (block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE',
+  );
+
+  if (hasTest && !responseBlock) return 'TEST';
+  if (hasTest && responseBlock) return 'COMBO';
+  if (hasMedia && !responseBlock) return 'EXTERNAL';
+
+  if (responseBlock) {
+    const voiceOnly =
+      responseBlock.allowVoice &&
+      !responseBlock.allowText &&
+      !responseBlock.allowFiles &&
+      !responseBlock.allowPhotos &&
+      !responseBlock.allowDocuments &&
+      !responseBlock.allowAudio &&
+      !responseBlock.allowVideo;
+    if (voiceOnly) return 'ORAL';
+
+    const filesOnly =
+      (responseBlock.allowFiles || responseBlock.allowPhotos || responseBlock.allowDocuments) &&
+      !responseBlock.allowText &&
+      !responseBlock.allowVoice &&
+      !responseBlock.allowAudio &&
+      !responseBlock.allowVideo;
+    if (filesOnly) return 'FILE';
+
+    return 'WRITTEN';
+  }
+
+  return hasMedia ? 'EXTERNAL' : 'WRITTEN';
+};
+
 export const createTemplateEditorDraftFromTemplate = (template: HomeworkTemplate): HomeworkTemplateEditorDraft => ({
   title: template.title ?? '',
   tagsText: (template.tags ?? []).join(', '),
   subject: template.subject ?? '',
   level: template.level ?? '',
-  selectedType: 'TEST',
+  selectedType: inferHomeworkEditorTaskType(template.blocks ?? []),
   blocks: Array.isArray(template.blocks) && template.blocks.length ? template.blocks : [createTextBlock()],
 });
 
@@ -148,7 +186,7 @@ export const createHomeworkEditorDraftFromTemplate = (
     tagsText: (template.tags ?? []).join(', '),
     subject: template.subject ?? '',
     level: template.level ?? '',
-    selectedType: 'TEST',
+    selectedType: inferHomeworkEditorTaskType(template.blocks ?? []),
   },
 });
 
@@ -173,7 +211,7 @@ export const createHomeworkEditorDraftFromAssignment = (
     tagsText: (template?.tags ?? []).join(', '),
     subject: template?.subject ?? '',
     level: template?.level ?? '',
-    selectedType: 'TEST',
+    selectedType: inferHomeworkEditorTaskType(template?.blocks ?? []),
   },
 });
 

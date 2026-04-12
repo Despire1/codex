@@ -3,23 +3,21 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChartLine,
   faClock,
-  faEllipsis,
   faFilter,
+  faGrip,
+  faList,
   faPlus,
   faUserCheck,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { StudentListItem } from '../../../../entities/types';
-import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
-import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
-import {
-  buildStudentCardPresentation,
-  getStatusUiMeta,
-  getStudentDisplayName,
-  getStudentInitials,
-  type StudentLifecycleStatus,
-} from '../../model/referencePresentation';
+import { useIsMobile } from '@/shared/lib/useIsMobile';
+import { buildStudentCardPresentation, getStudentDisplayName, type StudentLifecycleStatus } from '../../model/referencePresentation';
+import { useStudentCardFilters } from '../../model/useStudentCardFilters';
+import { type StudentListViewMode } from '../../types';
 import { StudentsReferenceFilterSelect } from './StudentsReferenceFilterSelect';
+import { StudentReferenceCompactTableRow } from './StudentReferenceCompactTableRow';
+import { StudentReferenceStandardCard } from './StudentReferenceStandardCard';
 import styles from './StudentsReferenceListView.module.css';
 
 type ListSummary = {
@@ -61,6 +59,15 @@ const sortOptions: Array<{ value: 'name' | 'created' | 'score' | 'activity'; lab
   { value: 'activity', label: 'По активности' },
 ];
 
+const viewModeOptions: Array<{
+  value: StudentListViewMode;
+  label: string;
+  icon: typeof faGrip;
+}> = [
+  { value: 'standard', label: 'Режим карточек', icon: faGrip },
+  { value: 'compact', label: 'Режим списка', icon: faList },
+];
+
 export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   students,
   totalStudents,
@@ -75,10 +82,12 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   onDeleteStudent,
   timeZone,
 }) => {
+  const isMobile = useIsMobile(900);
+  const { studentsListViewMode, setStudentsListViewMode } = useStudentCardFilters();
   const [statusFilter, setStatusFilter] = useState<'all' | StudentLifecycleStatus>('all');
   const [levelFilter, setLevelFilter] = useState('Все уровни');
   const [sortBy, setSortBy] = useState<'name' | 'created' | 'score' | 'activity'>('name');
-  const [menuStudentId, setMenuStudentId] = useState<number | null>(null);
+  const effectiveViewMode: StudentListViewMode = isMobile ? 'standard' : studentsListViewMode;
 
   const levelOptions = useMemo(() => {
     const uniqueLevels = Array.from(
@@ -221,170 +230,84 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                 <button type="button" className={styles.iconControlButton} aria-label="Дополнительные фильтры">
                   <FontAwesomeIcon icon={faFilter} />
                 </button>
+
+                <div className={styles.viewModeGroup} role="group" aria-label="Режим карточек учеников">
+                  {viewModeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`${styles.viewModeButton} ${
+                        studentsListViewMode === option.value ? styles.viewModeButtonActive : ''
+                      }`}
+                      aria-label={option.label}
+                      title={option.label}
+                      aria-pressed={studentsListViewMode === option.value}
+                      onClick={() => setStudentsListViewMode(option.value)}
+                    >
+                      <FontAwesomeIcon icon={option.icon} />
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
 
-          <section className={styles.studentGrid}>
-            {preparedStudents.map(({ entry, presentation }) => {
-              const statusMeta = getStatusUiMeta(presentation.status);
-              const hasDebt =
-                (typeof entry.debtRub === 'number' && entry.debtRub > 0) || (entry.debtLessonCount ?? 0) > 0;
+          {effectiveViewMode === 'compact' ? (
+            <section className={styles.compactTable}>
+              <div className={styles.compactTableHeader}>
+                <div className={styles.compactTableGrid}>
+                  <div>Ученик</div>
+                  <div className={styles.compactHeaderCenter}>Занятий</div>
+                  <div className={styles.compactHeaderCenter}>Посещаемость</div>
+                  <div className={styles.compactHeaderCenter}>Средний балл</div>
+                  <div>Следующее занятие</div>
+                  <div className={styles.compactHeaderRight}>Статус</div>
+                </div>
+              </div>
 
-              return (
-                <article
+              <div className={styles.compactTableBody}>
+                {preparedStudents.map(({ entry }) => (
+                  <StudentReferenceCompactTableRow
+                    key={entry.student.id}
+                    item={entry}
+                    timeZone={timeZone}
+                    onOpenStudent={onOpenStudent}
+                    onEditStudent={onEditStudent}
+                    onDeleteStudent={onDeleteStudent}
+                  />
+                ))}
+
+                {!isLoading && preparedStudents.length === 0 ? (
+                  <div className={styles.compactEmptyState}>По текущим фильтрам ученики не найдены</div>
+                ) : null}
+
+                {isLoading && preparedStudents.length === 0
+                  ? Array.from({ length: 6 }).map((_, index) => <div key={index} className={styles.compactRowSkeleton} />)
+                  : null}
+              </div>
+            </section>
+          ) : (
+            <section className={styles.studentGrid}>
+              {preparedStudents.map(({ entry }) => (
+                <StudentReferenceStandardCard
                   key={entry.student.id}
-                  className={styles.studentCard}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onOpenStudent(entry.student.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onOpenStudent(entry.student.id);
-                    }
-                  }}
-                >
-                  <div className={styles.studentCardHead}>
-                    <div className={styles.studentIdentity}>
-                      <div
-                        className={styles.avatarCircle}
-                        style={{
-                          borderColor: presentation.uiColor,
-                          background: presentation.uiColor,
-                          color: '#ffffff',
-                        }}
-                      >
-                        {getStudentInitials(entry)}
-                      </div>
-                      <div className={styles.studentIdentityText}>
-                        <div className={styles.studentNameRow}>
-                          <h3 className={styles.studentName}>{getStudentDisplayName(entry)}</h3>
-                          {hasDebt ? (
-                            <Tooltip content="Есть неоплаченные занятия" side="bottom" align="start">
-                              <span className={styles.studentDebtBadge}>Долг</span>
-                            </Tooltip>
-                          ) : null}
-                        </div>
-                        {presentation.levelLabel ? (
-                          <p className={styles.studentLevel}>{presentation.levelLabel}</p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <AdaptivePopover
-                      isOpen={menuStudentId === entry.student.id}
-                      onClose={() => setMenuStudentId((prev) => (prev === entry.student.id ? null : prev))}
-                      side="bottom"
-                      align="end"
-                      offset={8}
-                      className={styles.cardMenuPopover}
-                      trigger={(
-                        <button
-                          type="button"
-                          className={styles.cardMenuButton}
-                          aria-label="Действия по ученику"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setMenuStudentId((prev) => (prev === entry.student.id ? null : entry.student.id));
-                          }}
-                        >
-                          <FontAwesomeIcon icon={faEllipsis} />
-                        </button>
-                      )}
-                    >
-                      <div className={styles.cardMenuList} role="menu" onClick={(event) => event.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMenuStudentId(null);
-                            onEditStudent(entry.student.id);
-                          }}
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.cardMenuDanger}
-                          onClick={() => {
-                            setMenuStudentId(null);
-                            onDeleteStudent(entry.student.id);
-                          }}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    </AdaptivePopover>
-                  </div>
+                  item={entry}
+                  timeZone={timeZone}
+                  onOpenStudent={onOpenStudent}
+                  onEditStudent={onEditStudent}
+                  onDeleteStudent={onDeleteStudent}
+                />
+              ))}
 
-                  <div className={styles.studentMetricsGrid}>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricValue}>{presentation.lessonsConducted}</div>
-                      <div className={styles.metricLabel}>Занятий проведено</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={`${styles.metricValue} ${styles.metricGreen}`}>{presentation.attendanceRate}%</div>
-                      <div className={styles.metricLabel}>Посещ.</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={`${styles.metricValue} ${styles.metricBlue}`}>{presentation.averageScore.toFixed(1)}</div>
-                      <div className={styles.metricLabel}>Средний</div>
-                    </div>
-                  </div>
+              {!isLoading && preparedStudents.length === 0 ? (
+                <div className={styles.emptyState}>По текущим фильтрам ученики не найдены</div>
+              ) : null}
 
-                  <div className={styles.homeworkProgressRow}>
-                    <span>Выполнено домашек</span>
-                    <strong>
-                      {presentation.completedHomeworks}/{presentation.totalHomeworks || presentation.completedHomeworks}
-                    </strong>
-                  </div>
-                  <div className={styles.progressBarTrack}>
-                    <div
-                      className={styles.progressBarFill}
-                      style={{
-                        width: `${presentation.progressPercent}%`,
-                        background: presentation.uiColor,
-                      }}
-                    />
-                  </div>
-
-                  <div className={styles.studentCardFooter}>
-                    <span className={styles.nextLessonMeta}>
-                      <span
-                        className={`${styles.nextLessonDot} ${
-                          presentation.nextLessonTone === 'today'
-                            ? styles.nextLessonDotToday
-                            : presentation.nextLessonTone === 'future'
-                              ? styles.nextLessonDotFuture
-                              : styles.nextLessonDotNone
-                        }`}
-                        aria-hidden
-                      />
-                      <span className={styles.nextLessonText}>{presentation.nextLessonLabel}</span>
-                    </span>
-                    <span
-                      className={`${styles.statusText} ${
-                        statusMeta.tone === 'active'
-                          ? styles.statusTextActive
-                          : statusMeta.tone === 'paused'
-                            ? styles.statusTextPaused
-                            : styles.statusTextCompleted
-                      }`}
-                    >
-                      {statusMeta.label}
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
-
-            {!isLoading && preparedStudents.length === 0 ? (
-              <div className={styles.emptyState}>По текущим фильтрам ученики не найдены</div>
-            ) : null}
-
-            {isLoading && preparedStudents.length === 0
-              ? Array.from({ length: 6 }).map((_, index) => <div key={index} className={styles.cardSkeleton} />)
-              : null}
-          </section>
+              {isLoading && preparedStudents.length === 0
+                ? Array.from({ length: 6 }).map((_, index) => <div key={index} className={styles.cardSkeleton} />)
+                : null}
+            </section>
+          )}
 
           {hasMore ? <div ref={loadMoreRef} className={styles.loadMoreAnchor} aria-hidden /> : null}
         </div>

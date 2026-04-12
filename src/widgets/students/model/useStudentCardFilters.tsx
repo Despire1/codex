@@ -15,6 +15,7 @@ import {
   type LessonSortOrder,
   type LessonStatusFilter,
 } from '../../../entities/types';
+import { type StudentListViewMode } from '../types';
 
 const STUDENT_CARD_FILTERS_KEY = 'student_card_filters';
 
@@ -26,6 +27,7 @@ type StudentCardFiltersState = {
   lessonSortOrder?: LessonSortOrder;
   paymentFilter?: 'all' | 'topup' | 'charges' | 'manual';
   paymentDate?: string;
+  studentsListViewMode?: StudentListViewMode;
 };
 
 const DEFAULT_LESSON_DATE_RANGE: LessonDateRange = {
@@ -54,6 +56,9 @@ const isLessonSortOrder = (value: unknown): value is LessonSortOrder => value ==
 
 const isPaymentFilter = (value: unknown): value is 'all' | 'topup' | 'charges' | 'manual' =>
   value === 'all' || value === 'topup' || value === 'charges' || value === 'manual';
+
+const isStudentListViewMode = (value: unknown): value is StudentListViewMode =>
+  value === 'standard' || value === 'compact';
 
 const parseLessonDateRange = (value: unknown): LessonDateRange | null => {
   if (!value || typeof value !== 'object') return null;
@@ -103,6 +108,9 @@ const loadStudentCardFilters = (): StudentCardFiltersState => {
     if (typeof parsed.paymentDate === 'string') {
       result.paymentDate = parsed.paymentDate;
     }
+    if (isStudentListViewMode(parsed.studentsListViewMode)) {
+      result.studentsListViewMode = parsed.studentsListViewMode;
+    }
     return result;
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -136,6 +144,8 @@ export type StudentCardFiltersContextValue = {
   setPaymentFilter: Dispatch<SetStateAction<'all' | 'topup' | 'charges' | 'manual'>>;
   paymentDate: string;
   setPaymentDate: Dispatch<SetStateAction<string>>;
+  studentsListViewMode: StudentListViewMode;
+  setStudentsListViewMode: Dispatch<SetStateAction<StudentListViewMode>>;
 };
 
 const StudentCardFiltersContext = createContext<StudentCardFiltersContextValue | null>(null);
@@ -176,6 +186,9 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
     storedFilters.paymentFilter ?? 'all',
   );
   const [paymentDate, setPaymentDate] = useState(storedFilters.paymentDate ?? '');
+  const [studentsListViewMode, setStudentsListViewMode] = useState<StudentListViewMode>(
+    storedFilters.studentsListViewMode ?? 'standard',
+  );
 
   useEffect(() => {
     saveStudentCardFilters({
@@ -186,6 +199,7 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
       lessonSortOrder,
       paymentFilter,
       paymentDate,
+      studentsListViewMode,
     });
   }, [
     homeworkFilter,
@@ -195,6 +209,7 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
     lessonStatusFilter,
     paymentDate,
     paymentFilter,
+    studentsListViewMode,
   ]);
 
   return useMemo(
@@ -214,6 +229,11 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
       setPaymentFilter,
       paymentDate,
       setPaymentDate,
+      studentsListViewMode,
+      setStudentsListViewMode: (value) =>
+        setStudentsListViewMode((prev) =>
+          typeof value === 'function' ? value(prev) : value === prev ? prev : value
+        ),
     }),
     [
       homeworkFilter,
@@ -223,6 +243,7 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
       lessonStatusFilter,
       paymentDate,
       paymentFilter,
+      studentsListViewMode,
     ],
   );
 };

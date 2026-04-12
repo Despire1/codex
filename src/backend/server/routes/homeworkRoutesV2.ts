@@ -51,6 +51,7 @@ type HomeworkRoutesV2Handlers = {
   updateHomeworkAssignmentV2: (user: unknown, assignmentId: number, body: Record<string, unknown>) => Promise<unknown>;
   deleteHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   remindHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
+  cancelHomeworkAssignmentIssueV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   listHomeworkSubmissionsV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   createHomeworkSubmissionV2: (
     user: unknown,
@@ -286,6 +287,22 @@ export const tryHandleHomeworkRoutesV2 = async ({
       return true;
     }
     const data = await handlers.remindHomeworkAssignmentV2(requireApiUser(), assignmentId);
+    sendJson(res, 200, data);
+    return true;
+  }
+
+  const homeworkAssignmentCancelIssueMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/cancel-issue$/);
+  if (req.method === 'POST' && homeworkAssignmentCancelIssueMatch) {
+    if (role === 'STUDENT') {
+      sendJson(res, 403, { message: 'forbidden' });
+      return true;
+    }
+    const assignmentId = Number(homeworkAssignmentCancelIssueMatch[1]);
+    if (!Number.isFinite(assignmentId)) {
+      badRequest(res, 'invalid_assignment_id');
+      return true;
+    }
+    const data = await handlers.cancelHomeworkAssignmentIssueV2(requireApiUser(), assignmentId);
     sendJson(res, 200, data);
     return true;
   }

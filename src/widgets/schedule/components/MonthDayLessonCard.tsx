@@ -1,11 +1,11 @@
 import { addMinutes, format } from 'date-fns';
-import { CSSProperties, MouseEvent } from 'react';
-import { Lesson, LinkedStudent } from '../../../entities/types';
+import { CSSProperties, KeyboardEvent, MouseEvent } from 'react';
+import { HomeworkAssignment, Lesson, LinkedStudent } from '../../../entities/types';
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
-import { MeetingLinkIcon, MoreHorizIcon, RotateIcon } from '../../../icons/MaterialIcons';
+import { BookOpenIcon, MeetingLinkIcon, MoreHorizIcon, RotateIcon } from '../../../icons/MaterialIcons';
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
-import { buildParticipants, getLessonLabel, isLessonInSeries, resolveLessonPaid } from '../../../entities/lesson/lib/lessonDetails';
+import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../../entities/lesson/lib/lessonDetails';
 import { resolveLessonCancelActionCopy } from '../../../entities/lesson/lib/lessonStatusPresentation';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import {
@@ -13,16 +13,22 @@ import {
   resolveLessonEditDisabledReason,
   resolveLessonMutationDisabledReason,
 } from '../../../entities/lesson/lib/lessonMutationGuards';
+import {
+  resolveMonthDayHomeworkSummary,
+  resolveMonthDayHomeworkTitle,
+  resolveMonthDayLessonSubtitle,
+} from '../model/monthDayLessonPresentation';
 import styles from './MonthDayLessonCard.module.css';
 
 interface MonthDayLessonCardProps {
   lesson: Lesson;
   linkedStudentsById: Map<number, LinkedStudent>;
+  homeworkAssignments: HomeworkAssignment[];
   timeZone: string;
   style?: CSSProperties;
   isActionsOpen: boolean;
+  onOpenHomeworkAssignment: (assignment: HomeworkAssignment) => void;
   onEdit: () => void;
-  onTogglePaid: (studentId?: number) => void;
   onOpenActions: () => void;
   onCloseActions: () => void;
   onDelete: () => void;
@@ -35,11 +41,12 @@ interface MonthDayLessonCardProps {
 export const MonthDayLessonCard = ({
   lesson,
   linkedStudentsById,
+  homeworkAssignments,
   timeZone,
   style,
   isActionsOpen,
+  onOpenHomeworkAssignment,
   onEdit,
-  onTogglePaid,
   onOpenActions,
   onCloseActions,
   onDelete,
@@ -50,52 +57,62 @@ export const MonthDayLessonCard = ({
 }: MonthDayLessonCardProps) => {
   const participants = buildParticipants(lesson, linkedStudentsById);
   const lessonLabel = getLessonLabel(participants, linkedStudentsById);
+  const subtitle = resolveMonthDayLessonSubtitle(lesson, participants);
   const startDate = toZonedDate(lesson.startAt, timeZone);
   const endDate = addMinutes(startDate, lesson.durationMinutes);
   const startTime = format(startDate, 'HH:mm');
   const endTime = format(endDate, 'HH:mm');
-  const isPaid = resolveLessonPaid(lesson, participants);
-  const participant = participants[0];
   const isCanceled = lesson.status === 'CANCELED';
   const isRecurring = isLessonInSeries(lesson);
+  const { primaryAssignment, extraCount } = resolveMonthDayHomeworkSummary(homeworkAssignments);
   const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
   const editDisabledReason = resolveLessonEditDisabledReason(lesson);
   const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
-  const paymentLabel = isPaid ? 'Оплачено' : 'Не оплачено';
   const cancelCopy = resolveLessonCancelActionCopy(lesson);
+  const hasMetaRow = Boolean(primaryAssignment || lesson.meetingLink || isCanceled);
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onEdit();
+  };
 
   return (
     <div className={styles.cardWrap} style={style}>
-      <div className={`${styles.card} ${isCanceled ? styles.canceled : ''}`} style={style} onClick={onEdit}>
+      <div
+        className={`${styles.card} ${isCanceled ? styles.canceled : ''}`}
+        role="button"
+        tabIndex={0}
+        onClick={onEdit}
+        onKeyDown={handleCardKeyDown}
+      >
         <div className={styles.content}>
           <div className={styles.headerRow}>
             <div className={styles.headerInfo}>
               <div className={styles.timeBadge}>
                 <span className={styles.timeStart}>{startTime}</span>
+                <span className={styles.timeDivider} aria-hidden="true" />
                 <span className={styles.timeEnd}>{endTime}</span>
               </div>
-              <Ellipsis className={styles.title} title={lessonLabel}>
-                {lessonLabel}
-              </Ellipsis>
+
+              <div className={styles.identity}>
+                <Ellipsis className={styles.title} title={lessonLabel}>
+                  {lessonLabel}
+                </Ellipsis>
+                <p className={styles.subtitle}>{subtitle}</p>
+              </div>
             </div>
-            <div
-              className={[
-                styles.headerControls,
-                isRecurring ? styles.headerControlsWithRecurring : '',
-                isActionsOpen ? styles.headerControlsExpanded : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              {isRecurring && (
+
+            <div className={styles.headerControls}>
+              {isRecurring ? (
                 <Tooltip content="Повторяющееся занятие">
-                  <span className={styles.recurringControl}>
-                    <span className={styles.recurringIconBadge} aria-label="Повторяющееся занятие">
-                      <RotateIcon className={styles.recurringIcon} />
-                    </span>
+                  <span className={styles.recurringIconBadge} aria-label="Повторяющееся занятие">
+                    <RotateIcon className={styles.recurringIcon} />
                   </span>
                 </Tooltip>
-              )}
+              ) : null}
+
               <AdaptivePopover
                 isOpen={isActionsOpen}
                 onClose={onCloseActions}
@@ -120,7 +137,7 @@ export const MonthDayLessonCard = ({
                 }
               >
                 <div className={styles.actionsPopover} role="menu" aria-label={`Действия для занятия #${lesson.id}`}>
-                  {!isCanceled && (
+                  {!isCanceled ? (
                     <>
                       <Tooltip content={rescheduleDisabledReason}>
                         <button
@@ -136,6 +153,7 @@ export const MonthDayLessonCard = ({
                           Перенести занятие
                         </button>
                       </Tooltip>
+
                       <Tooltip content={editDisabledReason}>
                         <button
                           type="button"
@@ -150,6 +168,7 @@ export const MonthDayLessonCard = ({
                           Редактировать
                         </button>
                       </Tooltip>
+
                       <button
                         type="button"
                         className={styles.actionItem}
@@ -162,8 +181,7 @@ export const MonthDayLessonCard = ({
                         {cancelCopy.actionLabel}
                       </button>
                     </>
-                  )}
-                  {isCanceled && (
+                  ) : (
                     <button
                       type="button"
                       className={styles.actionItem}
@@ -176,6 +194,7 @@ export const MonthDayLessonCard = ({
                       Восстановить
                     </button>
                   )}
+
                   <Tooltip content={deleteDisabledReason}>
                     <button
                       type="button"
@@ -194,9 +213,28 @@ export const MonthDayLessonCard = ({
               </AdaptivePopover>
             </div>
           </div>
-          {(lesson.meetingLink || isCanceled) && (
+
+          {hasMetaRow ? (
             <div className={styles.metaRow}>
-              {lesson.meetingLink && (
+              {primaryAssignment ? (
+                <Tooltip content={resolveMonthDayHomeworkTitle(primaryAssignment)} align="start">
+                  <button
+                    type="button"
+                    className={styles.homeworkBadge}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenHomeworkAssignment(primaryAssignment);
+                    }}
+                  >
+                    <BookOpenIcon className={styles.homeworkIcon} />
+                    <span className={styles.homeworkBadgeLabel}>{resolveMonthDayHomeworkTitle(primaryAssignment)}</span>
+                  </button>
+                </Tooltip>
+              ) : null}
+
+              {extraCount > 0 ? <span className={styles.homeworkCountBadge}>+{extraCount}</span> : null}
+
+              {lesson.meetingLink ? (
                 <button
                   type="button"
                   className={styles.linkBadge}
@@ -205,30 +243,11 @@ export const MonthDayLessonCard = ({
                   <MeetingLinkIcon className={styles.linkIcon} />
                   Ссылка
                 </button>
-              )}
-              {isCanceled && <span className={`${styles.linkBadge} ${styles.canceledBadge}`}>Отменено</span>}
+              ) : null}
+
+              {isCanceled ? <span className={`${styles.linkBadge} ${styles.canceledBadge}`}>Отменено</span> : null}
             </div>
-          )}
-          {isPaid && (
-            <>
-              <div className={styles.divider} />
-              <div className={styles.paymentRow}>
-                <Tooltip content={paymentLabel}>
-                  <button
-                    type="button"
-                    className={`${styles.paymentBadge} ${styles.paymentPaid}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onTogglePaid(participant?.studentId);
-                    }}
-                  >
-                    <span className={styles.paymentIcon} aria-hidden="true" />
-                    <span>{paymentLabel}</span>
-                  </button>
-                </Tooltip>
-              </div>
-            </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

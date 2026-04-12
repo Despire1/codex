@@ -306,6 +306,11 @@
   color: #34d399;
 }
 
+.heroChipPreview {
+  background: rgba(251, 146, 60, 0.22);
+  color: #fdba74;
+}
+
 .heroChipSecondary {
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.9);
@@ -790,7 +795,8 @@
 .stopRecordButton,
 .lightButton,
 .bottomSubmitButton,
-.bottomStartButton {
+.bottomStartButton,
+.bottomPreviewButton {
   border: none;
   border-radius: 14px;
   padding: 10px 14px;
@@ -1048,6 +1054,13 @@
   flex: 1;
 }
 
+.submitSectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .submitSectionTitle {
   margin: 0;
   font-size: 24px;
@@ -1069,8 +1082,22 @@
   flex-shrink: 0;
 }
 
+.bottomPreviewButton {
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 16px;
+  padding: 14px 20px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  flex-shrink: 0;
+}
+
 .bottomSubmitButton:hover {
   background: #1f2937;
+}
+
+.bottomPreviewButton:hover {
+  background: #eef2f7;
 }
 
 .bottomStartButton {
@@ -1087,7 +1114,8 @@
 }
 
 .bottomSubmitButton:disabled,
-.bottomStartButton:disabled {
+.bottomStartButton:disabled,
+.bottomPreviewButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1617,12 +1645,19 @@
     align-items: flex-start;
   }
 
+  .submitSectionActions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .bottomSubmitButton {
     width: 100%;
     justify-content: center;
   }
 
-  .bottomStartButton {
+  .bottomStartButton,
+  .bottomPreviewButton {
     width: 100%;
     justify-content: center;
   }
@@ -1723,7 +1758,8 @@
   .stopRecordButton,
   .lightButton,
   .bottomSubmitButton,
-  .bottomStartButton {
+  .bottomStartButton,
+  .bottomPreviewButton {
     width: 100%;
     justify-content: center;
   }

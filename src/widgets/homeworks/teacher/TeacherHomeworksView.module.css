@@ -546,6 +546,11 @@
   background: var(--color-slate-50);
 }
 
+.row:hover .rowMenuButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .rowOverdue {
   background: transparent;
 }
@@ -599,13 +604,31 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+}
+
+.assignmentTitleButton {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
 .assignmentTitle {
+  display: block;
+  width: 100%;
+  min-width: 0;
   font-size: 15px;
   font-weight: 700;
   color: #111827;
   line-height: 1.2;
+}
+
+.assignmentTitleButton:hover .assignmentTitle {
+  color: #2563eb;
 }
 
 .assignmentMeta {
@@ -616,6 +639,20 @@
   color: var(--color-slate-500);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.metaLinkButton {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.metaLinkButton:hover {
+  color: #2563eb;
 }
 
 .lessonMeta {
@@ -655,8 +692,8 @@
 }
 
 .issuanceBadge_draft {
-  background: #fef3c7;
-  color: #92400e;
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .issuanceBadge_sent {
@@ -797,6 +834,118 @@
   color: #111827;
 }
 
+.deadlineButton {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deadlineButton:hover .deadlineColumn {
+  color: #2563eb;
+}
+
+.deadlineEditor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.deadlinePopover {
+  z-index: 1450;
+}
+
+.deadlinePickerCard {
+  width: min(360px, calc(100vw - 24px));
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 20px;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.deadlinePickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+
+.deadlinePickerTitle {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.deadlineClearButton {
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fff5f5;
+  color: #dc2626;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deadlinePickerCalendar {
+  padding: 0 8px 8px;
+}
+
+.deadlinePickerTimeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--color-slate-100);
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
+.deadlineTimeField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.deadlineTimeField span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.deadlineTimeSelect {
+  min-height: 38px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 12px;
+  background: var(--color-white);
+  padding: 0 10px;
+  color: #0f172a;
+  font-size: 13px;
+  outline: none;
+}
+
+.deadlineTimeSelect:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.deadlineApplyButton {
+  min-height: 38px;
+  border: 1px solid #0f172a;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .deadlineHint {
   font-size: 13px;
   color: var(--color-slate-500);
@@ -808,6 +957,12 @@
 
 .deadlineHintToday {
   color: var(--color-green-700);
+}
+
+.createdAtCell {
+  font-size: 14px;
+  color: #0f172a;
+  white-space: nowrap;
 }
 
 .responseMeta {
@@ -926,6 +1081,83 @@
   align-items: center;
   gap: 8px;
   min-height: 36px;
+  position: relative;
+}
+
+.rowActions > :not(.rowMenuButton) {
+  transition: transform 0.18s ease;
+}
+
+.row:hover .rowActions > :not(.rowMenuButton) {
+  transform: translateX(-40px);
+}
+
+.rowMenuButton {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-slate-500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(6px);
+  transition: opacity 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.rowMenuButton:hover {
+  color: #2563eb;
+  border-color: #cbd5e1;
+}
+
+.row:hover .rowMenuButton {
+  transform: translateY(-50%) translateX(0);
+}
+
+.rowMenuPopover {
+  min-width: 220px;
+  z-index: 2200;
+  background: var(--color-white);
+  border: 1px solid var(--color-slate-200);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.rowMenuList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+
+.rowMenuItem {
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  padding: 10px 12px;
+  text-align: left;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rowMenuItem:hover {
+  background: #f8fafc;
+}
+
+.rowMenuItemDanger {
+  color: #b42318;
+}
+
+.rowMenuItemDangerSoft {
+  color: #c2410c;
 }
 
 .reviewButton {
@@ -966,6 +1198,22 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.cancelIssueButton {
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: #fff7f7;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelIssueButton:hover {
+  border-color: #fca5a5;
+  background: #fff1f2;
 }
 
 .iconActionButton {
@@ -1076,6 +1324,7 @@
   color: var(--color-slate-500);
   font-size: 13px;
   line-height: 1.35;
+  width: fit-content;
 }
 
 .mobileMetaGrid {
@@ -1159,6 +1408,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.mobileActions .rowMenuButton {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  justify-self: end;
+  transform: none;
+}
+
+.mobileActions {
+  padding-right: 0;
+}
+
+.mobileActions > :not(.rowMenuButton) {
+  transform: none !important;
+}
+
+.mobileActions .rowMenuButton:hover {
+  transform: none;
 }
 
 .mobileActionFull {

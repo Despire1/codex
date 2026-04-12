@@ -1,10 +1,18 @@
 .page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.previewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: linear-gradient(180deg, #eef3fa 0%, #e7eef7 100%);
 }
 
 .contentGrid {
@@ -46,7 +54,6 @@
     min-height: 100%;
     overflow: visible;
   }
-
   .contentGrid {
     grid-template-columns: 1fr;
     flex: none;

@@ -1,13 +1,20 @@
-import { FC, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';
 import { TeacherBulkAction, TeacherHomeworksViewModel, TeacherHomeworkGroupKey } from '../types';
 import { HomeworkAssignModal } from '../../../features/homework-assign/ui/HomeworkAssignModal';
 import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
+import { canCancelHomeworkAssignmentIssue } from '../../../entities/homework-assignment/model/lib/assignmentIssuance';
 import { HomeworkReviewModal } from '../../../features/homework-review/ui/HomeworkReviewModal';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import { Checkbox } from '../../../shared/ui/Checkbox/Checkbox';
 import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
+import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
+import { AnchoredPopover } from '../../../shared/ui/AnchoredPopover/AnchoredPopover';
+import { DayPicker } from '../../../shared/day-picker';
 import { loadStoredCreateTemplateDraftSummary } from '../../../features/homework-template-editor/model/lib/createTemplateDraftStorage';
 import {
   HomeworkAlignLeftIcon,
@@ -28,6 +35,7 @@ import {
   HomeworkPlusIcon,
   HomeworkRobotIcon,
 } from '../../../shared/ui/icons/HomeworkFaIcons';
+import { MoreHorizIcon } from '../../../icons/MaterialIcons';
 import {
   AutoCheckBadge,
   formatAssignmentStatus,
@@ -38,6 +46,8 @@ import {
   resolveAssignmentStudentAvatarColor,
   resolveAssignmentStudentAvatarTextColor,
 } from './model/lib/assignmentPresentation';
+import { useTimeZone } from '../../../shared/lib/timezoneContext';
+import { toLocalDateTimeValue, toUtcIsoFromLocal } from '../../../features/homework-assign/model/lib/assignmentStarter';
 import {
   estimateHomeworkTemplateDurationMinutes,
   formatHomeworkTemplateDuration,
@@ -60,6 +70,13 @@ import { HomeworkListFiltersPopover } from './ui/HomeworkListFiltersPopover/Home
 import { TopbarCreateMenu } from '../../layout/ui/TopbarCreateMenu/TopbarCreateMenu';
 
 type WorkspaceMode = 'list' | 'groups' | 'templates';
+
+const resolveWorkspaceMode = (value: string | null): WorkspaceMode => {
+  if (value === 'groups' || value === 'templates') {
+    return value;
+  }
+  return 'list';
+};
 
 const MODE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
   { id: 'list', label: 'Список домашек' },
@@ -167,7 +184,7 @@ const resolveResponseVisual = (assignment: HomeworkAssignment): ResponseVisual =
   if (autoCheckBadge) {
     return {
       kind: 'icons',
-      icons: [{ id: 'test', kind: 'test', tone: 'indigo' }],
+      icons: [],
       autoCheckBadge,
     };
   }
@@ -205,12 +222,12 @@ const resolveStatusLabel = (assignment: HomeworkAssignment) => {
   return formatAssignmentStatus(assignment);
 };
 
-const resolveIssuanceLabel = (assignment: HomeworkAssignment) =>
-  assignment.status === 'REVIEWED'
-    ? 'Проверено'
-    : assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED'
-      ? 'Не выдана'
-      : 'Выдана';
+const resolveIssuanceLabel = (assignment: HomeworkAssignment) => {
+  if (assignment.status === 'DRAFT') return 'Черновик';
+  if (assignment.status === 'REVIEWED') return 'Проверено';
+  if (assignment.status === 'SCHEDULED') return 'Не выдана';
+  return 'Выдана';
+};
 
 const resolveIssuanceTone = (assignment: HomeworkAssignment) =>
   assignment.status === 'REVIEWED'
@@ -218,6 +235,292 @@ const resolveIssuanceTone = (assignment: HomeworkAssignment) =>
     : assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED'
       ? 'draft'
       : 'sent';
+
+const resolveAutoCheckTooltip = (badge: AutoCheckBadge | null) => {
+  if (!badge) return null;
+  if (badge.tone === 'success') return 'Проверено автоматически';
+  if (badge.tone === 'warning') return 'Частично проверено автоматически';
+  return 'Автопроверка недоступна';
+};
+
+const padTimePart = (value: number) => value.toString().padStart(2, '0');
+
+const parseDraftDateTime = (value: string, timeZone: string) => {
+  const nextIso = toUtcIsoFromLocal(value, timeZone);
+  if (!nextIso) return null;
+  const nextDate = new Date(nextIso);
+  if (Number.isNaN(nextDate.getTime())) return null;
+  return nextDate;
+};
+
+const getDraftTimeParts = (value?: string) => {
+  if (!value) {
+    return { hours: '20', minutes: '00' };
+  }
+  const [, timePart = '20:00'] = value.split('T');
+  const [hours = '20', minutes = '00'] = timePart.split(':');
+  return {
+    hours: hours.padStart(2, '0'),
+    minutes: minutes.padStart(2, '0'),
+  };
+};
+
+type AssignmentRowMenuProps = {
+  assignment: HomeworkAssignment;
+  canCancelIssue: boolean;
+  shouldShowRemind: boolean;
+  onCancelIssue: (assignment: HomeworkAssignment) => void;
+  onRemind: (assignment: HomeworkAssignment) => void;
+  onDelete: (assignment: HomeworkAssignment) => void;
+};
+
+const AssignmentRowMenu: FC<AssignmentRowMenuProps> = ({
+  assignment,
+  canCancelIssue,
+  shouldShowRemind,
+  onCancelIssue,
+  onRemind,
+  onDelete,
+}) => {
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const isOpen = anchorEl !== null;
+  const hasActions = true;
+
+  if (!hasActions) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.rowMenuButton}
+        aria-label="Открыть меню действий"
+        onClick={(event) => {
+          setAnchorEl((current) => (current ? null : event.currentTarget));
+        }}
+      >
+        <MoreHorizIcon width={18} height={18} />
+      </button>
+      <AnchoredPopover
+        isOpen={isOpen}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        side="bottom"
+        align="end"
+        className={styles.rowMenuPopover}
+      >
+        <div className={styles.rowMenuList}>
+          {canCancelIssue ? (
+            <button
+              type="button"
+              className={`${styles.rowMenuItem} ${styles.rowMenuItemDanger}`}
+              onClick={() => {
+                setAnchorEl(null);
+                onCancelIssue(assignment);
+              }}
+            >
+              Отменить выдачу
+            </button>
+          ) : null}
+          {shouldShowRemind ? (
+            <button
+              type="button"
+              className={styles.rowMenuItem}
+              onClick={() => {
+                setAnchorEl(null);
+                onRemind(assignment);
+              }}
+            >
+              Напомнить ученику
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={`${styles.rowMenuItem} ${styles.rowMenuItemDangerSoft}`}
+            onClick={() => {
+              setAnchorEl(null);
+              onDelete(assignment);
+            }}
+          >
+            Удалить
+          </button>
+        </div>
+      </AnchoredPopover>
+    </>
+  );
+};
+
+type AssignmentDeadlineCellProps = {
+  assignment: HomeworkAssignment;
+  onUpdate: (assignment: HomeworkAssignment, deadlineAt: string | null) => Promise<void>;
+};
+
+const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, onUpdate }) => {
+  const timeZone = useTimeZone();
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftValue, setDraftValue] = useState<string | undefined>(
+    assignment.deadlineAt ? toLocalDateTimeValue(assignment.deadlineAt, timeZone) : undefined,
+  );
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftValue(assignment.deadlineAt ? toLocalDateTimeValue(assignment.deadlineAt, timeZone) : undefined);
+  }, [assignment.deadlineAt, timeZone]);
+
+  const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
+  const parsedDraftDate = useMemo(
+    () => (draftValue ? parseDraftDateTime(draftValue, timeZone) : null),
+    [draftValue, timeZone],
+  );
+  const selectedDraftDate = useMemo(
+    () => (parsedDraftDate ? new Date(parsedDraftDate.getTime()) : undefined),
+    [parsedDraftDate],
+  );
+  const selectedTimeParts = useMemo(() => getDraftTimeParts(draftValue), [draftValue]);
+  const monthViewDate = useMemo(() => selectedDraftDate ?? new Date(), [selectedDraftDate]);
+  const timeOptions = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => padTimePart(index * 5)),
+    [],
+  );
+
+  const handlePersist = async (nextLocalValue: string | undefined = draftValue) => {
+    if (saving) return;
+    setIsEditing(false);
+    const nextDeadlineAt = nextLocalValue ? toUtcIsoFromLocal(nextLocalValue, timeZone) : null;
+    if ((assignment.deadlineAt ?? null) === nextDeadlineAt) return;
+    setSaving(true);
+    try {
+      await onUpdate(assignment, nextDeadlineAt);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeEditor = (nextLocalValue?: string) => {
+    void handlePersist(nextLocalValue);
+  };
+
+  const handleDateSelect = (date?: Date) => {
+    if (!date) return;
+    const { hours, minutes } = getDraftTimeParts(draftValue);
+    setDraftValue(`${format(date, "yyyy-MM-dd")}T${hours}:${minutes}`);
+  };
+
+  const handleTimeChange =
+    (part: 'hours' | 'minutes') =>
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const baseDate = selectedDraftDate ?? new Date();
+      const nextDate = format(baseDate, 'yyyy-MM-dd');
+      const currentParts = getDraftTimeParts(draftValue);
+      const nextParts =
+        part === 'hours'
+          ? { hours: event.target.value, minutes: currentParts.minutes }
+          : { hours: currentParts.hours, minutes: event.target.value };
+      setDraftValue(`${nextDate}T${nextParts.hours}:${nextParts.minutes}`);
+    };
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        className={styles.deadlineButton}
+        onClick={() => {
+          setIsEditing((current) => {
+            if (current) {
+              closeEditor(draftValue);
+              return false;
+            }
+            return true;
+          });
+        }}
+        disabled={saving}
+      >
+        <div className={styles.deadlineColumn}>
+          <div>{deadlineMeta.primary}</div>
+          {deadlineMeta.secondary ? (
+            deadlineMeta.tone === 'danger' ? (
+              <div className={`${styles.deadlineHint} ${styles.deadlineHintDanger}`}>{deadlineMeta.secondary}</div>
+            ) : (
+              <div className={styles.deadlineHint}>{deadlineMeta.secondary}</div>
+            )
+          ) : null}
+        </div>
+      </button>
+      <AnchoredPopover
+        isOpen={isEditing}
+        anchorEl={anchorRef.current}
+        onClose={() => closeEditor(draftValue)}
+        side="bottom"
+        align="start"
+        className={styles.deadlinePopover}
+      >
+        <div className={styles.deadlinePickerCard}>
+          <div className={styles.deadlinePickerHeader}>
+            <span className={styles.deadlinePickerTitle}>Изменить дедлайн</span>
+            <button
+              type="button"
+              className={styles.deadlineClearButton}
+              onClick={() => {
+                setDraftValue(undefined);
+                closeEditor(undefined);
+              }}
+            >
+              Убрать
+            </button>
+          </div>
+          <div className={styles.deadlinePickerCalendar}>
+            <DayPicker
+              mode="single"
+              locale={ru}
+              weekStartsOn={1}
+              selected={selectedDraftDate}
+              defaultMonth={monthViewDate}
+              onSelect={handleDateSelect}
+            />
+          </div>
+          <div className={styles.deadlinePickerTimeRow}>
+            <div className={styles.deadlineTimeField}>
+              <span>Часы</span>
+              <select
+                className={styles.deadlineTimeSelect}
+                value={selectedTimeParts.hours}
+                onChange={handleTimeChange('hours')}
+              >
+                {Array.from({ length: 24 }, (_, hour) => padTimePart(hour)).map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.deadlineTimeField}>
+              <span>Минуты</span>
+              <select
+                className={styles.deadlineTimeSelect}
+                value={selectedTimeParts.minutes}
+                onChange={handleTimeChange('minutes')}
+              >
+                {timeOptions.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className={styles.deadlineApplyButton}
+              onClick={() => closeEditor(draftValue)}
+            >
+              Готово
+            </button>
+          </div>
+        </div>
+      </AnchoredPopover>
+    </>
+  );
+};
 
 const toGroupEditorDraft = (group: HomeworkGroupListItem): GroupEditorDraft => ({
   title: group.title,
@@ -278,7 +581,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onToggleTemplateFavorite,
   onCreateAssignment,
   onSendAssignmentNow,
+  onCancelAssignmentIssue,
   onRemindAssignment,
+  onOpenStudentProfile,
+  onOpenLessonDay,
+  onUpdateAssignmentDeadline,
   onDeleteAssignment,
   onFixConfigError,
   onBulkAction,
@@ -292,11 +599,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onLoadHomeworkActivity,
   onMarkHomeworkActivitySeen,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isBulkPanelOpen, setIsBulkPanelOpen] = useState(false);
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('list');
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
   const [templateSearchQuery, setTemplateSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Partial<Record<TeacherHomeworkGroupKey, boolean>>>({});
@@ -321,6 +629,24 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState<TeacherBulkAction>('SEND_NOW');
+  const workspaceSearchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
+  const workspaceMode = useMemo(
+    () => resolveWorkspaceMode(workspaceSearchParams.get('view')),
+    [workspaceSearchParams],
+  );
+
+  const setWorkspaceMode = (nextMode: WorkspaceMode) => {
+    const nextSearchParams = new URLSearchParams(location.search);
+    if (nextMode === 'list') {
+      nextSearchParams.delete('view');
+    } else {
+      nextSearchParams.set('view', nextMode);
+    }
+    navigate(`${location.pathname}${nextSearchParams.toString() ? `?${nextSearchParams.toString()}` : ''}`);
+  };
 
   const countsByTab = useMemo(
     () => ({
@@ -703,6 +1029,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 <th>Ученик / Задание</th>
                 <th>Статус</th>
                 <th>Дедлайн</th>
+                <th>Дата создания</th>
                 <th>Ответ</th>
                 <th className={styles.rightCell}>Действия</th>
               </tr>
@@ -745,13 +1072,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 ))
               ) : assignments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={styles.emptyRow}>
+                  <td colSpan={7} className={styles.emptyRow}>
                     Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить» в верхнем хедере, чтобы создать задание, выдать домашку или собрать новый шаблон.
                   </td>
                 </tr>
               ) : (
                 assignments.map((assignment) => {
-                  const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
                   const responseMeta = resolveAssignmentResponseMeta(assignment);
                   const problemBadges = resolveAssignmentProblemBadges(assignment);
                   const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
@@ -764,7 +1090,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const shouldShowEmptyResponse = responseText === 'Нет ответа';
                   const isOverdueRow = problemBadges.hasOverdue;
                   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
-                  const isEditableAssignment = !shouldReview && !assignment.hasConfigError;
+                  const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
+                  const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
                   return (
                     <tr
                       key={assignment.id}
@@ -797,15 +1124,38 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                             ) : null}
                           </div>
                           <div className={styles.primaryCell}>
-                            <div className={styles.assignmentTitle}>{assignment.title}</div>
+                            <button
+                              type="button"
+                              className={styles.assignmentTitleButton}
+                              onClick={() => onOpenDetail(assignment)}
+                              aria-label={`Открыть домашнее задание "${assignment.title}"`}
+                            >
+                              <Ellipsis
+                                className={styles.assignmentTitle}
+                                title={assignment.title}
+                                tooltipAlign="start"
+                              >
+                                {assignment.title}
+                              </Ellipsis>
+                            </button>
                             <div className={styles.assignmentMeta}>
-                              <span>{studentLabel}</span>
+                              <button
+                                type="button"
+                                className={styles.metaLinkButton}
+                                onClick={() => onOpenStudentProfile(assignment.studentId)}
+                              >
+                                {studentLabel}
+                              </button>
                               <span className={styles.metaDot} />
                               {assignment.lessonId ? (
-                                <span className={styles.lessonMeta}>
+                                <button
+                                  type="button"
+                                  className={`${styles.lessonMeta} ${styles.metaLinkButton}`}
+                                  onClick={() => onOpenLessonDay(assignment)}
+                                >
                                   <HomeworkLinkIcon size={10} className={styles.lessonMetaIcon} />
-                                  <span>Урок #{assignment.lessonId}</span>
-                                </span>
+                                  <span>{formatDateTime(assignment.lessonStartAt)}</span>
+                                </button>
                               ) : (
                                 <span>Без привязки к уроку</span>
                               )}
@@ -827,14 +1177,10 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         </div>
                       </td>
                       <td>
-                        <div className={styles.deadlineColumn}>
-                          <div>{deadlineMeta.primary}</div>
-                          {deadlineMeta.tone === 'danger' ? (
-                            <div className={`${styles.deadlineHint} ${styles.deadlineHintDanger}`}>
-                              {deadlineMeta.secondary}
-                            </div>
-                          ) : null}
-                        </div>
+                        <AssignmentDeadlineCell assignment={assignment} onUpdate={onUpdateAssignmentDeadline} />
+                      </td>
+                      <td>
+                        <div className={styles.createdAtCell}>{formatDateTime(assignment.createdAt)}</div>
                       </td>
                       <td>
                         <div className={styles.responseColumn}>
@@ -854,14 +1200,16 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                                 </span>
                               ))}
                               {responseVisual.autoCheckBadge ? (
-                                <span
-                                  className={`${styles.responseAutoBadge} ${
-                                    styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
-                                  }`}
-                                >
-                                  <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
-                                  <span>{responseVisual.autoCheckBadge.label}</span>
-                                </span>
+                                <Tooltip content={resolveAutoCheckTooltip(responseVisual.autoCheckBadge) ?? ''}>
+                                  <span
+                                    className={`${styles.responseAutoBadge} ${
+                                      styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
+                                    }`}
+                                  >
+                                    <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
+                                    <span>{responseVisual.autoCheckBadge.label}</span>
+                                  </span>
+                                </Tooltip>
                               ) : null}
                             </div>
                           )}
@@ -887,42 +1235,33 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                             >
                               Исправить
                             </button>
-                          ) : canSendNow ? (
-                            <>
-                              <button
-                                type="button"
-                                className={styles.sendNowButton}
-                                onClick={() => {
-                                  void onSendAssignmentNow(assignment);
-                                }}
-                              >
-                                Выдать
-                              </button>
-                              <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
-                                Открыть
-                              </button>
-                            </>
                           ) : (
                             <>
-                              {(assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow) ? (
-                                <Tooltip content="Напомнить">
-                                  <button
-                                    type="button"
-                                    className={styles.iconActionButton}
-                                    onClick={() => {
-                                      void onRemindAssignment(assignment);
-                                    }}
-                                    aria-label="Напомнить"
-                                  >
-                                    <HomeworkBellRegularIcon size={13} className={styles.inlineFaIcon} />
-                                  </button>
-                                </Tooltip>
-                              ) : null}
-                              {isEditableAssignment ? (
-                                <button type="button" className={styles.detailOutlinedButton} onClick={() => onOpenDetail(assignment)}>
-                                  Открыть
+                              {canSendNow ? (
+                                <button
+                                  type="button"
+                                  className={styles.sendNowButton}
+                                  onClick={() => {
+                                    void onSendAssignmentNow(assignment);
+                                  }}
+                                >
+                                  Выдать
                                 </button>
                               ) : null}
+                              <AssignmentRowMenu
+                                assignment={assignment}
+                                canCancelIssue={canCancelIssue}
+                                shouldShowRemind={shouldShowRemind}
+                                onCancelIssue={(targetAssignment) => {
+                                  void onCancelAssignmentIssue(targetAssignment);
+                                }}
+                                onRemind={(targetAssignment) => {
+                                  void onRemindAssignment(targetAssignment);
+                                }}
+                                onDelete={(targetAssignment) => {
+                                  void onDeleteAssignment(targetAssignment);
+                                }}
+                              />
                             </>
                           )}
                         </div>
@@ -978,7 +1317,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить», чтобы создать новое задание.
                 </div>
               ) : assignments.map((assignment) => {
-                const deadlineMeta = resolveAssignmentDeadlineMeta(assignment);
                 const responseMeta = resolveAssignmentResponseMeta(assignment);
                 const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
                 const studentInitials = getStudentInitials(studentLabel);
@@ -991,9 +1329,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 const isSelected = selectedIds.includes(assignment.id);
                 const isOverdueRow = problemBadges.hasOverdue;
                 const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
+                const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
                 const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
-                const shouldShowPrimaryOpen = !shouldReview && !assignment.hasConfigError && !canSendNow;
-                const shouldShowOpenAsSecondary = shouldReview || assignment.hasConfigError || canSendNow;
                 const hasLessonMeta = Boolean(assignment.lessonId);
                 const hasTemplateMeta = Boolean(assignment.templateTitle);
                 return (
@@ -1009,7 +1346,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                           {resolveIssuanceLabel(assignment)}
                         </span>
                         <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
-                          {formatAssignmentStatus(assignment)}
+                          {resolveStatusLabel(assignment)}
                         </span>
                       </div>
                       <Checkbox
@@ -1037,8 +1374,27 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       </div>
 
                       <div className={styles.mobileStudentMain}>
-                        <div className={styles.assignmentTitle}>{assignment.title}</div>
-                        <div className={styles.mobileStudentLabel}>{studentLabel}</div>
+                        <button
+                          type="button"
+                          className={styles.assignmentTitleButton}
+                          onClick={() => onOpenDetail(assignment)}
+                          aria-label={`Открыть домашнее задание "${assignment.title}"`}
+                        >
+                          <Ellipsis
+                            className={styles.assignmentTitle}
+                            title={assignment.title}
+                            tooltipAlign="start"
+                          >
+                            {assignment.title}
+                          </Ellipsis>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.mobileStudentLabel} ${styles.metaLinkButton}`}
+                          onClick={() => onOpenStudentProfile(assignment.studentId)}
+                        >
+                          {studentLabel}
+                        </button>
                         {problemBadges.hasOverdue || problemBadges.hasReturned || problemBadges.hasConfigError ? (
                           <div className={styles.problemBadges}>
                             {problemBadges.hasOverdue ? <span className={styles.problemDanger}>Просрочено</span> : null}
@@ -1052,14 +1408,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                     <div className={styles.mobileMetaGrid}>
                       <div className={styles.mobileMetaCard}>
                         <span className={styles.mobileMetaLabel}>Дедлайн</span>
-                        <span className={styles.mobileMetaValue}>{deadlineMeta.primary}</span>
-                        <span
-                          className={`${styles.mobileMetaHint} ${
-                            deadlineMeta.tone === 'danger' ? styles.mobileMetaHintDanger : ''
-                          }`}
-                        >
-                          {deadlineMeta.secondary}
-                        </span>
+                        <AssignmentDeadlineCell assignment={assignment} onUpdate={onUpdateAssignmentDeadline} />
+                      </div>
+
+                      <div className={styles.mobileMetaCard}>
+                        <span className={styles.mobileMetaLabel}>Создано</span>
+                        <span className={styles.mobileMetaValue}>{formatDateTime(assignment.createdAt)}</span>
                       </div>
 
                       <div className={styles.mobileMetaCard}>
@@ -1082,14 +1436,16 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                               ))}
                             </div>
                             {responseVisual.autoCheckBadge ? (
-                              <span
-                                className={`${styles.responseAutoBadge} ${
-                                  styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
-                                }`}
-                              >
-                                <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
-                                <span>{responseVisual.autoCheckBadge.label}</span>
-                              </span>
+                              <Tooltip content={resolveAutoCheckTooltip(responseVisual.autoCheckBadge) ?? ''}>
+                                <span
+                                  className={`${styles.responseAutoBadge} ${
+                                    styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
+                                  }`}
+                                >
+                                  <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
+                                  <span>{responseVisual.autoCheckBadge.label}</span>
+                                </span>
+                              </Tooltip>
                             ) : null}
                           </div>
                         )}
@@ -1099,10 +1455,14 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                     {hasLessonMeta || hasTemplateMeta ? (
                       <div className={styles.mobileSubmeta}>
                         {hasLessonMeta ? (
-                          <span className={styles.lessonMeta}>
+                          <button
+                            type="button"
+                            className={`${styles.lessonMeta} ${styles.metaLinkButton}`}
+                            onClick={() => onOpenLessonDay(assignment)}
+                          >
                             <HomeworkLinkIcon size={10} className={styles.lessonMetaIcon} />
-                            <span>Урок #{assignment.lessonId}</span>
-                          </span>
+                            <span>{formatDateTime(assignment.lessonStartAt)}</span>
+                          </button>
                         ) : null}
                         {hasTemplateMeta ? <span>Шаблон: {assignment.templateTitle}</span> : null}
                       </div>
@@ -1143,39 +1503,20 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         </button>
                       ) : null}
 
-                      {shouldShowPrimaryOpen ? (
-                        <button
-                          type="button"
-                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton} ${
-                            shouldShowRemind ? '' : styles.mobileActionFull
-                          }`}
-                          onClick={() => onOpenDetail(assignment)}
-                        >
-                          Открыть
-                        </button>
-                      ) : null}
-
-                      {shouldShowOpenAsSecondary ? (
-                        <button
-                          type="button"
-                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton}`}
-                          onClick={() => onOpenDetail(assignment)}
-                        >
-                          Открыть
-                        </button>
-                      ) : null}
-
-                      {!shouldReview && shouldShowRemind && !assignment.hasConfigError && !canSendNow ? (
-                        <button
-                          type="button"
-                          className={`${styles.detailOutlinedButton} ${styles.mobileActionButton}`}
-                          onClick={() => {
-                            void onRemindAssignment(assignment);
-                          }}
-                        >
-                          Напомнить
-                        </button>
-                      ) : null}
+                      <AssignmentRowMenu
+                        assignment={assignment}
+                        canCancelIssue={canCancelIssue}
+                        shouldShowRemind={shouldShowRemind}
+                        onCancelIssue={(targetAssignment) => {
+                          void onCancelAssignmentIssue(targetAssignment);
+                        }}
+                        onRemind={(targetAssignment) => {
+                          void onRemindAssignment(targetAssignment);
+                        }}
+                        onDelete={(targetAssignment) => {
+                          void onDeleteAssignment(targetAssignment);
+                        }}
+                      />
                     </div>
                   </article>
                 );
@@ -1434,7 +1775,16 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 onToggleFavorite={(item) => {
                   void onToggleTemplateFavorite(item);
                 }}
-                onUseTemplate={(item) => openAssignModal({ templateId: item.id })}
+                onUseTemplate={(item) => {
+                  void onCreateAssignment({
+                    studentId: selectedStudentId,
+                    lessonId: null,
+                    templateId: item.id,
+                    groupId: null,
+                    deadlineAt: null,
+                    sendMode: 'MANUAL',
+                  });
+                }}
                 onEditTemplate={(item) => onOpenEditTemplateScreen(item.id)}
               />
             ))}

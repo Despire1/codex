@@ -1,5 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { HomeworkGroupListItem, Lesson } from '../../../../entities/types';
+import { ru } from 'date-fns/locale';
+import { Lesson } from '../../../../entities/types';
 import { api } from '../../../../shared/api/client';
 import { Checkbox } from '../../../../shared/ui/Checkbox';
 import { DatePickerField } from '../../../../shared/ui/DatePickerField';
@@ -14,7 +15,6 @@ import {
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
 import { HomeworkEditorAssignmentContext } from '../../model/types';
 import {
-  createQuickDeadlineValue,
   toLocalDateTimeValue,
   toUtcIsoFromLocal,
 } from '../../../homework-assign/model/lib/assignmentStarter';
@@ -29,14 +29,18 @@ type StudentOption = {
 interface AssignmentSettingsSidebarProps {
   assignment: HomeworkEditorAssignmentContext;
   students: StudentOption[];
-  groups: HomeworkGroupListItem[];
   disabled?: boolean;
+  previewDisabled?: boolean;
   studentLocked?: boolean;
   saveAsTemplateSubmitting?: boolean;
-  validationErrors: string[];
+  showCancelIssueAction?: boolean;
+  cancelIssueSubmitting?: boolean;
+  studentError?: string | null;
+  lessonError?: string | null;
   onChange: (next: HomeworkEditorAssignmentContext) => void;
   onOpenPreview: () => void;
   onSaveAsTemplate: () => void;
+  onCancelIssue?: () => void;
 }
 
 type FutureLessonRef = Pick<Lesson, 'id' | 'startAt' | 'durationMinutes'>;
@@ -44,44 +48,27 @@ type FutureLessonRef = Pick<Lesson, 'id' | 'startAt' | 'durationMinutes'>;
 export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
   assignment,
   students,
-  groups,
   disabled = false,
+  previewDisabled = false,
   studentLocked = false,
   saveAsTemplateSubmitting = false,
-  validationErrors,
+  showCancelIssueAction = false,
+  cancelIssueSubmitting = false,
+  studentError = null,
+  lessonError = null,
   onChange,
   onOpenPreview,
   onSaveAsTemplate,
+  onCancelIssue,
 }) => {
   const timeZone = useTimeZone();
   const requestIdRef = useRef(0);
   const [isResolvingNextLesson, setIsResolvingNextLesson] = useState(false);
   const [futureLessons, setFutureLessons] = useState<FutureLessonRef[]>([]);
 
-  const assignmentGroups = useMemo(
-    () =>
-      groups
-        .filter((group) => !group.isArchived && !group.isSystem)
-        .slice()
-        .sort((left, right) => {
-          if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
-          return left.title.localeCompare(right.title, 'ru');
-        }),
-    [groups],
-  );
   const studentOptions = useMemo(
     () => students.map((student) => ({ value: String(student.id), label: student.name })),
     [students],
-  );
-  const groupOptions = useMemo(
-    () => [
-      { value: '', label: 'Без группы' },
-      ...assignmentGroups.map((group) => ({
-        value: String(group.id ?? ''),
-        label: group.title,
-      })),
-    ],
-    [assignmentGroups],
   );
 
   const deadlineLocalValue = useMemo(() => {
@@ -139,7 +126,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
     () =>
       futureLessons.map((lesson) => ({
         value: String(lesson.id),
-        label: formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { timeZone }),
+        label: formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { timeZone, locale: ru }),
         description:
           lesson.durationMinutes > 0
             ? `${lesson.durationMinutes} мин`
@@ -171,7 +158,6 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
     onChange({
       ...assignment,
       lessonId: firstLesson.id,
-      deadlineAt: firstLesson.startAt,
     });
   }, [assignment, futureLessons, isResolvingNextLesson, onChange, selectedLesson]);
 
@@ -188,8 +174,10 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           </div>
         </div>
 
-        <label className={styles.field}>
-          Кому
+        <div className={styles.field}>
+          <span>
+            Кому <span className={styles.requiredMark}>*</span>
+          </span>
           <AssignmentSettingsSelect
             value={assignment.studentId ? String(assignment.studentId) : ''}
             options={studentOptions}
@@ -197,6 +185,8 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             ariaLabel="Выбор ученика для домашнего задания"
             disabled={disabled || studentLocked || students.length === 0}
             compact
+            invalid={Boolean(studentError)}
+            validationPath="assignment.studentId"
             onChange={(nextValue) =>
               onChange({
                 ...assignment,
@@ -206,33 +196,16 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
               })
             }
           />
-        </label>
+        </div>
 
-        <label className={styles.field}>
-          Группа
-          <AssignmentSettingsSelect
-            value={assignment.groupId ? String(assignment.groupId) : ''}
-            options={groupOptions}
-            placeholder="Без группы"
-            ariaLabel="Выбор группы для домашнего задания"
-            disabled={disabled}
-            compact
-            onChange={(nextValue) =>
-              onChange({
-                ...assignment,
-                groupId: nextValue ? Number(nextValue) : null,
-              })
-            }
-          />
-        </label>
-
-        <label className={styles.field}>
+        <div className={styles.field}>
           Дедлайн
           <DatePickerField
             mode="datetime"
             className={styles.datePickerField}
             placeholder="Выберите дату и время"
             value={deadlineLocalValue || undefined}
+            allowClear
             onChange={(nextValue) =>
               onChange({
                 ...assignment,
@@ -241,22 +214,6 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             }
             disabled={disabled}
           />
-        </label>
-
-        <div className={styles.actionsRow}>
-          <button
-            type="button"
-            className={styles.quickButton}
-            onClick={() =>
-              onChange({
-                ...assignment,
-                deadlineAt: toUtcIsoFromLocal(createQuickDeadlineValue(2, timeZone), timeZone),
-              })
-            }
-            disabled={disabled}
-          >
-            +2 дня
-          </button>
         </div>
 
         {futureLessons.length > 0 ? (
@@ -281,7 +238,6 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
                     ...assignment,
                     sendMode: 'AUTO_AFTER_LESSON_DONE',
                     lessonId: lesson?.id ?? null,
-                    deadlineAt: lesson?.startAt ?? assignment.deadlineAt,
                   });
                 }}
               />
@@ -292,8 +248,8 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             </label>
 
             {autoSendEnabled ? (
-              <label className={styles.field}>
-                Урок для авто-отправки
+              <div className={styles.field}>
+                Отправить после урока
                 <AssignmentSettingsSelect
                   value={assignment.lessonId ? String(assignment.lessonId) : ''}
                   options={futureLessonOptions}
@@ -301,31 +257,19 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
                   ariaLabel="Выбор урока для автоматической отправки домашнего задания"
                   disabled={disabled || isResolvingNextLesson || futureLessonOptions.length === 0}
                   compact
+                  invalid={Boolean(lessonError)}
+                  validationPath="assignment.lessonId"
                   onChange={(nextValue) => {
                     const lesson = futureLessons.find((item) => String(item.id) === nextValue) ?? null;
                     onChange({
                       ...assignment,
                       sendMode: 'AUTO_AFTER_LESSON_DONE',
                       lessonId: lesson?.id ?? null,
-                      deadlineAt: lesson?.startAt ?? assignment.deadlineAt,
                     });
                   }}
                 />
-                {selectedLesson ? (
-                  <p className={styles.inlineInfo}>
-                    Выдача сработает после урока {formatInTimeZone(selectedLesson.startAt, 'd MMM, HH:mm', { timeZone })}.
-                  </p>
-                ) : null}
-              </label>
+              </div>
             ) : null}
-          </div>
-        ) : null}
-
-        {validationErrors.length > 0 ? (
-          <div className={styles.validationBlock}>
-            {validationErrors.map((error) => (
-              <p key={error}>{error}</p>
-            ))}
           </div>
         ) : null}
       </section>
@@ -338,7 +282,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           <h3>Предпросмотр</h3>
         </div>
         <p>Посмотрите, как домашнее задание будет выглядеть для ученика перед отправкой.</p>
-        <button type="button" onClick={onOpenPreview} disabled={disabled}>
+        <button type="button" onClick={onOpenPreview} disabled={disabled || previewDisabled}>
           <HomeworkPlayIcon size={12} />
           Открыть предпросмотр
         </button>
@@ -351,7 +295,6 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           </span>
           <div>
             <h2 className={styles.cardTitle}>Дополнительные действия</h2>
-            <p className={styles.cardSubtitle}>Сохраните удачную домашку как шаблон, чтобы быстро использовать её повторно.</p>
           </div>
         </div>
 
@@ -365,23 +308,17 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           {saveAsTemplateSubmitting ? 'Сохраняю шаблон…' : 'Сохранить как шаблон'}
         </button>
 
-        <p className={styles.cardSubtitle}>
-          Шаблон сохранит контент задания и ваши template-метки, чтобы использовать их позже повторно.
-        </p>
-      </section>
-
-      <section className={styles.card}>
-        <div className={styles.cardHeader}>
-          <span className={styles.cardIcon}>
-            <HomeworkPaperPlaneIcon size={15} />
-          </span>
-          <div>
-            <h2 className={styles.cardTitle}>Что произойдёт дальше</h2>
-            <p className={styles.cardSubtitle}>
-              «Сохранить черновик» оставит домашку в работе у преподавателя. «Выдать» сразу отправит ученику текущую версию.
-            </p>
-          </div>
-        </div>
+        {showCancelIssueAction ? (
+          <button
+            type="button"
+            className={styles.cancelIssueButton}
+            onClick={onCancelIssue}
+            disabled={disabled || cancelIssueSubmitting}
+          >
+            <HomeworkPaperPlaneIcon size={13} />
+            {cancelIssueSubmitting ? 'Отменяю выдачу…' : 'Отменить выдачу'}
+          </button>
+        ) : null}
       </section>
     </div>
   );

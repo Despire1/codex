@@ -514,7 +514,8 @@
 }
 
 .activeDay.todayCell .noteCounter {
-  background: #d9f99d;
+  background: #ddd6fe;
+  color: #4c1d95;
 }
 
 .monthDateRow {
@@ -525,7 +526,7 @@
 
 .monthDateNumber {
   font-weight: 800;
-  font-size: 16px;
+  font-size: 18px;
   color: #111827;
 }
 
@@ -573,21 +574,22 @@
 }
 
 .lessonCounter {
-  background: #111827;
-  color: var(--color-white);
-}
-
-.noteCounter {
   background: #c4f33f;
   color: #111827;
 }
 
+.noteCounter {
+  background: #ddd6fe;
+  color: #4c1d95;
+}
+
 .todayCell .lessonCounter {
-  border: 1px solid #2b3443;
+  border: 1px solid rgba(184, 250, 78, 0.42);
 }
 
 .todayCell .noteCounter {
-  background: #b8fa4e;
+  background: #c4b5fd;
+  color: #4c1d95;
 }
 
 .activeDay .monthDateNumber {

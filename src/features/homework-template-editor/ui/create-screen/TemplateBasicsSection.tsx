@@ -28,6 +28,10 @@ interface TemplateBasicsSectionProps {
   estimatedMinutes: number | null;
   tags: string[];
   selectedType: HomeworkEditorTaskType;
+  assignmentTemplateId?: string;
+  assignmentTemplateOptions?: ReadonlyArray<AssignmentSettingsSelectOption>;
+  assignmentGroupId?: string;
+  assignmentGroupOptions?: ReadonlyArray<AssignmentSettingsSelectOption>;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
@@ -35,6 +39,8 @@ interface TemplateBasicsSectionProps {
   onTagAdd: (value: string) => void;
   onTagRemove: (value: string) => void;
   onTypeChange: (value: HomeworkEditorTaskType) => void;
+  onAssignmentTemplateChange?: (value: string) => void;
+  onAssignmentGroupChange?: (value: string) => void;
 }
 
 const TYPE_OPTIONS: AssignmentSettingsSelectOption[] = [
@@ -88,6 +94,10 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
   estimatedMinutes,
   tags,
   selectedType,
+  assignmentTemplateId = '',
+  assignmentTemplateOptions,
+  assignmentGroupId = '',
+  assignmentGroupOptions,
   onTitleChange,
   onDescriptionChange,
   onCategoryChange,
@@ -95,6 +105,8 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
   onTagAdd,
   onTagRemove,
   onTypeChange,
+  onAssignmentTemplateChange,
+  onAssignmentGroupChange,
 }) => {
   const [pendingTag, setPendingTag] = useState('');
 
@@ -166,86 +178,128 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
           <span className={styles.fieldHint}>Будет видно ученику при получении задания</span>
         </label>
 
-        <div className={styles.splitGrid}>
-          <label className={styles.fieldLabel}>
-            Категория
-            <AssignmentSettingsSelect
-              value={resolvedCategory}
-              options={categoryOptions}
-              placeholder="Без категории"
-              ariaLabel="Выбор категории домашнего задания"
-              compact
-              onChange={onCategoryChange}
-            />
-          </label>
-
-          <label className={styles.fieldLabel}>
-            Примерное время
-            <span className={styles.minutesInputWrap}>
-              <input
-                type="number"
-                className={styles.input}
-                min={1}
-                max={240}
-                placeholder="15"
-                value={estimatedMinutes ?? ''}
-                onChange={(event) =>
-                  onEstimatedMinutesChange(event.target.value ? Number(event.target.value) : null)
-                }
-              />
-              <span className={styles.minutesSuffix}>мин</span>
-            </span>
-          </label>
-        </div>
-
-        <div className={styles.metaRow}>
-          <div className={styles.fieldLabel}>
-            Теги
-            <div className={styles.tagsWrap}>
-              {tags.map((tag) => (
-                <span key={tag} className={styles.tagChip}>
-                  {tag}
-                  <button
-                    type="button"
-                    className={styles.tagRemoveButton}
-                    onClick={() => onTagRemove(tag)}
-                    aria-label={`Удалить тег ${tag}`}
-                  >
-                    <HomeworkXMarkIcon size={10} />
-                  </button>
-                </span>
-              ))}
-
-              <div className={styles.tagEditor}>
-                <input
-                  type="text"
-                  className={styles.tagInput}
-                  value={pendingTag}
-                  onChange={(event) => setPendingTag(event.target.value)}
-                  onKeyDown={handlePendingTagKeydown}
-                  placeholder="Новый тег"
+        <div className={styles.metaPanel}>
+          {assignmentTemplateOptions && onAssignmentTemplateChange ? (
+            <div className={`${styles.metaCard} ${styles.metaCardFull}`}>
+              <div className={styles.fieldLabel}>
+                <span>Создать по шаблону</span>
+                <AssignmentSettingsSelect
+                  value={assignmentTemplateId}
+                  options={assignmentTemplateOptions}
+                  placeholder={
+                    assignmentTemplateOptions.length > 0 ? 'Выберите шаблон…' : 'Нет доступных шаблонов'
+                  }
+                  ariaLabel="Выбор шаблона домашнего задания"
+                  compact
+                  allowClear
+                  disabled={assignmentTemplateOptions.length === 0}
+                  onChange={onAssignmentTemplateChange}
                 />
-                <button type="button" className={styles.tagAddButton} onClick={submitPendingTag}>
-                  <HomeworkPlusIcon size={11} />
-                  Добавить
-                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className={styles.metaGrid}>
+            <div className={styles.metaCard}>
+              <div className={styles.fieldLabel}>
+                <span>Тип задания</span>
+                <AssignmentSettingsSelect
+                  value={selectedType}
+                  options={TYPE_OPTIONS}
+                  placeholder="Выберите тип…"
+                  ariaLabel="Выбор типа домашнего задания"
+                  compact
+                  onChange={(nextValue) => onTypeChange(nextValue as HomeworkEditorTaskType)}
+                />
+              </div>
+            </div>
+
+            <div className={styles.metaCard}>
+              <div className={styles.fieldLabel}>
+                <span>Категория</span>
+                <AssignmentSettingsSelect
+                  value={resolvedCategory}
+                  options={categoryOptions}
+                  placeholder="Без категории"
+                  ariaLabel="Выбор категории домашнего задания"
+                  compact
+                  onChange={onCategoryChange}
+                />
+              </div>
+            </div>
+
+            {assignmentGroupOptions && onAssignmentGroupChange ? (
+              <div className={styles.metaCard}>
+                <div className={styles.fieldLabel}>
+                  <span>Группа домашних заданий</span>
+                  <AssignmentSettingsSelect
+                    value={assignmentGroupId}
+                    options={assignmentGroupOptions}
+                    placeholder="Без группы"
+                    ariaLabel="Выбор группы домашних заданий"
+                    compact
+                    onChange={onAssignmentGroupChange}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className={`${styles.metaCard} ${styles.metaCardCompact}`}>
+              <label className={styles.fieldLabel}>
+                Примерное время
+                <span className={styles.minutesInputWrap}>
+                  <input
+                    type="number"
+                    className={styles.input}
+                    min={1}
+                    max={240}
+                    placeholder="15"
+                    value={estimatedMinutes ?? ''}
+                    onChange={(event) =>
+                      onEstimatedMinutesChange(event.target.value ? Number(event.target.value) : null)
+                    }
+                  />
+                  <span className={styles.minutesSuffix}>мин</span>
+                </span>
+              </label>
+            </div>
+
+            <div className={`${styles.metaCard} ${styles.metaCardWide}`}>
+              <div className={styles.fieldLabel}>
+                Теги
+                <div className={styles.tagsWrap}>
+                  {tags.map((tag) => (
+                    <span key={tag} className={styles.tagChip}>
+                      {tag}
+                      <button
+                        type="button"
+                        className={styles.tagRemoveButton}
+                        onClick={() => onTagRemove(tag)}
+                        aria-label={`Удалить тег ${tag}`}
+                      >
+                        <HomeworkXMarkIcon size={10} />
+                      </button>
+                    </span>
+                  ))}
+
+                  <div className={styles.tagEditor}>
+                    <input
+                      type="text"
+                      className={styles.tagInput}
+                      value={pendingTag}
+                      onChange={(event) => setPendingTag(event.target.value)}
+                      onKeyDown={handlePendingTagKeydown}
+                      placeholder="Новый тег"
+                    />
+                    <button type="button" className={styles.tagAddButton} onClick={submitPendingTag}>
+                      <HomeworkPlusIcon size={11} />
+                      Добавить
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-
-          <label className={styles.fieldLabel}>
-            Тип задания
-            <div className={styles.typeField}>
-              <AssignmentSettingsSelect
-                value={selectedType}
-                options={TYPE_OPTIONS}
-                placeholder="Выберите тип…"
-                ariaLabel="Выбор типа домашнего задания"
-                compact
-                onChange={(nextValue) => onTypeChange(nextValue as HomeworkEditorTaskType)}
-              />
-            </div>
-          </label>
         </div>
       </div>
     </section>

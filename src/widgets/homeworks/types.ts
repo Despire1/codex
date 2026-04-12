@@ -134,7 +134,11 @@ export interface TeacherHomeworksViewModel {
   onToggleTemplateFavorite: (template: HomeworkTemplate) => Promise<void>;
   onCreateAssignment: (payload: TeacherAssignmentEditorPrefill) => Promise<boolean>;
   onSendAssignmentNow: (assignment: HomeworkAssignment) => Promise<void>;
+  onCancelAssignmentIssue: (assignment: HomeworkAssignment) => Promise<void>;
   onRemindAssignment: (assignment: HomeworkAssignment) => Promise<void>;
+  onOpenStudentProfile: (studentId: number) => void;
+  onOpenLessonDay: (assignment: HomeworkAssignment) => void;
+  onUpdateAssignmentDeadline: (assignment: HomeworkAssignment, deadlineAt: string | null) => Promise<void>;
   onDeleteAssignment: (assignment: HomeworkAssignment) => Promise<void>;
   onFixConfigError: (assignment: HomeworkAssignment) => Promise<void>;
   onBulkAction: (payload: { ids: number[]; action: TeacherBulkAction }) => Promise<void>;

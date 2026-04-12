@@ -26,7 +26,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { ru } from 'date-fns/locale';
 import {
-  Homework,
+  HomeworkAssignment,
   Lesson,
   LinkedStudent,
   PaymentEvent,
@@ -55,6 +55,13 @@ import {
   getStudentDisplayName,
   getStudentInitials,
 } from '../../model/referencePresentation';
+import {
+  canRemindStudentProfileHomework,
+  resolveStudentProfileHomeworkDeadlineLabel,
+  resolveStudentProfileHomeworkMetaLabel,
+  resolveStudentProfileHomeworkStatusLabel,
+  resolveStudentProfileHomeworkTone,
+} from '../../model/referenceHomeworkPresentation';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
@@ -68,6 +75,7 @@ import {
   ReplayOutlinedIcon,
 } from '@/icons/MaterialIcons';
 import { StudentDebtPopoverContent } from '../StudentDebtPopoverContent';
+import { StudentProfileLearningGoalPanel } from './StudentProfileLearningGoalPanel';
 import { StudentProfileNotesPanel } from './StudentProfileNotesPanel';
 import styles from './StudentsReferenceProfileView.module.css';
 
@@ -75,8 +83,10 @@ type ProfileTabId = 'homework' | 'lessons' | 'payments';
 
 interface StudentsReferenceProfileViewProps {
   studentEntry: StudentListItem;
-  studentHomeworks: Homework[];
-  studentHomeworksLoading: boolean;
+  studentHomeworkAssignments: HomeworkAssignment[];
+  studentHomeworkAssignmentsLoading: boolean;
+  studentHomeworkAssignmentsHasMore: boolean;
+  studentHomeworkAssignmentsLoadingMore: boolean;
   studentLessons: Lesson[];
   studentLessonsHasMore: boolean;
   studentLessonsLoading: boolean;
@@ -85,6 +95,7 @@ interface StudentsReferenceProfileViewProps {
   studentDebtItems: StudentDebtItem[];
   payments: PaymentEvent[];
   paymentsLoading: boolean;
+  onLoadMoreHomeworks: () => void;
   onLoadMoreLessons: () => void;
   onCreateStudentNote: (
     studentEntry: StudentListItem,
@@ -111,7 +122,7 @@ interface StudentsReferenceProfileViewProps {
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
   onTogglePaid: (lessonId: number, studentId?: number, options?: { currentIsPaid?: boolean }) => void | Promise<void>;
-  onRemindHomework: (homeworkId: number) => void;
+  onRemindHomework: (assignmentId: number) => void;
   timeZone: string;
 }
 
@@ -213,8 +224,10 @@ const formatPaymentEventValue = (event: PaymentEvent) => {
 
 export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps> = ({
   studentEntry,
-  studentHomeworks,
-  studentHomeworksLoading,
+  studentHomeworkAssignments,
+  studentHomeworkAssignmentsLoading,
+  studentHomeworkAssignmentsHasMore,
+  studentHomeworkAssignmentsLoadingMore,
   studentLessons,
   studentLessonsHasMore,
   studentLessonsLoading,
@@ -223,6 +236,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   studentDebtItems,
   payments,
   paymentsLoading,
+  onLoadMoreHomeworks,
   onLoadMoreLessons,
   onCreateStudentNote,
   onUpdateStudentNote,
@@ -249,6 +263,8 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
   const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
   const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
+  const homeworksListRef = useRef<HTMLDivElement | null>(null);
+  const homeworksLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const lessonsListRef = useRef<HTMLDivElement | null>(null);
   const lessonsLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
@@ -257,11 +273,11 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const previousDebtCount = useRef(0);
   const cardPresentation = buildStudentCardPresentation(studentEntry, timeZone);
   const statusMeta = getStatusUiMeta(cardPresentation.status);
-  const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworks, studentDebtItems);
+  const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworkAssignments, studentDebtItems);
 
-  const homeworksOrdered = useMemo(
-    () => [...studentHomeworks].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
-    [studentHomeworks],
+  const homeworkAssignmentsOrdered = useMemo(
+    () => [...studentHomeworkAssignments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [studentHomeworkAssignments],
   );
   const lessonsOrdered = studentLessons;
   const paymentsOrdered = useMemo(
@@ -291,67 +307,71 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   }, [studentDebtItems, studentEntry.debtRub]);
 
   const renderHomeworkTab = () => {
-    if (studentHomeworksLoading && homeworksOrdered.length === 0) {
+    if (studentHomeworkAssignmentsLoading && homeworkAssignmentsOrdered.length === 0) {
       return <div className={styles.tabEmpty}>Загружаем домашние задания…</div>;
     }
 
-    if (homeworksOrdered.length === 0) {
+    if (homeworkAssignmentsOrdered.length === 0) {
       return <div className={styles.tabEmpty}>У ученика пока нет домашних заданий.</div>;
     }
 
     return (
-      <div className={styles.listStack}>
-        {homeworksOrdered.map((homework) => {
-          const done = homework.isDone || homework.status === 'DONE';
-          const inProgress = homework.status === 'IN_PROGRESS';
-          const assigned = homework.status === 'ASSIGNED';
-          const statusLabel = done ? 'Выполнено' : inProgress ? 'В процессе' : assigned ? 'Назначено' : 'Черновик';
+      <div ref={homeworksListRef} className={`${styles.listStack} ${styles.homeworksListStack}`}>
+        {homeworkAssignmentsOrdered.map((assignment) => {
+          const tone = resolveStudentProfileHomeworkTone(assignment);
+          const canRemind = canRemindStudentProfileHomework(assignment);
+          const statusLabel = resolveStudentProfileHomeworkStatusLabel(assignment);
 
           return (
             <article
-              key={homework.id}
+              key={assignment.id}
               className={`${styles.activityCard} ${
-                done ? styles.activityDone : inProgress ? styles.activityProgress : styles.activityScheduled
+                tone === 'done'
+                  ? styles.activityDone
+                  : tone === 'progress'
+                    ? styles.activityProgress
+                    : tone === 'muted'
+                      ? styles.activityMuted
+                      : styles.activityScheduled
               }`}
             >
               <div className={styles.activityHeader}>
                 <div>
-                  <h3 className={styles.activityTitle}>{homework.text.slice(0, 70) || 'Домашнее задание'}</h3>
+                  <h3 className={styles.activityTitle}>{assignment.title || 'Домашнее задание'}</h3>
                   <p className={styles.activitySubtitle}>
-                    {homework.deadlineAt || homework.deadline
-                      ? `Срок: ${formatInTimeZone(homework.deadlineAt ?? homework.deadline ?? '', 'd MMMM yyyy', {
-                          locale: ru,
-                          timeZone,
-                        })}`
-                      : 'Без дедлайна'}
+                    {resolveStudentProfileHomeworkDeadlineLabel(assignment, timeZone)}
                   </p>
                 </div>
                 <span className={styles.statusBadge}>{statusLabel}</span>
               </div>
 
-              <div className={styles.activityFooter}>
+              <div className={`${styles.activityFooter} ${!canRemind ? styles.activityFooterCompact : ''}`}>
                 <div className={styles.activityMetaLine}>
                   <FontAwesomeIcon icon={faClock} />
-                  <span>
-                    {done ? 'Завершено' : inProgress ? 'Выполняется' : 'Ожидает выполнения'}
-                  </span>
+                  <span>{resolveStudentProfileHomeworkMetaLabel(assignment)}</span>
                 </div>
 
-                <button
-                  type="button"
-                  className={styles.activityActionButton}
-                  onClick={() => {
-                    if (!done) {
-                      onRemindHomework(homework.id);
-                    }
-                  }}
-                >
-                  {done ? 'Посмотреть' : 'Напомнить'}
-                </button>
+                {canRemind ? (
+                  <button
+                    type="button"
+                    className={styles.activityActionButton}
+                    onClick={() => {
+                      onRemindHomework(assignment.id);
+                    }}
+                  >
+                    Напомнить
+                  </button>
+                ) : null}
               </div>
             </article>
           );
         })}
+        {studentHomeworkAssignmentsHasMore ? (
+          <div ref={homeworksLoadMoreRef} className={styles.loadMoreSentinel} aria-hidden="true" />
+        ) : null}
+        {studentHomeworkAssignmentsLoadingMore ? (
+          <div className={styles.listLoadingMore}>Загружаем ещё домашние задания…</div>
+        ) : null}
       </div>
     );
   };
@@ -680,6 +700,26 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   }, [pendingPaymentIds.length, shouldAutoCloseDebt, studentDebtItems.length]);
 
   useEffect(() => {
+    if (activeTab !== 'homework') return;
+    const root = homeworksListRef.current;
+    const target = homeworksLoadMoreRef.current;
+    if (!root || !target || !studentHomeworkAssignmentsHasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !studentHomeworkAssignmentsLoadingMore) {
+          onLoadMoreHomeworks();
+        }
+      },
+      {
+        root,
+        rootMargin: '180px',
+      },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeTab, onLoadMoreHomeworks, studentHomeworkAssignmentsHasMore, studentHomeworkAssignmentsLoadingMore]);
+
+  useEffect(() => {
     if (activeTab !== 'lessons') return;
     const root = lessonsListRef.current;
     const target = lessonsLoadMoreRef.current;
@@ -922,15 +962,17 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <div className={styles.heroStatValue}>{profileStats.lessonsConducted}</div>
                 <div className={styles.heroStatLabel}>Занятий проведено</div>
               </div>
-              <button
-                type="button"
-                className={styles.heroStatButton}
-                onClick={() => onEditStudent({ focusField: 'price' })}
-                aria-label="Изменить цену занятия"
-              >
-                <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{priceValueLabel}</div>
-                <div className={styles.heroStatLabel}>Цена за урок</div>
-              </button>
+              <Tooltip content="Изменить цену урока" side="bottom" align="start">
+                <button
+                  type="button"
+                  className={styles.heroStatButton}
+                  onClick={() => onEditStudent({ focusField: 'price' })}
+                  aria-label="Изменить цену занятия"
+                >
+                  <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{priceValueLabel}</div>
+                  <div className={styles.heroStatLabel}>Цена за урок</div>
+                </button>
+              </Tooltip>
               {hasUnpaidLessons ? (
                 <AdaptivePopover
                   isOpen={isDebtPopoverOpen}
@@ -940,15 +982,17 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   offset={8}
                   className={styles.debtPopover}
                   trigger={(
-                    <button
-                      type="button"
-                      className={`${styles.heroStatButton} ${styles.heroStatDangerButton}`}
-                      onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
-                      aria-label="Показать неоплаченные занятия"
-                    >
-                      <div className={`${styles.heroStatValue} ${styles.heroStatDanger}`}>{unpaidLessonsValueLabel}</div>
-                      <div className={styles.heroStatLabel}>{unpaidLessonsLabel}</div>
-                    </button>
+                    <Tooltip content="Посмотреть неоплаченные занятия" side="bottom" align="center">
+                      <button
+                        type="button"
+                        className={`${styles.heroStatButton} ${styles.heroStatDangerButton}`}
+                        onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
+                        aria-label="Показать неоплаченные занятия"
+                      >
+                        <div className={`${styles.heroStatValue} ${styles.heroStatDanger}`}>{unpaidLessonsValueLabel}</div>
+                        <div className={styles.heroStatLabel}>{unpaidLessonsLabel}</div>
+                      </button>
+                    </Tooltip>
                   )}
                 >
                   <StudentDebtPopoverContent
@@ -1085,6 +1129,8 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
             </div>
 
             <div className={styles.sideColumn}>
+              <StudentProfileLearningGoalPanel studentEntry={studentEntry} />
+
               <StudentProfileNotesPanel
                 studentEntry={studentEntry}
                 timeZone={timeZone}

@@ -1,4 +1,23 @@
-import { FC, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FC, HTMLAttributes, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { HomeworkBlockTest, HomeworkTestQuestion, HomeworkTestTableConfig } from '../../../../entities/types';
 import { pathToKey } from '../../../../shared/lib/form-validation/path';
 import { FormValidationIssue, FormValidationPath } from '../../../../shared/lib/form-validation/types';
@@ -278,6 +297,179 @@ const cloneQuestion = (question: HomeworkTestQuestion): HomeworkTestQuestion => 
   });
 };
 
+interface QuestionEditorCardProps {
+  question: HomeworkTestQuestion;
+  questionIndex: number;
+  questionKind: CreateQuestionKind;
+  promptPathKey: string;
+  promptClassName: string;
+  promptError: ReactNode;
+  children: ReactNode;
+  onDuplicate: () => void;
+  onRemove: () => void;
+  onPromptChange: (value: string) => void;
+  onToggleMultiple?: (checked: boolean) => void;
+  onPointsChange: (value: string) => void;
+  style?: CSSProperties;
+  dragging?: boolean;
+  itemRef?: (node: HTMLElement | null) => void;
+  handleRef?: (node: HTMLButtonElement | null) => void;
+  handleProps?: HTMLAttributes<HTMLButtonElement>;
+}
+
+const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
+  question,
+  questionIndex,
+  questionKind,
+  promptPathKey,
+  promptClassName,
+  promptError,
+  children,
+  onDuplicate,
+  onRemove,
+  onPromptChange,
+  onToggleMultiple,
+  onPointsChange,
+  style,
+  dragging = false,
+  itemRef,
+  handleRef,
+  handleProps,
+}) => (
+  <article
+    ref={itemRef}
+    style={style}
+    className={`${styles.questionCard} ${dragging ? styles.questionCardDragging : ''}`}
+  >
+    <div className={styles.questionHeader}>
+      <div className={styles.questionHeaderLeft}>
+        <button
+          type="button"
+          ref={handleRef}
+          className={styles.dragHandleButton}
+          aria-label="Перетащить вопрос"
+          {...handleProps}
+        >
+          <HomeworkGripVerticalIcon size={12} />
+        </button>
+        <span className={styles.questionIndex}>
+          Вопрос {questionIndex + 1} • {resolveQuestionKindTitle(questionKind)}
+        </span>
+      </div>
+
+      <div className={styles.questionActions}>
+        <button
+          type="button"
+          className={styles.iconButton}
+          onClick={onDuplicate}
+          aria-label="Дублировать вопрос"
+        >
+          <HomeworkCopyIcon size={12} />
+        </button>
+        <button
+          type="button"
+          className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+          onClick={onRemove}
+          aria-label="Удалить вопрос"
+        >
+          <HomeworkTrashIcon size={12} />
+        </button>
+      </div>
+    </div>
+
+    <input
+      type="text"
+      className={promptClassName}
+      placeholder="Введите текст вопроса..."
+      value={question.prompt}
+      data-validation-path={promptPathKey}
+      onChange={(event) => {
+        onPromptChange(event.target.value);
+      }}
+    />
+    {promptError}
+
+    {children}
+
+    <div className={styles.questionFooter}>
+      {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && onToggleMultiple ? (
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={isQuestionMultipleChoice(question)}
+            onChange={(event) => onToggleMultiple(event.target.checked)}
+          />
+          <span>Несколько верных ответов</span>
+        </label>
+      ) : null}
+      <label className={styles.pointsField}>
+        Баллы:
+        <input
+          type="number"
+          min={1}
+          className={styles.pointsInput}
+          value={question.points ?? 1}
+          onChange={(event) => onPointsChange(event.target.value)}
+        />
+      </label>
+    </div>
+  </article>
+);
+
+interface SortableQuestionCardProps
+  extends Omit<
+    QuestionEditorCardProps,
+    'style' | 'dragging' | 'itemRef' | 'handleRef' | 'handleProps'
+  > {}
+
+const SortableQuestionCard: FC<SortableQuestionCardProps> = (props) => {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.question.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <QuestionEditorCard
+      {...props}
+      style={style}
+      dragging={isDragging}
+      itemRef={setNodeRef}
+      handleRef={setActivatorNodeRef}
+      handleProps={{ ...attributes, ...listeners }}
+    />
+  );
+};
+
+interface QuestionDragOverlayCardProps {
+  question: HomeworkTestQuestion;
+  questionKind: CreateQuestionKind;
+  questionIndex: number;
+}
+
+const QuestionDragOverlayCard: FC<QuestionDragOverlayCardProps> = ({
+  question,
+  questionKind,
+  questionIndex,
+}) => (
+  <div className={`${styles.questionCard} ${styles.questionCardOverlay}`}>
+    <div className={styles.questionHeader}>
+      <div className={styles.questionHeaderLeft}>
+        <span className={styles.dragHandleButton} aria-hidden>
+          <HomeworkGripVerticalIcon size={12} />
+        </span>
+        <span className={styles.questionIndex}>
+          Вопрос {questionIndex + 1} • {resolveQuestionKindTitle(questionKind)}
+        </span>
+      </div>
+    </div>
+    <div className={styles.questionOverlayTitle}>{question.prompt.trim() || 'Новый вопрос'}</div>
+  </div>
+);
+
 export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   testBlock,
   testBlockPath,
@@ -286,11 +478,22 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   onTestBlockChange,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [dragQuestionIndex, setDragQuestionIndex] = useState<number | null>(null);
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [dragOrderingState, setDragOrderingState] = useState<{ questionId: string; itemIndex: number } | null>(null);
   const dropdownWrapRef = useRef<HTMLDivElement | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 4,
+      },
+    }),
+  );
 
   const questions = testBlock?.questions ?? [];
+  const questionIds = useMemo(() => questions.map((question) => question.id), [questions]);
+  const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question] as const)), [questions]);
+  const activeQuestion = activeQuestionId ? questionById.get(activeQuestionId) ?? null : null;
+  const activeQuestionIndex = activeQuestionId ? questionIds.indexOf(activeQuestionId) : -1;
   const questionsRootPath: FormValidationPath = [...(testBlockPath ?? ['blocks', 0]), 'questions'];
   const resolveQuestionPath = (questionIndex: number): FormValidationPath => [
     ...(testBlockPath ?? ['blocks', 0]),
@@ -350,13 +553,39 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
     if (sourceIndex < 0 || targetIndex < 0) return;
     if (sourceIndex >= testBlock.questions.length || targetIndex >= testBlock.questions.length) return;
 
-    const nextQuestions = [...testBlock.questions];
-    const [movedQuestion] = nextQuestions.splice(sourceIndex, 1);
-    nextQuestions.splice(targetIndex, 0, movedQuestion);
     onTestBlockChange({
       ...testBlock,
-      questions: nextQuestions.map((question) => enforceQuestionInvariants(question)),
+      questions: arrayMove(testBlock.questions, sourceIndex, targetIndex).map((question) =>
+        enforceQuestionInvariants(question),
+      ),
     });
+  };
+
+  const handleQuestionDragStart = ({ active }: DragStartEvent) => {
+    setActiveQuestionId(String(active.id));
+  };
+
+  const handleQuestionDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) {
+      setActiveQuestionId(null);
+      return;
+    }
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId !== overId) {
+      const oldIndex = questionIds.indexOf(activeId);
+      const newIndex = questionIds.indexOf(overId);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderQuestions(oldIndex, newIndex);
+      }
+    }
+
+    setActiveQuestionId(null);
+  };
+
+  const handleQuestionDragCancel = () => {
+    setActiveQuestionId(null);
   };
 
   const addQuestion = (kind: CreateQuestionKind) => {
@@ -1294,123 +1523,79 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
           {renderFieldError(questionsRootPath)}
         </div>
       ) : (
-        <div className={styles.questionsList}>
-          {questions.map((question, questionIndex) => {
-            const questionKind = getQuestionKind(question);
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
+          onDragStart={handleQuestionDragStart}
+          onDragEnd={handleQuestionDragEnd}
+          onDragCancel={handleQuestionDragCancel}
+        >
+          <SortableContext items={questionIds} strategy={verticalListSortingStrategy}>
+            <div className={styles.questionsList}>
+              {questions.map((question, questionIndex) => {
+                const questionKind = getQuestionKind(question);
+                const promptPath = resolveFieldPath(questionIndex, 'prompt');
 
-            return (
-              <article
-                key={question.id}
-                className={`${styles.questionCard} ${dragQuestionIndex === questionIndex ? styles.questionCardDragging : ''}`}
-                onDragOver={(event) => {
-                  if (dragQuestionIndex === null || dragQuestionIndex === questionIndex) return;
-                  event.preventDefault();
-                }}
-                onDrop={(event) => {
-                  if (dragQuestionIndex === null) return;
-                  event.preventDefault();
-                  reorderQuestions(dragQuestionIndex, questionIndex);
-                  setDragQuestionIndex(null);
-                }}
-              >
-                <div className={styles.questionHeader}>
-                  <div className={styles.questionHeaderLeft}>
-                    <button
-                      type="button"
-                      className={styles.dragHandleButton}
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = 'move';
-                        setDragQuestionIndex(questionIndex);
-                      }}
-                      onDragEnd={() => setDragQuestionIndex(null)}
-                      aria-label="Перетащить вопрос"
-                    >
-                      <HomeworkGripVerticalIcon size={12} />
-                    </button>
-                    <span className={styles.questionIndex}>
-                      Вопрос {questionIndex + 1} • {resolveQuestionKindTitle(questionKind)}
-                    </span>
-                  </div>
+                return (
+                  <SortableQuestionCard
+                    key={question.id}
+                    question={question}
+                    questionIndex={questionIndex}
+                    questionKind={questionKind}
+                    promptPathKey={pathToKey(promptPath)}
+                    promptClassName={getFieldClassName(styles.questionPrompt, promptPath)}
+                    promptError={renderFieldError(promptPath)}
+                    onDuplicate={() => duplicateQuestion(questionIndex)}
+                    onRemove={() => removeQuestion(questionIndex)}
+                    onPromptChange={(value) => {
+                      onFieldEdit(promptPath);
+                      updateQuestion(questionIndex, (previousQuestion) => ({
+                        ...previousQuestion,
+                        prompt: value,
+                      }));
+                    }}
+                    onToggleMultiple={
+                      question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE'
+                        ? (checked) =>
+                            updateQuestion(questionIndex, (previousQuestion) =>
+                              toggleQuestionMultipleChoice(previousQuestion, checked),
+                            )
+                        : undefined
+                    }
+                    onPointsChange={(value) =>
+                      updateQuestion(questionIndex, (previousQuestion) => ({
+                        ...previousQuestion,
+                        points: value ? Number(value) : 1,
+                      }))
+                    }
+                  >
+                    {renderQuestionSpecificFields(question, questionIndex)}
+                  </SortableQuestionCard>
+                );
+              })}
 
-                  <div className={styles.questionActions}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={() => duplicateQuestion(questionIndex)}
-                      aria-label="Дублировать вопрос"
-                    >
-                      <HomeworkCopyIcon size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.iconButton} ${styles.iconButtonDanger}`}
-                      onClick={() => removeQuestion(questionIndex)}
-                      aria-label="Удалить вопрос"
-                    >
-                      <HomeworkTrashIcon size={12} />
-                    </button>
-                  </div>
-                </div>
-
-                <input
-                  type="text"
-                  className={getFieldClassName(styles.questionPrompt, resolveFieldPath(questionIndex, 'prompt'))}
-                  placeholder="Введите текст вопроса..."
-                  value={question.prompt}
-                  data-validation-path={pathToKey(resolveFieldPath(questionIndex, 'prompt'))}
-                  onChange={(event) => {
-                    onFieldEdit(resolveFieldPath(questionIndex, 'prompt'));
-                    updateQuestion(questionIndex, (previousQuestion) => ({
-                      ...previousQuestion,
-                      prompt: event.target.value,
-                    }));
-                  }}
-                />
-                {renderFieldError(resolveFieldPath(questionIndex, 'prompt'))}
-
-                {renderQuestionSpecificFields(question, questionIndex)}
-
-                <div className={styles.questionFooter}>
-                  {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') ? (
-                    <label className={styles.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={isQuestionMultipleChoice(question)}
-                        onChange={(event) =>
-                          updateQuestion(questionIndex, (previousQuestion) =>
-                            toggleQuestionMultipleChoice(previousQuestion, event.target.checked),
-                          )
-                        }
-                      />
-                      <span>Несколько верных ответов</span>
-                    </label>
-                  ) : null}
-                  <label className={styles.pointsField}>
-                    Баллы:
-                    <input
-                      type="number"
-                      min={1}
-                      className={styles.pointsInput}
-                      value={question.points ?? 1}
-                      onChange={(event) =>
-                        updateQuestion(questionIndex, (previousQuestion) => ({
-                          ...previousQuestion,
-                          points: event.target.value ? Number(event.target.value) : 1,
-                        }))
-                      }
+              <button type="button" className={styles.bottomAddButton} onClick={() => setDropdownOpen(true)}>
+                <HomeworkPlusIcon size={12} />
+                <span>Добавить еще вопрос</span>
+              </button>
+            </div>
+          </SortableContext>
+          {typeof document !== 'undefined'
+            ? createPortal(
+                <DragOverlay adjustScale={false}>
+                  {activeQuestion ? (
+                    <QuestionDragOverlayCard
+                      question={activeQuestion}
+                      questionKind={getQuestionKind(activeQuestion)}
+                      questionIndex={activeQuestionIndex === -1 ? 0 : activeQuestionIndex}
                     />
-                  </label>
-                </div>
-              </article>
-            );
-          })}
-
-          <button type="button" className={styles.bottomAddButton} onClick={() => setDropdownOpen(true)}>
-            <HomeworkPlusIcon size={12} />
-            <span>Добавить еще вопрос</span>
-          </button>
-        </div>
+                  ) : null}
+                </DragOverlay>,
+                document.body,
+              )
+            : null}
+        </DndContext>
       )}
 
       <div className={styles.summary}>Максимум баллов: {pointsSummary}</div>

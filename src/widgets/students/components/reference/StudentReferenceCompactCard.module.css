@@ -1,0 +1,228 @@
+.card {
+  --student-accent: #5a8dff;
+  position: relative;
+  z-index: 0;
+  border-radius: 22px;
+  cursor: pointer;
+  overflow: visible;
+  margin-bottom: 6px;
+  transition: transform 0.2s ease;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 120px;
+  background: var(--student-accent);
+  border-radius: 22px;
+  z-index: -1;
+}
+
+.surface {
+  position: relative;
+  z-index: 1;
+  border-radius: 22px;
+  border: 1px solid #e6edf7;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, #ffffff 100%);
+  padding: 14px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  margin-top: 3px;
+}
+
+.card:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.18);
+  outline-offset: 2px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.identityCentered {
+  align-items: center;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 2px solid var(--student-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.identityText {
+  min-width: 0;
+  flex: 1;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.name {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #111827;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.levelBadge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alertsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.alertChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.alertDanger {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.alertWarning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.alertInactive {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.alertMuted {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.alertSuccess {
+  background: #ecfdf3;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.nextLessonRow {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nextLessonDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.nextLessonDotToday {
+  background: #22c55e;
+}
+
+.nextLessonDotFuture {
+  background: #3b82f6;
+}
+
+.nextLessonDotNone {
+  background: #9ca3af;
+}
+
+.nextLessonText {
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: #374151;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statsRow {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.statPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e5ecf5;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-1px);
+  }
+
+  .card:hover .surface {
+    border-color: #d6e2f0;
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  }
+}

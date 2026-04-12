@@ -1,0 +1,200 @@
+.row {
+  position: relative;
+  padding: 16px 32px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.row:hover {
+  background: #fafbfc;
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(90, 141, 255, 0.24);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(84px, 1fr) minmax(112px, 1fr) minmax(112px, 1fr) minmax(0, 2fr) minmax(92px, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.studentCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid var(--student-accent, #d1d5db);
+  background: color-mix(in srgb, var(--student-accent, #d1d5db) 16%, #ffffff);
+  color: var(--student-accent, #4b5563);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.studentText {
+  min-width: 0;
+}
+
+.studentName {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studentLevel {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.25;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.centerCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.primaryValue {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  color: #111827;
+}
+
+.attendanceBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.attendanceSuccess {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.attendanceWarning {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.attendanceDanger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.attendanceNeutral {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.scoreValue {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  color: #2563eb;
+}
+
+.scoreValueMuted {
+  color: #9ca3af;
+}
+
+.lessonCell {
+  min-width: 0;
+}
+
+.lessonMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lessonDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.lessonDotToday {
+  background: #22c55e;
+}
+
+.lessonDotFuture {
+  background: #3b82f6;
+}
+
+.lessonDotNone {
+  background: #9ca3af;
+}
+
+.lessonText {
+  display: inline-block;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.statusText {
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 800;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.statusActive {
+  color: #365314;
+}
+
+.statusPaused {
+  color: #6b7280;
+}
+
+.statusCompleted {
+  color: #92400e;
+}
+
+.statusInactive {
+  color: #5b6475;
+}

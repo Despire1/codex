@@ -1,342 +1,266 @@
 .cardWrap {
   position: relative;
-  margin-left: 4px;
-}
-
-.cardWrap::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: 1px;
-  bottom: 1px;
-  width: 30px;
-  border-radius: 999px;
-  background: var(--lesson-border, var(--color-blue-600));
-  z-index: 0;
 }
 
 .card {
   position: relative;
-  border-radius: 16px;
+  border-radius: 24px;
+  border: 1px solid #f0f3f7;
   background: var(--color-white);
-  border: 1.5px solid var(--color-slate-200);
-  border-left: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
   cursor: pointer;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-  z-index: 1;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .card:hover {
-  border-color: var(--color-slate-300);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+  border-color: #e4ebf5;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
+.card:focus-visible,
 .card:focus-within {
-  border-color: var(--color-slate-300);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  outline: none;
+  border-color: #cbd9f2;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.14),
+    0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 .canceled {
+  background: #fafbfd;
   border-style: dashed;
-  background: var(--color-slate-50);
-  color: var(--color-slate-400);
 }
 
 .content {
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .headerRow {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .headerInfo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
+  flex: 1;
 }
 
 .timeBadge {
-  min-width: 72px;
+  min-width: 74px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--lesson-bg, var(--color-blue-50));
-  color: var(--lesson-hover-bg, var(--color-blue-600));
-  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #eff6ff;
+  flex-shrink: 0;
 }
 
 .timeStart {
-  font-size: 20px;
+  font-size: 21px;
   line-height: 1;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #2563eb;
+  letter-spacing: -0.02em;
+}
+
+.timeDivider {
+  width: 100%;
+  height: 1px;
+  margin: 6px 0 5px;
+  background: #bfdbfe;
 }
 
 .timeEnd {
-  font-size: 13px;
-  color: var(--lesson-border);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  color: #93c5fd;
+  letter-spacing: 0.04em;
+}
+
+.identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-slate-900);
+  font-size: 18px;
   line-height: 1.2;
+  font-weight: 700;
+  color: #111827;
 }
 
-.metaRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #6b7280;
 }
 
 .headerControls {
-  position: relative;
-  display: inline-flex;
-  align-items: flex-start;
-  flex-shrink: 0;
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-}
-
-.headerControlsWithRecurring {
-  width: 68px;
-  min-width: 68px;
-}
-
-.headerControlsExpanded .recurringControl {
-  transform: translateX(-38px);
-}
-
-.linkBadge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--color-blue-200);
-  color: var(--color-blue-600) !important;
-  background: var(--color-blue-50);
-  font-weight: 500;
-  font-size: 12px;
-  cursor: pointer;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.linkBadge:hover {
-  border-color: var(--color-blue-600);
-  background: var(--color-blue-600);
-  color: var(--color-white) !important;
+.recurringIconBadge {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
 }
 
-.linkIcon {
+.recurringIcon {
   width: 16px;
   height: 16px;
 }
 
-.recurringControl {
-  position: absolute;
-  top: 0;
-  right: 0;
+.actionsButton {
+  width: 36px;
+  height: 36px;
+  border: none;
+  padding: 0;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  background: #eff6ff;
+  color: #3b82f6;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
 }
 
-.recurringIconBadge {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
+.actionsButton:hover {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.actionsButton:focus-visible {
+  outline: none;
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.homeworkBadge {
+  min-width: 0;
+  max-width: 100%;
+  border: none;
+  padding: 9px 12px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--lesson-hover-bg, var(--color-blue-600));
-  background: var(--lesson-bg, var(--color-blue-50));
-  border: 1px solid var(--lesson-border, var(--color-blue-200));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  gap: 8px;
+  background: #f9fafb;
+  color: #4b5563;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
-.recurringIcon {
-  width: 13px;
-  height: 13px;
+.homeworkBadge:hover {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.recurringTooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.94);
-  color: var(--color-white);
-  font-size: 12px;
-  font-weight: 600;
+.homeworkIcon {
+  width: 15px;
+  height: 15px;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.homeworkBadgeLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
-  opacity: 0;
-  transform: translateY(-4px);
-  pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-  z-index: 3;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
 }
 
-.recurringTooltip::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  right: 12px;
-  width: 10px;
-  height: 10px;
-  background: inherit;
-  transform: rotate(45deg);
+.homeworkCountBadge {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
 }
 
-.recurringControl:hover .recurringTooltip {
-  opacity: 1;
-  transform: translateY(0);
+.linkBadge {
+  border: none;
+  padding: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.linkBadge:hover {
+  color: #111827;
+}
+
+.linkIcon {
+  width: 15px;
+  height: 15px;
+  color: #8b5cf6;
+  flex-shrink: 0;
 }
 
 .canceledBadge {
-  border-color: var(--color-slate-200);
-  background: var(--color-slate-100);
-  color: var(--color-slate-500) !important;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
   cursor: default;
 }
 
 .canceledBadge:hover {
-  border-color: var(--color-slate-200);
-  background: var(--color-slate-100);
-  color: var(--color-slate-500) !important;
-}
-
-.divider {
-  height: 1px;
-  background: var(--color-slate-200);
-}
-
-.paymentRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 4px;
-}
-
-.paymentBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: transparent;
-  padding: 0;
-  font-weight: 700;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.paymentBadge:disabled {
-  cursor: default;
-}
-
-.paymentIcon {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: currentColor;
-}
-
-.paymentPaid {
-  color: var(--color-emerald-500) !important;
-}
-
-.paymentPaid .paymentIcon::after {
-  content: '';
-  width: 8px;
-  height: 8px;
-  background: var(--color-white) !important;
-  clip-path: polygon(14% 52%, 0 66%, 39% 100%, 100% 28%, 86% 14%, 38% 68%);
-}
-
-.paymentUnpaid {
-  color: var(--color-red-500) !important;
-}
-
-.paymentPrice {
-  color: var(--color-slate-500);
-  font-weight: 600;
-}
-
-.actionsButton {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: rgba(255, 255, 255, 0.88);
-  padding: 0;
-  border-radius: 10px;
-  color: var(--color-slate-400);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
-}
-
-.actionsButton:hover {
-  background: var(--color-white);
-  color: var(--color-slate-700);
-}
-
-.actionsButton:focus-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .actionsButton {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-2px);
-  }
-
-  .card:hover .actionsButton,
-  .card:focus-within .actionsButton {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-
-  .card:hover .headerControlsWithRecurring .recurringControl,
-  .card:focus-within .headerControlsWithRecurring .recurringControl {
-    transform: translateX(-38px);
-  }
-}
-
-@media (hover: none), (pointer: coarse) {
-  .headerControlsWithRecurring .recurringControl {
-    transform: translateX(-38px);
-  }
-
-  .recurringTooltip {
-    display: none;
-  }
+  color: #6b7280;
 }
 
 .actionsPopover {

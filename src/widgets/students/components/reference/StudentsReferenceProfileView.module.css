@@ -488,6 +488,24 @@
   gap: 10px;
 }
 
+.homeworksListStack {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.homeworksListStack::-webkit-scrollbar {
+  width: 8px;
+}
+
+.homeworksListStack::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+
 .paymentsListStack {
   height: 100%;
   min-height: 0;
@@ -622,7 +640,7 @@
 }
 
 .paymentEventCard {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: #ffffff;
 }
 
 .paymentEventMain {
@@ -710,7 +728,7 @@
 }
 
 .lessonCard {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background: #ffffff;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
