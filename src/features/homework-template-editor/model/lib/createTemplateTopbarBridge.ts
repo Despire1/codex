@@ -3,7 +3,9 @@ export interface HomeworkTemplateCreateTopbarState {
   hasValidationErrors: boolean;
   primaryActionDisabled: boolean;
   draftSavedAtLabel: string | null;
+  subtitleOverride?: string | null;
   showSecondaryAction: boolean;
+  showPrimaryAction: boolean;
   secondaryActionLabel: string;
   primaryActionLabel: string;
   primarySubmittingLabel: string;
@@ -33,10 +35,12 @@ export const clearHomeworkTemplateCreateTopbarState = () => {
           hasValidationErrors: false,
           primaryActionDisabled: false,
           draftSavedAtLabel: null,
+          subtitleOverride: null,
           showSecondaryAction: false,
+          showPrimaryAction: true,
           secondaryActionLabel: '',
-        primaryActionLabel: '',
-        primarySubmittingLabel: '',
+          primaryActionLabel: '',
+          primarySubmittingLabel: '',
       } as HomeworkTemplateCreateTopbarState,
     }),
   );

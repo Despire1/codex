@@ -53,7 +53,7 @@ export type TeacherAssignModalRequest = {
   lessonId: number | null;
 };
 
-export type TeacherBulkAction = 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+export type TeacherBulkAction = 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
 
 export type TeacherAssignmentsSummary = HomeworkAssignmentsSummary;
 export type TeacherHomeworkSort = HomeworkAssignmentsSort;
@@ -140,6 +140,7 @@ export interface TeacherHomeworksViewModel {
   onOpenLessonDay: (assignment: HomeworkAssignment) => void;
   onUpdateAssignmentDeadline: (assignment: HomeworkAssignment, deadlineAt: string | null) => Promise<void>;
   onDeleteAssignment: (assignment: HomeworkAssignment) => Promise<void>;
+  onReissueAssignment: (assignment: HomeworkAssignment) => Promise<void>;
   onFixConfigError: (assignment: HomeworkAssignment) => Promise<void>;
   onBulkAction: (payload: { ids: number[]; action: TeacherBulkAction }) => Promise<void>;
   onOpenReview: (assignment: HomeworkAssignment) => void;
@@ -155,6 +156,7 @@ export interface TeacherHomeworksViewModel {
     manualScore: number | null;
     finalScore: number | null;
     teacherComment: string | null;
+    reviewResult?: HomeworkSubmission['reviewResult'];
   }) => Promise<boolean>;
   onRefresh: () => void;
   onLoadHomeworkActivity: () => void;

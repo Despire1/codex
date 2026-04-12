@@ -1,8 +1,8 @@
 export const SETTINGS_TABS = [
-  { id: 'profile', label: 'Профиль' },
-  { id: 'schedule', label: 'Расписание' },
+  { id: 'profile', label: 'Аккаунт' },
+  { id: 'schedule', label: 'Учебный процесс' },
   { id: 'notifications', label: 'Уведомления' },
-  { id: 'security', label: 'Доступ и безопасность' },
+  { id: 'security', label: 'Безопасность' },
 ] as const;
 
 export type SettingsTabId = (typeof SETTINGS_TABS)[number]['id'];

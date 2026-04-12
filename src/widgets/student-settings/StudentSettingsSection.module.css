@@ -1,42 +1,267 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
+  min-width: 0;
 }
 
-.title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--color-slate-900);
-}
-
-.caption {
-  margin: 0;
-  color: var(--color-slate-600);
-  font-size: 13px;
-}
-
-.card {
-  border: 1px solid var(--color-slate-200);
-  border-radius: 14px;
-  background: var(--color-white);
-  padding: 14px;
+.heroCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 24px;
+  padding: 32px;
+  border-radius: 32px;
+  background: linear-gradient(160deg, #111827 0%, #1f2937 100%);
+  color: #fff;
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
+}
+
+.heroHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.heroIconWrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffe45a;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.heroSubtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.heroBody {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.heroCaption {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.fieldBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .label {
-  font-size: 13px;
-  color: var(--color-slate-700);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
 }
 
-.actions {
+.input {
+  min-height: 52px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 14px 16px;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.input:focus,
+.input:focus-visible {
+  border-color: #b9ff4f;
+  box-shadow: 0 0 0 4px rgba(185, 255, 79, 0.16);
+}
+
+.helperText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.teacherCard {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.teacherCardTitle {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.teacherInfo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.teacherAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #e5e7eb 0%, #d1d5db 100%);
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.teacherName {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.teacherMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.saveButton {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 18px;
+  background: #ffe45a;
+  color: #111827;
+  --primary-button-bg: #ffe45a;
+  --primary-button-hover-bg: #ffd93a;
+  --primary-button-text: #111827;
+  font-weight: 900;
+  box-shadow: 0 18px 32px rgba(255, 212, 59, 0.22);
 }
 
 .message {
-  color: var(--color-slate-600);
   font-size: 13px;
+  color: #fff;
+}
+
+.infoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px;
+  border-radius: 32px;
+  border: 1px solid #edf0f4;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
+}
+
+.infoHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.infoIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infoIconBlue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.infoTitle {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 900;
+  color: #111827;
+}
+
+.infoSubtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.infoStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.noteCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+}
+
+.noteCardBlue {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.noteCardPurple {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.noteCardGreen {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.noteTitle {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.noteText {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+@media (max-width: 720px) {
+  .page {
+    gap: 18px;
+  }
+
+  .heroCard,
+  .infoCard {
+    padding: 22px;
+    border-radius: 26px;
+  }
+
+  .heroTitle,
+  .infoTitle {
+    font-size: 22px;
+  }
 }

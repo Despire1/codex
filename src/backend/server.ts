@@ -9,8 +9,10 @@ import { ru } from 'date-fns/locale';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
 import type {
+  HomeworkAssignment,
   HomeworkBlock,
   HomeworkStatus,
+  HomeworkSubmission,
   LessonMutationAction,
   LessonSeriesScope,
   PaymentCancelBehavior,
@@ -20,7 +22,24 @@ import {
   hasRealHomeworkSubmissionStatus,
   isHomeworkAssignmentVisibleToStudent,
 } from '../entities/homework-assignment/model/lib/assignmentIssuance';
-import { resolveHomeworkAttemptTimerConfig } from '../entities/homework-template/model/lib/quizSettings';
+import {
+  assignmentBelongsToBucket,
+  assignmentBelongsToTab,
+  canReissueHomeworkAssignment,
+  HomeworkAssignmentBucketId,
+  HomeworkAssignmentsTabId,
+  normalizeHomeworkAssignmentStatus,
+  normalizeHomeworkSendMode,
+  normalizeHomeworkSubmissionStatus,
+  resolveHomeworkAssignmentWorkflow,
+  resolveHomeworkAssignmentViewStatus,
+} from '../entities/homework-assignment/model/lib/workflow';
+import { normalizeHomeworkReviewResult } from '../entities/homework-submission/model/lib/reviewResult';
+import {
+  readHomeworkTemplateQuizSettingsFromBlocks,
+  resolveHomeworkAttemptTimerConfig,
+} from '../entities/homework-template/model/lib/quizSettings';
+import { buildHomeworkReviewItems, normalizeReviewPoints } from '../features/homework-review/model/lib/questionReview';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
 import {
   isValidMeetingLink,
@@ -102,7 +121,6 @@ import {
 } from './server/modules/activityFeed';
 import { createStudentsService, normalizeTelegramUsername } from './server/modules/students';
 import { clampNumber, isValidTimeString } from './server/lib/runtimeLimits';
-import { createAuthTransferHandlers } from './server/routes/authTransfer';
 import { createAuthSessionHandlers } from './server/routes/authSession';
 import { tryHandleAuthRoutes } from './server/routes/authRoutes';
 import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
@@ -157,18 +175,10 @@ const LOCAL_DEV_FIRST_NAME = process.env.LOCAL_DEV_FIRST_NAME ?? 'Local';
 const LOCAL_DEV_LAST_NAME = process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher';
 const SESSION_TTL_MINUTES = Number(process.env.SESSION_TTL_MINUTES ?? 43_200);
 const SESSION_RENEW_THRESHOLD_MINUTES = Number(process.env.SESSION_RENEW_THRESHOLD_MINUTES ?? 10_080);
-const TRANSFER_TOKEN_TTL_SEC = Number(process.env.TRANSFER_TOKEN_TTL_SEC ?? 120);
-const TRANSFER_TOKEN_MIN_TTL_SEC = 30;
-const TRANSFER_TOKEN_MAX_TTL_SEC = 300;
-const TRANSFER_REDIRECT_URL = process.env.TRANSFER_REDIRECT_URL ?? '/dashboard';
 const TELEGRAM_BROWSER_REDIRECT_URL = process.env.TELEGRAM_BROWSER_REDIRECT_URL ?? '/dashboard';
 const SESSION_COOKIE_NAME = 'session_id';
 const RATE_LIMIT_WEBAPP_PER_MIN = Number(process.env.RATE_LIMIT_WEBAPP_PER_MIN ?? 30);
 const RATE_LIMIT_BROWSER_LOGIN_PER_MIN = Number(process.env.RATE_LIMIT_BROWSER_LOGIN_PER_MIN ?? 20);
-const RATE_LIMIT_TRANSFER_CREATE_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_PER_MIN ?? 3);
-const RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN ?? 10);
-const RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN ?? 10);
-const RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN = Number(process.env.RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN ?? 5);
 const NOTIFICATION_TICK_MS = 60_000;
 const ONBOARDING_NUDGE_TICK_MS = 15 * 60_000;
 const ONBOARDING_NUDGE_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -189,22 +199,9 @@ const authService = createAuthService({
     lastName: LOCAL_DEV_LAST_NAME,
   },
 });
-const { createSession, getSessionTokenHash, getSessionUser, resolveSessionUser } = authService;
+const { createSession, getSessionTokenHash, resolveSessionUser } = authService;
 const sessionService = createSessionService({ getSessionTokenHash });
 const { listSessions, revokeSession, revokeOtherSessions } = sessionService;
-const authTransferHandlers = createAuthTransferHandlers({
-  createSession,
-  getSessionUser,
-  port: PORT,
-  transferRedirectUrl: TRANSFER_REDIRECT_URL,
-  transferTokenTtlSec: TRANSFER_TOKEN_TTL_SEC,
-  transferTokenMinTtlSec: TRANSFER_TOKEN_MIN_TTL_SEC,
-  transferTokenMaxTtlSec: TRANSFER_TOKEN_MAX_TTL_SEC,
-  rateLimitTransferCreatePerMin: RATE_LIMIT_TRANSFER_CREATE_PER_MIN,
-  rateLimitTransferCreateIpPerMin: RATE_LIMIT_TRANSFER_CREATE_IP_PER_MIN,
-  rateLimitTransferConsumeIpPerMin: RATE_LIMIT_TRANSFER_CONSUME_IP_PER_MIN,
-  rateLimitTransferConsumeTokenPerMin: RATE_LIMIT_TRANSFER_CONSUME_TOKEN_PER_MIN,
-});
 const authSessionHandlers = createAuthSessionHandlers({
   appBaseUrl: process.env.APP_BASE_URL ?? '',
   createSession,
@@ -1943,60 +1940,8 @@ const normalizeHomeworkAttachments = (value: unknown) => {
   return parseObjectArray(value);
 };
 
-const normalizeHomeworkAssignmentStatus = (
-  value: unknown,
-):
-  | 'DRAFT'
-  | 'SCHEDULED'
-  | 'SENT'
-  | 'SUBMITTED'
-  | 'IN_REVIEW'
-  | 'RETURNED'
-  | 'REVIEWED'
-  | 'OVERDUE' => {
-  const normalized = typeof value === 'string' ? value.toUpperCase() : '';
-  if (
-    normalized === 'DRAFT' ||
-    normalized === 'SCHEDULED' ||
-    normalized === 'SENT' ||
-    normalized === 'SUBMITTED' ||
-    normalized === 'IN_REVIEW' ||
-    normalized === 'RETURNED' ||
-    normalized === 'REVIEWED' ||
-    normalized === 'OVERDUE'
-  ) {
-    return normalized;
-  }
-  return 'DRAFT';
-};
-
-const normalizeHomeworkSendMode = (value: unknown): 'AUTO_AFTER_LESSON_DONE' | 'MANUAL' =>
-  value === 'AUTO_AFTER_LESSON_DONE' ? 'AUTO_AFTER_LESSON_DONE' : 'MANUAL';
-
-const normalizeHomeworkSubmissionStatus = (value: unknown): 'DRAFT' | 'SUBMITTED' | 'REVIEWED' => {
-  const normalized = typeof value === 'string' ? value.toUpperCase() : '';
-  if (normalized === 'DRAFT' || normalized === 'SUBMITTED' || normalized === 'REVIEWED') return normalized;
-  return 'DRAFT';
-};
-
-const resolveAssignmentViewStatus = (assignment: { status: string; deadlineAt?: Date | null }, now = new Date()) => {
-  const status = normalizeHomeworkAssignmentStatus(assignment.status);
-  const deadline = assignment.deadlineAt ? new Date(assignment.deadlineAt) : null;
-  const isOverdueCandidate = status === 'SENT' || status === 'RETURNED';
-  if (isOverdueCandidate && deadline && deadline.getTime() < now.getTime()) return 'OVERDUE' as const;
-  return status;
-};
-
-type HomeworkAssignmentBucketV2 = 'all' | 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
-type HomeworkAssignmentsTabV2 =
-  | 'all'
-  | 'inbox'
-  | 'draft'
-  | 'scheduled'
-  | 'in_progress'
-  | 'review'
-  | 'closed'
-  | 'overdue';
+type HomeworkAssignmentBucketV2 = HomeworkAssignmentBucketId;
+type HomeworkAssignmentsTabV2 = HomeworkAssignmentsTabId;
 type HomeworkAssignmentsSortV2 = 'urgency' | 'deadline' | 'student' | 'updated' | 'created';
 type HomeworkAssignmentProblemFilterV2 = 'overdue' | 'returned' | 'config_error';
 
@@ -2105,45 +2050,6 @@ const normalizeHomeworkAssignmentProblemFiltersV2 = (value: unknown): HomeworkAs
   return Array.from(new Set(normalized));
 };
 
-const resolveAssignmentBucketWhereV2 = (bucket: HomeworkAssignmentBucketV2, now: Date): Record<string, unknown> => {
-  if (bucket === 'draft') return { status: { in: ['DRAFT', 'SCHEDULED'] } };
-  if (bucket === 'sent') return { status: { in: ['SENT', 'RETURNED'] } };
-  if (bucket === 'review') return { status: { in: ['SUBMITTED', 'IN_REVIEW'] } };
-  if (bucket === 'reviewed') return { status: 'REVIEWED' };
-  if (bucket === 'overdue') {
-    return {
-      OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
-    };
-  }
-  return {};
-};
-
-const resolveAssignmentTabWhereV2 = (tab: HomeworkAssignmentsTabV2, now: Date): Record<string, unknown> => {
-  if (tab === 'draft') return { status: 'DRAFT' };
-  if (tab === 'scheduled') return { status: 'SCHEDULED' };
-  if (tab === 'in_progress') return { status: { in: ['SENT', 'RETURNED'] } };
-  if (tab === 'review') return { status: { in: ['SUBMITTED', 'IN_REVIEW'] } };
-  if (tab === 'closed') return { status: 'REVIEWED' };
-  if (tab === 'overdue') {
-    return {
-      OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
-    };
-  }
-  if (tab === 'inbox') {
-    return {
-      OR: [
-        { status: 'SUBMITTED' },
-        { status: 'IN_REVIEW' },
-        { status: 'RETURNED' },
-        { status: 'OVERDUE' },
-        { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
-        { sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
-      ],
-    };
-  }
-  return {};
-};
-
 const attachLatestSubmissionMetaToAssignments = async (items: any[]) => {
   if (!items.length) return items;
   const assignmentIds = items
@@ -2200,9 +2106,10 @@ const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[]
   );
 
   return assignments.map((assignment) => {
-    const resolvedStatus = resolveAssignmentViewStatus(assignment, now);
-    const isOverdue = resolvedStatus === 'OVERDUE';
-    const hasConfigError = normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' && !assignment.lessonId;
+    const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
+    const resolvedStatus = workflow.status;
+    const isOverdue = workflow.isOverdue;
+    const hasConfigError = workflow.hasConfigError;
     const studentLink = linkByStudentId.get(assignment.studentId);
     const studentName =
       studentLink?.customName?.trim() ||
@@ -2218,17 +2125,8 @@ const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments: any[]
       groupTitle: assignment.group?.title ?? null,
       hasConfigError,
       isOverdue,
-      problemFlags: Array.from(
-        new Set(
-          [
-            isOverdue ? 'OVERDUE' : null,
-            resolvedStatus === 'RETURNED' ? 'RETURNED' : null,
-            hasConfigError ? 'CONFIG_ERROR' : null,
-            resolvedStatus === 'SUBMITTED' ? 'SUBMITTED' : null,
-            resolvedStatus === 'IN_REVIEW' ? 'IN_REVIEW' : null,
-          ].filter(Boolean),
-        ),
-      ),
+      lateState: workflow.lateState,
+      problemFlags: workflow.problemFlags,
     };
   });
 };
@@ -2365,20 +2263,11 @@ const serializeHomeworkGroupListItemV2 = (
 };
 
 const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
-  const status = resolveAssignmentViewStatus(assignment, now);
-  const isOverdue = status === 'OVERDUE';
-  const hasConfigError = normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' && !assignment.lessonId;
-  const problemFlags = Array.from(
-    new Set(
-      [
-        isOverdue ? 'OVERDUE' : null,
-        status === 'RETURNED' ? 'RETURNED' : null,
-        hasConfigError ? 'CONFIG_ERROR' : null,
-        status === 'SUBMITTED' ? 'SUBMITTED' : null,
-        status === 'IN_REVIEW' ? 'IN_REVIEW' : null,
-      ].filter(Boolean),
-    ),
-  );
+  const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
+  const status = workflow.status;
+  const isOverdue = workflow.isOverdue;
+  const hasConfigError = workflow.hasConfigError;
+  const problemFlags = workflow.problemFlags;
 
   return {
     id: assignment.id,
@@ -2397,6 +2286,7 @@ const serializeHomeworkAssignmentV2 = (assignment: any, now = new Date()) => {
     title: assignment.title ?? '',
     status,
     isOverdue,
+    lateState: workflow.lateState,
     hasConfigError,
     problemFlags,
     sendMode: normalizeHomeworkSendMode(assignment.sendMode),
@@ -2468,6 +2358,49 @@ const normalizeHomeworkReviewDraftV2 = (value: unknown): HomeworkReviewDraftV2 |
   };
 };
 
+const buildHomeworkReviewResultV2 = ({
+  assignment,
+  submission,
+  reviewDraft,
+  reviewResult,
+}: {
+  assignment: any;
+  submission: any;
+  reviewDraft: HomeworkReviewDraftV2 | null;
+  reviewResult: unknown;
+}) => {
+  const serializedAssignment = serializeHomeworkAssignmentV2(assignment) as unknown as HomeworkAssignment;
+  const serializedSubmission = serializeHomeworkSubmissionV2(submission) as HomeworkSubmission;
+  const reviewItems = buildHomeworkReviewItems(serializedAssignment, serializedSubmission);
+  const normalizedReviewResult = normalizeHomeworkReviewResult(reviewResult);
+
+  const items = reviewItems.reduce<Record<string, { decision: 'ACCEPTED' | 'REWORK_REQUIRED'; score: number; comment: string | null }>>(
+    (acc, item) => {
+      const reviewItem = normalizedReviewResult?.items[item.id] ?? null;
+      const draftScore = reviewDraft?.scoresById[item.id];
+      const draftComment = reviewDraft?.commentsById[item.id];
+      const score = reviewItem
+        ? normalizeReviewPoints(reviewItem.score, item.maxPoints)
+        : Number.isFinite(draftScore)
+          ? normalizeReviewPoints(Number(draftScore), item.maxPoints)
+          : normalizeReviewPoints(item.initialPoints, item.maxPoints);
+      acc[item.id] = {
+        decision: reviewItem?.decision ?? (score >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED'),
+        score,
+        comment: reviewItem?.comment ?? (typeof draftComment === 'string' && draftComment.trim() ? draftComment : null),
+      };
+      return acc;
+    },
+    {},
+  );
+
+  return {
+    submissionId: submission.id,
+    generalComment: normalizedReviewResult?.generalComment ?? reviewDraft?.generalComment ?? '',
+    items,
+  };
+};
+
 const serializeHomeworkSubmissionV2 = (submission: any) => ({
   id: submission.id,
   assignmentId: submission.assignmentId,
@@ -2481,6 +2414,7 @@ const serializeHomeworkSubmissionV2 = (submission: any) => ({
   testAnswers: parseObjectRecord(submission.testAnswers),
   teacherComment: submission.teacherComment ?? null,
   reviewDraft: normalizeHomeworkReviewDraftV2(submission.reviewDraft),
+  reviewResult: normalizeHomeworkReviewResult(submission.reviewResult),
   submittedAt: submission.submittedAt ?? null,
   reviewedAt: submission.reviewedAt ?? null,
   createdAt: submission.createdAt,
@@ -2558,6 +2492,16 @@ const finalizeTimedOutDraftSubmission = async (
     assignment: updatedAssignment,
     submission: updatedSubmission,
   };
+};
+
+const assignmentWasExplicitlyReissued = (assignment: any, latestSubmission: any) => {
+  if (!assignment || !latestSubmission) return false;
+  if (normalizeHomeworkAssignmentStatus(assignment.status) !== 'SENT') return false;
+  if (normalizeHomeworkSubmissionStatus(latestSubmission.status) !== 'REVIEWED') return false;
+  const sentAt = toValidDate(assignment.sentAt);
+  const reviewedAt = toValidDate(latestSubmission.reviewedAt);
+  if (!sentAt || !reviewedAt) return false;
+  return sentAt.getTime() > reviewedAt.getTime();
 };
 
 const normalizeAnswerString = (value: unknown, caseSensitive = false) => {
@@ -6158,35 +6102,12 @@ const listHomeworkAssignmentsV2 = async (
     where.groupId = resolvedGroupId;
   }
   const tab = normalizeHomeworkAssignmentsTabV2(params.tab);
+  const bucket = normalizeHomeworkAssignmentBucketV2(params.bucket);
   const sort = normalizeHomeworkAssignmentsSortV2(params.sort);
   const problemFilters = normalizeHomeworkAssignmentProblemFiltersV2(params.problemFilters);
   const query = typeof params.q === 'string' ? params.q.trim() : '';
-
-  if (params.status && params.status !== 'all') {
-    where.status = normalizeHomeworkAssignmentStatus(params.status);
-  } else if (tab !== 'all') {
-    Object.assign(where, resolveAssignmentTabWhereV2(tab, now));
-  } else {
-    Object.assign(where, resolveAssignmentBucketWhereV2(normalizeHomeworkAssignmentBucketV2(params.bucket), now));
-  }
-
-  if (problemFilters.length > 0) {
-    const conditions = problemFilters.map((filterName) => {
-      if (filterName === 'overdue') {
-        return {
-          OR: [{ status: 'OVERDUE' }, { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } }],
-        };
-      }
-      if (filterName === 'returned') {
-        return { status: 'RETURNED' };
-      }
-      return {
-        sendMode: 'AUTO_AFTER_LESSON_DONE',
-        lessonId: null,
-      };
-    });
-    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), { OR: conditions }];
-  }
+  const requestedStatus =
+    params.status && params.status !== 'all' ? normalizeHomeworkAssignmentStatus(params.status) : null;
 
   if (query) {
     const matchedLinks = await prisma.teacherStudent.findMany({
@@ -6247,7 +6168,22 @@ const listHomeworkAssignmentsV2 = async (
   const filteredByQuery = query
     ? withDisplayMeta.filter((item) => matchesAssignmentSearchQuery(item, query.toLowerCase()))
     : withDisplayMeta;
-  const sorted = sortHomeworkAssignmentsV2(filteredByQuery, sort);
+  const filtered = filteredByQuery.filter((item) => {
+    const workflow = resolveHomeworkAssignmentWorkflow(item, now);
+    if (requestedStatus && workflow.status !== requestedStatus) return false;
+    if (!requestedStatus && tab !== 'all' && !assignmentBelongsToTab(item, tab, now)) return false;
+    if (!requestedStatus && tab === 'all' && !assignmentBelongsToBucket(item, bucket, now)) return false;
+    if (problemFilters.length > 0) {
+      const matchesProblemFilter = problemFilters.some((filterName) => {
+        if (filterName === 'overdue') return workflow.isOverdue;
+        if (filterName === 'returned') return workflow.status === 'RETURNED';
+        return workflow.hasConfigError;
+      });
+      if (!matchesProblemFilter) return false;
+    }
+    return true;
+  });
+  const sorted = sortHomeworkAssignmentsV2(filtered, sort);
   const pagedItems = shouldSortInMemory ? sorted.slice(offset, offset + limit) : sorted;
   const resolvedTotal = shouldSortInMemory ? sorted.length : total ?? sorted.length;
   return {
@@ -6272,11 +6208,6 @@ const getHomeworkAssignmentsSummaryV2 = async (
     baseWhere.lessonId = Number(params.lessonId);
   }
 
-  const buildWhere = (bucket: HomeworkAssignmentBucketV2) => ({
-    ...baseWhere,
-    ...resolveAssignmentBucketWhereV2(bucket, now),
-  });
-
   const todayZoned = toZonedDate(now, resolvedTimeZone);
   const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
   const todayStart = toUtcDateFromTimeZone(todayKey, '00:00', resolvedTimeZone);
@@ -6295,99 +6226,47 @@ const getHomeworkAssignmentsSummaryV2 = async (
   const previousWeekWindowEndKey = format(addDays(todayZoned, -7), 'yyyy-MM-dd');
   const previousWeekWindowEnd = toUtcEndOfDay(previousWeekWindowEndKey, resolvedTimeZone);
 
-  const [
-    totalCount,
-    draftCount,
-    sentCount,
-    reviewCount,
-    reviewedCount,
-    overdueCount,
-    scheduledCount,
-    inProgressCount,
-    closedCount,
-    configErrorCount,
-    returnedCount,
-    reviewedThisMonthCount,
-    sentTodayCount,
-    inboxCount,
-    dueTodayCount,
-    reviewedThisWeekCount,
-    reviewedPreviousWeekCount,
-    scoredReviewedAssignments30d,
-  ] = await Promise.all([
-    (prisma as any).homeworkAssignment.count({ where: baseWhere }),
-    (prisma as any).homeworkAssignment.count({ where: buildWhere('draft') }),
-    (prisma as any).homeworkAssignment.count({ where: buildWhere('sent') }),
-    (prisma as any).homeworkAssignment.count({ where: buildWhere('review') }),
-    (prisma as any).homeworkAssignment.count({ where: buildWhere('reviewed') }),
-    (prisma as any).homeworkAssignment.count({ where: buildWhere('overdue') }),
-    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'SCHEDULED' } }),
-    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: { in: ['SENT', 'RETURNED'] } } }),
-    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'REVIEWED' } }),
-    (prisma as any).homeworkAssignment.count({
-      where: { ...baseWhere, sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
-    }),
-    (prisma as any).homeworkAssignment.count({ where: { ...baseWhere, status: 'RETURNED' } }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        status: 'REVIEWED',
-        reviewedAt: { gte: monthStart, lt: nextMonthStart },
-      },
-    }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        sentAt: { gte: todayStart, lte: todayEnd },
-      },
-    }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        OR: [
-          { status: 'SUBMITTED' },
-          { status: 'IN_REVIEW' },
-          { status: 'RETURNED' },
-          { status: 'OVERDUE' },
-          { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
-          { sendMode: 'AUTO_AFTER_LESSON_DONE', lessonId: null },
-        ],
-      },
-    }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        status: { in: ['SENT', 'SUBMITTED', 'IN_REVIEW', 'RETURNED', 'OVERDUE'] },
-        deadlineAt: { gte: todayStart, lte: todayEnd },
-      },
-    }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        status: 'REVIEWED',
-        reviewedAt: { gte: currentWeekWindowStart, lte: now },
-      },
-    }),
-    (prisma as any).homeworkAssignment.count({
-      where: {
-        ...baseWhere,
-        status: 'REVIEWED',
-        reviewedAt: { gte: previousWeekWindowStart, lte: previousWeekWindowEnd },
-      },
-    }),
-    (prisma as any).homeworkAssignment.findMany({
-      where: {
-        ...baseWhere,
-        status: 'REVIEWED',
-        reviewedAt: { gte: scoreWindowStart, lte: todayEnd },
-        OR: [{ finalScore: { not: null } }, { manualScore: { not: null } }, { autoScore: { not: null } }],
-      },
-      select: { finalScore: true, manualScore: true, autoScore: true },
-    }),
-  ]);
+  const assignments = await (prisma as any).homeworkAssignment.findMany({
+    where: baseWhere,
+    select: {
+      id: true,
+      status: true,
+      sendMode: true,
+      lessonId: true,
+      deadlineAt: true,
+      reviewedAt: true,
+      sentAt: true,
+      autoScore: true,
+      manualScore: true,
+      finalScore: true,
+    },
+  });
+  const assignmentsWithSubmissions = await attachLatestSubmissionMetaToAssignments(assignments);
 
-  const normalizedScores = (scoredReviewedAssignments30d as Array<any>)
-    .map((item) => {
+  let draftCount = 0;
+  let sentCount = 0;
+  let reviewCount = 0;
+  let reviewedCount = 0;
+  let overdueCount = 0;
+  let scheduledCount = 0;
+  let inProgressCount = 0;
+  let closedCount = 0;
+  let configErrorCount = 0;
+  let returnedCount = 0;
+  let reviewedThisMonthCount = 0;
+  let sentTodayCount = 0;
+  let inboxCount = 0;
+  let dueTodayCount = 0;
+  let reviewedThisWeekCount = 0;
+  let reviewedPreviousWeekCount = 0;
+
+  const normalizedScores = assignmentsWithSubmissions
+    .filter((assignment: any) => {
+      const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
+      const reviewedAt = toValidDate(assignment.reviewedAt);
+      return workflow.status === 'REVIEWED' && Boolean(reviewedAt && reviewedAt >= scoreWindowStart && reviewedAt <= todayEnd);
+    })
+    .map((item: any) => {
       const raw = item.finalScore ?? item.manualScore ?? item.autoScore;
       if (!Number.isFinite(raw)) return null;
       const normalizedRaw = Number(raw);
@@ -6395,6 +6274,50 @@ const getHomeworkAssignmentsSummaryV2 = async (
       return Math.max(0, Math.min(10, normalized));
     })
     .filter((score): score is number => Number.isFinite(score));
+
+  assignmentsWithSubmissions.forEach((assignment: any) => {
+    const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
+    const reviewedAt = toValidDate(assignment.reviewedAt);
+    const sentAt = toValidDate(assignment.sentAt);
+    const deadlineAt = toValidDate(assignment.deadlineAt);
+
+    if (assignmentBelongsToBucket(assignment, 'draft', now)) draftCount += 1;
+    if (assignmentBelongsToBucket(assignment, 'sent', now)) sentCount += 1;
+    if (assignmentBelongsToBucket(assignment, 'review', now)) reviewCount += 1;
+    if (assignmentBelongsToBucket(assignment, 'reviewed', now)) {
+      reviewedCount += 1;
+      closedCount += 1;
+    }
+    if (assignmentBelongsToBucket(assignment, 'overdue', now)) overdueCount += 1;
+    if (workflow.persistedStatus === 'SCHEDULED') scheduledCount += 1;
+    if (workflow.needsStudentAction && !workflow.isOverdue) inProgressCount += 1;
+    if (workflow.hasConfigError) configErrorCount += 1;
+    if (workflow.status === 'RETURNED') returnedCount += 1;
+    if (workflow.needsTeacherAction || workflow.status === 'RETURNED' || workflow.isOverdue || workflow.hasConfigError) {
+      inboxCount += 1;
+    }
+    if (workflow.needsStudentAction && deadlineAt && deadlineAt >= todayStart && deadlineAt <= todayEnd) {
+      dueTodayCount += 1;
+    }
+    if (sentAt && sentAt >= todayStart && sentAt <= todayEnd) {
+      sentTodayCount += 1;
+    }
+    if (workflow.status === 'REVIEWED' && reviewedAt && reviewedAt >= monthStart && reviewedAt < nextMonthStart) {
+      reviewedThisMonthCount += 1;
+    }
+    if (workflow.status === 'REVIEWED' && reviewedAt && reviewedAt >= currentWeekWindowStart && reviewedAt <= now) {
+      reviewedThisWeekCount += 1;
+    }
+    if (
+      workflow.status === 'REVIEWED' &&
+      reviewedAt &&
+      reviewedAt >= previousWeekWindowStart &&
+      reviewedAt <= previousWeekWindowEnd
+    ) {
+      reviewedPreviousWeekCount += 1;
+    }
+  });
+
   const averageScore30d =
     normalizedScores.length > 0
       ? Number((normalizedScores.reduce((sum, score) => sum + score, 0) / normalizedScores.length).toFixed(1))
@@ -6407,7 +6330,7 @@ const getHomeworkAssignmentsSummaryV2 = async (
         : 0;
 
   return {
-    totalCount,
+    totalCount: assignmentsWithSubmissions.length,
     draftCount,
     sentCount,
     reviewCount,
@@ -6464,14 +6387,9 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
     'Домашнее задание';
   const snapshot = normalizeHomeworkBlocks(body.contentSnapshot ?? template?.blocks ?? []);
   const sendMode = normalizeHomeworkSendMode(body.sendMode);
-  const status = body.status
-    ? normalizeHomeworkAssignmentStatus(body.status)
-    : sendMode === 'AUTO_AFTER_LESSON_DONE'
-      ? 'SCHEDULED'
-      : 'DRAFT';
+  const status = sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
   const deadlineAt =
     toValidDate(body.deadlineAt) ?? (await resolveHomeworkDefaultDeadline(teacher.chatId, studentId, lessonId)).deadlineAt;
-  const sentAt = status === 'SENT' ? toValidDate(body.sentAt) ?? new Date() : null;
   const assignment = await (prisma as any).homeworkAssignment.create({
     data: {
       teacherId: teacher.chatId,
@@ -6484,20 +6402,10 @@ const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unkno
       status,
       sendMode,
       deadlineAt,
-      sentAt,
+      sentAt: null,
       contentSnapshot: JSON.stringify(snapshot),
     },
   });
-
-  if (status === 'SENT' && teacher.homeworkNotifyOnAssign) {
-    await sendHomeworkNotificationToStudent({
-      teacherId: teacher.chatId,
-      studentId,
-      type: 'HOMEWORK_ASSIGNED',
-      dedupeKey: `HOMEWORK_ASSIGNED:${assignment.id}`,
-      text: buildHomeworkNotificationText('ASSIGNED', assignment, teacher.timezone),
-    });
-  }
 
   return { assignment: serializeHomeworkAssignmentV2(assignment) };
 };
@@ -6541,14 +6449,29 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
   if (!existing) throw createHttpError('Домашка не найдена', 404);
   if (existing.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
 
+  const forbiddenFields = ['status', 'sentAt', 'teacherComment', 'autoScore', 'manualScore', 'finalScore'];
+  const forbiddenField = forbiddenFields.find((fieldName) => Object.prototype.hasOwnProperty.call(body, fieldName));
+  if (forbiddenField) {
+    throw createHttpError('Lifecycle-поля домашки нельзя менять через обычное редактирование.', 409);
+  }
+
+  const existingWorkflow = resolveHomeworkAssignmentWorkflow(existing);
+  if (!existingWorkflow.canTeacherEditAssignment) {
+    throw createHttpError(
+      'После выдачи домашку нельзя редактировать. Сначала отмените выдачу, чтобы вернуть её в черновик.',
+      409,
+    );
+  }
+
   const data: Record<string, unknown> = {};
   if (typeof body.title === 'string') {
     const title = body.title.trim();
     if (!title) throw new Error('Название обязательно');
     data.title = title;
   }
-  if ('status' in body) data.status = normalizeHomeworkAssignmentStatus(body.status);
-  if ('sendMode' in body) data.sendMode = normalizeHomeworkSendMode(body.sendMode);
+  if ('sendMode' in body) {
+    data.sendMode = normalizeHomeworkSendMode(body.sendMode);
+  }
   if ('lessonId' in body) {
     const lessonIdRaw = Number(body.lessonId);
     if (body.lessonId === null || body.lessonId === undefined || body.lessonId === '') {
@@ -6587,17 +6510,8 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
     }
   }
   if ('deadlineAt' in body) data.deadlineAt = toValidDate(body.deadlineAt);
-  if ('sentAt' in body) data.sentAt = toValidDate(body.sentAt);
-  if ('contentSnapshot' in body) data.contentSnapshot = JSON.stringify(normalizeHomeworkBlocks(body.contentSnapshot));
-  if ('teacherComment' in body) data.teacherComment = typeof body.teacherComment === 'string' ? body.teacherComment : null;
-  if ('autoScore' in body) data.autoScore = clampHomeworkScore(body.autoScore);
-  if ('manualScore' in body) data.manualScore = clampHomeworkScore(body.manualScore);
-  if ('finalScore' in body) data.finalScore = clampHomeworkScore(body.finalScore);
-
-  const nextStatus =
-    'status' in data ? normalizeHomeworkAssignmentStatus(data.status) : normalizeHomeworkAssignmentStatus(existing.status);
-  if (nextStatus === 'SENT' && !existing.sentAt && !('sentAt' in data)) {
-    data.sentAt = new Date();
+  if ('contentSnapshot' in body) {
+    data.contentSnapshot = JSON.stringify(normalizeHomeworkBlocks(body.contentSnapshot));
   }
 
   const updated = await (prisma as any).homeworkAssignment.update({
@@ -6605,16 +6519,42 @@ const updateHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
     data,
   });
 
-  if (
-    nextStatus === 'SENT' &&
-    normalizeHomeworkAssignmentStatus(existing.status) !== 'SENT' &&
-    teacher.homeworkNotifyOnAssign
-  ) {
+  return { assignment: serializeHomeworkAssignmentV2(updated) };
+};
+
+const sendHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+  });
+  if (!assignment) throw createHttpError('Домашка не найдена', 404);
+  if (assignment.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+
+  const workflow = resolveHomeworkAssignmentWorkflow(assignment);
+  if (workflow.persistedStatus !== 'DRAFT' && workflow.persistedStatus !== 'SCHEDULED') {
+    throw createHttpError('Отправить можно только черновик или запланированную домашку.', 409);
+  }
+
+  const updated = await (prisma as any).homeworkAssignment.update({
+    where: { id: assignmentId },
+    data: {
+      status: 'SENT',
+      sentAt: new Date(),
+      reviewedAt: null,
+      reminder24hSentAt: null,
+      reminderMorningSentAt: null,
+      reminder3hSentAt: null,
+      overdueReminderCount: 0,
+      lastOverdueReminderAt: null,
+    },
+  });
+
+  if (teacher.homeworkNotifyOnAssign) {
     await sendHomeworkNotificationToStudent({
       teacherId: teacher.chatId,
       studentId: updated.studentId,
       type: 'HOMEWORK_ASSIGNED',
-      dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}`,
+      dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
       text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
     });
   }
@@ -6769,6 +6709,49 @@ const cancelHomeworkAssignmentIssueV2 = async (user: User, assignmentId: number)
   };
 };
 
+const reissueHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
+  const teacher = await ensureTeacher(user);
+  const assignment = await (prisma as any).homeworkAssignment.findUnique({
+    where: { id: assignmentId },
+  });
+  if (!assignment) throw createHttpError('Домашка не найдена', 404);
+  if (assignment.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+
+  if (!canReissueHomeworkAssignment(assignment)) {
+    throw createHttpError('Переоткрыть можно только уже проверенную домашку.', 409);
+  }
+
+  const updated = await (prisma as any).homeworkAssignment.update({
+    where: { id: assignmentId },
+    data: {
+      status: 'SENT',
+      sentAt: new Date(),
+      teacherComment: null,
+      reviewedAt: null,
+      autoScore: null,
+      manualScore: null,
+      finalScore: null,
+      reminder24hSentAt: null,
+      reminderMorningSentAt: null,
+      reminder3hSentAt: null,
+      overdueReminderCount: 0,
+      lastOverdueReminderAt: null,
+    },
+  });
+
+  if (teacher.homeworkNotifyOnAssign) {
+    await sendHomeworkNotificationToStudent({
+      teacherId: teacher.chatId,
+      studentId: updated.studentId,
+      type: 'HOMEWORK_ASSIGNED',
+      dedupeKey: `HOMEWORK_ASSIGNED:REISSUE:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
+      text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+    });
+  }
+
+  return { assignment: serializeHomeworkAssignmentV2(updated) };
+};
+
 const deleteHomeworkAssignmentV2 = async (user: User, assignmentId: number) => {
   const teacher = await ensureTeacher(user);
   const existing = await (prisma as any).homeworkAssignment.findUnique({
@@ -6808,7 +6791,7 @@ const bulkHomeworkAssignmentsV2 = async (user: User, body: Record<string, unknow
 
   const actionRaw = typeof body.action === 'string' ? body.action.toUpperCase() : '';
   const action =
-    actionRaw === 'SEND_NOW' || actionRaw === 'REMIND' || actionRaw === 'MOVE_TO_DRAFT' || actionRaw === 'DELETE'
+    actionRaw === 'SEND_NOW' || actionRaw === 'REMIND' || actionRaw === 'CANCEL_ISSUE' || actionRaw === 'DELETE'
       ? actionRaw
       : null;
   if (!action) throw new Error('Некорректное действие');
@@ -6832,30 +6815,11 @@ const bulkHomeworkAssignmentsV2 = async (user: User, body: Record<string, unknow
 
     try {
       if (action === 'SEND_NOW') {
-        const nextStatus = normalizeHomeworkAssignmentStatus(assignment.status) === 'SENT' ? 'SENT' : 'SENT';
-        const updated = await (prisma as any).homeworkAssignment.update({
-          where: { id },
-          data: {
-            status: nextStatus,
-            sentAt: assignment.sentAt ?? new Date(),
-          },
-        });
-        if (normalizeHomeworkAssignmentStatus(assignment.status) !== 'SENT' && teacher.homeworkNotifyOnAssign) {
-          await sendHomeworkNotificationToStudent({
-            teacherId: teacher.chatId,
-            studentId: updated.studentId,
-            type: 'HOMEWORK_ASSIGNED',
-            dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}`,
-            text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
-          });
-        }
+        await sendHomeworkAssignmentV2(user, id);
       } else if (action === 'REMIND') {
         await sendManualHomeworkReminderForAssignmentV2(teacher, assignment);
-      } else if (action === 'MOVE_TO_DRAFT') {
-        await (prisma as any).homeworkAssignment.update({
-          where: { id },
-          data: { status: 'DRAFT' },
-        });
+      } else if (action === 'CANCEL_ISSUE') {
+        await cancelHomeworkAssignmentIssueV2(user, id);
       } else if (action === 'DELETE') {
         await (prisma as any).homeworkAssignment.delete({ where: { id } });
       }
@@ -7081,10 +7045,18 @@ const createHomeworkSubmissionV2 = async (
     }
   }
 
-  const assignmentStatus = normalizeHomeworkAssignmentStatus(assignment.status);
-  if (role === 'STUDENT' && !isHomeworkAssignmentVisibleToStudent(assignmentStatus)) {
+  const workflow = resolveHomeworkAssignmentWorkflow(assignment);
+  if (role === 'STUDENT' && !workflow.isStudentVisible) {
     throw createHttpError('Домашка недоступна', 404);
   }
+  if (!workflow.canStudentEdit) {
+    throw createHttpError('Домашка сейчас доступна только для просмотра.', 409);
+  }
+
+  const attemptsLimit = readHomeworkTemplateQuizSettingsFromBlocks(
+    normalizeHomeworkBlocks(assignment.contentSnapshot) as unknown as HomeworkBlock[],
+  ).attemptsLimit;
+  const isReissueAttempt = assignmentWasExplicitlyReissued(assignment, latest);
 
   let targetAttempt = latest?.attemptNo ?? 1;
   let mode: 'create' | 'update' = 'create';
@@ -7092,11 +7064,14 @@ const createHomeworkSubmissionV2 = async (
     targetAttempt = latest.attemptNo;
     mode = 'update';
   } else if (latest && normalizeHomeworkSubmissionStatus(latest.status) !== 'DRAFT') {
-    if (assignmentStatus !== 'RETURNED') {
-      throw new Error('Домашка уже сдана. Новая попытка доступна после возврата на доработку.');
+    if (!isReissueAttempt && workflow.persistedStatus !== 'RETURNED') {
+      throw new Error('Домашка уже сдана. Новая попытка доступна после возврата на доработку или переоткрытия.');
     }
     targetAttempt = latest.attemptNo + 1;
     mode = 'create';
+  }
+  if (attemptsLimit !== null && targetAttempt > attemptsLimit && workflow.persistedStatus !== 'RETURNED' && !isReissueAttempt) {
+    throw createHttpError('Лимит попыток исчерпан.', 409);
   }
 
   const answerText = typeof body.answerText === 'string' ? body.answerText : null;
@@ -7138,7 +7113,11 @@ const createHomeworkSubmissionV2 = async (
   const assignmentUpdateData: Record<string, unknown> = {};
   if (shouldSubmit) {
     assignmentUpdateData.status = 'SUBMITTED';
+    assignmentUpdateData.teacherComment = null;
+    assignmentUpdateData.reviewedAt = null;
     assignmentUpdateData.autoScore = autoScore;
+    assignmentUpdateData.manualScore = null;
+    assignmentUpdateData.finalScore = autoScore;
     assignmentUpdateData.updatedAt = new Date();
   }
 
@@ -7162,6 +7141,9 @@ const reviewHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
     where: { id: assignmentId, teacherId: teacher.chatId },
   });
   if (!assignment) throw new Error('Домашка не найдена');
+  if (!resolveHomeworkAssignmentWorkflow(assignment).canTeacherReview) {
+    throw createHttpError('Домашка сейчас не находится в состоянии проверки.', 409);
+  }
 
   const action = body.action === 'RETURNED' ? 'RETURNED' : body.action === 'REVIEWED' ? 'REVIEWED' : null;
   if (!action) throw new Error('Некорректное действие проверки');
@@ -7174,17 +7156,28 @@ const reviewHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
         orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
       });
   if (!submission) throw new Error('Попытка не найдена');
+  if (normalizeHomeworkSubmissionStatus(submission.status) !== 'SUBMITTED') {
+    throw createHttpError('Проверять можно только отправленную попытку.', 409);
+  }
 
   const teacherComment = typeof body.teacherComment === 'string' ? body.teacherComment.trim() : '';
-  if (action === 'RETURNED' && !teacherComment) {
-    throw new Error('Комментарий обязателен при возврате на доработку');
-  }
 
   const autoScore = clampHomeworkScore(body.autoScore ?? submission.autoScore ?? assignment.autoScore);
   const manualScore = clampHomeworkScore(body.manualScore ?? submission.manualScore ?? assignment.manualScore);
   const overrideFinal = clampHomeworkScore(body.finalScore);
   const finalScore = overrideFinal ?? (manualScore ?? autoScore);
   const now = new Date();
+  const reviewDraft = normalizeHomeworkReviewDraftV2(submission.reviewDraft);
+  const reviewResult = buildHomeworkReviewResultV2({
+    assignment,
+    submission,
+    reviewDraft,
+    reviewResult: body.reviewResult,
+  });
+  const hasReviewItemComment = Object.values(reviewResult.items).some((item) => Boolean(item.comment));
+  if (action === 'RETURNED' && !teacherComment && !hasReviewItemComment) {
+    throw new Error('Комментарий обязателен при возврате на доработку');
+  }
 
   const updatedSubmission = await (prisma as any).homeworkSubmission.update({
     where: { id: submission.id },
@@ -7193,6 +7186,7 @@ const reviewHomeworkAssignmentV2 = async (user: User, assignmentId: number, body
       reviewerTeacherId: teacher.chatId,
       teacherComment: teacherComment || null,
       reviewDraft: null,
+      reviewResult: JSON.stringify(reviewResult),
       autoScore,
       manualScore,
       finalScore,
@@ -7246,32 +7240,25 @@ const listStudentHomeworkAssignmentsV2 = async (
     teacherId: active.teacherId,
     studentId: active.studentId,
   };
-  if (filter === 'submitted') {
-    where.status = { in: ['SUBMITTED', 'IN_REVIEW'] };
-  } else if (filter === 'reviewed') {
-    where.status = 'REVIEWED';
-  } else if (filter === 'active') {
-    where.status = { in: ['SENT', 'RETURNED', 'OVERDUE', 'SUBMITTED', 'IN_REVIEW'] };
-  } else if (filter === 'overdue') {
-    where.OR = [
-      { status: 'OVERDUE' },
-      { status: { in: ['SENT', 'RETURNED'] }, deadlineAt: { lt: now } },
-    ];
-  }
-
-  const total = await (prisma as any).homeworkAssignment.count({ where });
   const rawItems = await (prisma as any).homeworkAssignment.findMany({
     where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    skip: offset,
-    take: limit,
   });
   const items = await attachLatestSubmissionMetaToAssignments(rawItems);
+  const filtered = items.filter((item: any) => {
+    const workflow = resolveHomeworkAssignmentWorkflow(item, now);
+    if (filter === 'submitted') return workflow.needsTeacherAction;
+    if (filter === 'reviewed') return workflow.status === 'REVIEWED';
+    if (filter === 'active') return workflow.needsStudentAction || workflow.needsTeacherAction;
+    if (filter === 'overdue') return workflow.isOverdue;
+    return true;
+  });
+  const pagedItems = filtered.slice(offset, offset + limit);
 
   return {
-    items: items.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
-    total,
-    nextOffset: offset + limit < total ? offset + limit : null,
+    items: pagedItems.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
+    total: filtered.length,
+    nextOffset: offset + limit < filtered.length ? offset + limit : null,
   };
 };
 
@@ -7338,16 +7325,17 @@ const getStudentHomeworkSummaryV2 = async (
   let dueTodayCount = 0;
 
   assignments.forEach((item: any) => {
-    const status = resolveAssignmentViewStatus(item, now);
+    const workflow = resolveHomeworkAssignmentWorkflow(item, now);
+    const status = workflow.status;
     if (status === 'REVIEWED') reviewedCount += 1;
-    if (status === 'SUBMITTED' || status === 'IN_REVIEW') submittedCount += 1;
-    if (status === 'OVERDUE') overdueCount += 1;
-    if (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE' || status === 'SUBMITTED' || status === 'IN_REVIEW') activeCount += 1;
+    if (workflow.needsTeacherAction) submittedCount += 1;
+    if (workflow.isOverdue) overdueCount += 1;
+    if (workflow.needsStudentAction || workflow.needsTeacherAction) activeCount += 1;
     if (item.deadlineAt) {
       const deadlineKey = formatInTimeZone(item.deadlineAt, 'yyyy-MM-dd', {
         timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
       });
-      if (deadlineKey === todayKey && (status === 'SENT' || status === 'RETURNED' || status === 'OVERDUE')) {
+      if (deadlineKey === todayKey && workflow.needsStudentAction) {
         dueTodayCount += 1;
       }
     }
@@ -8068,15 +8056,6 @@ const cleanupSessions = async () => {
   });
 };
 
-const cleanupTransferTokens = async () => {
-  const now = new Date();
-  await prisma.transferToken.deleteMany({
-    where: {
-      OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }],
-    },
-  });
-};
-
 const resolveNotificationLogRetentionDays = () => {
   if (!Number.isFinite(NOTIFICATION_LOG_RETENTION_DAYS) || NOTIFICATION_LOG_RETENTION_DAYS <= 0) {
     return null;
@@ -8110,10 +8089,6 @@ const scheduleDailySessionCleanup = () => {
       // eslint-disable-next-line no-console
       console.error('Не удалось очистить сессии', error);
     });
-    cleanupTransferTokens().catch((error) => {
-      // eslint-disable-next-line no-console
-      console.error('Не удалось очистить токены переноса', error);
-    });
     cleanupNotificationLogs().catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Не удалось очистить логи уведомлений', error);
@@ -8123,10 +8098,6 @@ const scheduleDailySessionCleanup = () => {
       cleanupSessions().catch((error) => {
         // eslint-disable-next-line no-console
         console.error('Не удалось очистить сессии', error);
-      });
-      cleanupTransferTokens().catch((error) => {
-        // eslint-disable-next-line no-console
-        console.error('Не удалось очистить токены переноса', error);
       });
       cleanupNotificationLogs().catch((error) => {
         // eslint-disable-next-line no-console
@@ -8292,7 +8263,6 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         pathname,
         resolveSessionUser,
         authSessionHandlers,
-        authTransferHandlers,
       })
     ) {
       return;
@@ -8406,9 +8376,11 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           bulkHomeworkAssignmentsV2,
           getHomeworkAssignmentV2,
           updateHomeworkAssignmentV2,
+          sendHomeworkAssignmentV2,
           deleteHomeworkAssignmentV2,
           remindHomeworkAssignmentV2,
           cancelHomeworkAssignmentIssueV2,
+          reissueHomeworkAssignmentV2,
           listHomeworkSubmissionsV2,
           createHomeworkSubmissionV2,
           openHomeworkReviewSessionV2,

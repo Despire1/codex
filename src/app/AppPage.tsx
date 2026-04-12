@@ -175,7 +175,9 @@ const AppPageContent = () => {
     hasValidationErrors: false,
     primaryActionDisabled: false,
     draftSavedAtLabel: null,
+    subtitleOverride: null,
     showSecondaryAction: false,
+    showPrimaryAction: true,
     secondaryActionLabel: '',
     primaryActionLabel: '',
     primarySubmittingLabel: '',
@@ -458,9 +460,11 @@ const AppPageContent = () => {
     [],
   );
   const desktopTopbarResolvedSubtitle = isTeacherHomeworkEditorRoute
-    ? isTeacherAssignmentEditRoute
+    ? templateCreateTopbarState.subtitleOverride ??
+      (isTeacherAssignmentEditRoute
       ? 'Обновите контент и параметры выдачи'
       : 'Соберите домашку и подготовьте её к отправке'
+      )
     : isTeacherTemplateEditorRoute
       ? templateCreateTopbarState.draftSavedAtLabel
         ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
@@ -475,7 +479,7 @@ const AppPageContent = () => {
   );
   const editorSecondaryActionLabel = templateCreateTopbarState.secondaryActionLabel || 'Сохранить черновик';
   const showEditorSecondaryAction =
-    templateCreateTopbarState.showSecondaryAction || isTeacherHomeworkEditorRoute || isTeacherTemplateCreateRoute;
+    templateCreateTopbarState.showSecondaryAction || isTeacherTemplateCreateRoute;
   const editorPrimarySubmittingLabel =
     templateCreateTopbarState.primarySubmittingLabel || (
       isTeacherHomeworkEditorRoute
@@ -1497,6 +1501,7 @@ const AppPageContent = () => {
                             createMenuItems={activeTab === 'homeworks' ? homeworkTopbarCreateMenuItems : undefined}
                             showEditorActions={isTeacherAnyHomeworkEditorRoute}
                             showEditorSecondaryAction={showEditorSecondaryAction}
+                            showEditorPrimaryAction={templateCreateTopbarState.showPrimaryAction}
                             showBackButton={isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
                             onBack={() =>
                               guardedNavigate(

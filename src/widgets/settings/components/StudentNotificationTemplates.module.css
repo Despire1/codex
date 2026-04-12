@@ -1,26 +1,73 @@
 .wrapper {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
+}
+
+.headerBlock {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.headerIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #fde7f2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.headerIconGlyph {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #d63384;
+  position: relative;
+  display: inline-block;
+}
+
+.headerIconGlyph::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  bottom: -4px;
+  width: 6px;
+  height: 6px;
+  background: #d63384;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
 .header {
-  font-weight: 600;
-  color: var(--color-slate-700);
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 900;
+  color: #1f2937;
+}
+
+.headerSubtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .tabRow {
   display: flex;
-  gap: 12px;
-  justify-content: space-between;
   align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .tabButtons {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
+  padding-bottom: 0;
 }
 
 .tabAction {
@@ -28,94 +75,86 @@
 }
 
 .tabButton {
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  padding: 8px 12px;
-  border-radius: 12px;
+  border: none;
+  background: transparent;
+  padding: 0 18px 14px;
+  border-bottom: 2px solid transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  font-weight: 600;
-  color: var(--color-slate-600);
 }
 
 .tabButtonActive {
-  background: var(--color-blue-100);
-  color: var(--color-blue-700);
-  border-color: transparent;
+  color: #111827;
+  border-bottom-color: #b7ff42;
 }
 
 .editorCard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  gap: 22px;
 }
 
 .editorHeader {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
 }
 
 .editorTitle {
-  font-weight: 600;
-  color: var(--color-slate-700);
+  font-size: 14px;
+  font-weight: 800;
+  color: #374151;
 }
 
 .editorDescription {
-  font-size: 13px;
-  color: var(--color-slate-400);
-  margin-top: 4px;
+  display: none;
 }
 
 .variablePanel {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .variableBadge {
   border: none;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 8px 12px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
   border-radius: 12px;
-  background: var(--color-slate-100);
-  color: var(--color-slate-700);
+  background: #eef8d9;
+  color: #1f2937;
   text-align: left;
+  line-height: 1;
 }
 
 .variableLabel {
-  font-size: 13px;
-  font-weight: 600;
+  display: none;
 }
 
 .variableCode {
   font-size: 12px;
-  color: var(--color-slate-500);
+  font-weight: 600;
+  color: #1f2937;
 }
 
 .editorGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.fieldGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
 }
 
-.fieldLabel {
-  font-size: 13px;
-  color: var(--color-slate-500);
+.fieldGroup,
+.previewGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .fieldLabelRow {
@@ -125,89 +164,125 @@
   gap: 10px;
 }
 
+.fieldLabel,
+.previewTitle {
+  font-size: 14px;
+  font-weight: 800;
+  color: #374151;
+}
+
 .fieldError {
-  border-color: var(--color-rose-400);
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.12);
 }
 
 .errorText {
   font-size: 12px;
-  color: var(--color-rose-600);
-}
-
-.previewGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  color: #dc2626;
 }
 
 .previewHeader {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.previewTitle {
-  font-size: 13px;
-  color: var(--color-slate-500);
+  gap: 12px;
 }
 
 .exampleToggle {
   display: flex;
-  gap: 6px;
+  gap: 0;
   flex-wrap: wrap;
 }
 
 .exampleButton {
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0 18px 14px;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  color: var(--color-slate-600);
+  color: #4b5563;
 }
 
 .exampleButtonActive {
-  background: var(--color-blue-100);
-  color: var(--color-blue-700);
-  border-color: transparent;
+  background: transparent;
+  color: #111827;
+  border-color: #b7ff42;
 }
 
 .previewBox {
-  border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  padding: 12px;
-  background: var(--color-slate-50);
+  border-radius: 24px;
+  border: none;
+  padding: 18px;
+  background: #f7f8fb;
+  min-height: 100%;
 }
 
 .previewText {
   white-space: pre-wrap;
   font-size: 14px;
-  color: var(--color-slate-700);
+  line-height: 1.5;
+  color: #111827;
+  background: #fff;
+  border: 1px solid #e6e8ee;
+  border-radius: 20px;
+  padding: 16px 18px;
 }
 
 .previewMissing {
-  color: var(--color-slate-400);
+  color: #9ca3af;
+}
+
+.previewAccent {
+  color: #8dde44;
+  font-weight: 700;
 }
 
 .actionsRow {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.sendTestButton:disabled {
-  opacity: 0.6;
-  cursor: default;
+  gap: 12px;
+  justify-content: stretch;
 }
 
 .sendTestWrapper {
   display: inline-flex;
 }
 
+.resetButton,
+.sendTestButton,
+.saveButton {
+  min-height: 50px;
+  border-radius: 999px;
+  font-weight: 800;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+}
+
+.resetButton {
+  background: #f1f3f7;
+  color: #4b5563;
+  border-color: transparent;
+}
+
+.sendTestButton {
+  background: #4a7fe8;
+  color: #fff;
+  border-color: transparent;
+}
+
+.saveButton {
+  background: #111827;
+  color: #fff;
+  --primary-button-bg: #111827;
+  --primary-button-hover-bg: #1f2937;
+  --primary-button-text: #fff;
+}
+
+.sendTestButton:disabled,
 .saveButton:disabled {
-  opacity: 0.6;
+  opacity: 0.56;
   cursor: default;
 }
 
@@ -216,10 +291,10 @@
 }
 
 .overflowPopover {
-  padding: 6px;
-  border-radius: 12px;
-  background: var(--color-white);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  padding: 8px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -227,12 +302,12 @@
 
 .overflowAction {
   border: none;
-  background: var(--color-slate-50);
-  border-radius: 10px;
-  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 10px 12px;
   cursor: pointer;
-  font-weight: 600;
-  color: var(--color-slate-700);
+  font-weight: 700;
+  color: #111827;
   text-align: left;
 }
 
@@ -250,9 +325,9 @@
 
 .emojiPopover {
   padding-bottom: 3px;
-  border-radius: 10px;
-  background: var(--color-white);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
 }
 
 .emojiPickerWrapper {
@@ -261,12 +336,29 @@
 }
 
 .textArea {
-  min-height: 157px;
+  min-height: 144px;
+  border-radius: 20px;
+  border: 2px solid #e5e7eb;
+  padding: 16px 18px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.02);
+}
+
+.mobileActions {
+  display: none;
+}
+
+.mobileActionButton {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 @media (max-width: 720px) {
-  .editorGrid {
-    grid-template-columns: 1fr;
+  .headerBlock {
+    align-items: flex-start;
+  }
+
+  .header {
+    font-size: 18px;
   }
 
   .actionsRow {
@@ -279,27 +371,13 @@
     display: flex;
     gap: 10px;
     padding: 10px;
-    border-radius: 16px;
+    border-radius: 18px;
     background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
     z-index: 5;
-  }
-
-  .mobileActionButton {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .mobileActionButton:disabled {
-    opacity: 0.6;
-    cursor: default;
   }
 
   .emojiButton {
     display: none;
-  }
-
-  .textArea {
-    min-height: 160px;
   }
 }

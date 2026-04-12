@@ -49,9 +49,11 @@ type HomeworkRoutesV2Handlers = {
   bulkHomeworkAssignmentsV2: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   getHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   updateHomeworkAssignmentV2: (user: unknown, assignmentId: number, body: Record<string, unknown>) => Promise<unknown>;
+  sendHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   deleteHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   remindHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   cancelHomeworkAssignmentIssueV2: (user: unknown, assignmentId: number) => Promise<unknown>;
+  reissueHomeworkAssignmentV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   listHomeworkSubmissionsV2: (user: unknown, assignmentId: number) => Promise<unknown>;
   createHomeworkSubmissionV2: (
     user: unknown,
@@ -276,6 +278,21 @@ export const tryHandleHomeworkRoutesV2 = async ({
   }
 
   const homeworkAssignmentRemindMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/remind$/);
+  const homeworkAssignmentSendMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/send$/);
+  if (req.method === 'POST' && homeworkAssignmentSendMatch) {
+    if (role === 'STUDENT') {
+      sendJson(res, 403, { message: 'forbidden' });
+      return true;
+    }
+    const assignmentId = Number(homeworkAssignmentSendMatch[1]);
+    if (!Number.isFinite(assignmentId)) {
+      badRequest(res, 'invalid_assignment_id');
+      return true;
+    }
+    const data = await handlers.sendHomeworkAssignmentV2(requireApiUser(), assignmentId);
+    sendJson(res, 200, data);
+    return true;
+  }
   if (req.method === 'POST' && homeworkAssignmentRemindMatch) {
     if (role === 'STUDENT') {
       sendJson(res, 403, { message: 'forbidden' });
@@ -303,6 +320,22 @@ export const tryHandleHomeworkRoutesV2 = async ({
       return true;
     }
     const data = await handlers.cancelHomeworkAssignmentIssueV2(requireApiUser(), assignmentId);
+    sendJson(res, 200, data);
+    return true;
+  }
+
+  const homeworkAssignmentReissueMatch = pathname.match(/^\/api\/v2\/homework\/assignments\/(\d+)\/reissue$/);
+  if (req.method === 'POST' && homeworkAssignmentReissueMatch) {
+    if (role === 'STUDENT') {
+      sendJson(res, 403, { message: 'forbidden' });
+      return true;
+    }
+    const assignmentId = Number(homeworkAssignmentReissueMatch[1]);
+    if (!Number.isFinite(assignmentId)) {
+      badRequest(res, 'invalid_assignment_id');
+      return true;
+    }
+    const data = await handlers.reissueHomeworkAssignmentV2(requireApiUser(), assignmentId);
     sendJson(res, 200, data);
     return true;
   }

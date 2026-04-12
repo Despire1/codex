@@ -17,9 +17,11 @@ import {
   HomeworkAssignment,
   HomeworkAttachment,
   HomeworkReviewDraft,
+  HomeworkReviewResult,
   HomeworkSubmission,
 } from '../../../entities/types';
 import { getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
+import { readHomeworkTemplateQuizSettingsFromBlocks } from '../../../entities/homework-template/model/lib/quizSettings';
 import { resolveHomeworkStorageUrl } from '../../homework-submit/model/upload';
 import { buildHomeworkReviewItems, normalizeReviewPoints } from '../model/lib/questionReview';
 import styles from './HomeworkReviewScreen.module.css';
@@ -41,6 +43,7 @@ interface HomeworkReviewScreenProps {
     manualScore: number | null;
     finalScore: number | null;
     teacherComment: string | null;
+    reviewResult: HomeworkReviewResult;
   }) => Promise<boolean>;
 }
 
@@ -161,6 +164,10 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
   onSubmitReview,
 }) => {
   const latestSubmission = useMemo(() => getLatestSubmission(submissions), [submissions]);
+  const quizSettings = useMemo(
+    () => readHomeworkTemplateQuizSettingsFromBlocks(assignment?.contentSnapshot ?? []),
+    [assignment?.contentSnapshot],
+  );
   const reviewItems = useMemo(() => {
     if (!assignment || !latestSubmission) return [];
     return buildHomeworkReviewItems(assignment, latestSubmission);
@@ -168,6 +175,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
 
   const [scoresById, setScoresById] = useState<Record<string, number>>({});
   const [commentsById, setCommentsById] = useState<Record<string, string>>({});
+  const [decisionOverridesById, setDecisionOverridesById] = useState<Record<string, 'ACCEPTED' | 'REWORK_REQUIRED'>>({});
   const [baselineDraft, setBaselineDraft] = useState<HomeworkReviewDraft | null>(null);
   const [generalComment, setGeneralComment] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -212,6 +220,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
     setBaselineDraft(nextBaselineDraft);
     setScoresById(initialScores);
     setCommentsById(initialComments);
+    setDecisionOverridesById({});
     setGeneralComment(initialGeneralComment);
     setError(null);
   }, [assignment?.id, initialDraft, latestSubmission, reviewItems]);
@@ -277,33 +286,29 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
     setScoresById((prev) => ({ ...prev, [itemId]: normalized }));
   };
 
-  const buildTeacherComment = () => {
-    const base = generalComment.trim();
-    const details = reviewItems
-      .map((item, index) => {
-        const comment = commentsById[item.id]?.trim();
-        if (!comment) return null;
-        return `${index + 1}. ${item.prompt}: ${comment}`;
-      })
-      .filter((line): line is string => Boolean(line));
-
-    if (details.length === 0) {
-      return base || null;
-    }
-
-    if (!base) {
-      return `Комментарии по вопросам:\n${details.join('\n')}`;
-    }
-
-    return `${base}\n\nКомментарии по вопросам:\n${details.join('\n')}`;
-  };
+  const buildReviewResult = (): HomeworkReviewResult => ({
+    submissionId: latestSubmission!.id,
+    generalComment: generalComment.trim(),
+    items: reviewItems.reduce<Record<string, HomeworkReviewResult['items'][string]>>((acc, item) => {
+      const score = Number(scoresById[item.id]);
+      const normalizedScore = Number.isFinite(score) ? normalizeReviewPoints(score, item.maxPoints) : 0;
+      acc[item.id] = {
+        decision: decisionOverridesById[item.id] ?? (normalizedScore >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED'),
+        score: normalizedScore,
+        comment: commentsById[item.id]?.trim() || null,
+      };
+      return acc;
+    }, {}),
+  });
 
   const submitReview = async (action: 'REVIEWED' | 'RETURNED') => {
     if (!assignment || !latestSubmission) return;
     setError(null);
-    const teacherComment = buildTeacherComment();
+    const reviewResult = buildReviewResult();
+    const teacherComment = reviewResult.generalComment || null;
+    const hasItemComments = Object.values(reviewResult.items).some((item) => Boolean(item.comment));
 
-    if (action === 'RETURNED' && !teacherComment) {
+    if (action === 'RETURNED' && !teacherComment && !hasItemComments) {
       setError('При возврате на доработку добавьте комментарий ученику.');
       return;
     }
@@ -315,6 +320,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
       manualScore: Math.round(scoreTenScale * 10),
       finalScore: Math.round(scoreTenScale * 10),
       teacherComment,
+      reviewResult,
     });
 
     if (!success) {
@@ -433,6 +439,8 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
 
           {reviewItems.map((item, index) => {
             const currentScore = scoresById[item.id] ?? 0;
+            const currentDecision =
+              decisionOverridesById[item.id] ?? (currentScore >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED');
             const scoreStatusClass =
               currentScore >= item.maxPoints
                 ? styles.scoreStatusCorrect
@@ -471,7 +479,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
                     ) : null}
                   </div>
 
-                  {item.correctAnswerSummary ? (
+                  {quizSettings.showCorrectAnswers && item.correctAnswerSummary ? (
                     <div className={styles.correctBlock}>
                       <div className={styles.correctLabel}>Правильный ответ</div>
                       <div className={styles.correctText}>{item.correctAnswerSummary}</div>
@@ -533,6 +541,36 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
                       onChange={(event) => handleScoreChange(item.id, item.maxPoints, event.target.value)}
                     />
                     <span className={styles.scoreMax}>/ {formatScore(item.maxPoints)}</span>
+                  </div>
+                  <div className={styles.scoreControls}>
+                    <button
+                      type="button"
+                      className={`${styles.secondaryButton} ${
+                        currentDecision === 'ACCEPTED' ? styles.scoreActionSuccess : ''
+                      }`}
+                      onClick={() =>
+                        setDecisionOverridesById((prev) => ({
+                          ...prev,
+                          [item.id]: 'ACCEPTED',
+                        }))
+                      }
+                    >
+                      Принято
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.secondaryButton} ${
+                        currentDecision === 'REWORK_REQUIRED' ? styles.scoreActionWarning : ''
+                      }`}
+                      onClick={() =>
+                        setDecisionOverridesById((prev) => ({
+                          ...prev,
+                          [item.id]: 'REWORK_REQUIRED',
+                        }))
+                      }
+                    >
+                      На доработку
+                    </button>
                   </div>
                 </div>
 

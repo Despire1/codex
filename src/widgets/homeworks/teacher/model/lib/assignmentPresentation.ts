@@ -6,6 +6,7 @@ import {
   STUDENT_UI_COLOR_PALETTE,
   normalizeStudentUiColor,
 } from '../../../../../shared/lib/studentUiColors';
+import { formatHumanizedDurationRu } from '../../../../../shared/lib/humanizeDurationRu';
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
@@ -29,14 +30,6 @@ const endOfDay = (date: Date) => {
   const value = new Date(date);
   value.setHours(23, 59, 59, 999);
   return value;
-};
-
-const formatDuration = (deltaMs: number) => {
-  const absMs = Math.abs(deltaMs);
-  const totalHours = Math.floor(absMs / (60 * 60 * 1000));
-  const totalMinutes = Math.floor((absMs % (60 * 60 * 1000)) / (60 * 1000));
-  if (totalHours > 0) return `${totalHours} ч ${totalMinutes} мин`;
-  return `${totalMinutes} мин`;
 };
 
 const hexToRgb = (hexColor: string) => {
@@ -156,7 +149,7 @@ export const resolveAssignmentDeadlineMeta = (assignment: HomeworkAssignment, no
   if (isOverdue) {
     return {
       primary: dateFormatter.format(deadline),
-      secondary: `Просрочено на ${formatDuration(now.getTime() - deadline.getTime())}`,
+      secondary: `Просрочено на ${formatHumanizedDurationRu(now.getTime() - deadline.getTime())}`,
       tone: 'danger' as const,
     };
   }

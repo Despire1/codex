@@ -138,7 +138,7 @@
 }
 
 .switch input:checked + .slider {
-  background-color: var(--color-blue-600);
+  background-color: var(--switch-on-bg, var(--color-blue-600));
 }
 
 .switch input:checked + .slider:before {

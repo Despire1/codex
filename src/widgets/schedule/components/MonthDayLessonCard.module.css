@@ -5,29 +5,27 @@
 .card {
   position: relative;
   border-radius: 24px;
-  border: 1px solid #f0f3f7;
-  background: var(--color-white);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  border: 1px solid color-mix(in srgb, var(--lesson-border, #dbeafe) 78%, #ffffff);
+  background: color-mix(in srgb, var(--lesson-bg, #dbeafe) 20%, #ffffff);
   cursor: pointer;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
-    border-color 0.18s ease;
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
 .card:hover {
   transform: translateY(-1px);
-  border-color: #e4ebf5;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: var(--lesson-border, #cbd5e1);
+  background: color-mix(in srgb, var(--lesson-bg, #dbeafe) 28%, #ffffff);
 }
 
 .card:focus-visible,
 .card:focus-within {
   outline: none;
-  border-color: #cbd9f2;
-  box-shadow:
-    0 0 0 3px rgba(59, 130, 246, 0.14),
-    0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: var(--lesson-strong-border, var(--lesson-border, #cbd9f2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lesson-bg, #dbeafe) 56%, transparent);
 }
 
 .canceled {
@@ -65,7 +63,8 @@
   justify-content: center;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #eff6ff;
+  background: color-mix(in srgb, var(--lesson-bg, #dbeafe) 78%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--lesson-border, #93c5fd) 68%, #ffffff);
   flex-shrink: 0;
 }
 
@@ -73,7 +72,7 @@
   font-size: 21px;
   line-height: 1;
   font-weight: 700;
-  color: #2563eb;
+  color: var(--lesson-text, #2563eb);
   letter-spacing: -0.02em;
 }
 
@@ -81,14 +80,14 @@
   width: 100%;
   height: 1px;
   margin: 6px 0 5px;
-  background: #bfdbfe;
+  background: color-mix(in srgb, var(--lesson-border, #bfdbfe) 74%, #ffffff);
 }
 
 .timeEnd {
   font-size: 11px;
   line-height: 1;
   font-weight: 600;
-  color: #93c5fd;
+  color: color-mix(in srgb, var(--lesson-text, #2563eb) 62%, #ffffff);
   letter-spacing: 0.04em;
 }
 
@@ -117,54 +116,63 @@
 .headerControls {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .recurringIconBadge {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #3b82f6;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  color: var(--lesson-text, #3b82f6);
+  background: transparent;
+  border: none;
+  padding: 0;
+  flex: 0 0 auto;
+  margin-right: 2px;
 }
 
 .recurringIcon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .actionsButton {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border: none;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--lesson-bg, #eff6ff) 78%, #ffffff);
+  color: var(--lesson-text, #3b82f6);
+  border: 1px solid color-mix(in srgb, var(--lesson-border, #dbeafe) 72%, #ffffff);
   cursor: pointer;
   transition:
     background-color 0.18s ease,
     color 0.18s ease,
-    transform 0.18s ease;
+    transform 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .actionsButton:hover {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--lesson-bg, #dbeafe);
+  color: var(--lesson-text, #2563eb);
+  border-color: var(--lesson-border, #93c5fd);
 }
 
 .actionsButton:focus-visible {
   outline: none;
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--lesson-bg, #dbeafe);
+  color: var(--lesson-text, #2563eb);
+  border-color: var(--lesson-strong-border, var(--lesson-border, #93c5fd));
+}
+
+.actionsButton svg {
+  width: 15px;
+  height: 15px;
 }
 
 .metaRow {
@@ -199,7 +207,7 @@
 .homeworkIcon {
   width: 15px;
   height: 15px;
-  color: #3b82f6;
+  color: var(--lesson-text, #3b82f6);
   flex-shrink: 0;
 }
 
@@ -244,7 +252,7 @@
 .linkIcon {
   width: 15px;
   height: 15px;
-  color: #8b5cf6;
+  color: var(--lesson-text, #8b5cf6);
   flex-shrink: 0;
 }
 

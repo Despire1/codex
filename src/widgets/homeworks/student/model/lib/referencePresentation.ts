@@ -1,6 +1,10 @@
 import { HomeworkAssignment } from '../../../../../entities/types';
+import {
+  DAY_DURATION_MS,
+  formatHumanizedCompactRelativeDurationRu,
+  formatHumanizedDurationRu,
+} from '../../../../../shared/lib/humanizeDurationRu';
 import { StudentHomeworkSummary } from '../../../types';
-import { pluralizeRu } from '../../../../../shared/lib/pluralizeRu';
 import {
   calculateStudentHomeworkCompletedThisWeek,
   calculateStudentHomeworkCurrentStreak,
@@ -117,35 +121,6 @@ const formatRelativeDeadlinePrimary = (date: Date, now: Date) => {
   return formatShortDateTime(date);
 };
 
-const formatCompactDuration = (durationMs: number) => {
-  const absolute = Math.max(0, Math.floor(Math.abs(durationMs)));
-  const totalMinutes = Math.max(1, Math.floor(absolute / 60_000));
-  const totalHours = Math.floor(totalMinutes / 60);
-  const totalDays = Math.floor(totalHours / 24);
-
-  if (totalDays > 0) {
-    return pluralizeRu(totalDays, {
-      one: 'день',
-      few: 'дня',
-      many: 'дней',
-    });
-  }
-
-  if (totalHours > 0) {
-    return pluralizeRu(totalHours, {
-      one: 'час',
-      few: 'часа',
-      many: 'часов',
-    });
-  }
-
-  return pluralizeRu(totalMinutes, {
-    one: 'минута',
-    few: 'минуты',
-    many: 'минут',
-  });
-};
-
 const resolveEffectiveDeadlineDate = (assignment: HomeworkAssignment) =>
   toValidDate(assignment.deadlineAt) ??
   toValidDate(assignment.sentAt) ??
@@ -243,8 +218,13 @@ export const resolveStudentHomeworkReferenceDeadlineMeta = (
     const reviewedAt = toValidDate(assignment.reviewedAt);
     return {
       primary: deadline ? formatShortDate(deadline) : 'Проверено',
-      secondary: reviewedAt ? `Пров. ${formatShortDate(reviewedAt)}` : 'Проверено',
-      tone: 'normal',
+      secondary:
+        assignment.lateState === 'LATE'
+          ? 'Сдано с опозданием'
+          : reviewedAt
+            ? `Пров. ${formatShortDate(reviewedAt)}`
+            : 'Проверено',
+      tone: assignment.lateState === 'LATE' ? 'warning' : 'normal',
     };
   }
 
@@ -261,7 +241,7 @@ export const resolveStudentHomeworkReferenceDeadlineMeta = (
   if (kind === 'overdue') {
     return {
       primary,
-      secondary: `+${formatCompactDuration(now.getTime() - deadline.getTime())}`,
+      secondary: formatHumanizedCompactRelativeDurationRu(now.getTime() - deadline.getTime(), 'past'),
       tone: 'danger',
     };
   }
@@ -269,8 +249,8 @@ export const resolveStudentHomeworkReferenceDeadlineMeta = (
   const diffMs = deadline.getTime() - now.getTime();
   return {
     primary,
-    secondary: formatCompactDuration(diffMs),
-    tone: diffMs <= DAY_MS ? 'warning' : 'normal',
+    secondary: formatHumanizedDurationRu(diffMs),
+    tone: diffMs <= DAY_DURATION_MS ? 'warning' : 'normal',
   };
 };
 

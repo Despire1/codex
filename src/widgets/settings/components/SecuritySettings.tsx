@@ -1,23 +1,94 @@
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
-import { TransferLinkCard } from '../../../features/auth/transfer';
+import { FC, SVGProps, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AndroidBrandIcon,
+  AppleBrandIcon,
+  ChromeBrandIcon,
+  SettingsIcon,
+  TelegramBrandIcon,
+} from '../../../icons/MaterialIcons';
 import { SessionSummary, api } from '../../../shared/api/client';
 import { useToast } from '../../../shared/lib/toast';
-import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../SettingsSection.module.css';
 
-const formatSessionDate = (value: string, timeZone: string) =>
-  new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
+type SessionPresentation = {
+  title: string;
+  icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  iconClassName: string;
+};
 
-const formatSessionTitle = (session: SessionSummary) => {
-  if (session.userAgent) return session.userAgent;
-  if (session.ip) return `IP ${session.ip}`;
-  return 'Сессия';
+const getSessionPresentation = (session: SessionSummary): SessionPresentation => {
+  const value = session.userAgent?.toLowerCase() ?? '';
+
+  if (value.includes('telegram') && value.includes('android')) {
+    return {
+      title: 'Telegram на Android',
+      icon: AndroidBrandIcon,
+      iconClassName: styles.sessionGlyphAndroid,
+    };
+  }
+
+  if (value.includes('telegram')) {
+    return {
+      title: 'Telegram Desktop',
+      icon: TelegramBrandIcon,
+      iconClassName: styles.sessionGlyphTelegram,
+    };
+  }
+
+  if (value.includes('iphone') || value.includes('ios') || value.includes('safari')) {
+    return {
+      title: 'Safari на iPhone',
+      icon: AppleBrandIcon,
+      iconClassName: styles.sessionGlyphApple,
+    };
+  }
+
+  if (value.includes('chrome') || value.includes('chromium')) {
+    return {
+      title: value.includes('windows') ? 'Chrome на Windows' : 'Chrome',
+      icon: ChromeBrandIcon,
+      iconClassName: styles.sessionGlyphChrome,
+    };
+  }
+
+  return {
+    title: session.userAgent?.trim() || (session.ip ? `Сессия · ${session.ip}` : 'Сессия'),
+    icon: SettingsIcon,
+    iconClassName: styles.sessionGlyphDefault,
+  };
+};
+
+const formatSessionActivity = (value: string) => {
+  const createdAt = new Date(value);
+  const now = new Date();
+  const diffMs = now.getTime() - createdAt.getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / (1000 * 60)));
+
+  if (diffMinutes < 2) return 'Последняя активность: Только что';
+  if (diffMinutes < 60) return `Последняя активность: ${diffMinutes} мин назад`;
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `Последняя активность: ${diffHours} ${diffHours === 1 ? 'час' : diffHours < 5 ? 'часа' : 'часов'} назад`;
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 7) {
+    return `Последняя активность: ${diffDays} ${diffDays === 1 ? 'день' : diffDays < 5 ? 'дня' : 'дней'} назад`;
+  }
+
+  return `Последняя активность: ${createdAt.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
 };
 
 export const SecuritySettings: FC = () => {
   const { showToast } = useToast();
-  const timeZone = useTimeZone();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [actionLoading, setActionLoading] = useState(false);
@@ -38,6 +109,10 @@ export const SecuritySettings: FC = () => {
   }, [loadSessions]);
 
   const hasOtherSessions = useMemo(() => sessions.some((session) => !session.isCurrent), [sessions]);
+  const sortedSessions = useMemo(
+    () => [...sessions].sort((left, right) => Number(right.isCurrent) - Number(left.isCurrent)),
+    [sessions],
+  );
 
   const handleRevoke = async (sessionId: number) => {
     setActionLoading(true);
@@ -65,59 +140,84 @@ export const SecuritySettings: FC = () => {
 
   return (
     <div className={styles.moduleStack}>
-      <TransferLinkCard />
+      <section className={styles.settingsCard}>
+        <div className={styles.sectionHeaderBetween}>
+          <div className={styles.sectionHeaderCompact}>
+            <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
+              <SettingsIcon width={20} height={20} />
+            </div>
+            <div className={styles.sectionHeaderCopy}>
+              <h2 className={styles.sectionHeading}>Активные сессии</h2>
+              <p className={styles.sectionDescription}>Устройства с доступом к вашему аккаунту</p>
+            </div>
+          </div>
 
-      <div className={styles.sectionBlock}>
-        <div className={styles.sectionTitle}>Активные сессии</div>
-        {status === 'loading' && <div className={styles.helperText}>Загрузка…</div>}
+          <button
+            className={`${controls.secondaryButton} ${styles.dangerActionButton}`}
+            type="button"
+            onClick={handleRevokeOthers}
+            disabled={!hasOtherSessions || actionLoading || status !== 'ready'}
+          >
+            Завершить все другие
+          </button>
+        </div>
+
+        {status === 'loading' && <div className={styles.loadingState}>Загрузка…</div>}
+
         {status === 'error' && (
           <div className={styles.errorBox}>
             Не удалось загрузить список сессий.
-            <button className={controls.secondaryButton} type="button" onClick={loadSessions}>
+            <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSessions}>
               Повторить
             </button>
           </div>
         )}
+
         {status === 'ready' && (
           <div className={styles.sessionsList}>
-            {sessions.length === 0 && <div className={styles.helperText}>Активных сессий не найдено.</div>}
-            {sessions.map((session) => (
-              <div key={session.id} className={styles.sessionRow}>
-                <div>
-                  <div className={styles.sessionTitle}>
-                    {formatSessionTitle(session)}
-                    {session.isCurrent && <span className={styles.sessionBadge}>Текущая</span>}
+            {sortedSessions.length === 0 && <div className={styles.helperText}>Активных сессий не найдено.</div>}
+
+            {sortedSessions.map((session) => {
+              const presentation = getSessionPresentation(session);
+              const Icon = presentation.icon;
+
+              return (
+                <div
+                  key={session.id}
+                  className={`${styles.sessionCard} ${session.isCurrent ? styles.sessionCardCurrent : ''}`}
+                >
+                  <div className={styles.sessionCardMain}>
+                    <div className={`${styles.sessionGlyph} ${presentation.iconClassName}`}>
+                      <Icon width={24} height={24} />
+                    </div>
+
+                    <div className={styles.sessionContent}>
+                      <div className={styles.sessionTitle}>
+                        {presentation.title}
+                        {session.isCurrent && <span className={styles.sessionBadge}>Текущая</span>}
+                      </div>
+
+                      <div className={styles.sessionMetaLine}>{session.ip ? `IP: ${session.ip}` : 'IP не определён'}</div>
+                      <div className={styles.sessionMetaSecondary}>{formatSessionActivity(session.createdAt)}</div>
+                    </div>
                   </div>
-                  <div className={styles.helperText}>
-                    {session.ip && <span>IP {session.ip} · </span>}
-                    {formatSessionDate(session.createdAt, timeZone)}
-                  </div>
+
+                  {!session.isCurrent ? (
+                    <button
+                      className={`${controls.secondaryButton} ${styles.sessionActionButton}`}
+                      type="button"
+                      onClick={() => handleRevoke(session.id)}
+                      disabled={actionLoading}
+                    >
+                      Завершить
+                    </button>
+                  ) : null}
                 </div>
-                {!session.isCurrent && (
-                  <button
-                    className={controls.smallButton}
-                    type="button"
-                    onClick={() => handleRevoke(session.id)}
-                    disabled={actionLoading}
-                  >
-                    Завершить
-                  </button>
-                )}
-              </div>
-            ))}
-            {sessions.length > 1 && (
-              <button
-                className={controls.secondaryButton}
-                type="button"
-                onClick={handleRevokeOthers}
-                disabled={!hasOtherSessions || actionLoading}
-              >
-                Завершить все другие
-              </button>
-            )}
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };

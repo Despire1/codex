@@ -8,6 +8,11 @@ import { TeacherBulkAction, TeacherHomeworksViewModel, TeacherHomeworkGroupKey }
 import { HomeworkAssignModal } from '../../../features/homework-assign/ui/HomeworkAssignModal';
 import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
 import { canCancelHomeworkAssignmentIssue } from '../../../entities/homework-assignment/model/lib/assignmentIssuance';
+import {
+  canReissueHomeworkAssignment,
+  canTeacherEditHomeworkAssignment,
+  resolveHomeworkAssignmentWorkflow,
+} from '../../../entities/homework-assignment/model/lib/workflow';
 import { HomeworkReviewModal } from '../../../features/homework-review/ui/HomeworkReviewModal';
 import { Modal } from '../../../shared/ui/Modal/Modal';
 import { Checkbox } from '../../../shared/ui/Checkbox/Checkbox';
@@ -103,7 +108,7 @@ const SORT_LABELS: Array<{ id: TeacherHomeworksViewModel['sortBy']; label: strin
 const BULK_ACTION_LABELS: Array<{ id: TeacherBulkAction; label: string }> = [
   { id: 'SEND_NOW', label: 'Отправить сейчас' },
   { id: 'REMIND', label: 'Напомнить' },
-  { id: 'MOVE_TO_DRAFT', label: 'Перевести в черновики' },
+  { id: 'CANCEL_ISSUE', label: 'Отменить выдачу' },
   { id: 'DELETE', label: 'Удалить' },
 ];
 
@@ -147,11 +152,7 @@ const getStudentInitials = (name: string) => {
 };
 
 const needsAssignmentReview = (assignment: HomeworkAssignment) =>
-  assignment.status === 'SUBMITTED' ||
-  assignment.status === 'IN_REVIEW' ||
-  assignment.status === 'RETURNED' ||
-  (assignment.problemFlags ?? []).includes('SUBMITTED') ||
-  (assignment.problemFlags ?? []).includes('IN_REVIEW');
+  resolveHomeworkAssignmentWorkflow(assignment).canTeacherReview;
 
 const resolveStatusTone = (assignment: HomeworkAssignment) => {
   if (assignment.hasConfigError) return 'config';
@@ -268,8 +269,10 @@ const getDraftTimeParts = (value?: string) => {
 type AssignmentRowMenuProps = {
   assignment: HomeworkAssignment;
   canCancelIssue: boolean;
+  canReissue: boolean;
   shouldShowRemind: boolean;
   onCancelIssue: (assignment: HomeworkAssignment) => void;
+  onReissue: (assignment: HomeworkAssignment) => void;
   onRemind: (assignment: HomeworkAssignment) => void;
   onDelete: (assignment: HomeworkAssignment) => void;
 };
@@ -277,8 +280,10 @@ type AssignmentRowMenuProps = {
 const AssignmentRowMenu: FC<AssignmentRowMenuProps> = ({
   assignment,
   canCancelIssue,
+  canReissue,
   shouldShowRemind,
   onCancelIssue,
+  onReissue,
   onRemind,
   onDelete,
 }) => {
@@ -333,6 +338,18 @@ const AssignmentRowMenu: FC<AssignmentRowMenuProps> = ({
               Напомнить ученику
             </button>
           ) : null}
+          {canReissue ? (
+            <button
+              type="button"
+              className={styles.rowMenuItem}
+              onClick={() => {
+                setAnchorEl(null);
+                onReissue(assignment);
+              }}
+            >
+              Переоткрыть домашку
+            </button>
+          ) : null}
           <button
             type="button"
             className={`${styles.rowMenuItem} ${styles.rowMenuItemDangerSoft}`}
@@ -351,10 +368,11 @@ const AssignmentRowMenu: FC<AssignmentRowMenuProps> = ({
 
 type AssignmentDeadlineCellProps = {
   assignment: HomeworkAssignment;
+  readOnly?: boolean;
   onUpdate: (assignment: HomeworkAssignment, deadlineAt: string | null) => Promise<void>;
 };
 
-const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, onUpdate }) => {
+const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, readOnly = false, onUpdate }) => {
   const timeZone = useTimeZone();
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -426,6 +444,7 @@ const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, o
         type="button"
         className={styles.deadlineButton}
         onClick={() => {
+          if (readOnly) return;
           setIsEditing((current) => {
             if (current) {
               closeEditor(draftValue);
@@ -434,7 +453,7 @@ const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, o
             return true;
           });
         }}
-        disabled={saving}
+        disabled={saving || readOnly}
       >
         <div className={styles.deadlineColumn}>
           <div>{deadlineMeta.primary}</div>
@@ -587,6 +606,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onOpenLessonDay,
   onUpdateAssignmentDeadline,
   onDeleteAssignment,
+  onReissueAssignment,
   onFixConfigError,
   onBulkAction,
   onOpenReview,
@@ -1089,8 +1109,10 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                   const responseText = responseVisual.kind === 'empty' ? responseVisual.emptyText || responseMeta : '';
                   const shouldShowEmptyResponse = responseText === 'Нет ответа';
                   const isOverdueRow = problemBadges.hasOverdue;
+                  const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
                   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
                   const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
+                  const canReissue = canReissueHomeworkAssignment(assignment);
                   const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
                   return (
                     <tr
@@ -1177,7 +1199,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         </div>
                       </td>
                       <td>
-                        <AssignmentDeadlineCell assignment={assignment} onUpdate={onUpdateAssignmentDeadline} />
+                        <AssignmentDeadlineCell
+                          assignment={assignment}
+                          readOnly={!canEditAssignment}
+                          onUpdate={onUpdateAssignmentDeadline}
+                        />
                       </td>
                       <td>
                         <div className={styles.createdAtCell}>{formatDateTime(assignment.createdAt)}</div>
@@ -1225,7 +1251,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                             >
                               Проверить
                             </button>
-                          ) : assignment.hasConfigError ? (
+                          ) : assignment.hasConfigError && canEditAssignment ? (
                             <button
                               type="button"
                               className={styles.fixButton}
@@ -1251,9 +1277,13 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                               <AssignmentRowMenu
                                 assignment={assignment}
                                 canCancelIssue={canCancelIssue}
+                                canReissue={canReissue}
                                 shouldShowRemind={shouldShowRemind}
                                 onCancelIssue={(targetAssignment) => {
                                   void onCancelAssignmentIssue(targetAssignment);
+                                }}
+                                onReissue={(targetAssignment) => {
+                                  void onReissueAssignment(targetAssignment);
                                 }}
                                 onRemind={(targetAssignment) => {
                                   void onRemindAssignment(targetAssignment);
@@ -1328,8 +1358,10 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 const responseVisual = resolveResponseVisual(assignment);
                 const isSelected = selectedIds.includes(assignment.id);
                 const isOverdueRow = problemBadges.hasOverdue;
+                const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
                 const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
                 const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
+                const canReissue = canReissueHomeworkAssignment(assignment);
                 const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
                 const hasLessonMeta = Boolean(assignment.lessonId);
                 const hasTemplateMeta = Boolean(assignment.templateTitle);
@@ -1395,10 +1427,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         >
                           {studentLabel}
                         </button>
-                        {problemBadges.hasOverdue || problemBadges.hasReturned || problemBadges.hasConfigError ? (
+                        {problemBadges.hasOverdue || problemBadges.hasReturned || problemBadges.hasConfigError || assignment.lateState === 'LATE' ? (
                           <div className={styles.problemBadges}>
                             {problemBadges.hasOverdue ? <span className={styles.problemDanger}>Просрочено</span> : null}
                             {problemBadges.hasReturned ? <span className={styles.problemWarn}>На доработке</span> : null}
+                            {assignment.lateState === 'LATE' ? <span className={styles.problemWarn}>Сдано после срока</span> : null}
                             {problemBadges.hasConfigError ? <span className={styles.problemDanger}>Ошибка настройки</span> : null}
                           </div>
                         ) : null}
@@ -1408,7 +1441,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                     <div className={styles.mobileMetaGrid}>
                       <div className={styles.mobileMetaCard}>
                         <span className={styles.mobileMetaLabel}>Дедлайн</span>
-                        <AssignmentDeadlineCell assignment={assignment} onUpdate={onUpdateAssignmentDeadline} />
+                        <AssignmentDeadlineCell
+                          assignment={assignment}
+                          readOnly={!canEditAssignment}
+                          onUpdate={onUpdateAssignmentDeadline}
+                        />
                       </div>
 
                       <div className={styles.mobileMetaCard}>
@@ -1479,7 +1516,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                         </button>
                       ) : null}
 
-                      {assignment.hasConfigError ? (
+                      {assignment.hasConfigError && canEditAssignment ? (
                         <button
                           type="button"
                           className={`${styles.fixButton} ${styles.mobileActionButton}`}
@@ -1506,9 +1543,13 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                       <AssignmentRowMenu
                         assignment={assignment}
                         canCancelIssue={canCancelIssue}
+                        canReissue={canReissue}
                         shouldShowRemind={shouldShowRemind}
                         onCancelIssue={(targetAssignment) => {
                           void onCancelAssignmentIssue(targetAssignment);
+                        }}
+                        onReissue={(targetAssignment) => {
+                          void onReissueAssignment(targetAssignment);
                         }}
                         onRemind={(targetAssignment) => {
                           void onRemindAssignment(targetAssignment);
@@ -1653,6 +1694,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                                   studentsById.get(assignment.studentId) ||
                                   `Ученик #${assignment.studentId}`;
                                 const tone = resolveStatusTone(assignment);
+                                const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
                               return (
                                 <article key={assignment.id} className={styles.groupAssignmentItem}>
                                   <div className={styles.groupAssignmentIcon}>
@@ -1679,12 +1721,12 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                                       >
                                         {resolveStatusLabel(assignment)}
                                       </span>
-                                      <Tooltip content="Редактировать">
+                                      <Tooltip content={canEditAssignment ? 'Редактировать' : 'Открыть'}>
                                         <button
                                           type="button"
                                           className={styles.groupAssignmentEditButton}
                                           onClick={() => onOpenDetail(assignment)}
-                                          aria-label="Редактировать"
+                                          aria-label={canEditAssignment ? 'Редактировать' : 'Открыть'}
                                         >
                                           <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
                                         </button>

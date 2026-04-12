@@ -187,7 +187,7 @@ export const useStudentCardFiltersInternal = (): StudentCardFiltersContextValue 
   );
   const [paymentDate, setPaymentDate] = useState(storedFilters.paymentDate ?? '');
   const [studentsListViewMode, setStudentsListViewMode] = useState<StudentListViewMode>(
-    storedFilters.studentsListViewMode ?? 'standard',
+    storedFilters.studentsListViewMode ?? 'compact',
   );
 
   useEffect(() => {

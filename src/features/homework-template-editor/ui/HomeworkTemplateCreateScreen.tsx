@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
+import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
 import { HomeworkEditorDraft, HomeworkEditorVariant } from '../model/types';
 import {
   buildTemplateCreateStats,
@@ -47,6 +47,7 @@ import { TemplateSettingsSidebar } from './create-screen/TemplateSettingsSidebar
 import { TemplatePreviewModal } from './create-screen/TemplatePreviewModal';
 import { AssignmentSettingsSidebar } from './create-screen/AssignmentSettingsSidebar';
 import { AssignmentPreviewScreen } from './create-screen/AssignmentPreviewScreen';
+import { AssignmentReadOnlyScreen } from './create-screen/AssignmentReadOnlyScreen';
 import styles from './HomeworkTemplateCreateScreen.module.css';
 
 export interface HomeworkTemplateCreateSubmitResult {
@@ -60,6 +61,8 @@ interface HomeworkTemplateCreateScreenProps {
   mode: 'create' | 'edit';
   draft: HomeworkEditorDraft;
   submitting: boolean;
+  readOnly?: boolean;
+  readOnlyAssignment?: HomeworkAssignment | null;
   saveAsTemplateSubmitting?: boolean;
   students?: Array<{ id: number; name: string }>;
   groups?: HomeworkGroupListItem[];
@@ -95,6 +98,8 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   mode,
   draft,
   submitting,
+  readOnly = false,
+  readOnlyAssignment = null,
   saveAsTemplateSubmitting = false,
   students = [],
   groups = [],
@@ -445,20 +450,22 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   ]);
 
   const handleSecondaryAction = useCallback(() => {
+    if (readOnly) return;
     if (variant === 'template') {
       handleSaveDraft();
       return;
     }
     void runValidatedAction('save');
-  }, [handleSaveDraft, runValidatedAction, variant]);
+  }, [handleSaveDraft, readOnly, runValidatedAction, variant]);
 
   const handlePrimaryAction = useCallback(() => {
+    if (readOnly) return;
     if (variant === 'assignment' && assignmentPrimaryActionMode === 'save') {
       void runValidatedAction('save');
       return;
     }
     void runValidatedAction('submit');
-  }, [assignmentPrimaryActionMode, runValidatedAction, variant]);
+  }, [assignmentPrimaryActionMode, readOnly, runValidatedAction, variant]);
 
   const assignmentPrimaryActionLabel =
     assignmentPrimaryActionMode === 'create'
@@ -472,10 +479,15 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       : assignmentPrimaryActionMode === 'save'
         ? 'Сохраняю…'
         : 'Выдаю…';
+  const assignmentReadOnlyNotice =
+    variant === 'assignment' && readOnly
+      ? 'Домашка уже выдана. Чтобы изменить её, сначала отмените выдачу.'
+      : null;
 
   useLayoutEffect(() => {
-    const showSecondaryAction = variant === 'assignment' || mode === 'create';
+    const showSecondaryAction = !readOnly && (variant === 'assignment' || mode === 'create');
     const secondaryActionLabel = variant === 'assignment' ? 'Сохранить черновик' : 'Сохранить черновик';
+    const showPrimaryAction = !readOnly;
     const primaryActionLabel =
       variant === 'assignment'
         ? assignmentPrimaryActionLabel
@@ -495,7 +507,9 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       hasValidationErrors: hasVisibleErrors || showAssignmentValidationErrors,
       primaryActionDisabled: assignmentPrimaryActionDisabled,
       draftSavedAtLabel: variant === 'template' && mode === 'create' ? draftSavedAtLabel : null,
+      subtitleOverride: assignmentReadOnlyNotice,
       showSecondaryAction,
+      showPrimaryAction,
       secondaryActionLabel,
       primaryActionLabel,
       primarySubmittingLabel,
@@ -505,10 +519,12 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     assignmentPrimaryActionLabel,
     assignmentPrimaryActionDisabled,
     assignmentPrimarySubmittingLabel,
+    assignmentReadOnlyNotice,
     draftSavedAtLabel,
     hasAssignmentValidationErrors,
     hasVisibleErrors,
     mode,
+    readOnly,
     submitting,
     variant,
   ]);
@@ -537,6 +553,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         assignment={draft.assignment}
         students={students}
         disabled={submitting}
+        readOnly={readOnly}
         studentLocked={lockAssignmentStudent}
         previewDisabled={previewDisabled}
         saveAsTemplateSubmitting={saveAsTemplateSubmitting}
@@ -571,6 +588,37 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       />
     ) : null;
 
+  if (variant === 'assignment' && readOnly) {
+    return (
+      <section className={styles.page}>
+        <AssignmentReadOnlyScreen
+          draft={draft}
+          assignment={readOnlyAssignment}
+          students={students}
+          groups={groups}
+          templates={templates}
+          previewDisabled={previewDisabled}
+          showCancelIssueAction={showCancelIssueAction}
+          cancelIssueSubmitting={cancelIssueSubmitting}
+          onOpenPreview={() => {
+            if (previewDisabled) return;
+            setPreviewOpen(true);
+          }}
+          onCancelIssue={() => {
+            void onCancelIssue?.();
+          }}
+          onBack={onBack}
+        />
+
+        {isPreviewOpen ? (
+          <div className={styles.previewOverlay}>
+            <AssignmentPreviewScreen draft={draft} students={students} groups={groups} onClose={() => setPreviewOpen(false)} />
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <section className={styles.page}>
       {!isDesktop && !(variant === 'assignment' && isPreviewOpen) ? (
@@ -581,7 +629,9 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           hasValidationErrors={hasVisibleErrors || showAssignmentValidationErrors}
           primaryActionDisabled={assignmentPrimaryActionDisabled}
           draftSavedAtLabel={variant === 'template' && mode === 'create' ? draftSavedAtLabel : null}
-          showSecondaryAction={variant === 'assignment' || mode === 'create'}
+          subtitleOverride={assignmentReadOnlyNotice}
+          showSecondaryAction={!readOnly && (variant === 'assignment' || mode === 'create')}
+          showPrimaryAction={!readOnly}
           secondaryActionLabel="Сохранить черновик"
           primaryActionLabel={
             variant === 'assignment'
@@ -607,94 +657,115 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
 
       <div className={styles.contentGrid}>
         <div className={styles.mainColumn}>
-          <TemplateBasicsSection
-            titleLabel={variant === 'assignment' ? 'Название домашнего задания' : 'Название шаблона'}
-            titlePlaceholder={
-              variant === 'assignment'
-                ? 'Например: Домашка после урока 18 марта'
-                : 'Например: Present Perfect Practice'
-            }
-            title={draft.title}
-            titleError={titleError}
-            titleValidationPath={titleValidationPath}
-            titleInputRef={titleInputRef}
-            description={description}
-            category={draft.template.subject}
-            estimatedMinutes={estimatedMinutes}
-            tags={tags}
-            onTitleChange={(value) => {
-              handleFieldEdit(titlePath);
-              updateDraft({
-                ...draft,
-                title: value,
-              });
-            }}
-            onDescriptionChange={(value) => updateBlocks(setPrimaryTextContent(draft.blocks, value))}
-            onCategoryChange={(value) =>
-              updateTemplateContext({
-                subject: value,
-              })
-            }
-            onEstimatedMinutesChange={(value) =>
-              updateTemplateContext({
-                level: serializeEstimatedMinutes(value),
-              })
-            }
-            onTagAdd={(value) => {
-              if (tags.includes(value)) return;
-              const nextTags = [...tags, value];
-              updateTemplateContext({
-                tagsText: stringifyTags(nextTags),
-              });
-            }}
-            onTagRemove={(value) => {
-              const nextTags = tags.filter((tag) => tag !== value);
-              updateTemplateContext({
-                tagsText: stringifyTags(nextTags),
-              });
-            }}
-            selectedType={selectedType}
-            assignmentTemplateId={draft.assignment.sourceTemplateId ? String(draft.assignment.sourceTemplateId) : ''}
-            assignmentTemplateOptions={variant === 'assignment' ? assignmentTemplateOptions : undefined}
-            onAssignmentTemplateChange={
-              variant === 'assignment' && onAssignmentTemplateSelect
-                ? (value) => {
-                    if (!value) {
-                      onAssignmentTemplateSelect(null);
-                      return;
-                    }
-                    onAssignmentTemplateSelect(Number(value));
-                  }
-                : undefined
-            }
-            assignmentGroupId={draft.assignment.groupId ? String(draft.assignment.groupId) : ''}
-            assignmentGroupOptions={variant === 'assignment' ? assignmentGroupOptions : undefined}
-            onAssignmentGroupChange={
-              variant === 'assignment'
-                ? (value) =>
-                    updateDraft({
-                      ...draft,
-                      assignment: {
-                        ...draft.assignment,
-                        groupId: value ? Number(value) : null,
-                      },
-                    })
-                : undefined
-            }
-            onTypeChange={handleTemplateTypeSelect}
-          />
+          {assignmentReadOnlyNotice ? <div className={styles.readOnlyNotice}>{assignmentReadOnlyNotice}</div> : null}
+          <div className={styles.readOnlySectionWrap}>
+            <fieldset className={styles.readOnlyFieldset} disabled={readOnly}>
+              <TemplateBasicsSection
+                disabled={readOnly}
+                titleLabel={variant === 'assignment' ? 'Название домашнего задания' : 'Название шаблона'}
+                titlePlaceholder={
+                  variant === 'assignment'
+                    ? 'Например: Домашка после урока 18 марта'
+                    : 'Например: Present Perfect Practice'
+                }
+                title={draft.title}
+                titleError={titleError}
+                titleValidationPath={titleValidationPath}
+                titleInputRef={titleInputRef}
+                description={description}
+                category={draft.template.subject}
+                estimatedMinutes={estimatedMinutes}
+                tags={tags}
+                onTitleChange={(value) => {
+                  handleFieldEdit(titlePath);
+                  updateDraft({
+                    ...draft,
+                    title: value,
+                  });
+                }}
+                onDescriptionChange={(value) => updateBlocks(setPrimaryTextContent(draft.blocks, value))}
+                onCategoryChange={(value) =>
+                  updateTemplateContext({
+                    subject: value,
+                  })
+                }
+                onEstimatedMinutesChange={(value) =>
+                  updateTemplateContext({
+                    level: serializeEstimatedMinutes(value),
+                  })
+                }
+                onTagAdd={(value) => {
+                  if (tags.includes(value)) return;
+                  const nextTags = [...tags, value];
+                  updateTemplateContext({
+                    tagsText: stringifyTags(nextTags),
+                  });
+                }}
+                onTagRemove={(value) => {
+                  const nextTags = tags.filter((tag) => tag !== value);
+                  updateTemplateContext({
+                    tagsText: stringifyTags(nextTags),
+                  });
+                }}
+                selectedType={selectedType}
+                assignmentTemplateId={draft.assignment.sourceTemplateId ? String(draft.assignment.sourceTemplateId) : ''}
+                assignmentTemplateOptions={variant === 'assignment' ? assignmentTemplateOptions : undefined}
+                onAssignmentTemplateChange={
+                  variant === 'assignment' && onAssignmentTemplateSelect
+                    ? (value) => {
+                        if (!value) {
+                          onAssignmentTemplateSelect(null);
+                          return;
+                        }
+                        onAssignmentTemplateSelect(Number(value));
+                      }
+                    : undefined
+                }
+                assignmentGroupId={draft.assignment.groupId ? String(draft.assignment.groupId) : ''}
+                assignmentGroupOptions={variant === 'assignment' ? assignmentGroupOptions : undefined}
+                onAssignmentGroupChange={
+                  variant === 'assignment'
+                    ? (value) =>
+                        updateDraft({
+                          ...draft,
+                          assignment: {
+                            ...draft.assignment,
+                            groupId: value ? Number(value) : null,
+                          },
+                        })
+                    : undefined
+                }
+                onTypeChange={handleTemplateTypeSelect}
+              />
+            </fieldset>
+            {readOnly ? <div className={styles.readOnlyOverlay} aria-hidden /> : null}
+          </div>
 
           {shouldInlineAssignmentSidebar ? assignmentSidebar : null}
 
-          <TemplateQuestionsSection
-            testBlock={primaryTestEntry?.block ?? null}
-            testBlockPath={testBlockPath}
-            getIssueForPath={getIssueForPath}
-            onFieldEdit={handleFieldEdit}
-            onTestBlockChange={updatePrimaryTestBlock}
-          />
+          <div className={styles.readOnlySectionWrap}>
+            <fieldset className={styles.readOnlyFieldset} disabled={readOnly}>
+              <TemplateQuestionsSection
+                testBlock={primaryTestEntry?.block ?? null}
+                testBlockPath={testBlockPath}
+                getIssueForPath={getIssueForPath}
+                onFieldEdit={handleFieldEdit}
+                onTestBlockChange={updatePrimaryTestBlock}
+              />
+            </fieldset>
+            {readOnly ? <div className={styles.readOnlyOverlay} aria-hidden /> : null}
+          </div>
 
-          <TemplateMaterialsSection mediaBlock={mediaBlock} onMediaBlockChange={updatePrimaryMediaBlock} />
+          <div className={styles.readOnlySectionWrap}>
+            <fieldset className={styles.readOnlyFieldset} disabled={readOnly}>
+              <TemplateMaterialsSection
+                disabled={readOnly}
+                mediaBlock={mediaBlock}
+                onMediaBlockChange={updatePrimaryMediaBlock}
+              />
+            </fieldset>
+            {readOnly ? <div className={styles.readOnlyOverlay} aria-hidden /> : null}
+          </div>
         </div>
 
         {variant !== 'assignment' || !shouldInlineAssignmentSidebar ? (

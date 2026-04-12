@@ -26,6 +26,7 @@ import {
 import {
   HomeworkAssignment,
   HomeworkAttachment,
+  HomeworkReviewResult,
   HomeworkSubmission,
   HomeworkTestQuestion,
   HomeworkTestQuestionKind,
@@ -35,12 +36,14 @@ import styles from './StudentHomeworkDetailView.module.css';
 import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/model/lib/assignmentBuckets';
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
 import { canStudentEditSubmission, getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
+import { getSubmissionReviewResult, isReviewItemAccepted } from '../../../entities/homework-submission/model/lib/reviewResult';
 import { resolveHomeworkStorageUrl, uploadFileToHomeworkStorage } from '../model/upload';
 import {
   clearStoredStudentHomeworkSubmissionDraft,
   loadStoredStudentHomeworkSubmissionDraft,
   saveStoredStudentHomeworkSubmissionDraft,
 } from '../model/lib/submissionDraftStorage';
+import { buildHomeworkReviewItems } from '../../homework-review/model/lib/questionReview';
 import { StudentOrderingQuestion } from './StudentOrderingQuestion';
 
 export type StudentHomeworkSubmitPayload = {
@@ -78,7 +81,7 @@ type QuestionCardModel =
       tone: 'single' | 'multiple' | 'short' | 'matching' | 'fillWord' | 'ordering' | 'table' | 'manual';
     }
   | {
-      id: 'essay_response';
+      id: 'response_text';
       kind: 'essay';
       points: number;
       typeLabel: string;
@@ -330,6 +333,16 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         })[0] ?? null,
     [submissions],
   );
+  const latestReviewedSubmission = useMemo(
+    () =>
+      submissions
+        .filter((submission) => submission.status === 'REVIEWED')
+        .sort((left, right) => {
+          if (right.attemptNo !== left.attemptNo) return right.attemptNo - left.attemptNo;
+          return right.id - left.id;
+        })[0] ?? null,
+    [submissions],
+  );
   const canEdit = assignment ? (isPreview ? true : canStudentEditSubmission(assignment)) : false;
   const responseConfig = useMemo(
     () => (assignment ? resolveAssignmentResponseConfig(assignment) : null),
@@ -364,6 +377,24 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     Boolean(responseConfig?.allowVideo);
   const canUploadVoice = Boolean(responseConfig?.allowVoice);
   const canEditText = canInteractWithAttempt && Boolean(responseConfig?.allowText);
+  const activeReviewSubmission =
+    assignment?.status === 'RETURNED' || assignment?.status === 'REVIEWED' ? latestReviewedSubmission : null;
+  const reviewResult = useMemo<HomeworkReviewResult | null>(
+    () => (activeReviewSubmission ? getSubmissionReviewResult(activeReviewSubmission) : null),
+    [activeReviewSubmission],
+  );
+  const reviewItemsById = useMemo(() => {
+    if (!assignment || !activeReviewSubmission) return new Map<string, ReturnType<typeof buildHomeworkReviewItems>[number]>();
+    return new Map(
+      buildHomeworkReviewItems(assignment, activeReviewSubmission).map((item) => [item.id, item] as const),
+    );
+  }, [activeReviewSubmission, assignment]);
+  const showCorrectAnswers =
+    Boolean(assignment && (assignment.status === 'RETURNED' || assignment.status === 'REVIEWED')) &&
+    quizSettings.showCorrectAnswers &&
+    Boolean(activeReviewSubmission);
+  const latestEditableSubmission = latestDraftSubmission ?? (assignment?.status === 'RETURNED' ? latestReviewedSubmission : latestSubmission);
+  const canEditReviewItem = (itemId: string) => canInteractWithAttempt && !isReviewItemAccepted(reviewResult, itemId);
 
   const [answerText, setAnswerText] = useState('');
   const [attachments, setAttachments] = useState<HomeworkAttachment[]>([]);
@@ -407,11 +438,22 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const storedDraft = !isPreview
       ? loadStoredStudentHomeworkSubmissionDraft(assignment.id, assignment.updatedAt)
       : null;
-    setAnswerText(storedDraft?.answerText ?? latestSubmission?.answerText ?? '');
-    setAttachments(storedDraft?.attachments ?? latestSubmission?.attachments ?? []);
-    setVoice(storedDraft?.voice ?? latestSubmission?.voice ?? []);
-    setTestAnswers(storedDraft?.testAnswers ?? ((latestSubmission?.testAnswers as Record<string, unknown>) ?? {}));
-  }, [assignment, assignment?.id, isPreview, latestSubmission?.id, latestSubmission?.answerText, latestSubmission?.attachments, latestSubmission?.testAnswers, latestSubmission?.voice]);
+    setAnswerText(storedDraft?.answerText ?? latestEditableSubmission?.answerText ?? '');
+    setAttachments(storedDraft?.attachments ?? latestEditableSubmission?.attachments ?? []);
+    setVoice(storedDraft?.voice ?? latestEditableSubmission?.voice ?? []);
+    setTestAnswers(
+      storedDraft?.testAnswers ?? ((latestEditableSubmission?.testAnswers as Record<string, unknown>) ?? {}),
+    );
+  }, [
+    assignment,
+    assignment?.id,
+    isPreview,
+    latestEditableSubmission?.id,
+    latestEditableSubmission?.answerText,
+    latestEditableSubmission?.attachments,
+    latestEditableSubmission?.testAnswers,
+    latestEditableSubmission?.voice,
+  ]);
 
   useEffect(() => {
     if (isPreview || !assignment) return;
@@ -592,7 +634,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   };
 
   const handleUploadAttachments = async (files: FileList | null) => {
-    if (!files || !files.length || !canInteractWithAttempt || !canUploadAttachments) return;
+    if (!files || !files.length || !canEditReviewItem('response_attachments') || !canUploadAttachments) return;
 
     setLocalError(null);
     if (isPreview) {
@@ -615,7 +657,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   };
 
   const startVoiceRecording = async () => {
-    if (!canInteractWithAttempt || recording || !canUploadVoice) return;
+    if (!canEditReviewItem('response_voice') || recording || !canUploadVoice) return;
     setLocalError(null);
 
     if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
@@ -810,7 +852,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const showEssayCard = Boolean(responseConfig?.allowText) || (!canEdit && Boolean(answerText.trim()));
     if (showEssayCard) {
       cards.push({
-        id: 'essay_response',
+        id: 'response_text',
         kind: 'essay',
         points: 3,
         typeLabel: 'Эссе',
@@ -991,9 +1033,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const renderTestQuestionControls = (question: HomeworkTestQuestion) => {
+  const renderTestQuestionControls = (itemId: string, question: HomeworkTestQuestion) => {
     const currentValue = getQuestionAnswerValue(question, testAnswers);
     const questionKind = resolveQuestionKind(question);
+    const canEditCurrentQuestion = canEditReviewItem(itemId) && canEditTest;
 
     if (questionKind === 'CHOICE' && question.type === 'SINGLE_CHOICE') {
       const selected =
@@ -1010,13 +1053,13 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             return (
               <label
                 key={option.id}
-                className={`${styles.optionCard} ${isActive ? styles.optionCardActive : ''} ${!canEditTest ? styles.optionCardDisabled : ''}`}
+                className={`${styles.optionCard} ${isActive ? styles.optionCardActive : ''} ${!canEditCurrentQuestion ? styles.optionCardDisabled : ''}`}
               >
                 <input
                   type="radio"
                   className={styles.optionInput}
                   checked={isActive}
-                  disabled={!canEditTest}
+                  disabled={!canEditCurrentQuestion}
                   onChange={() => setQuestionAnswer(question.id, option.id)}
                 />
                 <span className={`${styles.optionControl} ${styles.radioControl}`} aria-hidden />
@@ -1040,13 +1083,13 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             return (
               <label
                 key={option.id}
-                className={`${styles.optionCard} ${isActive ? styles.optionCardActive : ''} ${!canEditTest ? styles.optionCardDisabled : ''}`}
+                className={`${styles.optionCard} ${isActive ? styles.optionCardActive : ''} ${!canEditCurrentQuestion ? styles.optionCardDisabled : ''}`}
               >
                 <input
                   type="checkbox"
                   className={styles.optionInput}
                   checked={isActive}
-                  disabled={!canEditTest}
+                  disabled={!canEditCurrentQuestion}
                   onChange={(event) => {
                     const next = event.target.checked
                       ? Array.from(new Set([...selected, option.id]))
@@ -1070,7 +1113,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         <input
           className={styles.shortInput}
           value={typeof currentValue === 'string' ? currentValue : ''}
-          disabled={!canEditTest}
+          disabled={!canEditCurrentQuestion}
           onChange={(event) => setQuestionAnswer(question.id, event.target.value)}
           placeholder="Введите ваш ответ..."
         />
@@ -1082,7 +1125,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         <textarea
           className={styles.essayInput}
           value={typeof currentValue === 'string' ? currentValue : ''}
-          disabled={!canEditTest}
+          disabled={!canEditCurrentQuestion}
           onChange={(event) => setQuestionAnswer(question.id, event.target.value)}
           placeholder="Напишите развернутый ответ..."
         />
@@ -1127,7 +1170,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             <input
               className={styles.shortInput}
               value={normalizedAnswers[0] ?? ''}
-              disabled={!canEditTest}
+              disabled={!canEditCurrentQuestion}
               onChange={(event) => updateBlankAnswer(0, event.target.value)}
               placeholder="Введите ответ..."
             />
@@ -1145,7 +1188,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   <input
                     className={styles.fillWordInput}
                     value={normalizedAnswers[segmentIndex] ?? ''}
-                    disabled={!canEditTest}
+                    disabled={!canEditCurrentQuestion}
                     onChange={(event) => updateBlankAnswer(segmentIndex, event.target.value)}
                     aria-label={`Пропуск ${segmentIndex + 1}`}
                   />
@@ -1180,7 +1223,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
         <StudentOrderingQuestion
           items={baseItems}
           selectedOrder={selectedOrder}
-          canEdit={canEditTest}
+          canEdit={canEditCurrentQuestion}
           onChange={(nextOrder) => setQuestionAnswer(question.id, nextOrder)}
         />
       );
@@ -1222,7 +1265,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                         <input
                           className={styles.answerTableInput}
                           value={rowValues[cellIndex] ?? ''}
-                          disabled={!canEditTest}
+                          disabled={!canEditCurrentQuestion}
                           onChange={(event) => {
                             const nextRowValues = Array.from({ length: answerColumns.length }, (_, index) => rowValues[index] ?? '');
                             nextRowValues[cellIndex] = event.target.value;
@@ -1264,7 +1307,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             <select
               className={styles.matchingSelect}
               value={typeof selectedMap[pair.left] === 'string' ? (selectedMap[pair.left] as string) : ''}
-              disabled={!canEditTest}
+              disabled={!canEditCurrentQuestion}
               onChange={(event) =>
                 setQuestionAnswer(question.id, {
                   ...selectedMap,
@@ -1521,6 +1564,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           : styles.badgeEssay;
 
                 const promptText = card.kind === 'essay' ? card.prompt : card.question.prompt || 'Вопрос без текста';
+                const reviewItem = reviewItemsById.get(card.id);
+                const reviewFeedback = reviewResult?.items[card.id] ?? null;
+                const isLockedByReview = Boolean(reviewFeedback && reviewFeedback.decision === 'ACCEPTED');
 
                 return (
                   <section
@@ -1547,7 +1593,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           <textarea
                             className={styles.essayInput}
                             value={answerText}
-                            disabled={!canEditText}
+                            disabled={!canEditReviewItem(card.id) || !canEditText}
                             onChange={(event) => setAnswerText(event.target.value)}
                             placeholder="Начните писать здесь..."
                           />
@@ -1557,8 +1603,17 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           </div>
                         </>
                       ) : (
-                        renderTestQuestionControls(card.question)
+                        renderTestQuestionControls(card.id, card.question)
                       )}
+                      {reviewFeedback?.comment ? (
+                        <div className={styles.manualAnswerStub}>Комментарий преподавателя: {reviewFeedback.comment}</div>
+                      ) : null}
+                      {showCorrectAnswers && reviewItem?.correctAnswerSummary ? (
+                        <div className={styles.manualAnswerStub}>Правильный ответ: {reviewItem.correctAnswerSummary}</div>
+                      ) : null}
+                      {isLockedByReview ? (
+                        <div className={styles.manualAnswerStub}>Этот элемент принят и больше не требует изменений.</div>
+                      ) : null}
                     </div>
                   </section>
                 );
@@ -1577,10 +1632,15 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   </div>
 
                   <div className={styles.questionBody}>
+                    {reviewResult?.items.response_attachments?.comment ? (
+                      <div className={styles.manualAnswerStub}>
+                        Комментарий преподавателя: {reviewResult.items.response_attachments.comment}
+                      </div>
+                    ) : null}
                     <div className={styles.uploadControls}>
                       <label
                         className={`${styles.uploadButton} ${
-                          !canInteractWithAttempt || uploading || !canUploadAttachments ? styles.uploadButtonDisabled : ''
+                          !canEditReviewItem('response_attachments') || uploading || !canUploadAttachments ? styles.uploadButtonDisabled : ''
                         }`}
                       >
                         <FontAwesomeIcon icon={faPaperclip} />
@@ -1590,7 +1650,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           type="file"
                           accept={responseConfig?.attachmentAccept}
                           multiple
-                          disabled={!canInteractWithAttempt || uploading || !canUploadAttachments}
+                          disabled={!canEditReviewItem('response_attachments') || uploading || !canUploadAttachments}
                           onChange={(event) => {
                             void handleUploadAttachments(event.target.files);
                             event.target.value = '';
@@ -1611,7 +1671,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                             <span className={styles.attachmentName}>{item.fileName || item.url}</span>
                             <span className={styles.attachmentSize}>{formatFileSize(item.size)}</span>
                           </a>
-                          {canInteractWithAttempt ? (
+                          {canEditReviewItem('response_attachments') ? (
                             <button
                               type="button"
                               className={styles.removeButton}
@@ -1641,12 +1701,17 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   </div>
 
                   <div className={styles.questionBody}>
+                    {reviewResult?.items.response_voice?.comment ? (
+                      <div className={styles.manualAnswerStub}>
+                        Комментарий преподавателя: {reviewResult.items.response_voice.comment}
+                      </div>
+                    ) : null}
                     <div className={styles.uploadControls}>
                       {canUploadVoice && !recording ? (
                         <button
                           type="button"
                           className={styles.recordButton}
-                          disabled={!canInteractWithAttempt || uploading}
+                          disabled={!canEditReviewItem('response_voice') || uploading}
                           onClick={() => {
                             void startVoiceRecording();
                           }}
@@ -1701,7 +1766,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                       {voice.map((item) => (
                         <div key={item.id} className={styles.attachmentRow}>
                           <audio controls src={resolveHomeworkStorageUrl(item.url)} className={styles.voicePlayer} />
-                          {canInteractWithAttempt ? (
+                          {canEditReviewItem('response_voice') ? (
                             <button
                               type="button"
                               className={styles.removeButton}

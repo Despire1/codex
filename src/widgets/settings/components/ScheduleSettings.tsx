@@ -1,6 +1,10 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { Teacher } from '../../../entities/types';
 import {
+  CalendarIcon,
+  CalendarWeekReferenceIcon,
+  CheckCircleOutlineIcon,
+  CoffeeIcon,
   ExpandLessOutlinedIcon,
   ExpandMoreOutlinedIcon,
 } from '../../../icons/MaterialIcons';
@@ -30,9 +34,7 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   const [weekendDraft, setWeekendDraft] = useState(() => normalizeWeekdayList(teacher.weekendWeekdays));
   const isWeekendDirty = useMemo(() => {
     const saved = normalizeWeekdayList(teacher.weekendWeekdays);
-    return (
-      saved.length !== weekendDraft.length || saved.some((weekday, index) => weekday !== weekendDraft[index])
-    );
+    return saved.length !== weekendDraft.length || saved.some((weekday, index) => weekday !== weekendDraft[index]);
   }, [teacher.weekendWeekdays, weekendDraft]);
   const weekendSummary = useMemo(() => {
     const normalizedWeekends = normalizeWeekdayList(weekendDraft);
@@ -67,102 +69,121 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
 
   return (
     <div className={styles.moduleStack}>
-      <div className={styles.sectionBlock}>
-        <div className={styles.label}>Длительность урока по умолчанию (мин)</div>
-        <input
-          className={controls.input}
-          type="number"
-          min={15}
-          max={240}
-          step={5}
-          value={teacher.defaultLessonDuration}
-          onChange={(event) => {
-            const numeric = Number(event.target.value);
-            if (!Number.isFinite(numeric)) return;
-            const clamped = Math.min(Math.max(Math.round(numeric), 15), 240);
-            onChange({ defaultLessonDuration: clamped });
-          }}
-        />
-        <div className={styles.helperText}>Применяется при создании новых уроков.</div>
-      </div>
-      <div className={styles.sectionBlock}>
-        <div className={styles.rowHeader}>
-          <div>
-            <div className={styles.label}>Автоматически отмечать занятия как проведённые</div>
-            <div className={styles.helperText}>
-              Если выключено, занятия нужно подтверждать вручную. Автосписание и напоминания об оплате начнут работать
-              только после подтверждения занятия.
-            </div>
+      <section className={styles.settingsCard}>
+        <div className={styles.sectionHeader}>
+          <div className={`${styles.sectionIcon} ${styles.sectionIconBlue}`}>
+            <CalendarIcon width={20} height={20} />
           </div>
-          <label className={controls.switch}>
+          <div className={styles.sectionHeaderCopy}>
+            <h2 className={styles.sectionHeading}>Параметры уроков</h2>
+            <p className={styles.sectionDescription}>Базовые настройки занятий</p>
+          </div>
+        </div>
+
+        <div className={styles.cardStack}>
+          <div className={styles.fieldBlock}>
+            <label className={styles.fieldLabel}>Длительность урока по умолчанию (минут)</label>
             <input
-              type="checkbox"
-              checked={teacher.autoConfirmLessons}
-              onChange={(event) => onChange({ autoConfirmLessons: event.target.checked })}
+              className={`${controls.input} ${styles.fieldInput}`}
+              type="number"
+              min={15}
+              max={240}
+              step={5}
+              value={teacher.defaultLessonDuration}
+              onChange={(event) => {
+                const numeric = Number(event.target.value);
+                if (!Number.isFinite(numeric)) return;
+                const clamped = Math.min(Math.max(Math.round(numeric), 15), 240);
+                onChange({ defaultLessonDuration: clamped });
+              }}
             />
-            <span className={controls.slider} />
-          </label>
+          </div>
+
+          <div className={styles.infoRow}>
+            <div>
+              <div className={styles.infoRowTitle}>Автоматически отмечать занятия как проведённые</div>
+              <div className={styles.infoRowDescription}>
+                Если выключено, занятия нужно подтверждать вручную.
+              </div>
+            </div>
+            <label className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={teacher.autoConfirmLessons}
+                onChange={(event) => onChange({ autoConfirmLessons: event.target.checked })}
+              />
+              <span className={controls.slider} />
+            </label>
+          </div>
         </div>
-      </div>
-      <div className={styles.sectionBlock}>
-        <button
-          type="button"
-          className={styles.accordionButton}
-          onClick={() => setWeekendsExpanded((current) => !current)}
-          aria-expanded={weekendsExpanded}
-        >
-          <div className={styles.accordionHeaderCopy}>
-            <div className={styles.label}>Выходные дни</div>
-            <div className={styles.helperText}>
-              В эти дни календарь пометит отдых, а создание уроков будет недоступно.
+      </section>
+
+      <section className={styles.settingsCard}>
+        <div className={styles.sectionHeaderBetween}>
+          <div className={styles.sectionHeaderCompact}>
+            <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
+              <CalendarWeekReferenceIcon width={20} height={20} />
+            </div>
+            <div className={styles.sectionHeaderCopy}>
+              <h2 className={styles.sectionHeading}>Выходные дни</h2>
+              <p className={styles.sectionDescription}>Дни, когда вы не проводите занятия</p>
             </div>
           </div>
-          <div className={styles.accordionMeta}>
-            <span className={styles.accordionValue}>{weekendSummary}</span>
+
+          <button
+            type="button"
+            className={styles.roundIconButton}
+            onClick={() => setWeekendsExpanded((current) => !current)}
+            aria-expanded={weekendsExpanded}
+          >
             {weekendsExpanded ? <ExpandLessOutlinedIcon width={18} height={18} /> : <ExpandMoreOutlinedIcon width={18} height={18} />}
-          </div>
-        </button>
-        {weekendsExpanded && (
-          <div className={styles.accordionContent}>
-            <WeekdayToggleGroup
-              value={weekendDraft}
-              onChange={setWeekendDraft}
-              ariaLabel="Выберите выходные дни"
-            />
-            {isWeekendDirty && (
-              <div className={styles.weekendSavePanel}>
-                <div className={styles.weekendSaveActions}>
-                  <button
-                    type="button"
-                    className={controls.primaryButton}
-                    disabled={isWeekendSaving}
-                    onClick={() => void onSaveWeekendWeekdays(weekendDraft)}
-                  >
-                    {isWeekendSaving ? 'Сохраняем…' : 'Сохранить выходные'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <div className={styles.comingSoonGroup}>
-        <div className={styles.comingSoonHeader}>Дополнительные настройки расписания</div>
-        <div className={styles.comingSoonRow} onClick={onComingSoonClick} role="button" aria-disabled="true">
-          <div>
-            <div className={styles.label}>Перерыв между уроками (мин)</div>
-            <div className={styles.helperText}>Будет доступно в следующих обновлениях.</div>
-          </div>
-          <span className={styles.comingSoonBadge}>Скоро</span>
+          </button>
         </div>
-        <div className={styles.comingSoonRow} onClick={onComingSoonClick} role="button" aria-disabled="true">
-          <div>
-            <div className={styles.label}>Рабочие часы (с/по)</div>
-            <div className={styles.helperText}>Будет доступно в следующих обновлениях.</div>
+
+        {weekendsExpanded ? (
+          <div className={styles.cardStack}>
+            <div className={styles.weekdayPanelMeta}>
+              <span className={styles.weekdayPanelLabel}>Выбранные дни</span>
+              <span className={styles.weekdayPanelValue}>{weekendSummary}</span>
+            </div>
+
+            <WeekdayToggleGroup value={weekendDraft} onChange={setWeekendDraft} ariaLabel="Выберите выходные дни" />
+
+            <button
+              type="button"
+              className={`${controls.primaryButton} ${styles.darkActionButton}`}
+              disabled={isWeekendSaving || !isWeekendDirty}
+              onClick={() => void onSaveWeekendWeekdays(weekendDraft)}
+            >
+              <CheckCircleOutlineIcon width={16} height={16} />
+              <span>{isWeekendSaving ? 'Сохраняем…' : 'Сохранить выходные'}</span>
+            </button>
           </div>
-          <span className={styles.comingSoonBadge}>Скоро</span>
+        ) : null}
+      </section>
+
+      <section className={styles.comingSoonCard}>
+        <div className={styles.sectionHeader}>
+          <div className={`${styles.sectionIcon} ${styles.sectionIconDark}`}>
+            <CoffeeIcon width={20} height={20} />
+          </div>
+          <div className={styles.sectionHeaderCopy}>
+            <h2 className={styles.sectionHeadingOnDark}>Дополнительные настройки</h2>
+            <p className={styles.sectionDescriptionOnDark}>Скоро появятся новые возможности</p>
+          </div>
         </div>
-      </div>
+
+        <div className={styles.comingSoonStack}>
+          <button type="button" className={styles.comingSoonFeature} onClick={onComingSoonClick}>
+            <span className={styles.comingSoonFeatureTitle}>Перерыв между уроками</span>
+            <span className={styles.comingSoonBadgeAccent}>Скоро</span>
+          </button>
+          <button type="button" className={styles.comingSoonFeature} onClick={onComingSoonClick}>
+            <span className={styles.comingSoonFeatureTitle}>Рабочие часы</span>
+            <span className={styles.comingSoonBadgeAccent}>Скоро</span>
+          </button>
+        </div>
+      </section>
     </div>
   );
 };

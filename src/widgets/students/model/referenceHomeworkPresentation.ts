@@ -1,4 +1,5 @@
 import { HomeworkAssignment, HomeworkAssignmentStatus, HomeworkSubmissionStatus } from '../../../entities/types';
+import { resolveHomeworkAssignmentViewStatus, resolveHomeworkAssignmentWorkflow } from '../../../entities/homework-assignment/model/lib/workflow';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 
@@ -22,16 +23,7 @@ const assignmentStatusLabels: Record<HomeworkAssignmentStatus, string> = {
 export const resolveStudentProfileHomeworkEffectiveStatus = (
   assignment: HomeworkAssignment,
   now = new Date(),
-): HomeworkAssignmentStatus => {
-  if ((assignment.status === 'SENT' || assignment.status === 'RETURNED') && assignment.deadlineAt) {
-    const deadlineDate = new Date(assignment.deadlineAt);
-    if (!Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() < now.getTime()) {
-      return 'OVERDUE';
-    }
-  }
-
-  return assignment.status;
-};
+): HomeworkAssignmentStatus => resolveHomeworkAssignmentViewStatus(assignment, now);
 
 export const resolveStudentProfileHomeworkStatusLabel = (assignment: HomeworkAssignment, now = new Date()) =>
   assignmentStatusLabels[resolveStudentProfileHomeworkEffectiveStatus(assignment, now)];
@@ -56,6 +48,10 @@ export const resolveStudentProfileHomeworkDeadlineLabel = (assignment: HomeworkA
 };
 
 export const resolveStudentProfileHomeworkMetaLabel = (assignment: HomeworkAssignment) => {
+  const workflow = resolveHomeworkAssignmentWorkflow(assignment);
+  if (workflow.lateState === 'LATE') {
+    return 'Сдано после срока';
+  }
   if (assignment.latestSubmissionStatus) {
     return submissionStatusLabels[assignment.latestSubmissionStatus];
   }

@@ -221,6 +221,7 @@ model HomeworkSubmission {
   finalScore      Int?
   teacherComment  String?
   reviewDraft     String?
+  reviewResult    String?
   submittedAt     DateTime?
   reviewedAt      DateTime?
   createdAt       DateTime @default(now())

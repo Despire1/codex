@@ -15,7 +15,9 @@ interface CreateTemplateHeaderProps {
   hasValidationErrors: boolean;
   primaryActionDisabled?: boolean;
   draftSavedAtLabel: string | null;
+  subtitleOverride?: string | null;
   showSecondaryAction: boolean;
+  showPrimaryAction?: boolean;
   secondaryActionLabel: string;
   primaryActionLabel: string;
   primarySubmittingLabel: string;
@@ -31,7 +33,9 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
   hasValidationErrors,
   primaryActionDisabled = false,
   draftSavedAtLabel,
+  subtitleOverride = null,
   showSecondaryAction,
+  showPrimaryAction = true,
   secondaryActionLabel,
   primaryActionLabel,
   primarySubmittingLabel,
@@ -48,13 +52,13 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
       : isEditMode
         ? 'Редактирование шаблона'
         : 'Создание шаблона';
-  const subtitle = draftSavedAtLabel
+  const subtitle = subtitleOverride ?? (draftSavedAtLabel
     ? `Черновик сохранен: ${draftSavedAtLabel}`
     : variant === 'assignment'
       ? 'Настройте домашку и выберите способ выдачи'
       : isEditMode
         ? 'Обновите настройки и вопросы шаблона'
-        : 'Новый шаблон домашнего задания';
+        : 'Новый шаблон домашнего задания');
 
   return (
     <header className={styles.header}>
@@ -88,15 +92,17 @@ export const CreateTemplateHeader: FC<CreateTemplateHeaderProps> = ({
           </button>
         ) : null}
 
-        <button
-          type="button"
-          className={styles.submitButton}
-          disabled={submitting || hasValidationErrors || primaryActionDisabled}
-          onClick={onPrimaryAction}
-        >
-          <HomeworkCheckIcon size={14} className={styles.submitIcon} />
-          <span>{submitting ? primarySubmittingLabel : primaryActionLabel}</span>
-        </button>
+        {showPrimaryAction ? (
+          <button
+            type="button"
+            className={styles.submitButton}
+            disabled={submitting || hasValidationErrors || primaryActionDisabled}
+            onClick={onPrimaryAction}
+          >
+            <HomeworkCheckIcon size={14} className={styles.submitIcon} />
+            <span>{submitting ? primarySubmittingLabel : primaryActionLabel}</span>
+          </button>
+        ) : null}
       </div>
     </header>
   );

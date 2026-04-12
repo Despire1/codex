@@ -17,6 +17,7 @@ import styles from './TemplateBasicsSection.module.css';
 const CATEGORY_OPTIONS = ['Грамматика', 'Лексика', 'Speaking', 'Listening', 'Writing', 'Reading'];
 
 interface TemplateBasicsSectionProps {
+  disabled?: boolean;
   titleLabel?: string;
   titlePlaceholder?: string;
   title: string;
@@ -83,6 +84,7 @@ const TYPE_OPTIONS: AssignmentSettingsSelectOption[] = [
 ];
 
 export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
+  disabled = false,
   titleLabel = 'Название шаблона',
   titlePlaceholder = 'Например: Present Perfect Practice',
   title,
@@ -155,6 +157,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
             className={`${styles.input} ${titleError ? styles.inputError : ''}`}
             placeholder={titlePlaceholder}
             value={title}
+            disabled={disabled}
             onChange={(event) => onTitleChange(event.target.value)}
             data-validation-path={titleValidationPath}
             aria-invalid={Boolean(titleError)}
@@ -173,6 +176,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
             className={styles.textarea}
             placeholder="Краткое описание задания для учеников..."
             value={description}
+            disabled={disabled}
             onChange={(event) => onDescriptionChange(event.target.value)}
           />
           <span className={styles.fieldHint}>Будет видно ученику при получении задания</span>
@@ -192,7 +196,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                   ariaLabel="Выбор шаблона домашнего задания"
                   compact
                   allowClear
-                  disabled={assignmentTemplateOptions.length === 0}
+                  disabled={disabled || assignmentTemplateOptions.length === 0}
                   onChange={onAssignmentTemplateChange}
                 />
               </div>
@@ -209,6 +213,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                   placeholder="Выберите тип…"
                   ariaLabel="Выбор типа домашнего задания"
                   compact
+                  disabled={disabled}
                   onChange={(nextValue) => onTypeChange(nextValue as HomeworkEditorTaskType)}
                 />
               </div>
@@ -223,6 +228,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                   placeholder="Без категории"
                   ariaLabel="Выбор категории домашнего задания"
                   compact
+                  disabled={disabled}
                   onChange={onCategoryChange}
                 />
               </div>
@@ -238,6 +244,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                     placeholder="Без группы"
                     ariaLabel="Выбор группы домашних заданий"
                     compact
+                    disabled={disabled}
                     onChange={onAssignmentGroupChange}
                   />
                 </div>
@@ -255,6 +262,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                     max={240}
                     placeholder="15"
                     value={estimatedMinutes ?? ''}
+                    disabled={disabled}
                     onChange={(event) =>
                       onEstimatedMinutesChange(event.target.value ? Number(event.target.value) : null)
                     }
@@ -274,6 +282,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                       <button
                         type="button"
                         className={styles.tagRemoveButton}
+                        disabled={disabled}
                         onClick={() => onTagRemove(tag)}
                         aria-label={`Удалить тег ${tag}`}
                       >
@@ -287,11 +296,12 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                       type="text"
                       className={styles.tagInput}
                       value={pendingTag}
+                      disabled={disabled}
                       onChange={(event) => setPendingTag(event.target.value)}
                       onKeyDown={handlePendingTagKeydown}
                       placeholder="Новый тег"
                     />
-                    <button type="button" className={styles.tagAddButton} onClick={submitPendingTag}>
+                    <button type="button" className={styles.tagAddButton} onClick={submitPendingTag} disabled={disabled}>
                       <HomeworkPlusIcon size={11} />
                       Добавить
                     </button>

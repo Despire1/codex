@@ -33,6 +33,7 @@ import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './TemplateMaterialsSection.module.css';
 
 interface TemplateMaterialsSectionProps {
+  disabled?: boolean;
   mediaBlock: HomeworkBlockMedia;
   onMediaBlockChange: (nextBlock: HomeworkBlockMedia) => void;
 }
@@ -66,7 +67,11 @@ const resolveTypeIcon = (kind: TemplateMaterialKind) => {
   }
 };
 
-export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ mediaBlock, onMediaBlockChange }) => {
+export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
+  disabled = false,
+  mediaBlock,
+  onMediaBlockChange,
+}) => {
   const [pendingLink, setPendingLink] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +129,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
   };
 
   const removeAttachment = (attachmentId: string) => {
+    if (disabled) return;
     onMediaBlockChange({
       ...mediaBlock,
       attachments: attachments.filter((item) => item.id !== attachmentId),
@@ -149,6 +155,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
   };
 
   const handlePickFiles = async (fileList: FileList | null) => {
+    if (disabled) return;
     if (!fileList || !fileList.length) return;
     const pickedFiles = Array.from(fileList);
     const oversizedFiles = pickedFiles.filter((file) => file.size > MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES);
@@ -202,6 +209,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
   };
 
   const addLink = () => {
+    if (disabled) return;
     const attachment = createAttachmentFromUrl(pendingLink);
     if (!attachment) {
       setError('Укажите корректную ссылку в формате https://...');
@@ -267,6 +275,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
                   <button
                     type="button"
                     className={`${styles.actionButton} ${styles.actionOpen}`}
+                    disabled={disabled}
                     onClick={() => openAttachment(item.attachment)}
                     aria-label={`Открыть ссылку ${item.title}`}
                   >
@@ -277,6 +286,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.actionOpen}`}
+                      disabled={disabled}
                       onClick={() => openAttachment(item.attachment)}
                       aria-label={`Открыть файл ${item.title}`}
                     >
@@ -285,6 +295,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
                     <button
                       type="button"
                       className={`${styles.actionButton} ${styles.actionDownload}`}
+                      disabled={disabled}
                       onClick={() => downloadAttachment(item.attachment)}
                       aria-label={`Скачать файл ${item.title}`}
                     >
@@ -295,6 +306,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
                 <button
                   type="button"
                   className={`${styles.actionButton} ${styles.actionDelete}`}
+                  disabled={disabled}
                   onClick={() => removeAttachment(item.attachment.id)}
                   aria-label={`Удалить материал ${item.title}`}
                 >
@@ -312,7 +324,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
           className={styles.fileInput}
           accept={TEMPLATE_MATERIAL_FILE_ACCEPT}
           multiple
-          disabled={uploading}
+          disabled={uploading || disabled}
           onChange={(event) => {
             void handlePickFiles(event.target.files);
             event.target.value = '';
@@ -338,6 +350,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
           className={styles.linkInput}
           placeholder="Вставьте ссылку на материал..."
           value={pendingLink}
+          disabled={disabled}
           onChange={(event) => setPendingLink(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== 'Enter') return;
@@ -349,7 +362,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({ me
           type="button"
           className={styles.linkAddButton}
           onClick={addLink}
-          disabled={!pendingLink.trim()}
+          disabled={disabled || !pendingLink.trim()}
         >
           <HomeworkLinkIcon size={12} /> Добавить
         </button>

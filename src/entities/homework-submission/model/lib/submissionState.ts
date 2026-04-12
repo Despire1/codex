@@ -1,4 +1,5 @@
 import { HomeworkAssignment, HomeworkSubmission } from '../../../types';
+import { resolveHomeworkAssignmentWorkflow } from '../../../homework-assignment/model/lib/workflow';
 
 export const getLatestSubmission = (submissions: HomeworkSubmission[]) =>
   submissions.slice().sort((a, b) => {
@@ -7,11 +8,10 @@ export const getLatestSubmission = (submissions: HomeworkSubmission[]) =>
   })[0] ?? null;
 
 export const canStudentEditSubmission = (assignment: HomeworkAssignment) =>
-  assignment.status === 'SENT' || assignment.status === 'RETURNED' || assignment.status === 'OVERDUE';
+  resolveHomeworkAssignmentWorkflow(assignment).canStudentEdit;
 
 export const canStudentSubmitNow = (assignment: HomeworkAssignment) =>
   canStudentEditSubmission(assignment);
 
 export const isSubmissionReadonly = (assignment: HomeworkAssignment) =>
   !canStudentEditSubmission(assignment);
-

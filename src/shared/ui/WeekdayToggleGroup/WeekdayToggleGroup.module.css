@@ -11,29 +11,30 @@
 
 .button {
   width: 100%;
-  border: 2px solid var(--border);
-  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
   background: var(--color-white);
-  padding: 10px 0 8px;
-  display: flex;
-  flex-direction: column;
+  padding: 14px 0;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--color-slate-700);
+  font-weight: 800;
+  color: #4b5563;
   cursor: pointer;
-  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
 }
 
 .button:hover {
-  border-color: var(--color-blue-300);
-  background: var(--color-sky-25);
+  border-color: #b9ff4f;
+  background: #f5ffd9;
 }
 
 .buttonActive {
-  border-color: var(--color-blue-600);
-  background: var(--color-white);
+  border-color: #b9ff4f;
+  background: rgba(185, 255, 79, 0.22);
+  color: #111827;
+  box-shadow: 0 10px 20px rgba(185, 255, 79, 0.16);
 }
 
 .buttonBlocked {
@@ -48,18 +49,15 @@
 .buttonDisabled:hover,
 .buttonBlocked:hover {
   background: var(--color-white);
-  border-color: var(--border);
+  border-color: #e5e7eb;
 }
 
 .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-slate-300);
+  display: none;
 }
 
 .dotActive {
-  background: var(--color-blue-600);
+  display: none;
 }
 
 @media (max-width: 720px) {
@@ -68,7 +66,7 @@
   }
 
   .button {
-    padding: 9px 0 7px;
+    padding: 12px 0;
     font-size: 13px;
   }
 }

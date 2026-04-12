@@ -15,6 +15,7 @@ import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { buildStudentCardPresentation, getStudentDisplayName, type StudentLifecycleStatus } from '../../model/referencePresentation';
 import { useStudentCardFilters } from '../../model/useStudentCardFilters';
 import { type StudentListViewMode } from '../../types';
+import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import { StudentsReferenceFilterSelect } from './StudentsReferenceFilterSelect';
 import { StudentReferenceCompactTableRow } from './StudentReferenceCompactTableRow';
 import { StudentReferenceStandardCard } from './StudentReferenceStandardCard';
@@ -64,8 +65,16 @@ const viewModeOptions: Array<{
   label: string;
   icon: typeof faGrip;
 }> = [
-  { value: 'standard', label: 'Режим карточек', icon: faGrip },
-  { value: 'compact', label: 'Режим списка', icon: faList },
+  {
+    value: 'compact',
+    label: 'Компактный вид',
+    icon: faList,
+  },
+  {
+    value: 'standard',
+    label: 'Подробный вид',
+    icon: faGrip,
+  },
 ];
 
 export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
@@ -233,19 +242,19 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
 
                 <div className={styles.viewModeGroup} role="group" aria-label="Режим карточек учеников">
                   {viewModeOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`${styles.viewModeButton} ${
-                        studentsListViewMode === option.value ? styles.viewModeButtonActive : ''
-                      }`}
-                      aria-label={option.label}
-                      title={option.label}
-                      aria-pressed={studentsListViewMode === option.value}
-                      onClick={() => setStudentsListViewMode(option.value)}
-                    >
-                      <FontAwesomeIcon icon={option.icon} />
-                    </button>
+                    <Tooltip key={option.value} content={option.label} side="top" align="center">
+                      <button
+                        type="button"
+                        className={`${styles.viewModeButton} ${
+                          studentsListViewMode === option.value ? styles.viewModeButtonActive : ''
+                        }`}
+                        aria-label={option.label}
+                        aria-pressed={studentsListViewMode === option.value}
+                        onClick={() => setStudentsListViewMode(option.value)}
+                      >
+                        <FontAwesomeIcon icon={option.icon} />
+                      </button>
+                    </Tooltip>
                   ))}
                 </div>
               </div>

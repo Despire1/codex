@@ -1,5 +1,6 @@
 import { KeyboardEvent as ReactKeyboardEvent, MouseEvent, useEffect, useMemo, useState } from 'react';
 import { HomeworkAssignment, HomeworkTemplate } from '../../../../../entities/types';
+import { canTeacherEditHomeworkAssignment } from '../../../../../entities/homework-assignment/model/lib/workflow';
 import {
   HomeworkCheckIcon,
   HomeworkCircleInfoIcon,
@@ -316,6 +317,7 @@ export const GroupEditorModal = ({
                         })
                       : visibleAssignments.map((assignment) => {
                           const isChecked = selectedAssignmentIds.includes(assignment.id);
+                          const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
                           return (
                             <label
                               key={`assignment_${assignment.id}`}
@@ -325,7 +327,11 @@ export const GroupEditorModal = ({
                                 type="checkbox"
                                 className={styles.itemCheckbox}
                                 checked={isChecked}
-                                onChange={() => onToggleAssignment(assignment.id)}
+                                disabled={!canEditAssignment}
+                                onChange={() => {
+                                  if (!canEditAssignment) return;
+                                  onToggleAssignment(assignment.id);
+                                }}
                               />
                               <div className={styles.itemMain}>
                                 <div className={styles.itemHead}>
@@ -335,14 +341,20 @@ export const GroupEditorModal = ({
                                       {assignment.templateTitle || assignment.studentName || 'Домашнее задание'}
                                     </p>
                                   </div>
-                                  <span className={styles.homeworkBadge}>Домашка</span>
+                                  <span className={styles.homeworkBadge}>
+                                    {canEditAssignment ? 'Домашка' : 'Выдана'}
+                                  </span>
                                 </div>
                                 <div className={styles.itemMeta}>
                                   <span className={styles.itemMetaLine}>
                                     <HomeworkClockIcon size={11} />
                                     {assignment.deadlineAt ? formatCreatedAt(assignment.deadlineAt) : 'Без дедлайна'}
                                   </span>
-                                  <span className={styles.itemMetaMuted}>Создано {formatCreatedAt(assignment.createdAt)}</span>
+                                  <span className={styles.itemMetaMuted}>
+                                    {canEditAssignment
+                                      ? `Создано ${formatCreatedAt(assignment.createdAt)}`
+                                      : 'Изменение группы доступно только до выдачи'}
+                                  </span>
                                 </div>
                               </div>
                             </label>

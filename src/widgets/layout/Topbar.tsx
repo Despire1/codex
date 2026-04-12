@@ -25,6 +25,7 @@ interface TopbarProps {
   createMenuItems?: TopbarCreateMenuItem[];
   showEditorActions?: boolean;
   showEditorSecondaryAction?: boolean;
+  showEditorPrimaryAction?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
   backButtonTooltip?: string;
@@ -55,6 +56,7 @@ export const Topbar: FC<TopbarProps> = ({
   createMenuItems,
   showEditorActions = false,
   showEditorSecondaryAction = false,
+  showEditorPrimaryAction = true,
   showBackButton = false,
   onBack,
   backButtonTooltip = 'Назад',
@@ -160,15 +162,17 @@ export const Topbar: FC<TopbarProps> = ({
               </button>
             ) : null}
 
-            <button
-              type="button"
-              className={styles.templatePrimaryButton}
-              onClick={onEditorPrimaryAction}
-              disabled={editorSubmitting || editorPrimaryDisabled}
-            >
-              <DoneOutlinedIcon width={16} height={16} className={styles.templatePrimaryIcon} />
-              <span>{editorSubmitting ? editorPrimarySubmittingLabel : editorPrimaryActionLabel}</span>
-            </button>
+            {showEditorPrimaryAction ? (
+              <button
+                type="button"
+                className={styles.templatePrimaryButton}
+                onClick={onEditorPrimaryAction}
+                disabled={editorSubmitting || editorPrimaryDisabled}
+              >
+                <DoneOutlinedIcon width={16} height={16} className={styles.templatePrimaryIcon} />
+                <span>{editorSubmitting ? editorPrimarySubmittingLabel : editorPrimaryActionLabel}</span>
+              </button>
+            ) : null}
           </>
         ) : (
           <>

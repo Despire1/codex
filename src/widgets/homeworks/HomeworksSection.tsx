@@ -10,6 +10,7 @@ import {
   HomeworkTemplate,
 } from '../../entities/types';
 import { canCancelHomeworkAssignmentIssue } from '../../entities/homework-assignment/model/lib/assignmentIssuance';
+import { canTeacherEditHomeworkAssignment } from '../../entities/homework-assignment/model/lib/workflow';
 import { getLatestSubmission } from '../../entities/homework-submission/model/lib/submissionState';
 import { api, HomeworkAssignmentBucket, isApiRequestError } from '../../shared/api/client';
 import { useUnsavedChanges } from '../../shared/lib/unsavedChanges';
@@ -185,30 +186,6 @@ const mergeHomeworkTemplate = (items: HomeworkTemplate[], nextTemplate: Homework
   nextTemplate,
   ...items.filter((template) => template.id !== nextTemplate.id),
 ];
-
-const resolveAssignmentPersistedStatus = (params: {
-  action: 'save' | 'submit';
-  mode: 'create' | 'edit';
-  currentStatus: HomeworkAssignment['status'] | null;
-  sendMode: HomeworkAssignment['sendMode'];
-}): HomeworkAssignment['status'] => {
-  const { action, mode, currentStatus, sendMode } = params;
-
-  if (mode === 'create') {
-    if (action === 'save') return 'DRAFT';
-    return sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
-  }
-
-  if (action === 'submit') {
-    return 'SENT';
-  }
-
-  if (currentStatus === 'DRAFT' || currentStatus === 'SCHEDULED' || currentStatus === null) {
-    return sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'SCHEDULED' : 'DRAFT';
-  }
-
-  return currentStatus;
-};
 
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const { showToast } = useToast();
@@ -387,6 +364,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     hasSkippedAssignmentEditorAutoSaveRef.current = false;
   }, [assignmentEditorDraftStorageKey]);
 
+  const assignmentsById = useMemo(
+    () => new Map(assignments.map((assignment) => [assignment.id, assignment])),
+    [assignments],
+  );
+
   useEffect(() => {
     if (mode !== 'teacher') return;
     if (!isTeacherTemplateEditRoute || editingTemplateId === null) {
@@ -559,9 +541,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         }
 
         const nextDraft = createHomeworkEditorDraftFromAssignment(assignment, relatedTemplate);
-        const storedDraft = assignmentEditorDraftStorageKey
-          ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
-          : null;
+        const storedDraft =
+          assignmentEditorDraftStorageKey && canTeacherEditHomeworkAssignment(assignment)
+            ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
+            : null;
         setAssignmentEditorInitialDraft(nextDraft);
         setAssignmentEditorDraft(storedDraft?.draft ?? nextDraft);
         setAssignmentEditorOriginalStatus(assignment.status);
@@ -589,11 +572,20 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     templates,
   ]);
 
+  const assignmentEditorReadOnly = useMemo(
+    () =>
+      isTeacherAssignmentEditRoute &&
+      assignmentEditorServerAssignment !== null &&
+      !canTeacherEditHomeworkAssignment(assignmentEditorServerAssignment),
+    [assignmentEditorServerAssignment, isTeacherAssignmentEditRoute],
+  );
+
   const assignmentEditorHasUnsavedChanges = useMemo(
     () =>
       isTeacherAssignmentEditorRoute &&
+      !assignmentEditorReadOnly &&
       !areHomeworkEditorDraftsEqual(assignmentEditorDraft, assignmentEditorInitialDraft),
-    [assignmentEditorDraft, assignmentEditorInitialDraft, isTeacherAssignmentEditorRoute],
+    [assignmentEditorDraft, assignmentEditorInitialDraft, assignmentEditorReadOnly, isTeacherAssignmentEditorRoute],
   );
 
   const assignmentCanIssueNow = useMemo(
@@ -654,6 +646,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       return;
     }
 
+    if (assignmentEditorReadOnly) {
+      clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
+      return;
+    }
+
     setEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY, {
       isDirty: assignmentEditorHasUnsavedChanges,
       title: 'Сохранить изменения перед выходом?',
@@ -676,6 +673,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     assignmentEditorDraftStorageKey,
     assignmentEditorHasUnsavedChanges,
     clearEntry,
+    assignmentEditorReadOnly,
     isTeacherAssignmentEditorRoute,
     mode,
     saveAssignmentEditorDraftLocally,
@@ -704,7 +702,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   useEffect(() => {
     if (mode !== 'teacher') return;
-    if (!assignmentEditorDraftStorageKey || !isTeacherAssignmentEditorRoute) return;
+    if (!assignmentEditorDraftStorageKey || !isTeacherAssignmentEditorRoute || assignmentEditorReadOnly) return;
     if (!hasSkippedAssignmentEditorAutoSaveRef.current) {
       hasSkippedAssignmentEditorAutoSaveRef.current = true;
       return;
@@ -720,7 +718,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [assignmentEditorDraft, assignmentEditorDraftStorageKey, isTeacherAssignmentEditorRoute, mode]);
+  }, [assignmentEditorDraft, assignmentEditorDraftStorageKey, assignmentEditorReadOnly, isTeacherAssignmentEditorRoute, mode]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
@@ -1452,6 +1450,15 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const handleRebindAssignmentGroup = useCallback(
     async (assignmentId: number, groupId: number | null) => {
+      const assignment = assignmentsById.get(assignmentId);
+      if (assignment && !canTeacherEditHomeworkAssignment(assignment)) {
+        showToast({
+          message: 'После выдачи домашку нельзя переносить между группами. Сначала отмените выдачу.',
+          variant: 'error',
+        });
+        return;
+      }
+
       try {
         await api.updateHomeworkAssignmentV2(assignmentId, { groupId });
         await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
@@ -1463,7 +1470,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         showToast({ message: 'Не удалось обновить группу домашки', variant: 'error' });
       }
     },
-    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+    [assignmentsById, fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
   );
 
   const handleRebindAssignmentsGroup = useCallback(
@@ -1476,6 +1483,17 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         ),
       );
       if (!ids.length) return;
+      const hasLockedAssignments = ids.some((id) => {
+        const assignment = assignmentsById.get(id);
+        return assignment ? !canTeacherEditHomeworkAssignment(assignment) : false;
+      });
+      if (hasLockedAssignments) {
+        showToast({
+          message: 'После выдачи домашки нельзя массово переносить между группами. Сначала отмените выдачу.',
+          variant: 'error',
+        });
+        return;
+      }
 
       try {
         await Promise.all(ids.map((assignmentId) => api.updateHomeworkAssignmentV2(assignmentId, { groupId })));
@@ -1494,7 +1512,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         showToast({ message: 'Не удалось обновить группу домашних заданий', variant: 'error' });
       }
     },
-    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+    [assignmentsById, fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
   );
 
   const handleCreateAssignment = useCallback(
@@ -1574,88 +1592,58 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const handleSubmitAssignmentFromScreen = useCallback(
     async (action: 'save' | 'submit'): Promise<HomeworkTemplateCreateSubmitResult> => {
+      if (assignmentEditorReadOnly) {
+        showToast({
+          message: 'Домашка уже выдана. Чтобы изменить её, сначала отмените выдачу.',
+          variant: 'error',
+        });
+        return { success: false };
+      }
+
       if (!assignmentEditorDraft.assignment.studentId) {
         showToast({ message: 'Выберите ученика', variant: 'error' });
         return { success: false };
       }
 
-      const editorMode = isTeacherAssignmentEditRoute ? 'edit' : 'create';
-      const nextStatus = resolveAssignmentPersistedStatus({
-        action,
-        mode: editorMode,
-        currentStatus: assignmentEditorOriginalStatus,
-        sendMode: assignmentEditorDraft.assignment.sendMode,
-      });
-
       setSubmittingAssignment(true);
       try {
+        let assignmentResponse: { assignment: HomeworkAssignment };
         if (isTeacherAssignmentEditRoute && editingAssignmentId) {
-          const response = await api.updateHomeworkAssignmentV2(editingAssignmentId, {
+          assignmentResponse = await api.updateHomeworkAssignmentV2(editingAssignmentId, {
             title: assignmentEditorDraft.title.trim(),
             lessonId: assignmentEditorDraft.assignment.lessonId,
             templateId: assignmentEditorDraft.assignment.sourceTemplateId,
             groupId: assignmentEditorDraft.assignment.groupId,
             sendMode: assignmentEditorDraft.assignment.sendMode,
-            status: nextStatus,
-            sentAt: action === 'submit' ? new Date().toISOString() : null,
             deadlineAt: assignmentEditorDraft.assignment.deadlineAt,
             contentSnapshot: assignmentEditorDraft.blocks,
           });
-          setAssignmentEditorInitialDraft(assignmentEditorDraft);
-          setAssignmentEditorOriginalStatus(response.assignment.status);
-          setAssignmentEditorServerAssignment(response.assignment);
-
-          void Promise.allSettled([
-            fetchTeacherAssignments({ offset: 0, append: false }),
-            loadTeacherSummary(),
-            loadTeacherGroups(),
-          ]);
-
-          showToast({
-            message:
-              action === 'submit'
-                ? 'Домашка выдана ученику'
-                : nextStatus === 'SCHEDULED'
-                  ? 'Домашка сохранена и будет выдана после урока'
-                  : 'Изменения сохранены',
-            variant: 'success',
-          });
-
-          if (assignmentEditorDraftStorageKey) {
-            clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
-          }
-          clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
-          return { success: true, closeOnSuccess: false };
-        }
-
-        const response = await api.createHomeworkAssignmentV2({
+        } else {
+          assignmentResponse = await api.createHomeworkAssignmentV2({
             studentId: assignmentEditorDraft.assignment.studentId,
             lessonId: assignmentEditorDraft.assignment.lessonId ?? undefined,
             templateId: assignmentEditorDraft.assignment.sourceTemplateId ?? undefined,
             groupId: assignmentEditorDraft.assignment.groupId ?? undefined,
             title: assignmentEditorDraft.title.trim() || undefined,
             sendMode: assignmentEditorDraft.assignment.sendMode,
-            status: nextStatus,
             deadlineAt: assignmentEditorDraft.assignment.deadlineAt,
             contentSnapshot: assignmentEditorDraft.blocks,
           });
-
-        if (assignmentEditorDraftStorageKey) {
-          clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
         }
-        clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
 
-        showToast({
-          message:
-            nextStatus === 'SCHEDULED'
-              ? 'Домашка создана и будет выдана после урока'
-              : 'Домашка создана',
-          variant: 'success',
-        });
+        let finalAssignment = assignmentResponse.assignment;
+        const shouldSendNow =
+          action === 'submit' &&
+          assignmentEditorDraft.assignment.sendMode === 'MANUAL' &&
+          (finalAssignment.status === 'DRAFT' || finalAssignment.status === 'SCHEDULED');
+        if (shouldSendNow) {
+          const sendResponse = await api.sendHomeworkAssignmentV2(finalAssignment.id);
+          finalAssignment = sendResponse.assignment;
+        }
 
         setAssignmentEditorInitialDraft(assignmentEditorDraft);
-        setAssignmentEditorOriginalStatus(response.assignment.status);
-        setAssignmentEditorServerAssignment(response.assignment);
+        setAssignmentEditorOriginalStatus(finalAssignment.status);
+        setAssignmentEditorServerAssignment(finalAssignment);
 
         void Promise.allSettled([
           fetchTeacherAssignments({ offset: 0, append: false }),
@@ -1663,8 +1651,25 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
           loadTeacherGroups(),
         ]);
 
-        requestNavigationBypass();
-        navigate(`/homeworks/${response.assignment.id}/edit`, { replace: true });
+        showToast({
+          message:
+            action === 'submit' && assignmentEditorDraft.assignment.sendMode === 'MANUAL'
+              ? 'Домашка выдана ученику'
+              : assignmentEditorDraft.assignment.sendMode === 'AUTO_AFTER_LESSON_DONE'
+                ? 'Домашка сохранена и будет выдана после урока'
+                : 'Изменения сохранены',
+          variant: 'success',
+        });
+
+        if (assignmentEditorDraftStorageKey) {
+          clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
+        }
+        clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
+
+        if (!isTeacherAssignmentEditRoute) {
+          requestNavigationBypass();
+          navigate(`/homeworks/${finalAssignment.id}/edit`, { replace: true });
+        }
 
         return { success: true, closeOnSuccess: false };
       } catch (error) {
@@ -1681,6 +1686,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       assignmentEditorOriginalStatus,
       editingAssignmentId,
       assignmentEditorDraftStorageKey,
+      assignmentEditorReadOnly,
       fetchTeacherAssignments,
       isTeacherAssignmentEditRoute,
       loadTeacherGroups,
@@ -1724,16 +1730,27 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
   const handleSendAssignmentNow = useCallback(
     async (assignment: HomeworkAssignment) => {
       try {
-        await api.updateHomeworkAssignmentV2(assignment.id, {
-          status: 'SENT',
-          sentAt: new Date().toISOString(),
-        });
+        await api.sendHomeworkAssignmentV2(assignment.id);
         showToast({ message: 'Домашка отправлена ученику', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to send assignment now', error);
         showToast({ message: 'Не удалось отправить домашку', variant: 'error' });
+      }
+    },
+    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+  );
+
+  const handleReissueAssignment = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      try {
+        await api.reissueHomeworkAssignmentV2(assignment.id);
+        showToast({ message: 'Домашка переоткрыта для новой попытки', variant: 'success' });
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+      } catch (error) {
+        console.error('Failed to reissue assignment', error);
+        showToast({ message: 'Не удалось переоткрыть домашку', variant: 'error' });
       }
     },
     [fetchTeacherAssignments, loadTeacherSummary, showToast],
@@ -1826,6 +1843,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const handleUpdateAssignmentDeadline = useCallback(
     async (assignment: HomeworkAssignment, deadlineAt: string | null) => {
+      if (!canTeacherEditHomeworkAssignment(assignment)) {
+        showToast({
+          message: 'После выдачи дедлайн нельзя менять. Сначала отмените выдачу.',
+          variant: 'error',
+        });
+        return;
+      }
+
       try {
         const response = await api.updateHomeworkAssignmentV2(assignment.id, { deadlineAt });
         if (isTeacherAssignmentEditRoute && editingAssignmentId === assignment.id) {
@@ -1871,6 +1896,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
 
   const handleFixConfigError = useCallback(
     async (assignment: HomeworkAssignment) => {
+      if (!canTeacherEditHomeworkAssignment(assignment)) {
+        showToast({
+          message: 'Ошибка настройки у выданной домашки не исправляется напрямую. Сначала отмените выдачу.',
+          variant: 'error',
+        });
+        return;
+      }
+
       try {
         await api.updateHomeworkAssignmentV2(assignment.id, {
           sendMode: 'MANUAL',
@@ -1954,6 +1987,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       manualScore: number | null;
       finalScore: number | null;
       teacherComment: string | null;
+      reviewResult?: HomeworkSubmission['reviewResult'];
     }) => {
       if (!reviewAssignment) return false;
       setReviewSubmitting(true);
@@ -2176,6 +2210,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
         onOpenLessonDay={handleOpenAssignmentLessonDay}
         onUpdateAssignmentDeadline={handleUpdateAssignmentDeadline}
         onDeleteAssignment={handleDeleteAssignment}
+        onReissueAssignment={handleReissueAssignment}
         onFixConfigError={handleFixConfigError}
         onBulkAction={handleBulkAction}
         onOpenReview={(assignment) => {
@@ -2240,6 +2275,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
       handleOpenAssignmentLessonDay,
       handleOpenStudentProfile,
       handleOpenReview,
+      handleReissueAssignment,
       handleRebindAssignmentGroup,
       handleRebindAssignmentsGroup,
       handleRemindAssignment,
@@ -2368,6 +2404,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode }) => {
             mode={isTeacherAssignmentEditRoute ? 'edit' : 'create'}
             draft={assignmentEditorDraft}
             submitting={submittingAssignment}
+            readOnly={assignmentEditorReadOnly}
+            readOnlyAssignment={assignmentEditorServerAssignment}
             saveAsTemplateSubmitting={savingAssignmentAsTemplate}
             students={students}
             groups={groups}

@@ -97,7 +97,11 @@ const renderPreview = (value: string, example: Record<string, string>, allowedVa
           </span>,
         );
       } else {
-        nodes.push(replacement);
+        nodes.push(
+          <span key={`${variableName}-${match.index}`} className={styles.previewAccent}>
+            {replacement}
+          </span>,
+        );
       }
     }
     lastIndex = match.index + match[0].length;
@@ -378,12 +382,23 @@ const TemplateEditor: FC<{
         <div className={styles.actionsRow}>
           <button
             type="button"
-            className={controls.secondaryButton}
+            className={`${controls.secondaryButton} ${styles.resetButton}`}
             onClick={onReset}
             data-testid={`student-notification-${config.id}-reset`}
           >
             Сбросить по умолчанию
           </button>
+          <Tooltip content={sendTestHint} className={styles.sendTestWrapper}>
+            <button
+              type="button"
+              className={`${controls.secondaryButton} ${styles.sendTestButton}`}
+              onClick={onSendTest}
+              disabled={sendTestDisabled}
+              data-testid={`student-notification-${config.id}-send-test`}
+            >
+              Отправить тестовое
+            </button>
+          </Tooltip>
           <button
             type="button"
             className={`${controls.primaryButton} ${styles.saveButton}`}
@@ -528,7 +543,15 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.header}>Тексты уведомлений ученику</div>
+      <div className={styles.headerBlock}>
+        <div className={styles.headerIcon}>
+          <span className={styles.headerIconGlyph} />
+        </div>
+        <div>
+          <div className={styles.header}>Тексты уведомлений ученику</div>
+          <div className={styles.headerSubtitle}>Настройте шаблоны сообщений</div>
+        </div>
+      </div>
       <div className={styles.tabRow}>
         <div className={styles.tabButtons}>
           {templateConfigs.map((config) => (
@@ -542,68 +565,52 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
             </button>
           ))}
         </div>
-        {!isMobile && (
-          <Tooltip content={sendTestHint} className={`${styles.sendTestWrapper} ${styles.tabAction}`}>
-            <button
-              type="button"
-              className={`${controls.secondaryButton} ${styles.sendTestButton}`}
-              onClick={() => {
-                if (sendTestDisabled) return;
-                setIsSendTestOpen(true);
-              }}
-              disabled={sendTestDisabled}
-              data-testid={`student-notification-${activeTemplate}-send-test`}
-            >
-              Отправить тестовое уведомление
-            </button>
-          </Tooltip>
-        )}
       </div>
 
       {templateConfigs
         .filter((config) => config.id === activeTemplate)
         .map((config) => (
           <div key={config.id}>
-          <TemplateEditor
-            config={config}
-            value={values[config.id]}
-            onValueChange={(nextValue) => updateValue(config.id, nextValue)}
-            error={errors[config.id]}
-            onSave={() => handleSave(config)}
-            onReset={() => handleReset(config)}
-            isDirty={dirtyById[config.id]}
-            previewExample={
-              config.id === 'lesson'
-                ? STUDENT_LESSON_TEMPLATE_EXAMPLES[examples[config.id]]
-                : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[examples[config.id]]
-            }
-            example={examples[config.id]}
-            onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
-            onSendTest={() => {
-              if (sendTestDisabled) return;
-              setIsSendTestOpen(true);
-            }}
-            sendTestDisabled={sendTestDisabled}
-            sendTestHint={sendTestHint}
-            isMobile={isMobile}
-          />
-          <SendTestNotificationModal
-            open={isSendTestOpen}
-            variant={isMobile ? 'sheet' : 'modal'}
-            onClose={() => setIsSendTestOpen(false)}
-            templateType={config.templateType}
-            templateLabel={config.label}
-            templateText={values[config.id]}
-            isDirty={values[config.id] !== resolvedValues[config.id]}
-            allowedVariables={config.allowedVariables}
-            exampleKey={examples[config.id]}
-            onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
-            onSaveNow={onSaveNow}
-            saveField={config.field}
-            examples={
-              config.id === 'lesson' ? STUDENT_LESSON_TEMPLATE_EXAMPLES : STUDENT_PAYMENT_TEMPLATE_EXAMPLES
-            }
-          />
+            <TemplateEditor
+              config={config}
+              value={values[config.id]}
+              onValueChange={(nextValue) => updateValue(config.id, nextValue)}
+              error={errors[config.id]}
+              onSave={() => handleSave(config)}
+              onReset={() => handleReset(config)}
+              isDirty={dirtyById[config.id]}
+              previewExample={
+                config.id === 'lesson'
+                  ? STUDENT_LESSON_TEMPLATE_EXAMPLES[examples[config.id]]
+                  : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[examples[config.id]]
+              }
+              example={examples[config.id]}
+              onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
+              onSendTest={() => {
+                if (sendTestDisabled) return;
+                setIsSendTestOpen(true);
+              }}
+              sendTestDisabled={sendTestDisabled}
+              sendTestHint={sendTestHint}
+              isMobile={isMobile}
+            />
+            <SendTestNotificationModal
+              open={isSendTestOpen}
+              variant={isMobile ? 'sheet' : 'modal'}
+              onClose={() => setIsSendTestOpen(false)}
+              templateType={config.templateType}
+              templateLabel={config.label}
+              templateText={values[config.id]}
+              isDirty={values[config.id] !== resolvedValues[config.id]}
+              allowedVariables={config.allowedVariables}
+              exampleKey={examples[config.id]}
+              onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
+              onSaveNow={onSaveNow}
+              saveField={config.field}
+              examples={
+                config.id === 'lesson' ? STUDENT_LESSON_TEMPLATE_EXAMPLES : STUDENT_PAYMENT_TEMPLATE_EXAMPLES
+              }
+            />
           </div>
         ))}
     </div>

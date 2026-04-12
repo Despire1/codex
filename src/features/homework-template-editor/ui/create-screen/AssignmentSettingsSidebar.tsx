@@ -30,6 +30,7 @@ interface AssignmentSettingsSidebarProps {
   assignment: HomeworkEditorAssignmentContext;
   students: StudentOption[];
   disabled?: boolean;
+  readOnly?: boolean;
   previewDisabled?: boolean;
   studentLocked?: boolean;
   saveAsTemplateSubmitting?: boolean;
@@ -49,6 +50,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
   assignment,
   students,
   disabled = false,
+  readOnly = false,
   previewDisabled = false,
   studentLocked = false,
   saveAsTemplateSubmitting = false,
@@ -136,12 +138,14 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
   );
 
   const autoSendEnabled = assignment.sendMode === 'AUTO_AFTER_LESSON_DONE';
+  const controlsDisabled = disabled || readOnly;
   const selectedLesson = useMemo(
     () => futureLessons.find((lesson) => lesson.id === assignment.lessonId) ?? null,
     [futureLessons, assignment.lessonId],
   );
 
   useEffect(() => {
+    if (readOnly) return;
     if (isResolvingNextLesson) return;
     if (assignment.sendMode !== 'AUTO_AFTER_LESSON_DONE') return;
     if (futureLessons.length === 0) {
@@ -159,7 +163,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
       ...assignment,
       lessonId: firstLesson.id,
     });
-  }, [assignment, futureLessons, isResolvingNextLesson, onChange, selectedLesson]);
+  }, [assignment, futureLessons, isResolvingNextLesson, onChange, readOnly, selectedLesson]);
 
   return (
     <div className={styles.sidebar}>
@@ -183,7 +187,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             options={studentOptions}
             placeholder="Выберите ученика…"
             ariaLabel="Выбор ученика для домашнего задания"
-            disabled={disabled || studentLocked || students.length === 0}
+            disabled={controlsDisabled || studentLocked || students.length === 0}
             compact
             invalid={Boolean(studentError)}
             validationPath="assignment.studentId"
@@ -212,7 +216,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
                 deadlineAt: nextValue ? toUtcIsoFromLocal(nextValue, timeZone) : null,
               })
             }
-            disabled={disabled}
+            disabled={controlsDisabled}
           />
         </div>
 
@@ -221,7 +225,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             <label className={styles.autoSendToggle}>
               <Checkbox
                 checked={autoSendEnabled}
-                disabled={disabled || isResolvingNextLesson}
+                disabled={controlsDisabled || isResolvingNextLesson}
                 onChange={(event) => {
                   const checked = event.target.checked;
                   if (!checked) {
@@ -255,7 +259,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
                   options={futureLessonOptions}
                   placeholder={isResolvingNextLesson ? 'Загружаем уроки…' : 'Выберите урок'}
                   ariaLabel="Выбор урока для автоматической отправки домашнего задания"
-                  disabled={disabled || isResolvingNextLesson || futureLessonOptions.length === 0}
+                  disabled={controlsDisabled || isResolvingNextLesson || futureLessonOptions.length === 0}
                   compact
                   invalid={Boolean(lessonError)}
                   validationPath="assignment.lessonId"
@@ -298,15 +302,17 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          className={styles.saveTemplateButton}
-          onClick={onSaveAsTemplate}
-          disabled={disabled || saveAsTemplateSubmitting}
-        >
-          <HomeworkBookmarkRegularIcon size={13} />
-          {saveAsTemplateSubmitting ? 'Сохраняю шаблон…' : 'Сохранить как шаблон'}
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            className={styles.saveTemplateButton}
+            onClick={onSaveAsTemplate}
+            disabled={disabled || saveAsTemplateSubmitting}
+          >
+            <HomeworkBookmarkRegularIcon size={13} />
+            {saveAsTemplateSubmitting ? 'Сохраняю шаблон…' : 'Сохранить как шаблон'}
+          </button>
+        ) : null}
 
         {showCancelIssueAction ? (
           <button

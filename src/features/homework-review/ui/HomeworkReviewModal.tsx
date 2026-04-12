@@ -20,6 +20,7 @@ interface HomeworkReviewModalProps {
     manualScore: number | null;
     finalScore: number | null;
     teacherComment: string | null;
+    reviewResult?: HomeworkSubmission['reviewResult'];
   }) => Promise<boolean>;
 }
 

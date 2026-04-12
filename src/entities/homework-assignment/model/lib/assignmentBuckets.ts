@@ -1,6 +1,11 @@
 import { HomeworkAssignment } from '../../../types';
+import {
+  assignmentBelongsToBucket as assignmentBelongsToWorkflowBucket,
+  HomeworkAssignmentBucketId,
+  resolveHomeworkAssignmentViewStatus,
+} from './workflow';
 
-export type TeacherAssignmentBucket = 'draft' | 'sent' | 'review' | 'reviewed' | 'overdue';
+export type TeacherAssignmentBucket = HomeworkAssignmentBucketId;
 
 export type TeacherAssignmentBucketItem = {
   id: TeacherAssignmentBucket;
@@ -31,26 +36,11 @@ export const SEND_MODE_LABELS: Record<HomeworkAssignment['sendMode'], string> = 
   AUTO_AFTER_LESSON_DONE: 'После завершения урока',
 };
 
-export const resolveAssignmentEffectiveStatus = (assignment: HomeworkAssignment, now = new Date()) => {
-  if ((assignment.status === 'SENT' || assignment.status === 'RETURNED') && assignment.deadlineAt) {
-    const deadlineDate = new Date(assignment.deadlineAt);
-    if (!Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() < now.getTime()) {
-      return 'OVERDUE' as const;
-    }
-  }
-  return assignment.status;
-};
+export const resolveAssignmentEffectiveStatus = (assignment: HomeworkAssignment, now = new Date()) =>
+  resolveHomeworkAssignmentViewStatus(assignment, now);
 
 export const assignmentBelongsToBucket = (
   assignment: HomeworkAssignment,
   bucket: TeacherAssignmentBucket,
   now = new Date(),
-) => {
-  const status = resolveAssignmentEffectiveStatus(assignment, now);
-  if (bucket === 'draft') return status === 'DRAFT' || status === 'SCHEDULED';
-  if (bucket === 'sent') return status === 'SENT' || status === 'RETURNED';
-  if (bucket === 'review') return status === 'SUBMITTED' || status === 'IN_REVIEW';
-  if (bucket === 'reviewed') return status === 'REVIEWED';
-  if (bucket === 'overdue') return status === 'OVERDUE';
-  return false;
-};
+) => assignmentBelongsToWorkflowBucket(assignment, bucket, now);

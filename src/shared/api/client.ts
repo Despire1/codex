@@ -310,16 +310,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  createTransferLink: () =>
-    apiFetch<{ url: string; expires_in: number }>('/auth/transfer/create', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
-  consumeTransferToken: (token: string) =>
-    apiFetch<{ redirect_url: string }>('/auth/transfer/consume', {
-      method: 'POST',
-      body: JSON.stringify({ token }),
-    }),
   getSession: () => apiFetch<{ user: SessionUser }>('/auth/session'),
   logout: () =>
     apiFetch<{ status: string }>('/auth/logout', {
@@ -858,7 +848,6 @@ export const api = {
     templateId?: number | null;
     groupId?: number | null;
     title?: string;
-    status?: HomeworkAssignment['status'];
     sendMode?: HomeworkAssignment['sendMode'];
     deadlineAt?: string | null;
     contentSnapshot?: HomeworkBlock[];
@@ -874,23 +863,21 @@ export const api = {
     assignmentId: number,
     payload: Partial<{
       title: string;
-      status: HomeworkAssignment['status'];
       sendMode: HomeworkAssignment['sendMode'];
       lessonId: number | null;
       templateId: number | null;
       groupId: number | null;
       deadlineAt: string | null;
-      sentAt: string | null;
       contentSnapshot: HomeworkBlock[];
-      teacherComment: string | null;
-      autoScore: number | null;
-      manualScore: number | null;
-      finalScore: number | null;
     }>,
   ) =>
     apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
+    }),
+  sendHomeworkAssignmentV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}/send`, {
+      method: 'POST',
     }),
   remindHomeworkAssignmentV2: (assignmentId: number) =>
     apiFetch<{ status: 'sent' | 'skipped' | 'failed'; assignment: HomeworkAssignment }>(
@@ -901,16 +888,20 @@ export const api = {
     apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}/cancel-issue`, {
       method: 'POST',
     }),
+  reissueHomeworkAssignmentV2: (assignmentId: number) =>
+    apiFetch<{ assignment: HomeworkAssignment }>(`/api/v2/homework/assignments/${assignmentId}/reissue`, {
+      method: 'POST',
+    }),
   deleteHomeworkAssignmentV2: (assignmentId: number) =>
     apiFetch<{ deletedId: number }>(`/api/v2/homework/assignments/${assignmentId}`, {
       method: 'DELETE',
     }),
   bulkHomeworkAssignmentsV2: (payload: {
     ids: number[];
-    action: 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+    action: 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
   }) =>
     apiFetch<{
-      action: 'SEND_NOW' | 'REMIND' | 'MOVE_TO_DRAFT' | 'DELETE';
+      action: 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
       total: number;
       successCount: number;
       errorCount: number;
@@ -972,6 +963,7 @@ export const api = {
       manualScore?: number | null;
       finalScore?: number | null;
       teacherComment?: string | null;
+      reviewResult?: HomeworkSubmission['reviewResult'];
     },
   ) =>
     apiFetch<{ assignment: HomeworkAssignment; submission: HomeworkSubmission | null }>(

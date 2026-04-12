@@ -1,4 +1,6 @@
 import { HomeworkAssignment, HomeworkBlock } from '../../../../../entities/types';
+import { resolveHomeworkAssignmentWorkflow } from '../../../../../entities/homework-assignment/model/lib/workflow';
+import { formatHumanizedRelativeDurationRu } from '../../../../../shared/lib/humanizeDurationRu';
 import { pluralizeRu } from '../../../../../shared/lib/pluralizeRu';
 
 export type StudentHomeworkCardKind = 'overdue' | 'new' | 'in_progress' | 'submitted' | 'completed';
@@ -67,39 +69,6 @@ const formatShortDate = (date: Date) => `${date.getDate()} ${MONTH_LABELS[date.g
 
 const formatShortDateTime = (date: Date) => `${formatShortDate(date)}, ${formatTime(date)}`;
 
-const formatDuration = (deltaMs: number, mode: 'past' | 'future') => {
-  const absolute = Math.max(0, Math.floor(Math.abs(deltaMs)));
-  const totalMinutes = Math.floor(absolute / 60_000);
-  const totalHours = Math.floor(totalMinutes / 60);
-  const totalDays = Math.floor(totalHours / 24);
-
-  if (totalDays > 0) {
-    const label = pluralizeRu(totalDays, {
-      one: 'день',
-      few: 'дня',
-      many: 'дней',
-    });
-    return mode === 'past' ? `Прошло ${label}` : `Осталось ${label}`;
-  }
-
-  if (totalHours > 0) {
-    const label = pluralizeRu(totalHours, {
-      one: 'час',
-      few: 'часа',
-      many: 'часов',
-    });
-    return mode === 'past' ? `Прошло ${label}` : `Осталось ${label}`;
-  }
-
-  const minutes = Math.max(1, totalMinutes);
-  const label = pluralizeRu(minutes, {
-    one: 'минута',
-    few: 'минуты',
-    many: 'минут',
-  });
-  return mode === 'past' ? `Прошло ${label}` : `Осталось ${label}`;
-};
-
 const formatRelativeDateTime = (date: Date, now: Date) => {
   const today = startOfDay(now);
   const yesterday = new Date(today.getTime() - DAY_MS);
@@ -111,14 +80,8 @@ const formatRelativeDateTime = (date: Date, now: Date) => {
   return formatShortDateTime(date);
 };
 
-const resolveEffectiveStatus = (assignment: HomeworkAssignment, now: Date) => {
-  if (assignment.status === 'OVERDUE' || assignment.isOverdue) return 'OVERDUE';
-  if ((assignment.status === 'SENT' || assignment.status === 'RETURNED') && assignment.deadlineAt) {
-    const deadline = toValidDate(assignment.deadlineAt);
-    if (deadline && deadline.getTime() < now.getTime()) return 'OVERDUE';
-  }
-  return assignment.status;
-};
+const resolveEffectiveStatus = (assignment: HomeworkAssignment, now: Date) =>
+  resolveHomeworkAssignmentWorkflow(assignment, now).status;
 
 const collectTextBlocks = (blocks: HomeworkBlock[]) =>
   blocks
@@ -184,7 +147,7 @@ export const resolveStudentHomeworkDeadlineMeta = (
   if (kind === 'overdue') {
     return {
       primary,
-      secondary: formatDuration(now.getTime() - deadline.getTime(), 'past'),
+      secondary: formatHumanizedRelativeDurationRu(now.getTime() - deadline.getTime(), 'past'),
       tone: 'danger',
     };
   }
@@ -209,14 +172,19 @@ export const resolveStudentHomeworkDeadlineMeta = (
     const reviewedAt = toValidDate(assignment.reviewedAt);
     return {
       primary,
-      secondary: reviewedAt ? `Проверено ${formatShortDate(reviewedAt)}` : 'Домашка проверена',
-      tone: 'normal',
+      secondary:
+        assignment.lateState === 'LATE'
+          ? 'Сдано после срока'
+          : reviewedAt
+            ? `Проверено ${formatShortDate(reviewedAt)}`
+            : 'Домашка проверена',
+      tone: assignment.lateState === 'LATE' ? 'warning' : 'normal',
     };
   }
 
   return {
     primary,
-    secondary: formatDuration(deadline.getTime() - now.getTime(), 'future'),
+    secondary: formatHumanizedRelativeDurationRu(deadline.getTime() - now.getTime(), 'future'),
     tone: now.getTime() + DAY_MS > deadline.getTime() ? 'warning' : 'normal',
   };
 };

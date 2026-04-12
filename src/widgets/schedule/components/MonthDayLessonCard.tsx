@@ -4,6 +4,7 @@ import { HomeworkAssignment, Lesson, LinkedStudent } from '../../../entities/typ
 import { AdaptivePopover } from '../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import { BookOpenIcon, MeetingLinkIcon, MoreHorizIcon, RotateIcon } from '../../../icons/MaterialIcons';
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
+import { getLessonColorTheme, getLessonColorVars } from '../../../shared/lib/lessonColors';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
 import { buildParticipants, getLessonLabel, isLessonInSeries } from '../../../entities/lesson/lib/lessonDetails';
 import { resolveLessonCancelActionCopy } from '../../../entities/lesson/lib/lessonStatusPresentation';
@@ -70,6 +71,13 @@ export const MonthDayLessonCard = ({
   const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const cancelCopy = resolveLessonCancelActionCopy(lesson);
   const hasMetaRow = Boolean(primaryAssignment || lesson.meetingLink || isCanceled);
+  const lessonColorTheme = getLessonColorTheme(lesson.color);
+  const styleVars = {
+    ...getLessonColorVars(lesson.color),
+    '--lesson-text': lessonColorTheme.hoverBackground,
+    '--lesson-strong-border': lessonColorTheme.hoverBorder,
+    '--lesson-strong-text': lessonColorTheme.hoverText,
+  } as CSSProperties;
 
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
@@ -82,6 +90,7 @@ export const MonthDayLessonCard = ({
     <div className={styles.cardWrap} style={style}>
       <div
         className={`${styles.card} ${isCanceled ? styles.canceled : ''}`}
+        style={styleVars}
         role="button"
         tabIndex={0}
         onClick={onEdit}

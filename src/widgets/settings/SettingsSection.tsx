@@ -1,7 +1,15 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, SVGProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Teacher, TeacherStudent, WeekendConflictPreview } from '../../entities/types';
-import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/MaterialIcons';
+import {
+  BarsIcon,
+  CalendarIcon,
+  CheckCircleOutlineIcon,
+  ChevronLeftIcon,
+  NotificationsNoneOutlinedIcon,
+  PersonOutlineIcon,
+  SettingsIcon,
+} from '../../icons/MaterialIcons';
 import { api, UpdateSettingsSuccessResponse } from '../../shared/api/client';
 import { pluralizeRu } from '../../shared/lib/pluralizeRu';
 import { formatTimeZoneLabel, getResolvedTimeZone, getTimeZoneOptions } from '../../shared/lib/timezones';
@@ -58,6 +66,26 @@ type SettingsPatch = Partial<
   >
 >;
 
+type TabMeta = {
+  icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  badge?: string;
+};
+
+const SETTINGS_TAB_META: Record<SettingsTabId, TabMeta> = {
+  profile: {
+    icon: PersonOutlineIcon,
+  },
+  schedule: {
+    icon: CalendarIcon,
+  },
+  notifications: {
+    icon: NotificationsNoneOutlinedIcon,
+  },
+  security: {
+    icon: SettingsIcon,
+  },
+};
+
 const isSettingsTab = (value: string | null): value is SettingsTabId => SETTINGS_TABS.some((tab) => tab.id === value);
 
 const hasPatchValues = (patch: SettingsPatch) => Object.keys(patch).length > 0;
@@ -107,16 +135,22 @@ const buildWeekendConflictMessage = (conflict: WeekendConflictPreview) => {
 
   if (conflict.affectedDates.length > 0) {
     const previewDates = conflict.affectedDates.slice(0, 5).join(', ');
-    const moreSuffix =
-      conflict.affectedDates.length > 5
-        ? ` и ещё ${conflict.affectedDates.length - 5}`
-        : '';
+    const moreSuffix = conflict.affectedDates.length > 5 ? ` и ещё ${conflict.affectedDates.length - 5}` : '';
     lines.push(`Даты: ${previewDates}${moreSuffix}.`);
   }
 
   lines.push('Продолжить и применить выходные дни?');
 
   return lines.join('\n');
+};
+
+const getTeacherInitials = (teacher: Teacher) => {
+  const parts = teacher.name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (parts.length === 0) return 'TP';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
 };
 
 export const SettingsSection: FC<SettingsSectionProps> = ({
@@ -336,8 +370,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
 
   const showMobileList = isMobile && !tabFromPath && !tabFromQuery;
 
-  const activeTabLabel = SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label ?? 'Настройки';
-
   const renderModule = () => {
     if (loadStatus === 'loading') {
       return <div className={styles.loadingState}>Загрузка…</div>;
@@ -346,7 +378,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       return (
         <div className={styles.errorState}>
           Не удалось загрузить настройки.
-          <button className={controls.secondaryButton} type="button" onClick={loadSettings}>
+          <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSettings}>
             Повторить
           </button>
         </div>
@@ -355,7 +387,14 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
 
     switch (activeTab) {
       case 'profile':
-        return <ProfileSettings teacher={teacher} onChange={handleSettingsChange} timeZoneOptions={timeZoneOptions} />;
+        return (
+          <ProfileSettings
+            teacher={teacher}
+            onChange={handleSettingsChange}
+            timeZoneOptions={timeZoneOptions}
+            initials={getTeacherInitials(teacher)}
+          />
+        );
       case 'schedule':
         return (
           <ScheduleSettings
@@ -363,9 +402,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
             onChange={handleSettingsChange}
             onSaveWeekendWeekdays={saveWeekendWeekdays}
             isWeekendSaving={saveStatus === 'saving'}
-            onComingSoonClick={() =>
-              showToast({ message: 'Скоро, в следующих обновлениях', variant: 'success' })
-            }
+            onComingSoonClick={() => showToast({ message: 'Скоро, в следующих обновлениях', variant: 'success' })}
           />
         );
       case 'notifications':
@@ -377,28 +414,57 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     }
   };
 
+  const sidebarNav = (
+    <>
+      <div className={styles.sidebarNav}>
+        {SETTINGS_TABS.map((tab) => {
+          const meta = SETTINGS_TAB_META[tab.id];
+          const Icon = meta.icon;
+          const isActive = activeTab === tab.id;
+
+          return (
+            <button
+              key={tab.id}
+              className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
+              type="button"
+              onClick={() => navigate(`/settings/${tab.id}`)}
+            >
+              <span className={styles.sidebarButtonIcon}>
+                <Icon width={18} height={18} />
+              </span>
+              <span className={styles.sidebarButtonCopy}>
+                <span className={styles.sidebarButtonLabel}>{tab.label}</span>
+              </span>
+              {meta.badge ? <span className={styles.sidebarBadge}>{meta.badge}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={styles.sidebarFooterCard}>
+        <div className={styles.sidebarFooterTitleRow}>
+          <span className={styles.sidebarFooterIcon}>
+            <CheckCircleOutlineIcon width={18} height={18} />
+          </span>
+          <span className={styles.sidebarFooterTitle}>Совет</span>
+        </div>
+        <p className={styles.sidebarFooterText}>
+          Настройте автоматические напоминания, чтобы не забывать о важных событиях.
+        </p>
+      </div>
+    </>
+  );
+
   return (
     <section className={styles.page}>
       {showMobileList ? (
-        <div className={styles.moduleStack}>
-          <div className={`${styles.card} ${styles.mobileList}`}>
-            {SETTINGS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                className={styles.mobileItem}
-                type="button"
-                onClick={() => navigate(`/settings/${tab.id}`)}
-              >
-                {tab.label}
-                <ChevronRightIcon width={20} height={20} />
-              </button>
-            ))}
-          </div>
+        <div className={styles.mobileOverview}>
+          <div className={styles.mobileSidebarCard}>{sidebarNav}</div>
           {loadStatus === 'loading' && <div className={styles.loadingState}>Загрузка…</div>}
           {loadStatus === 'error' && (
             <div className={styles.errorState}>
               Не удалось загрузить настройки.
-              <button className={controls.secondaryButton} type="button" onClick={loadSettings}>
+              <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSettings}>
                 Повторить
               </button>
             </div>
@@ -406,38 +472,15 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         </div>
       ) : (
         <div className={styles.layout}>
-          {!isMobile && (
-            <nav className={styles.card}>
-              <div className={styles.navList}>
-                {SETTINGS_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    className={`${styles.navItem} ${activeTab === tab.id ? styles.navItemActive : ''}`}
-                    type="button"
-                    onClick={() => navigate(`/settings/${tab.id}`)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </nav>
-          )}
+          {!isMobile && <aside className={styles.sidebar}>{sidebarNav}</aside>}
 
-          <div className={`${styles.card} ${styles.moduleContent}`}>
-            <div className={styles.moduleHeader}>
-              {isMobile && (
-                <button className={styles.backButton} type="button" onClick={() => navigate('/settings')}>
-                  <ChevronLeftIcon width={20} height={20} />
-                </button>
-              )}
-              <h3>{activeTabLabel}</h3>
-              {saveStatus === 'saving' && <span className={styles.helperText}>Сохраняем…</span>}
-            </div>
+          <div className={styles.moduleShell}>
             {renderModule()}
-            {saveStatus === 'error' && <div className={styles.helperText}>Ошибка сохранения.</div>}
+            {saveStatus === 'error' && <div className={styles.saveErrorNote}>Ошибка сохранения. Попробуйте ещё раз.</div>}
           </div>
         </div>
       )}
+
       <DialogModal
         open={Boolean(weekendConflict)}
         title="Подтвердите выходные дни"
