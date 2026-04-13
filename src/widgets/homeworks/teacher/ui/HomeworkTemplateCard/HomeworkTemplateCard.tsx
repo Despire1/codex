@@ -1,5 +1,6 @@
 import { FC, KeyboardEvent, MouseEvent } from 'react';
 import { HomeworkTemplate } from '../../../../../entities/types';
+import { canTeacherEditHomeworkTemplate } from '../../../../../entities/homework-template/model/lib/workflow';
 import {
   HomeworkClockIcon,
   HomeworkMicrophoneIcon,
@@ -30,6 +31,7 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
   onEditTemplate,
 }) => {
   const favorite = isHomeworkTemplateFavorite(template);
+  const canEdit = canTeacherEditHomeworkTemplate(template);
   const category = resolveHomeworkTemplateCategory(template);
   const categoryTone = resolveHomeworkTemplateCategoryTone(template);
   const preview = resolveHomeworkTemplatePreview(template);
@@ -62,7 +64,7 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
       onKeyDown={handleCardKeyDown}
       tabIndex={0}
       role="button"
-      aria-label={`Открыть шаблон "${template.title}"`}
+      aria-label={`Открыть домашнее задание "${template.title}"`}
     >
       <div className={styles.head}>
         <span className={`${styles.category} ${categoryTone === 'purple' ? styles.categoryPurple : styles.categoryBlue}`}>
@@ -94,10 +96,10 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
           type="button"
           className={styles.useButton}
           onClick={handleUseTemplate}
-          aria-label={`Использовать шаблон "${template.title}"`}
+          aria-label={`Выдать домашнее задание "${template.title}"`}
         >
           <HomeworkPlusIcon size={12} />
-          <span>Создать домашку</span>
+          <span>{canEdit ? 'Выдать' : 'Выдать ещё'}</span>
         </button>
       </div>
     </article>

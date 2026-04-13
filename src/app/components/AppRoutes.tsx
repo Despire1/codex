@@ -1,5 +1,5 @@
 import { memo, type FC } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { Lesson, LinkedStudent, Teacher, TeacherStudent } from '../../entities/types';
 import { AnalyticsSection } from '../../widgets/analytics/AnalyticsSection';
 import { DashboardHome } from '../../widgets/dashboard/DashboardHome';
@@ -55,6 +55,7 @@ interface AppRoutesProps {
   };
   homeworks: {
     mode: 'teacher' | 'student';
+    onOpenMobileSidebar?: () => void;
   };
   studentDashboard: {
     activeTeacherName?: string | null;
@@ -63,6 +64,11 @@ interface AppRoutesProps {
     activeTeacherName?: string | null;
   };
 }
+
+const LegacyHomeworkTemplateEditRedirect: FC = () => {
+  const { templateId } = useParams<{ templateId?: string }>();
+  return <Navigate to={`${tabPathById.homeworks}/${templateId ?? ''}/edit`} replace />;
+};
 
 const AppRoutesComponent: FC<AppRoutesProps> = ({
   isStudentRole,
@@ -101,10 +107,12 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
       <Route path={`${tabPathById.students}/:studentId`} element={<StudentsSection {...students} />} />
       <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
       <Route path={`${tabPathById.homeworks}/new`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/:assignmentId/edit`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/templates/new`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/templates/:templateId/edit`} element={<HomeworksSection {...homeworks} />} />
+      <Route path={`${tabPathById.homeworks}/assignments/:assignmentId/edit`} element={<HomeworksSection {...homeworks} />} />
+      <Route path={`${tabPathById.homeworks}/templates/new`} element={<Navigate to={`${tabPathById.homeworks}/new`} replace />} />
+      <Route path={`${tabPathById.homeworks}/templates/:templateId/edit`} element={<LegacyHomeworkTemplateEditRedirect />} />
+      <Route path={`${tabPathById.homeworks}/:templateId/edit`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/review/:assignmentId`} element={<HomeworksSection {...homeworks} />} />
+      <Route path={`${tabPathById.homeworks}/:templateId`} element={<HomeworksSection {...homeworks} />} />
       <Route path={tabPathById.homeworks} element={<HomeworksSection {...homeworks} />} />
       <Route path={tabPathById.analytics} element={<AnalyticsSection />} />
       <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />

@@ -2,6 +2,7 @@ import { ChangeEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useIsMobile } from '../../../shared/lib/useIsMobile';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';
 import { TeacherBulkAction, TeacherHomeworksViewModel, TeacherHomeworkGroupKey } from '../types';
@@ -20,11 +21,9 @@ import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import { Ellipsis } from '../../../shared/ui/Ellipsis/Ellipsis';
 import { AnchoredPopover } from '../../../shared/ui/AnchoredPopover/AnchoredPopover';
 import { DayPicker } from '../../../shared/day-picker';
-import { loadStoredCreateTemplateDraftSummary } from '../../../features/homework-template-editor/model/lib/createTemplateDraftStorage';
 import {
   HomeworkAlignLeftIcon,
   HomeworkBellRegularIcon,
-  HomeworkBookmarkRegularIcon,
   HomeworkBoltIcon,
   HomeworkChevronDownIcon,
   HomeworkFilePdfIcon,
@@ -54,13 +53,6 @@ import {
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toLocalDateTimeValue, toUtcIsoFromLocal } from '../../../features/homework-assign/model/lib/assignmentStarter';
 import {
-  estimateHomeworkTemplateDurationMinutes,
-  formatHomeworkTemplateDuration,
-  isHomeworkTemplateFavorite,
-  resolveHomeworkTemplateCategory,
-  resolveHomeworkTemplatePreview,
-} from './model/lib/templatePresentation';
-import {
   DEFAULT_GROUP_EDITOR_BG_COLOR,
   DEFAULT_GROUP_EDITOR_ICON_KEY,
   resolveGroupCardPalette,
@@ -69,25 +61,21 @@ import {
 } from './model/lib/groupEditorStyles';
 import { GroupIconView } from './model/lib/groupIconView';
 import { GroupEditorModal } from './ui/GroupEditorModal/GroupEditorModal';
-import { HomeworkTemplateCard } from './ui/HomeworkTemplateCard/HomeworkTemplateCard';
-import { TeacherHomeworksKpiSection } from './ui/TeacherHomeworksKpiSection';
+import { HomeworkLibraryWorkspace } from './ui/HomeworkLibraryWorkspace/HomeworkLibraryWorkspace';
+import { HomeworkAssignmentsWorkspace } from './ui/HomeworkAssignmentsWorkspace/HomeworkAssignmentsWorkspace';
 import { HomeworkListFiltersPopover } from './ui/HomeworkListFiltersPopover/HomeworkListFiltersPopover';
+import { TeacherHomeworksHeader } from './ui/TeacherHomeworksHeader/TeacherHomeworksHeader';
 import { TopbarCreateMenu } from '../../layout/ui/TopbarCreateMenu/TopbarCreateMenu';
+import { TeacherHomeworksMobileScreen } from './ui/TeacherHomeworksMobileScreen/TeacherHomeworksMobileScreen';
 
-type WorkspaceMode = 'list' | 'groups' | 'templates';
+type WorkspaceMode = 'list' | 'drafts' | 'groups' | 'templates';
 
 const resolveWorkspaceMode = (value: string | null): WorkspaceMode => {
-  if (value === 'groups' || value === 'templates') {
+  if (value === 'list' || value === 'drafts' || value === 'groups' || value === 'templates') {
     return value;
   }
-  return 'list';
+  return 'templates';
 };
-
-const MODE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
-  { id: 'list', label: 'Список домашек' },
-  { id: 'groups', label: 'Группы' },
-  { id: 'templates', label: 'Шаблоны' },
-];
 
 const STATUS_TABS: Array<{ id: TeacherHomeworksViewModel['activeTab']; label: string }> = [
   { id: 'all', label: 'Все' },
@@ -561,6 +549,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   activeTab,
   searchQuery,
   sortBy,
+  problemFilters,
   selectedStudentId,
   loadingAssignments,
   loadingMoreAssignments,
@@ -587,15 +576,19 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onTabChange,
   onSearchChange,
   onSortChange,
+  onToggleProblemFilter,
   onSelectedStudentIdChange,
-  onOpenCreateAssignmentScreen,
   onOpenCreateTemplateScreen,
+  onOpenTemplateDetailScreen,
   onOpenEditTemplateScreen,
   onCreateGroup,
   onUpdateGroup,
   onDeleteGroup,
   onLoadGroupAssignments,
+  onDuplicateTemplate,
+  onArchiveTemplate,
   onRestoreTemplate,
+  onDeleteTemplate,
   onRebindAssignmentsGroup,
   onToggleTemplateFavorite,
   onCreateAssignment,
@@ -618,15 +611,15 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onSubmitReview,
   onLoadHomeworkActivity,
   onMarkHomeworkActivitySeen,
+  onOpenMobileSidebar,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile(720);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
-  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isBulkPanelOpen, setIsBulkPanelOpen] = useState(false);
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
-  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Partial<Record<TeacherHomeworkGroupKey, boolean>>>({});
   const [groupEditorOpen, setGroupEditorOpen] = useState(false);
   const [groupEditorMode, setGroupEditorMode] = useState<'create' | 'edit'>('create');
@@ -659,8 +652,13 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   );
 
   const setWorkspaceMode = (nextMode: WorkspaceMode) => {
+    if (nextMode === 'drafts') {
+      onTabChange('not_issued');
+    } else if (nextMode === 'list' && activeTab === 'not_issued') {
+      onTabChange('all');
+    }
     const nextSearchParams = new URLSearchParams(location.search);
-    if (nextMode === 'list') {
+    if (nextMode === 'templates') {
       nextSearchParams.delete('view');
     } else {
       nextSearchParams.set('view', nextMode);
@@ -679,45 +677,17 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     [summary],
   );
   const canStartReviewQueue = summary.permissions.canStartReviewQueue;
+  const headerSubtitle = useMemo(() => {
+    const formattedDate = new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date());
+    const weekday = new Intl.DateTimeFormat('ru-RU', { weekday: 'long' }).format(new Date());
+    return `${formattedDate}, ${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`;
+  }, []);
 
   const studentsById = useMemo(() => new Map(students.map((item) => [item.id, item.name])), [students]);
-
-  const activeTemplates = useMemo(() => {
-    const activeTemplates = templates.filter((template) => !template.isArchived);
-    return activeTemplates
-      .slice()
-      .sort((left, right) => {
-        const leftFavorite = isHomeworkTemplateFavorite(left) ? 1 : 0;
-        const rightFavorite = isHomeworkTemplateFavorite(right) ? 1 : 0;
-        if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
-        return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-      });
-  }, [templates]);
-
-  const archivedTemplates = useMemo(
-    () =>
-      templates
-        .filter((template) => template.isArchived)
-        .slice()
-        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()),
-    [templates],
-  );
-
-  const filteredTemplates = useMemo(() => {
-    const query = templateSearchQuery.trim().toLowerCase();
-    if (!query) return activeTemplates;
-    return activeTemplates.filter((template) => {
-      const category = resolveHomeworkTemplateCategory(template).toLowerCase();
-      const tags = template.tags.map((tag) => tag.toLowerCase()).join(' ');
-      return (
-        template.title.toLowerCase().includes(query) ||
-        category.includes(query) ||
-        tags.includes(query) ||
-        resolveHomeworkTemplatePreview(template).toLowerCase().includes(query)
-      );
-    });
-  }, [activeTemplates, templateSearchQuery]);
-  const quickTemplates = filteredTemplates;
 
   const filteredGroups = useMemo(() => {
     const query = groupSearchQuery.trim().toLowerCase();
@@ -727,28 +697,61 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       return group.title.toLowerCase().includes(query) || description.includes(query);
     });
   }, [groupSearchQuery, groups]);
-
-  const savedCreateDraft = useMemo(() => loadStoredCreateTemplateDraftSummary(), []);
-
-  const allSelected = assignments.length > 0 && selectedIds.length === assignments.length;
+  const draftAssignmentRows = useMemo(
+    () => assignments.filter((assignment) => assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED'),
+    [assignments],
+  );
+  const issuedAssignmentRows = useMemo(
+    () => assignments.filter((assignment) => assignment.status !== 'DRAFT' && assignment.status !== 'SCHEDULED'),
+    [assignments],
+  );
+  const assignmentRows = useMemo(
+    () => (workspaceMode === 'drafts' ? draftAssignmentRows : assignments),
+    [assignments, draftAssignmentRows, workspaceMode],
+  );
+  const assignedCounts = useMemo(
+    () => ({
+      all: Math.max(summary.totalCount - summary.draftCount - summary.scheduledCount, 0),
+      sent: summary.inProgressCount,
+      review: summary.reviewCount,
+      closed: summary.closedCount,
+    }),
+    [summary.closedCount, summary.draftCount, summary.inProgressCount, summary.reviewCount, summary.scheduledCount, summary.totalCount],
+  );
+  const draftCounts = useMemo(
+    () => ({
+      all: summary.draftCount + summary.scheduledCount,
+      draft: summary.draftCount,
+      scheduled: summary.scheduledCount,
+    }),
+    [summary.draftCount, summary.scheduledCount],
+  );
+  const allSelected =
+    assignmentRows.length > 0 && assignmentRows.every((assignment) => selectedIds.includes(assignment.id));
   const createMenuItems = [
     {
-      id: 'create_assignment',
+      id: 'create_homework',
       label: 'Создать домашнее задание',
-      description: 'Открыть редактор и собрать задание с нуля.',
-      onSelect: onOpenCreateAssignmentScreen,
+      description: 'Открыть новый экран создания домашки с настройкой срока и отправки.',
+      onSelect: onOpenCreateTemplateScreen,
+      icon: <HomeworkFileLinesIcon size={12} />,
+      iconTone: 'dark' as const,
     },
     {
       id: 'assign_homework',
       label: 'Отправить домашнее задание',
-      description: 'Быстро выдать домашку ученику по шаблону или черновику.',
+      description: 'Выдать уже готовую домашку ученику или группе учеников.',
       onSelect: () => openAssignModal(),
+      icon: <HomeworkLinkIcon size={12} />,
+      iconTone: 'lime' as const,
     },
     {
-      id: 'create_template',
-      label: 'Создать шаблон',
-      description: 'Подготовить заготовку, чтобы потом выдавать задания быстрее.',
-      onSelect: onOpenCreateTemplateScreen,
+      id: 'create_collection',
+      label: 'Создать коллекцию',
+      description: 'Собрать тематическую подборку домашних заданий.',
+      onSelect: () => openCreateGroupEditor(),
+      icon: <HomeworkFolderIcon size={12} />,
+      iconTone: 'blue' as const,
     },
   ];
 
@@ -765,8 +768,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     setAssignDefaults({
       studentId: assignModalRequest.studentId ?? selectedStudentId,
       lessonId: assignModalRequest.lessonId ?? null,
-      templateId: null,
-      groupId: null,
+      templateId: assignModalRequest.templateId ?? null,
+      groupId: assignModalRequest.groupId ?? null,
     });
     if (assignModalRequest.open) {
       setIsAssignmentModalOpen(true);
@@ -811,11 +814,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     });
   }, [expandedGroups, groupAssignmentsByKey, groupAssignmentsLoadingByKey, onLoadGroupAssignments]);
 
-  const openCreateGroupEditor = () => {
+  const openCreateGroupEditor = (templateIds: number[] = []) => {
     setGroupEditorMode('create');
     setEditingGroup(null);
     setGroupEditorDraft(createEmptyGroupDraft());
-    setGroupEditorSelectedTemplateIds([]);
+    setGroupEditorSelectedTemplateIds(templateIds);
     setGroupEditorSelectedAssignmentIds([]);
     setGroupEditorOpen(true);
   };
@@ -902,687 +905,196 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     });
   };
 
+  useEffect(() => {
+    if (workspaceSearchParams.get('createCollection') !== '1') return;
+
+    const requestedTemplateId = Number(workspaceSearchParams.get('templateId'));
+    const nextTemplateIds =
+      Number.isFinite(requestedTemplateId) && requestedTemplateId > 0 ? [requestedTemplateId] : [];
+
+    openCreateGroupEditor(nextTemplateIds);
+
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.delete('createCollection');
+    nextSearchParams.delete('templateId');
+    navigate(`${location.pathname}${nextSearchParams.toString() ? `?${nextSearchParams.toString()}` : ''}`, {
+      replace: true,
+    });
+  }, [location.pathname, location.search, navigate, openCreateGroupEditor, workspaceSearchParams]);
+
   return (
-    <section className={styles.page}>
-      <TeacherHomeworksKpiSection summary={summary} />
+    <section className={`${styles.page} ${isMobile ? styles.pageMobile : ''}`}>
+      {isMobile ? (
+        <TeacherHomeworksMobileScreen
+          templates={templates}
+          assignments={assignments}
+          students={students}
+          summary={summary}
+          workspaceMode={workspaceMode}
+          activeTab={activeTab}
+          searchQuery={searchQuery}
+          sortBy={sortBy}
+          problemFilters={problemFilters}
+          selectedStudentId={selectedStudentId}
+          loadingTemplates={loadingTemplates}
+          loadingAssignments={loadingAssignments}
+          loadingMoreAssignments={loadingMoreAssignments}
+          hasMoreAssignments={hasMoreAssignments}
+          templatesError={templatesError}
+          assignmentsError={assignmentsError}
+          homeworkActivityHasUnread={homeworkActivityHasUnread}
+          onOpenMobileSidebar={onOpenMobileSidebar}
+          onOpenActivity={handleOpenActivity}
+          onWorkspaceModeChange={setWorkspaceMode}
+          onSearchChange={onSearchChange}
+          onTabChange={onTabChange}
+          onSortChange={onSortChange}
+          onSelectedStudentIdChange={onSelectedStudentIdChange}
+          onToggleProblemFilter={onToggleProblemFilter}
+          onOpenCreateTemplateScreen={onOpenCreateTemplateScreen}
+          onOpenAssignModal={() => openAssignModal()}
+          onOpenTemplate={(template) => onOpenTemplateDetailScreen(template.id)}
+          onEditTemplate={(template) => onOpenEditTemplateScreen(template.id)}
+          onIssueTemplate={(template) => openAssignModal({ templateId: template.id })}
+          onToggleFavorite={(template) => {
+            void onToggleTemplateFavorite(template);
+          }}
+          onDuplicateTemplate={(template) => {
+            void onDuplicateTemplate(template);
+          }}
+          onArchiveTemplate={(template) => {
+            void onArchiveTemplate(template);
+          }}
+          onRestoreTemplate={(template) => {
+            void onRestoreTemplate(template);
+          }}
+          onCreateCollection={(template) => openCreateGroupEditor(template ? [template.id] : [])}
+          onDeleteTemplate={(template) => {
+            void onDeleteTemplate(template);
+          }}
+          onOpenAssignment={onOpenDetail}
+          onOpenReview={onOpenReview}
+          onFixConfigError={(assignment) => {
+            void onFixConfigError(assignment);
+          }}
+          onSendAssignmentNow={(assignment) => {
+            void onSendAssignmentNow(assignment);
+          }}
+          onRemindAssignment={(assignment) => {
+            void onRemindAssignment(assignment);
+          }}
+          onReissueAssignment={(assignment) => {
+            void onReissueAssignment(assignment);
+          }}
+          onDeleteAssignment={(assignment) => {
+            void onDeleteAssignment(assignment);
+          }}
+          onCancelAssignmentIssue={(assignment) => {
+            void onCancelAssignmentIssue(assignment);
+          }}
+          onOpenStudentProfile={onOpenStudentProfile}
+          onLoadMoreAssignments={onLoadMoreAssignments}
+        />
+      ) : (
+        <>
+          <TeacherHomeworksHeader
+            title="Задания"
+            subtitle={headerSubtitle}
+            workspaceMode={workspaceMode === 'groups' ? 'templates' : workspaceMode}
+            hasUnreadActivity={homeworkActivityHasUnread}
+            createMenuItems={createMenuItems}
+            onOpenActivity={handleOpenActivity}
+            onWorkspaceModeChange={setWorkspaceMode}
+          />
 
-      <section className={styles.workspace}>
-        <div className={styles.topActionsRow}>
-          <div className={styles.topSection}>
-            <div className={styles.modeTabsRow}>
-              {MODE_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`${styles.modeTabButton} ${workspaceMode === tab.id ? styles.modeTabButtonActive : ''}`}
-                  onClick={() => setWorkspaceMode(tab.id)}
-                >
-                  {tab.id === 'groups' ? <HomeworkFolderIcon size={13} className={styles.inlineFaIcon} /> : null}
-                  {tab.id === 'templates' ? <HomeworkLayerGroupIcon size={13} className={styles.inlineFaIcon} /> : null}
-                  {tab.label}
-                  {tab.id === 'list' ? <span className={styles.tabCounter}>{summary.totalCount}</span> : null}
-                </button>
-              ))}
-            </div>
-
-          </div>
+          {workspaceMode === 'templates' ? (
+            <HomeworkLibraryWorkspace
+              templates={templates}
+              loading={loadingTemplates}
+              error={templatesError}
+              onOpenTemplate={(template) => onOpenTemplateDetailScreen(template.id)}
+              onEditTemplate={(template) => onOpenEditTemplateScreen(template.id)}
+              onIssueTemplate={(template) => openAssignModal({ templateId: template.id })}
+              onToggleFavorite={(template) => {
+                void onToggleTemplateFavorite(template);
+              }}
+              onDuplicateTemplate={(template) => {
+                void onDuplicateTemplate(template);
+              }}
+              onArchiveTemplate={(template) => {
+                void onArchiveTemplate(template);
+              }}
+              onRestoreTemplate={(template) => {
+                void onRestoreTemplate(template);
+              }}
+              onCreateCollection={(template) => openCreateGroupEditor(template ? [template.id] : [])}
+              onDeleteTemplate={(template) => {
+                void onDeleteTemplate(template);
+              }}
+            />
+          ) : null}
 
           {workspaceMode === 'list' ? (
-            <div className={styles.actionsRow}>
-              <label className={styles.toolbarSearch}>
-                <HomeworkMagnifyingGlassIcon size={12} className={styles.toolbarSearchIcon} />
-                <input
-                  type="search"
-                  className={styles.toolbarSearchInput}
-                  value={searchQuery}
-                  placeholder="Поиск по заданию, ученику или шаблону"
-                  onChange={(event) => onSearchChange(event.target.value)}
-                />
-              </label>
-              <HomeworkListFiltersPopover
-                sortBy={sortBy}
-                selectedStudentId={selectedStudentId}
-                students={students}
-                loadingStudents={loadingStudents}
-                sortOptions={SORT_LABELS}
-                onSortChange={onSortChange}
-                onSelectedStudentIdChange={onSelectedStudentIdChange}
-              />
-              <div className={styles.mobileCreateMenu}>
-                <TopbarCreateMenu
-                  label="Добавить"
-                  items={createMenuItems}
-                  triggerClassName={styles.mobileCreateMenuButton}
-                />
-              </div>
-              <Tooltip content="События">
-                <button
-                  type="button"
-                  className={styles.toolIconButton}
-                  onClick={handleOpenActivity}
-                >
-                  <HomeworkBellRegularIcon size={15} className={styles.toolbarIcon} />
-                  {homeworkActivityHasUnread ? <span className={styles.unreadDot} /> : null}
-                </button>
-              </Tooltip>
-              <Tooltip content="Массовые действия">
-                <button
-                  type="button"
-                  className={styles.toolIconButton}
-                  onClick={() => setIsBulkPanelOpen((prev) => !prev)}
-                >
-                  <HomeworkLayerGroupIcon size={16} className={styles.toolbarIcon} />
-                </button>
-              </Tooltip>
-              {canStartReviewQueue ? (
-                <button type="button" className={styles.reviewQueueButton} onClick={onStartReviewQueue}>
-                  <HomeworkBoltIcon size={14} className={styles.toolbarIcon} />
-                  <span>Проверять подряд</span>
-                </button>
-              ) : null}
-            </div>
+            <HomeworkAssignmentsWorkspace
+              mode="assigned"
+              assignments={issuedAssignmentRows}
+              loading={loadingAssignments}
+              error={assignmentsError ?? summaryError ?? studentsError}
+              searchQuery={searchQuery}
+              sortBy={sortBy}
+              selectedStudentId={selectedStudentId}
+              students={students}
+              loadingStudents={loadingStudents}
+              activeTab={activeTab}
+              countsByTab={assignedCounts}
+              draftCounts={draftCounts}
+              onSearchChange={onSearchChange}
+              onSortChange={onSortChange}
+              onSelectedStudentIdChange={onSelectedStudentIdChange}
+              onTabChange={onTabChange}
+              onOpenDetail={onOpenDetail}
+              onOpenReview={onOpenReview}
+              onSendNow={onSendAssignmentNow}
+              onFixConfigError={onFixConfigError}
+              onCancelIssue={onCancelAssignmentIssue}
+              onReissue={onReissueAssignment}
+              onRemind={onRemindAssignment}
+              onDelete={onDeleteAssignment}
+            />
           ) : null}
-        </div>
 
-        {workspaceMode === 'list' ? (
-          <div className={styles.statusTabsRow}>
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`${styles.statusTabButton} ${activeTab === tab.id ? styles.statusTabButtonActive : ''}`}
-                onClick={() => onTabChange(tab.id)}
-              >
-                {tab.label}
-                {activeTab === tab.id ? <span className={styles.statusTabCounter}>{countsByTab[tab.id] ?? 0}</span> : null}
-              </button>
-            ))}
-            {loadingSummary ? <span className={styles.statusTabsMeta}>Обновляем сводку...</span> : null}
-          </div>
-        ) : null}
-
-        {workspaceMode === 'list' ? (
-          <>
-        {isBulkPanelOpen ? (
-          <div className={styles.bulkPanel}>
-            <select
-              className={`${controls.input} ${styles.bulkSelect}`}
-              value={bulkAction}
-              onChange={(event) => setBulkAction(event.target.value as TeacherBulkAction)}
-            >
-              {BULK_ACTION_LABELS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className={styles.bulkApplyButton}
-              onClick={() => {
-                void handleBulkApply();
-              }}
-              disabled={!selectedIds.length}
-            >
-              Применить ({selectedIds.length})
-            </button>
-          </div>
-        ) : null}
-
-        {assignmentsError ? <div className={styles.error}>{assignmentsError}</div> : null}
-        {summaryError ? <div className={styles.error}>{summaryError}</div> : null}
-        {studentsError ? <div className={styles.error}>{studentsError}</div> : null}
-
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>
-                  <Checkbox
-                    checked={allSelected}
-                    onChange={(event) =>
-                      setSelectedIds(event.target.checked ? assignments.map((assignment) => assignment.id) : [])
-                    }
-                    aria-label="Выбрать все"
-                  />
-                </th>
-                <th>Ученик / Задание</th>
-                <th>Статус</th>
-                <th>Дедлайн</th>
-                <th>Дата создания</th>
-                <th>Ответ</th>
-                <th className={styles.rightCell}>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingAssignments ? (
-                ASSIGNMENT_SKELETON_ROWS.map((index) => (
-                  <tr key={`skeleton_${index}`} className={styles.rowSkeleton} aria-hidden>
-                    <td>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonCheck}`} />
-                    </td>
-                    <td>
-                      <div className={styles.studentCell}>
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonAvatar}`} />
-                        <div className={styles.primaryCell}>
-                          <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineTitle}`} />
-                          <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineMeta}`} />
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonBadge}`} />
-                    </td>
-                    <td>
-                      <div className={styles.deadlineColumn}>
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineDeadline}`} />
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineDeadlineSub}`} />
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.skeletonLineResponse}`} />
-                    </td>
-                    <td className={styles.rightCell}>
-                      <div className={styles.rowActions}>
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonAction}`} />
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonAction} ${styles.skeletonActionShort}`} />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : assignments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={styles.emptyRow}>
-                    Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить» в верхнем хедере, чтобы создать задание, выдать домашку или собрать новый шаблон.
-                  </td>
-                </tr>
-              ) : (
-                assignments.map((assignment) => {
-                  const responseMeta = resolveAssignmentResponseMeta(assignment);
-                  const problemBadges = resolveAssignmentProblemBadges(assignment);
-                  const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
-                  const studentInitials = getStudentInitials(studentLabel);
-                  const studentAvatarColor = resolveAssignmentStudentAvatarColor(assignment);
-                  const studentAvatarTextColor = resolveAssignmentStudentAvatarTextColor(studentAvatarColor);
-                  const shouldReview = needsAssignmentReview(assignment);
-                  const responseVisual = resolveResponseVisual(assignment);
-                  const responseText = responseVisual.kind === 'empty' ? responseVisual.emptyText || responseMeta : '';
-                  const shouldShowEmptyResponse = responseText === 'Нет ответа';
-                  const isOverdueRow = problemBadges.hasOverdue;
-                  const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
-                  const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
-                  const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
-                  const canReissue = canReissueHomeworkAssignment(assignment);
-                  const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
-                  return (
-                    <tr
-                      key={assignment.id}
-                      className={`${styles.row} ${
-                        problemBadges.hasOverdue ? styles.rowOverdue : ''
-                      } ${problemBadges.hasConfigError ? styles.rowConfigError : ''}`}
-                    >
-                      <td>
-                        <Checkbox
-                          checked={selectedIds.includes(assignment.id)}
-                          onChange={(event) =>
-                            setSelectedIds((prev) =>
-                              event.target.checked ? [...prev, assignment.id] : prev.filter((id) => id !== assignment.id),
-                            )
-                          }
-                          aria-label={`Выбрать ${assignment.title}`}
-                        />
-                      </td>
-                      <td>
-                        <div className={styles.studentCell}>
-                          <div className={styles.studentAvatarWrap}>
-                            <div
-                              className={styles.studentAvatar}
-                              style={{ background: studentAvatarColor, color: studentAvatarTextColor }}
-                            >
-                              {studentInitials}
-                            </div>
-                            {assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' ? (
-                              <span className={styles.studentOnlineDot} aria-hidden />
-                            ) : null}
-                          </div>
-                          <div className={styles.primaryCell}>
-                            <button
-                              type="button"
-                              className={styles.assignmentTitleButton}
-                              onClick={() => onOpenDetail(assignment)}
-                              aria-label={`Открыть домашнее задание "${assignment.title}"`}
-                            >
-                              <Ellipsis
-                                className={styles.assignmentTitle}
-                                title={assignment.title}
-                                tooltipAlign="start"
-                              >
-                                {assignment.title}
-                              </Ellipsis>
-                            </button>
-                            <div className={styles.assignmentMeta}>
-                              <button
-                                type="button"
-                                className={styles.metaLinkButton}
-                                onClick={() => onOpenStudentProfile(assignment.studentId)}
-                              >
-                                {studentLabel}
-                              </button>
-                              <span className={styles.metaDot} />
-                              {assignment.lessonId ? (
-                                <button
-                                  type="button"
-                                  className={`${styles.lessonMeta} ${styles.metaLinkButton}`}
-                                  onClick={() => onOpenLessonDay(assignment)}
-                                >
-                                  <HomeworkLinkIcon size={10} className={styles.lessonMetaIcon} />
-                                  <span>{formatDateTime(assignment.lessonStartAt)}</span>
-                                </button>
-                              ) : (
-                                <span>Без привязки к уроку</span>
-                              )}
-                              {assignment.templateTitle ? (
-                                <>
-                                  <span className={styles.metaDot} />
-                                  <span>Шаблон: {assignment.templateTitle}</span>
-                                </>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.statusColumn}>
-                          <span className={`${styles.issuanceBadge} ${styles[`issuanceBadge_${resolveIssuanceTone(assignment)}`]}`}>
-                            {resolveIssuanceLabel(assignment)}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <AssignmentDeadlineCell
-                          assignment={assignment}
-                          readOnly={!canEditAssignment}
-                          onUpdate={onUpdateAssignmentDeadline}
-                        />
-                      </td>
-                      <td>
-                        <div className={styles.createdAtCell}>{formatDateTime(assignment.createdAt)}</div>
-                      </td>
-                      <td>
-                        <div className={styles.responseColumn}>
-                          {responseVisual.kind === 'empty' ? (
-                            shouldShowEmptyResponse ? <div className={styles.responseEmpty}>{responseText}</div> : null
-                          ) : (
-                            <div className={styles.responseIcons}>
-                              {(responseVisual.icons ?? []).map((icon) => (
-                                <span
-                                  key={`${assignment.id}_${icon.id}`}
-                                  className={`${styles.responseIconChip} ${styles[`responseIconChip_${icon.tone}`]}`}
-                                >
-                                  {icon.kind === 'text' ? <HomeworkAlignLeftIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'file' ? <HomeworkFilePdfIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'voice' ? <HomeworkMicrophoneIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'test' ? <HomeworkListCheckIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                </span>
-                              ))}
-                              {responseVisual.autoCheckBadge ? (
-                                <Tooltip content={resolveAutoCheckTooltip(responseVisual.autoCheckBadge) ?? ''}>
-                                  <span
-                                    className={`${styles.responseAutoBadge} ${
-                                      styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
-                                    }`}
-                                  >
-                                    <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
-                                    <span>{responseVisual.autoCheckBadge.label}</span>
-                                  </span>
-                                </Tooltip>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className={styles.rightCell}>
-                        <div className={styles.rowActions}>
-                          {shouldReview ? (
-                            <button
-                              type="button"
-                              className={styles.reviewButton}
-                              onClick={() => onOpenReview(assignment)}
-                            >
-                              Проверить
-                            </button>
-                          ) : assignment.hasConfigError && canEditAssignment ? (
-                            <button
-                              type="button"
-                              className={styles.fixButton}
-                              onClick={() => {
-                                void onFixConfigError(assignment);
-                              }}
-                            >
-                              Исправить
-                            </button>
-                          ) : (
-                            <>
-                              {canSendNow ? (
-                                <button
-                                  type="button"
-                                  className={styles.sendNowButton}
-                                  onClick={() => {
-                                    void onSendAssignmentNow(assignment);
-                                  }}
-                                >
-                                  Выдать
-                                </button>
-                              ) : null}
-                              <AssignmentRowMenu
-                                assignment={assignment}
-                                canCancelIssue={canCancelIssue}
-                                canReissue={canReissue}
-                                shouldShowRemind={shouldShowRemind}
-                                onCancelIssue={(targetAssignment) => {
-                                  void onCancelAssignmentIssue(targetAssignment);
-                                }}
-                                onReissue={(targetAssignment) => {
-                                  void onReissueAssignment(targetAssignment);
-                                }}
-                                onRemind={(targetAssignment) => {
-                                  void onRemindAssignment(targetAssignment);
-                                }}
-                                onDelete={(targetAssignment) => {
-                                  void onDeleteAssignment(targetAssignment);
-                                }}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className={styles.mobileList}>
-          {loadingAssignments
-            ? ASSIGNMENT_SKELETON_ROWS.map((index) => (
-                <article key={`mobile_skeleton_${index}`} className={`${styles.mobileCard} ${styles.mobileSkeletonCard}`} aria-hidden>
-                  <div className={styles.mobileCardHeader}>
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonCheck}`} />
-                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonBadge}`} />
-                  </div>
-                  <div className={styles.mobileStudent}>
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonAvatar}`} />
-                    <div className={styles.mobileStudentMain}>
-                      <div className={styles.mobileTop}>
-                        <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
-                        <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonBadge}`} />
-                      </div>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
-                    </div>
-                  </div>
-                  <div className={styles.mobileMetaGrid}>
-                    <div className={styles.mobileMetaCard}>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
-                    </div>
-                    <div className={styles.mobileMetaCard}>
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMeta}`} />
-                      <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
-                    </div>
-                  </div>
-                  <div className={styles.mobileSubmeta}>
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonTitle}`} />
-                    <span className={`${styles.skeletonPulse} ${styles.skeletonLine} ${styles.mobileSkeletonMetaShort}`} />
-                  </div>
-                  <div className={styles.mobileActions}>
-                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonAction}`} />
-                    <span className={`${styles.skeletonPulse} ${styles.mobileSkeletonAction}`} />
-                  </div>
-                </article>
-              ))
-            : assignments.length === 0 ? (
-                <div className={styles.mobileEmptyState}>
-                  Пока ничего не найдено. Попробуйте изменить поиск или используйте кнопку «Добавить», чтобы создать новое задание.
-                </div>
-              ) : assignments.map((assignment) => {
-                const responseMeta = resolveAssignmentResponseMeta(assignment);
-                const studentLabel = assignment.studentName || studentsById.get(assignment.studentId) || `Ученик #${assignment.studentId}`;
-                const studentInitials = getStudentInitials(studentLabel);
-                const studentAvatarColor = resolveAssignmentStudentAvatarColor(assignment);
-                const studentAvatarTextColor = resolveAssignmentStudentAvatarTextColor(studentAvatarColor);
-                const statusTone = resolveStatusTone(assignment);
-                const shouldReview = needsAssignmentReview(assignment);
-                const problemBadges = resolveAssignmentProblemBadges(assignment);
-                const responseVisual = resolveResponseVisual(assignment);
-                const isSelected = selectedIds.includes(assignment.id);
-                const isOverdueRow = problemBadges.hasOverdue;
-                const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
-                const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
-                const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
-                const canReissue = canReissueHomeworkAssignment(assignment);
-                const shouldShowRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || isOverdueRow;
-                const hasLessonMeta = Boolean(assignment.lessonId);
-                const hasTemplateMeta = Boolean(assignment.templateTitle);
-                return (
-                  <article
-                    key={`mobile_${assignment.id}`}
-                    className={`${styles.mobileCard} ${assignment.isOverdue ? styles.rowOverdue : ''} ${
-                      assignment.hasConfigError ? styles.rowConfigError : ''
-                    }`}
-                  >
-                    <div className={styles.mobileCardHeader}>
-                      <div className={styles.mobileBadgeRow}>
-                        <span className={`${styles.issuanceBadge} ${styles[`issuanceBadge_${resolveIssuanceTone(assignment)}`]}`}>
-                          {resolveIssuanceLabel(assignment)}
-                        </span>
-                        <span className={`${styles.statusBadge} ${styles[`statusBadge_${statusTone}`]}`}>
-                          {resolveStatusLabel(assignment)}
-                        </span>
-                      </div>
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={(event) =>
-                          setSelectedIds((prev) =>
-                            event.target.checked ? [...prev, assignment.id] : prev.filter((id) => id !== assignment.id),
-                          )
-                        }
-                        aria-label={`Выбрать ${assignment.title}`}
-                      />
-                    </div>
-
-                    <div className={styles.mobileStudent}>
-                      <div className={styles.studentAvatarWrap}>
-                        <div
-                          className={styles.studentAvatar}
-                          style={{ background: studentAvatarColor, color: studentAvatarTextColor }}
-                        >
-                          {studentInitials}
-                        </div>
-                        {assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' ? (
-                          <span className={styles.studentOnlineDot} aria-hidden />
-                        ) : null}
-                      </div>
-
-                      <div className={styles.mobileStudentMain}>
-                        <button
-                          type="button"
-                          className={styles.assignmentTitleButton}
-                          onClick={() => onOpenDetail(assignment)}
-                          aria-label={`Открыть домашнее задание "${assignment.title}"`}
-                        >
-                          <Ellipsis
-                            className={styles.assignmentTitle}
-                            title={assignment.title}
-                            tooltipAlign="start"
-                          >
-                            {assignment.title}
-                          </Ellipsis>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.mobileStudentLabel} ${styles.metaLinkButton}`}
-                          onClick={() => onOpenStudentProfile(assignment.studentId)}
-                        >
-                          {studentLabel}
-                        </button>
-                        {problemBadges.hasOverdue || problemBadges.hasReturned || problemBadges.hasConfigError || assignment.lateState === 'LATE' ? (
-                          <div className={styles.problemBadges}>
-                            {problemBadges.hasOverdue ? <span className={styles.problemDanger}>Просрочено</span> : null}
-                            {problemBadges.hasReturned ? <span className={styles.problemWarn}>На доработке</span> : null}
-                            {assignment.lateState === 'LATE' ? <span className={styles.problemWarn}>Сдано после срока</span> : null}
-                            {problemBadges.hasConfigError ? <span className={styles.problemDanger}>Ошибка настройки</span> : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className={styles.mobileMetaGrid}>
-                      <div className={styles.mobileMetaCard}>
-                        <span className={styles.mobileMetaLabel}>Дедлайн</span>
-                        <AssignmentDeadlineCell
-                          assignment={assignment}
-                          readOnly={!canEditAssignment}
-                          onUpdate={onUpdateAssignmentDeadline}
-                        />
-                      </div>
-
-                      <div className={styles.mobileMetaCard}>
-                        <span className={styles.mobileMetaLabel}>Создано</span>
-                        <span className={styles.mobileMetaValue}>{formatDateTime(assignment.createdAt)}</span>
-                      </div>
-
-                      <div className={styles.mobileMetaCard}>
-                        <span className={styles.mobileMetaLabel}>Ответ</span>
-                        {responseVisual.kind === 'empty' ? (
-                          <span className={styles.mobileResponseText}>{responseVisual.emptyText || responseMeta}</span>
-                        ) : (
-                          <div className={styles.mobileResponseRow}>
-                            <div className={styles.responseIcons}>
-                              {(responseVisual.icons ?? []).map((icon) => (
-                                <span
-                                  key={`${assignment.id}_mobile_${icon.id}`}
-                                  className={`${styles.responseIconChip} ${styles[`responseIconChip_${icon.tone}`]}`}
-                                >
-                                  {icon.kind === 'text' ? <HomeworkAlignLeftIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'file' ? <HomeworkFilePdfIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'voice' ? <HomeworkMicrophoneIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                  {icon.kind === 'test' ? <HomeworkListCheckIcon size={12} className={styles.inlineFaIcon} /> : null}
-                                </span>
-                              ))}
-                            </div>
-                            {responseVisual.autoCheckBadge ? (
-                              <Tooltip content={resolveAutoCheckTooltip(responseVisual.autoCheckBadge) ?? ''}>
-                                <span
-                                  className={`${styles.responseAutoBadge} ${
-                                    styles[`responseAutoBadge_${responseVisual.autoCheckBadge.tone}`]
-                                  }`}
-                                >
-                                  <HomeworkRobotIcon size={12} className={styles.inlineFaIcon} />
-                                  <span>{responseVisual.autoCheckBadge.label}</span>
-                                </span>
-                              </Tooltip>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {hasLessonMeta || hasTemplateMeta ? (
-                      <div className={styles.mobileSubmeta}>
-                        {hasLessonMeta ? (
-                          <button
-                            type="button"
-                            className={`${styles.lessonMeta} ${styles.metaLinkButton}`}
-                            onClick={() => onOpenLessonDay(assignment)}
-                          >
-                            <HomeworkLinkIcon size={10} className={styles.lessonMetaIcon} />
-                            <span>{formatDateTime(assignment.lessonStartAt)}</span>
-                          </button>
-                        ) : null}
-                        {hasTemplateMeta ? <span>Шаблон: {assignment.templateTitle}</span> : null}
-                      </div>
-                    ) : null}
-
-                    <div className={styles.mobileActions}>
-                      {shouldReview ? (
-                        <button
-                          type="button"
-                          className={`${styles.reviewButton} ${styles.mobileActionButton}`}
-                          onClick={() => onOpenReview(assignment)}
-                        >
-                          Проверить
-                        </button>
-                      ) : null}
-
-                      {assignment.hasConfigError && canEditAssignment ? (
-                        <button
-                          type="button"
-                          className={`${styles.fixButton} ${styles.mobileActionButton}`}
-                          onClick={() => {
-                            void onFixConfigError(assignment);
-                          }}
-                        >
-                          Исправить
-                        </button>
-                      ) : null}
-
-                      {canSendNow ? (
-                        <button
-                          type="button"
-                          className={`${styles.sendNowButton} ${styles.mobileActionButton}`}
-                          onClick={() => {
-                            void onSendAssignmentNow(assignment);
-                          }}
-                        >
-                          Выдать
-                        </button>
-                      ) : null}
-
-                      <AssignmentRowMenu
-                        assignment={assignment}
-                        canCancelIssue={canCancelIssue}
-                        canReissue={canReissue}
-                        shouldShowRemind={shouldShowRemind}
-                        onCancelIssue={(targetAssignment) => {
-                          void onCancelAssignmentIssue(targetAssignment);
-                        }}
-                        onReissue={(targetAssignment) => {
-                          void onReissueAssignment(targetAssignment);
-                        }}
-                        onRemind={(targetAssignment) => {
-                          void onRemindAssignment(targetAssignment);
-                        }}
-                        onDelete={(targetAssignment) => {
-                          void onDeleteAssignment(targetAssignment);
-                        }}
-                      />
-                    </div>
-                  </article>
-                );
-              })}
-        </div>
-
-        {hasMoreAssignments ? (
-          <div className={styles.loadMoreRow}>
-            <button
-              type="button"
-              className={styles.loadMoreButton}
-              onClick={onLoadMoreAssignments}
-              disabled={loadingMoreAssignments}
-            >
-              <span>{loadingMoreAssignments ? 'Загрузка...' : 'Показать еще 10'}</span>
-              <HomeworkChevronDownIcon size={12} className={styles.loadMoreArrow} />
-            </button>
-          </div>
-        ) : null}
-          </>
-        ) : null}
-
-        {workspaceMode === 'groups' ? (
-          <section className={styles.groupsSection}>
-            <div className={styles.groupsTopBar}>
+          {workspaceMode === 'drafts' ? (
+            <HomeworkAssignmentsWorkspace
+              mode="drafts"
+              assignments={draftAssignmentRows}
+              loading={loadingAssignments}
+              error={assignmentsError ?? summaryError ?? studentsError}
+              searchQuery={searchQuery}
+              sortBy={sortBy}
+              selectedStudentId={selectedStudentId}
+              students={students}
+              loadingStudents={loadingStudents}
+              activeTab={activeTab}
+              countsByTab={assignedCounts}
+              draftCounts={draftCounts}
+              onSearchChange={onSearchChange}
+              onSortChange={onSortChange}
+              onSelectedStudentIdChange={onSelectedStudentIdChange}
+              onTabChange={onTabChange}
+              onOpenDetail={onOpenDetail}
+              onOpenReview={onOpenReview}
+              onSendNow={onSendAssignmentNow}
+              onFixConfigError={onFixConfigError}
+              onCancelIssue={onCancelAssignmentIssue}
+              onReissue={onReissueAssignment}
+              onRemind={onRemindAssignment}
+              onDelete={onDeleteAssignment}
+            />
+          ) : null}
+          {workspaceMode === 'groups' ? (
+          <section className={styles.workspace}>
+            <section className={styles.groupsSection}>
+              <div className={styles.groupsTopBar}>
               <input
                 type="search"
                 className={styles.groupsSearchInput}
@@ -1590,7 +1102,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 value={groupSearchQuery}
                 onChange={(event) => setGroupSearchQuery(event.target.value)}
               />
-              <button type="button" className={styles.groupsCreateButton} onClick={openCreateGroupEditor}>
+              <button type="button" className={styles.groupsCreateButton} onClick={() => openCreateGroupEditor()}>
                 <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
                 <span>Создать группу</span>
               </button>
@@ -1758,94 +1270,11 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
                 })}
               </div>
             ) : null}
+            </section>
           </section>
-        ) : null}
-
-      {workspaceMode === 'templates' ? (
-        <section className={styles.templatesSection}>
-          <div className={styles.templatesTopBar}>
-            <input
-              type="search"
-              className={styles.templatesSearchInput}
-              placeholder="Поиск по шаблонам..."
-              value={templateSearchQuery}
-              onChange={(event) => setTemplateSearchQuery(event.target.value)}
-            />
-            <div className={styles.templatesTopActions}>
-              <button type="button" className={controls.secondaryButton} onClick={() => setIsArchiveModalOpen(true)}>
-                Архив ({archivedTemplates.length})
-              </button>
-              <button type="button" className={styles.templatesCreateButton} onClick={onOpenCreateTemplateScreen}>
-                <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
-                <span>Создать шаблон</span>
-              </button>
-            </div>
-          </div>
-
-        {templatesError ? <div className={styles.error}>{templatesError}</div> : null}
-        {loadingTemplates ? <div className={styles.emptyTemplates}>Загрузка шаблонов...</div> : null}
-
-        {!loadingTemplates ? (
-          <div className={styles.templatesGrid}>
-            {savedCreateDraft ? (
-              <article className={`${styles.templateCard} ${styles.templateDraftCard}`}>
-                <div className={styles.templateCardHead}>
-                  <span className={styles.templateDraftBadge}>
-                    <HomeworkBookmarkRegularIcon size={12} /> Черновик
-                  </span>
-                </div>
-                <h3 className={styles.templateTitle}>{savedCreateDraft.title}</h3>
-                <p className={styles.templatePreview}>{savedCreateDraft.preview}</p>
-                <div className={styles.templateFooter}>
-                  <span>
-                    Сохранен: {savedCreateDraft.savedAtLabel}
-                    {savedCreateDraft.questionCount > 0 ? ` · ${savedCreateDraft.questionCount} вопросов` : ''}
-                  </span>
-                  <div className={styles.templateActions}>
-                    <button type="button" className={controls.smallButton} onClick={onOpenCreateTemplateScreen}>
-                      Продолжить редактирование
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ) : null}
-
-            {quickTemplates.map((template) => (
-              <HomeworkTemplateCard
-                key={template.id}
-                template={template}
-                onToggleFavorite={(item) => {
-                  void onToggleTemplateFavorite(item);
-                }}
-                onUseTemplate={(item) => {
-                  void onCreateAssignment({
-                    studentId: selectedStudentId,
-                    lessonId: null,
-                    templateId: item.id,
-                    groupId: null,
-                    deadlineAt: null,
-                    sendMode: 'MANUAL',
-                  });
-                }}
-                onEditTemplate={(item) => onOpenEditTemplateScreen(item.id)}
-              />
-            ))}
-
-            <article className={`${styles.templateCard} ${styles.templateCreateCard}`}>
-              <button type="button" className={styles.createTemplateButton} onClick={onOpenCreateTemplateScreen}>
-                <span className={styles.createTemplateIconWrap}>
-                  <HomeworkPlusIcon size={18} className={styles.createTemplatePlusIcon} />
-                </span>
-                <span className={styles.createTemplateTitle}>Создать шаблон</span>
-                <span className={styles.createTemplateHint}>Конструктор заданий</span>
-              </button>
-            </article>
-          </div>
-        ) : null}
-      </section>
-      ) : null}
-
-      </section>
+          ) : null}
+        </>
+      )}
 
       <GroupEditorModal
         open={groupEditorOpen}
@@ -1881,45 +1310,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         }}
       />
 
-      <Modal open={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} title="Архив шаблонов">
-        <div className={styles.archiveModalContent}>
-          {archivedTemplates.length === 0 ? (
-            <div className={styles.emptyTemplates}>В архиве пока нет шаблонов</div>
-          ) : (
-            <div className={styles.archiveTemplatesList}>
-              {archivedTemplates.map((template) => {
-                const category = resolveHomeworkTemplateCategory(template);
-                const estimated = formatHomeworkTemplateDuration(estimateHomeworkTemplateDurationMinutes(template));
-                return (
-                  <article key={`archived_${template.id}`} className={styles.archiveTemplateCard}>
-                    <div className={styles.templateCardHead}>
-                      <span className={styles.templateCategory}>{category}</span>
-                    </div>
-                    <h3 className={styles.templateTitle}>{template.title}</h3>
-                    <p className={styles.templatePreview}>{resolveHomeworkTemplatePreview(template)}</p>
-                    <div className={styles.templateFooter}>
-                      <span>{estimated}</span>
-                      <div className={styles.templateActions}>
-                        <button
-                          type="button"
-                          className={controls.smallButton}
-                          disabled={submittingTemplate}
-                          onClick={() => {
-                            void onRestoreTemplate(template);
-                          }}
-                        >
-                          Восстановить
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </Modal>
-
       <HomeworkAssignModal
         open={isAssignmentModalOpen}
         templates={templates.filter((item) => !item.isArchived)}
@@ -1943,7 +1333,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         onClose={onCloseReview}
         onSubmitReview={onSubmitReview}
       />
-
       <Modal
         open={isActivityModalOpen}
         onClose={() => setIsActivityModalOpen(false)}

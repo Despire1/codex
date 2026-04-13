@@ -24,6 +24,7 @@ type HomeworkRoutesV2Handlers = {
   ) => Promise<unknown>;
   createHomeworkTemplateV2: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   updateHomeworkTemplateV2: (user: unknown, templateId: number, body: Record<string, unknown>) => Promise<unknown>;
+  deleteHomeworkTemplateV2: (user: unknown, templateId: number) => Promise<unknown>;
   listHomeworkAssignmentsV2: (
     user: unknown,
     params: {
@@ -174,7 +175,7 @@ export const tryHandleHomeworkRoutesV2 = async ({
   }
 
   const homeworkTemplateUpdateMatch = pathname.match(/^\/api\/v2\/homework\/templates\/(\d+)$/);
-  if (req.method === 'PATCH' && homeworkTemplateUpdateMatch) {
+  if (homeworkTemplateUpdateMatch) {
     if (role === 'STUDENT') {
       sendJson(res, 403, { message: 'forbidden' });
       return true;
@@ -184,10 +185,17 @@ export const tryHandleHomeworkRoutesV2 = async ({
       badRequest(res, 'invalid_template_id');
       return true;
     }
-    const body = await readBody(req);
-    const data = await handlers.updateHomeworkTemplateV2(requireApiUser(), templateId, body);
-    sendJson(res, 200, data);
-    return true;
+    if (req.method === 'PATCH') {
+      const body = await readBody(req);
+      const data = await handlers.updateHomeworkTemplateV2(requireApiUser(), templateId, body);
+      sendJson(res, 200, data);
+      return true;
+    }
+    if (req.method === 'DELETE') {
+      const data = await handlers.deleteHomeworkTemplateV2(requireApiUser(), templateId);
+      sendJson(res, 200, data);
+      return true;
+    }
   }
 
   if (req.method === 'GET' && pathname === '/api/v2/homework/assignments') {

@@ -1,0 +1,374 @@
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 30px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: #e6ebf2;
+  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.08);
+}
+
+.card:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+.cardList {
+  min-height: 0;
+}
+
+.cardBody {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: inherit;
+  padding: 18px 22px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.categoryBadgePurple {
+  background: #f3ecff;
+  color: #8a63ff;
+}
+
+.categoryBadgeBlue {
+  background: #eef4ff;
+  color: #5f85ff;
+}
+
+.categoryBadgeGreen {
+  background: #effaed;
+  color: #69bc6a;
+}
+
+.categoryBadgeOrange {
+  background: #fff1e6;
+  color: #f08b4b;
+}
+
+.categoryBadgeIndigo {
+  background: #eef0ff;
+  color: #6a77ee;
+}
+
+.categoryBadgePink {
+  background: #fff0f6;
+  color: #e97aac;
+}
+
+.categoryBadgeGray {
+  background: #f3f4f8;
+  color: #7b8495;
+}
+
+.menuButton {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #c5ccd8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: #f5f7fb;
+  color: #7c8597;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  color: #1a2030;
+  font-size: 17px;
+  line-height: 1.32;
+  font-weight: 800;
+}
+
+.description {
+  margin: 0;
+  color: #717b8e;
+  font-size: 13px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.badgesRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.metaBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.metaBadgeBlue {
+  background: #eef4ff;
+  color: #6788ff;
+}
+
+.metaBadgeGreen {
+  background: #effaed;
+  color: #6ab96f;
+}
+
+.metaBadgeOrange {
+  background: #fff1e6;
+  color: #ef914f;
+}
+
+.metaBadgeIndigo {
+  background: #eef0ff;
+  color: #6a77ee;
+}
+
+.metaBadgePink {
+  background: #fff0f6;
+  color: #e97aac;
+}
+
+.metaBadgePurple {
+  background: #f3ecff;
+  color: #8a63ff;
+}
+
+.metaBadgeGray {
+  background: #f2f4f7;
+  color: #7d8698;
+}
+
+.metricsRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #949cad;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.metricIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  color: #a0a7b6;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #f1f4f8;
+}
+
+.updatedLabel {
+  color: #a1a8b5;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.issuedMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6e7586;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.hoverActions {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: stretch;
+  padding: 10px 22px 18px;
+  background: #fff;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.card:hover .hoverActions,
+.card:focus-within .hoverActions,
+.hoverActionsList {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.hoverActionsList {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 28px 22px 18px;
+  background: #fff;
+}
+
+.issueButton {
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  border-radius: 16px;
+  background: #0d1017;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.issueButton:hover {
+  background: #000;
+}
+
+.menuPopover {
+  min-width: 216px;
+  border-radius: 18px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.16);
+  padding: 8px;
+}
+
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menuItem {
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #30384a;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: #f7f9fc;
+}
+
+.menuItemDanger {
+  color: #d14343;
+}
+
+.menuItemIcon {
+  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+@media (max-width: 720px) {
+  .card {
+    min-height: 0;
+    border-radius: 24px;
+  }
+
+  .cardBody {
+    padding: 18px 18px 16px;
+  }
+
+  .hoverActions,
+  .hoverActionsList {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    padding: 24px 18px 16px;
+    background: #fff;
+  }
+}

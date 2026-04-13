@@ -4,6 +4,8 @@
 
 .tooltip {
   position: fixed;
+  display: block;
+  box-sizing: border-box;
   z-index: 9999;
   padding: 6px 10px;
   border-radius: 10px;
@@ -16,6 +18,7 @@
   width: max-content;
   max-width: min(200px, calc(100vw - 16px));
   overflow-wrap: anywhere;
+  word-break: break-word;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
   pointer-events: none;
 }

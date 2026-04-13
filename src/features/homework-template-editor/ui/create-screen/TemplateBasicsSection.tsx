@@ -85,7 +85,7 @@ const TYPE_OPTIONS: AssignmentSettingsSelectOption[] = [
 
 export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
   disabled = false,
-  titleLabel = 'Название шаблона',
+  titleLabel = 'Название домашнего задания',
   titlePlaceholder = 'Например: Present Perfect Practice',
   title,
   titleError = null,
@@ -186,14 +186,14 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
           {assignmentTemplateOptions && onAssignmentTemplateChange ? (
             <div className={`${styles.metaCard} ${styles.metaCardFull}`}>
               <div className={styles.fieldLabel}>
-                <span>Создать по шаблону</span>
+                <span>Создать на основе домашки</span>
                 <AssignmentSettingsSelect
                   value={assignmentTemplateId}
                   options={assignmentTemplateOptions}
                   placeholder={
-                    assignmentTemplateOptions.length > 0 ? 'Выберите шаблон…' : 'Нет доступных шаблонов'
+                    assignmentTemplateOptions.length > 0 ? 'Выберите домашнее задание…' : 'Нет доступных домашних заданий'
                   }
-                  ariaLabel="Выбор шаблона домашнего задания"
+                  ariaLabel="Выбор домашнего задания"
                   compact
                   allowClear
                   disabled={disabled || assignmentTemplateOptions.length === 0}

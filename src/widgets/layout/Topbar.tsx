@@ -10,7 +10,9 @@ import {
   NotificationsNoneOutlinedIcon,
   SaveOutlinedIcon,
 } from '../../icons/MaterialIcons';
+import { type HomeworkTemplateDetailTopbarTone } from '../../features/homework-template-view/model/lib/homeworkTemplateDetailTopbarBridge';
 import { Avatar } from '../../shared/ui/Avatar/Avatar';
+import { HomeworkPrintIcon } from '../../shared/ui/icons/HomeworkFaIcons';
 import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
 import { TopbarCreateMenu, type TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
 import styles from './Topbar.module.css';
@@ -19,9 +21,11 @@ interface TopbarProps {
   teacher: Teacher;
   title: string;
   subtitle: string;
+  variant?: 'default' | 'homeworks';
   showCreateLesson: boolean;
   createButtonLabel?: string;
   createButtonIconAccent?: boolean;
+  reserveCreateButtonSpace?: boolean;
   createMenuItems?: TopbarCreateMenuItem[];
   showEditorActions?: boolean;
   showEditorSecondaryAction?: boolean;
@@ -42,6 +46,12 @@ interface TopbarProps {
   showScheduleViewToggle?: boolean;
   scheduleView?: 'month' | 'week' | 'day';
   onScheduleViewChange?: (view: 'month' | 'week' | 'day') => void;
+  statusBadgeLabel?: string | null;
+  statusBadgeTone?: HomeworkTemplateDetailTopbarTone;
+  showPrintAction?: boolean;
+  onPrintAction?: () => void;
+  notificationDotVisible?: boolean;
+  showProfile?: boolean;
 }
 
 export type { TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
@@ -50,9 +60,11 @@ export const Topbar: FC<TopbarProps> = ({
   teacher,
   title,
   subtitle,
+  variant = 'default',
   showCreateLesson,
   createButtonLabel = 'Новое занятие',
   createButtonIconAccent = false,
+  reserveCreateButtonSpace = true,
   createMenuItems,
   showEditorActions = false,
   showEditorSecondaryAction = false,
@@ -73,12 +85,19 @@ export const Topbar: FC<TopbarProps> = ({
   showScheduleViewToggle = false,
   scheduleView = 'month',
   onScheduleViewChange,
+  statusBadgeLabel = null,
+  statusBadgeTone = 'active',
+  showPrintAction = false,
+  onPrintAction,
+  notificationDotVisible = true,
+  showProfile = true,
 }) => {
   const fallbackText = teacher.name || teacher.username || 'П';
   const teacherDisplayName = teacher.name ?? teacher.username ?? 'Преподаватель';
+  const isHomeworksVariant = variant === 'homeworks';
 
   return (
-    <header className={styles.topbar}>
+    <header className={`${styles.topbar} ${isHomeworksVariant ? styles.topbarHomeworks : ''}`}>
       <div className={styles.left}>
         {showBackButton ? (
           <Tooltip content={backButtonTooltip} side="bottom" align="start">
@@ -87,11 +106,15 @@ export const Topbar: FC<TopbarProps> = ({
             </button>
           </Tooltip>
         ) : null}
-        <h1 className={styles.title}>{title}</h1>
-        <span className={styles.separator} aria-hidden>
-          |
-        </span>
-        <p className={styles.subtitle}>{subtitle}</p>
+        <div className={`${styles.titleGroup} ${isHomeworksVariant ? styles.titleGroupHomeworks : ''}`}>
+          <h1 className={`${styles.title} ${isHomeworksVariant ? styles.titleHomeworks : ''}`}>{title}</h1>
+          {isHomeworksVariant ? null : (
+            <span className={styles.separator} aria-hidden>
+              |
+            </span>
+          )}
+          <p className={`${styles.subtitle} ${isHomeworksVariant ? styles.subtitleHomeworks : ''}`}>{subtitle}</p>
+        </div>
       </div>
 
       <div
@@ -100,7 +123,9 @@ export const Topbar: FC<TopbarProps> = ({
             ? styles.actionsTemplateMode
             : showCreateLesson
               ? styles.actionsCreateVisible
-              : styles.actionsCreateHidden
+              : reserveCreateButtonSpace
+                ? styles.actionsCreateHidden
+                : styles.actionsNoCreateReserve
         }`}
       >
         {showScheduleViewToggle ? (
@@ -147,7 +172,7 @@ export const Topbar: FC<TopbarProps> = ({
               onClick={onOpenNotifications}
             >
               <NotificationsNoneOutlinedIcon width={20} height={20} />
-              <span className={styles.notificationDot} aria-hidden />
+              {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
             </button>
 
             {showEditorSecondaryAction ? (
@@ -176,6 +201,21 @@ export const Topbar: FC<TopbarProps> = ({
           </>
         ) : (
           <>
+            {statusBadgeLabel ? (
+              <span
+                className={`${styles.statusBadge} ${
+                  statusBadgeTone === 'draft'
+                    ? styles.statusBadgeDraft
+                    : statusBadgeTone === 'archived'
+                      ? styles.statusBadgeArchived
+                      : styles.statusBadgeActive
+                }`}
+              >
+                <span className={styles.statusBadgeDot} aria-hidden />
+                <span>{statusBadgeLabel}</span>
+              </span>
+            ) : null}
+
             <button
               type="button"
               className={styles.iconButton}
@@ -183,11 +223,20 @@ export const Topbar: FC<TopbarProps> = ({
               onClick={onOpenNotifications}
             >
               <NotificationsNoneOutlinedIcon width={20} height={20} />
-              <span className={styles.notificationDot} aria-hidden />
+              {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
             </button>
 
+            {showPrintAction ? (
+              <button type="button" className={styles.printButton} onClick={onPrintAction}>
+                <HomeworkPrintIcon size={14} />
+                <span>Печать</span>
+              </button>
+            ) : null}
+
             <div
-              className={`${styles.createButtonSlot} ${showCreateLesson ? styles.createButtonSlotVisible : styles.createButtonSlotHidden}`}
+              className={`${styles.createButtonSlot} ${
+                showCreateLesson || !reserveCreateButtonSpace ? styles.createButtonSlotVisible : styles.createButtonSlotHidden
+              }`}
             >
               {createMenuItems?.length ? (
                 <TopbarCreateMenu
@@ -219,10 +268,12 @@ export const Topbar: FC<TopbarProps> = ({
           </>
         )}
 
-        <div className={styles.profile}>
-          <span className={styles.teacherName}>{teacherDisplayName}</span>
-          <Avatar src={profilePhotoUrl} alt="Профиль преподавателя" fallbackText={fallbackText} />
-        </div>
+        {showProfile ? (
+          <div className={styles.profile}>
+            <span className={styles.teacherName}>{teacherDisplayName}</span>
+            <Avatar src={profilePhotoUrl} alt="Профиль преподавателя" fallbackText={fallbackText} />
+          </div>
+        ) : null}
       </div>
     </header>
   );

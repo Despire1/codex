@@ -29,7 +29,7 @@ export const MobileBottomTabs: FC<MobileBottomTabsProps> = ({ activeTab, items, 
               aria-current={isActive ? 'page' : undefined}
             >
               <span className={styles.iconWrap}>
-                <item.icon width={18} height={18} />
+                <item.icon width={24} height={24} />
                 {typeof item.badgeCount === 'number' ? (
                   <span className={styles.badge}>{item.badgeCount}</span>
                 ) : item.hasUnreadDot ? (

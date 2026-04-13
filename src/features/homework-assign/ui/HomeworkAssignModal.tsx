@@ -355,12 +355,12 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
       className={`${styles.modal} ${variant === 'sheet' ? styles.sheetModal : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Создать домашнее задание по шаблону"
+      aria-label="Выдать готовое домашнее задание"
       ref={containerRef}
     >
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.header}>
-            <h2 className={styles.title}>Создать домашку по шаблону</h2>
+            <h2 className={styles.title}>Выдать домашнее задание</h2>
             <button
               type="button"
               className={styles.closeButton}
@@ -409,7 +409,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
             </section>
 
             <section className={styles.section}>
-              <span className={styles.label}>Что (Шаблон)</span>
+              <span className={styles.label}>Что (Домашка)</span>
               <div className={styles.templateModeGrid}>
                 <button
                   type="button"
@@ -419,8 +419,8 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                   <span className={styles.templateModeIcon} aria-hidden>
                     <HomeworkCircleCheckIcon size={16} />
                   </span>
-                  <span className={styles.templateModeTitle}>Шаблон обязателен</span>
-                  <span className={styles.templateModeHint}>Сначала выбираем основу, потом донастраиваем в редакторе</span>
+                  <span className={styles.templateModeTitle}>Домашнее задание обязательно</span>
+                  <span className={styles.templateModeHint}>Выберите готовую домашку из библиотеки и выдайте её ученику</span>
                 </button>
               </div>
 
@@ -430,11 +430,11 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     <HomeworkFileLinesIcon size={16} />
                   </span>
                   <div className={styles.templatePreviewText}>
-                    <div className={styles.templatePreviewTitle}>{selectedTemplate?.title ?? 'Шаблон не выбран'}</div>
+                    <div className={styles.templatePreviewTitle}>{selectedTemplate?.title ?? 'Домашнее задание не выбрано'}</div>
                     <div className={styles.templatePreviewMeta}>
                       {selectedTemplate
                         ? `${resolveTemplateCategory(selectedTemplate)} · ${formatTemplateDuration(estimateTemplateDuration(selectedTemplate))}`
-                        : 'Выберите шаблон из списка'}
+                        : 'Выберите домашнее задание из списка'}
                     </div>
                   </div>
                 </div>
@@ -473,7 +473,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
               ) : null}
 
               {!hasValidTemplate ? (
-                <p className={styles.validationError}>Выберите шаблон для выдачи домашки.</p>
+                <p className={styles.validationError}>Выберите домашнее задание для выдачи.</p>
               ) : null}
             </section>
 

@@ -310,7 +310,7 @@ export const AssignmentSettingsSidebar: FC<AssignmentSettingsSidebarProps> = ({
             disabled={disabled || saveAsTemplateSubmitting}
           >
             <HomeworkBookmarkRegularIcon size={13} />
-            {saveAsTemplateSubmitting ? 'Сохраняю шаблон…' : 'Сохранить как шаблон'}
+            {saveAsTemplateSubmitting ? 'Сохраняю домашнее задание…' : 'Сохранить в библиотеку домашних заданий'}
           </button>
         ) : null}
 

@@ -1,0 +1,226 @@
+.card {
+  min-height: 148px;
+  border: 1px solid #e7ecf4;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 100ms ease-out;
+}
+
+.card:focus-visible {
+  outline: 2px solid #0d1526;
+  outline-offset: 2px;
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+.content {
+  padding: 16px 16px 14px;
+  position: relative;
+}
+
+.menuButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #6d7486;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mainRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 40px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #0d1526;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.studentMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.studentName {
+  width: fit-content;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #171c2b;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.assignmentTitle {
+  color: #171c2b;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  max-width: 100%;
+}
+
+.deadline {
+  color: #6d7486;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.deadlineDanger {
+  color: #d92d20;
+}
+
+.deadlineWarning {
+  color: #b54708;
+}
+
+.footer {
+  margin-top: auto;
+  min-height: 60px;
+  border-top: 1px solid #eef2f7;
+  background: #f8fafd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.statusChip {
+  width: fit-content;
+  min-height: 28px;
+  border-radius: 14px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+.statusChipReview {
+  background: #fff7ed;
+  color: #b54708;
+}
+
+.statusChipDanger {
+  background: #fef3f2;
+  color: #d92d20;
+}
+
+.statusChipWarning {
+  background: #fff7ed;
+  color: #b54708;
+}
+
+.statusChipSuccess {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.statusChipInfo {
+  background: #eef3ff;
+  color: #2f5bff;
+}
+
+.statusChipNeutral {
+  background: #f2f4f8;
+  color: #485162;
+}
+
+.submission {
+  color: #6d7486;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.primaryButton {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease-out;
+}
+
+.primaryButtonInfo {
+  background: #dfe9ff;
+  border-color: #c4d4ff;
+  color: #1f4fff;
+}
+
+.primaryButtonInfo:active {
+  background: #d2e0ff;
+}
+
+.primaryButtonWarning {
+  background: #ffedd5;
+  border-color: #ffd8ac;
+  color: #b54708;
+}
+
+.primaryButtonWarning:active {
+  background: #ffe4bf;
+}
+
+.primaryButtonDanger {
+  background: #fee4e2;
+  border-color: #fecdc9;
+  color: #d92d20;
+}
+
+.primaryButtonDanger:active {
+  background: #fdd5d1;
+}

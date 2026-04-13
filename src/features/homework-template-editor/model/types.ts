@@ -22,6 +22,7 @@ export type HomeworkEditorAssignmentContext = {
   studentId: number | null;
   lessonId: number | null;
   groupId: number | null;
+  scheduledFor: string | null;
   deadlineAt: string | null;
   sendMode: HomeworkSendMode;
   sourceTemplateId: number | null;

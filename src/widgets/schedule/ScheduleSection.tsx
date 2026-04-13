@@ -1090,7 +1090,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         onCloseActions={() => setDayPanelActionsLessonId((current) => (current === lesson.id ? null : current))}
                         onOpenHomeworkAssignment={(assignment) => {
                           setDayPanelActionsLessonId(null);
-                          navigate(`/homeworks/${assignment.id}/edit`);
+                          navigate(`/homeworks/assignments/${assignment.id}/edit`);
                         }}
                         onEdit={() => {
                           setDayPanelActionsLessonId(null);

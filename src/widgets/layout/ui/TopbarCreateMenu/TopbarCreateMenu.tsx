@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, ReactNode, useState } from 'react';
 import { AddOutlinedIcon, ExpandMoreOutlinedIcon } from '../../../../icons/MaterialIcons';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from './TopbarCreateMenu.module.css';
@@ -8,6 +8,8 @@ export interface TopbarCreateMenuItem {
   label: string;
   description?: string;
   onSelect: () => void;
+  icon?: ReactNode;
+  iconTone?: 'dark' | 'lime' | 'blue' | 'neutral';
 }
 
 interface TopbarCreateMenuProps {
@@ -66,8 +68,25 @@ export const TopbarCreateMenu: FC<TopbarCreateMenuProps> = ({
             role="menuitem"
             onClick={() => handleSelect(item.onSelect)}
           >
-            <span className={styles.menuLabel}>{item.label}</span>
-            {item.description ? <span className={styles.menuDescription}>{item.description}</span> : null}
+            {item.icon ? (
+              <span
+                className={`${styles.menuItemIcon} ${
+                  item.iconTone === 'dark'
+                    ? styles.menuItemIconDark
+                    : item.iconTone === 'lime'
+                      ? styles.menuItemIconLime
+                      : item.iconTone === 'blue'
+                        ? styles.menuItemIconBlue
+                        : styles.menuItemIconNeutral
+                }`}
+              >
+                {item.icon}
+              </span>
+            ) : null}
+            <span className={styles.menuItemText}>
+              <span className={styles.menuLabel}>{item.label}</span>
+              {item.description ? <span className={styles.menuDescription}>{item.description}</span> : null}
+            </span>
           </button>
         ))}
       </div>

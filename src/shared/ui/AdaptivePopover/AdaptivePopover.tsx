@@ -17,6 +17,7 @@ interface AdaptivePopoverProps {
   className?: string;
   rootClassName?: string;
   triggerClassName?: string;
+  matchTriggerWidth?: boolean;
 }
 
 const DEFAULT_OFFSET = 8;
@@ -50,10 +51,11 @@ export const AdaptivePopover = ({
   className = '',
   rootClassName = '',
   triggerClassName = '',
+  matchTriggerWidth = false,
 }: AdaptivePopoverProps) => {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const candidates = useMemo(
     () => uniqueSides([side, getOppositeSide(side), 'bottom', 'top', 'right', 'left']),
@@ -157,7 +159,10 @@ export const AdaptivePopover = ({
       delete popoverRef.current.dataset.side;
     }
 
-    setPosition(nextPosition);
+    setPosition({
+      ...nextPosition,
+      width: triggerRect.width,
+    });
   };
 
   useLayoutEffect(() => {
@@ -204,7 +209,11 @@ export const AdaptivePopover = ({
           <div
             ref={popoverRef}
             className={`${styles.popover} ${className}`}
-            style={{ top: `${position.top}px`, left: `${position.left}px` }}
+            style={{
+              top: `${position.top}px`,
+              left: `${position.left}px`,
+              width: matchTriggerWidth ? `${position.width}px` : undefined,
+            }}
           >
             {children}
           </div>,

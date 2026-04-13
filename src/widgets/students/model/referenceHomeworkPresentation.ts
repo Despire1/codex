@@ -60,7 +60,13 @@ export const resolveStudentProfileHomeworkMetaLabel = (assignment: HomeworkAssig
     return 'Привязано к занятию';
   }
 
-  return assignment.sendMode === 'AUTO_AFTER_LESSON_DONE' ? 'Выдача после завершения урока' : 'Выдача вручную';
+  if (assignment.sendMode === 'AUTO_AFTER_LESSON_DONE') {
+    return 'Выдача после завершения урока';
+  }
+  if (assignment.sendMode === 'SCHEDULED') {
+    return 'Выдача по расписанию';
+  }
+  return 'Выдача вручную';
 };
 
 export const canRemindStudentProfileHomework = (assignment: HomeworkAssignment, now = new Date()) => {

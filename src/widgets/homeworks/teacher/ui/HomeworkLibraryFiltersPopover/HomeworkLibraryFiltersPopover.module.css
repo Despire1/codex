@@ -1,0 +1,103 @@
+.popover {
+  min-width: 320px;
+  max-width: 360px;
+  border-radius: 24px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16);
+  padding: 0;
+}
+
+.content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #161c2d;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #7c8597;
+}
+
+.clearButton {
+  border: none;
+  background: transparent;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.clearButton:hover {
+  color: #111827;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.groupLabel {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 800;
+  color: #545c6d;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.optionChip {
+  border: 1px solid #e8ecf3;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #5f6778;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.optionChip:hover {
+  border-color: #d6dbe5;
+  background: #fff;
+  color: #111827;
+}
+
+.optionChipActive {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+}

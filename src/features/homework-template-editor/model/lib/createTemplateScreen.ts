@@ -517,7 +517,8 @@ export const normalizeEstimatedMinutes = (value: number | null): number => {
   return Math.max(1, Math.min(240, Math.round(value as number)));
 };
 
-export const extractEstimatedMinutes = (value: string): number | null => {
+export const extractEstimatedMinutes = (value: string | null | undefined): number | null => {
+  if (typeof value !== 'string') return null;
   const digits = value.replace(/[^0-9]/g, '');
   if (!digits) return null;
   const numeric = Number(digits);

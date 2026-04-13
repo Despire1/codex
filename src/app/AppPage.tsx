@@ -38,6 +38,11 @@ import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
 import { StudentsHomeworkProvider, useStudentsHomeworkInternal } from '../widgets/students/model/useStudentsHomework';
+import {
+  HomeworkFileLinesIcon,
+  HomeworkFolderIcon,
+  HomeworkLinkIcon,
+} from '../shared/ui/icons/HomeworkFaIcons';
 import { LessonActionsProvider, useLessonActionsInternal } from '../features/lessons/model/useLessonActions';
 import { ScheduleStateProvider, useScheduleStateInternal } from '../widgets/schedule/model/useScheduleState';
 import { DashboardStateProvider, useDashboardStateInternal } from '../widgets/dashboard/model/useDashboardState';
@@ -57,6 +62,10 @@ import {
   type HomeworkTemplateCreateTopbarState,
   subscribeHomeworkTemplateCreateTopbarState,
 } from '../features/homework-template-editor/model/lib/createTemplateTopbarBridge';
+import {
+  type HomeworkTemplateDetailTopbarState,
+  subscribeHomeworkTemplateDetailTopbarState,
+} from '../features/homework-template-view/model/lib/homeworkTemplateDetailTopbarBridge';
 
 const resolveAnalyticsSource = (source: string) => {
   if (source === 'onboarding_hero') return 'hero_cta';
@@ -106,7 +115,7 @@ const desktopTitleByTab: Record<TabId, string> = {
   dashboard: 'Обзор',
   students: 'Ученики',
   schedule: 'Расписание',
-  homeworks: 'Домашние задания',
+  homeworks: 'Задания',
   analytics: 'Аналитика',
   settings: 'Настройки',
 };
@@ -121,6 +130,8 @@ const mapStudentListItemsToHomeworkStudents = (
   items.map((item) => ({
     id: item.student.id,
     name: item.link.customName || item.student.username || `Ученик #${item.student.id}`,
+    level: item.link.studentLevel ?? null,
+    uiColor: item.link.uiColor ?? null,
   }));
 
 const loadHomeworkAssignStudents = async (): Promise<TeacherHomeworkStudentOption[]> => {
@@ -182,6 +193,7 @@ const AppPageContent = () => {
     primaryActionLabel: '',
     primarySubmittingLabel: '',
   });
+  const [homeworkDetailTopbarState, setHomeworkDetailTopbarState] = useState<HomeworkTemplateDetailTopbarState | null>(null);
   const [homeworkAssignModalOpen, setHomeworkAssignModalOpen] = useState(false);
   const [homeworkAssignSubmitting, setHomeworkAssignSubmitting] = useState(false);
   const [homeworkAssignLoading, setHomeworkAssignLoading] = useState(false);
@@ -428,15 +440,17 @@ const AppPageContent = () => {
   const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
 
   const isTeacherAssignmentCreateRoute = !isStudentRole && /^\/homeworks\/new\/?$/.test(location.pathname);
-  const isTeacherAssignmentEditRoute = !isStudentRole && /^\/homeworks\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherAssignmentEditRoute = !isStudentRole && /^\/homeworks\/assignments\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
-  const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/templates\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherHomeworksRootRoute = !isStudentRole && location.pathname === tabPathById.homeworks;
+  const isTeacherHomeworkSourceDetailRoute = !isStudentRole && /^\/homeworks\/\d+\/?$/.test(location.pathname);
   const isTeacherHomeworkReviewRoute = !isStudentRole && /^\/homeworks\/review\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
   const isTeacherHomeworkEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute;
   const isTeacherAnyHomeworkEditorRoute = isTeacherTemplateEditorRoute || isTeacherHomeworkEditorRoute;
   const teacherHomeworkEditorBackPath = isTeacherTemplateEditorRoute
-    ? `${tabPathById.homeworks}?view=templates`
+    ? tabPathById.homeworks
     : tabPathById.homeworks;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
@@ -446,9 +460,12 @@ const AppPageContent = () => {
       : 'Создание домашнего задания'
     : isTeacherTemplateEditorRoute
       ? isTeacherTemplateEditRoute
-        ? 'Редактирование шаблона'
-        : 'Создание шаблона'
+        ? 'Редактирование домашнего задания'
+        : 'Создание домашнего задания'
+      : isTeacherHomeworkSourceDetailRoute
+        ? 'Домашнее задание'
       : desktopTopbarTitle;
+  const desktopTopbarTitleWithOverrides = homeworkDetailTopbarState?.title ?? desktopTopbarResolvedTitle;
   const desktopDateLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('ru-RU', {
@@ -469,13 +486,20 @@ const AppPageContent = () => {
       ? templateCreateTopbarState.draftSavedAtLabel
         ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
         : isTeacherTemplateEditRoute
-          ? 'Обновите настройки и вопросы шаблона'
-          : 'Новый шаблон домашнего задания'
+          ? 'Обновите структуру и материалы домашнего задания'
+          : 'Новая домашка, которую можно будет выдавать ученикам'
+      : isTeacherHomeworkSourceDetailRoute
+        ? 'Карточка домашнего задания и история выдач по ученикам'
       : desktopDateLabel;
+  const isHomeworkDetailTopbarVisible = Boolean(homeworkDetailTopbarState);
+  const hasDesktopHomeworkDetailChrome = isTeacherHomeworkSourceDetailRoute || isHomeworkDetailTopbarVisible;
+  const desktopTopbarSubtitleWithOverrides = homeworkDetailTopbarState?.subtitle ?? desktopTopbarResolvedSubtitle;
+  const isDesktopHomeworksLibraryChrome =
+    activeTab === 'homeworks' && !hasDesktopHomeworkDetailChrome && !isTeacherAnyHomeworkEditorRoute;
   const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (
     isTeacherHomeworkEditorRoute
       ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать')
-      : 'Создать шаблон'
+      : 'Сохранить'
   );
   const editorSecondaryActionLabel = templateCreateTopbarState.secondaryActionLabel || 'Сохранить черновик';
   const showEditorSecondaryAction =
@@ -492,6 +516,12 @@ const AppPageContent = () => {
   useEffect(() => {
     return subscribeHomeworkTemplateCreateTopbarState((state) => {
       setTemplateCreateTopbarState(state);
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribeHomeworkTemplateDetailTopbarState((state) => {
+      setHomeworkDetailTopbarState(state);
     });
   }, []);
 
@@ -1228,22 +1258,28 @@ const AppPageContent = () => {
   const homeworkTopbarCreateMenuItems = useMemo<TopbarCreateMenuItem[]>(
     () => [
       {
-        id: 'create_assignment',
+        id: 'create_homework',
         label: 'Создать домашнее задание',
-        description: 'Открыть редактор и собрать задание с нуля.',
+        description: 'Открыть экран создания и сразу настроить выдачу домашнего задания ученику.',
         onSelect: () => guardedNavigate(`${tabPathById.homeworks}/new`),
+        icon: <HomeworkFileLinesIcon size={12} />,
+        iconTone: 'dark',
       },
       {
         id: 'assign_homework',
         label: 'Отправить домашнее задание',
-        description: 'Быстро выдать домашку ученику по шаблону или черновику.',
+        description: 'Выдать уже готовую домашку ученику или группе учеников.',
         onSelect: () => openDashboardHomeworkAssignModal(),
+        icon: <HomeworkLinkIcon size={12} />,
+        iconTone: 'lime',
       },
       {
-        id: 'create_template',
-        label: 'Создать шаблон',
-        description: 'Подготовить заготовку, чтобы потом выдавать задания быстрее.',
-        onSelect: () => guardedNavigate(`${tabPathById.homeworks}/templates/new`),
+        id: 'create_collection',
+        label: 'Создать коллекцию',
+        description: 'Собрать тематическую подборку домашних заданий.',
+        onSelect: () => guardedNavigate(`${tabPathById.homeworks}?createCollection=1`),
+        icon: <HomeworkFolderIcon size={12} />,
+        iconTone: 'blue',
       },
     ],
     [guardedNavigate, openDashboardHomeworkAssignModal],
@@ -1328,9 +1364,10 @@ const AppPageContent = () => {
     [guardedNavigate, handleSettingsLessonsRemoved, handleSettingsLinksPatched, teacher],
   );
 
-  const homeworksRouteProps = useMemo<{ mode: 'teacher' | 'student' }>(
+  const homeworksRouteProps = useMemo<{ mode: 'teacher' | 'student'; onOpenMobileSidebar?: () => void }>(
     () => ({
       mode: isStudentRole ? 'student' : 'teacher',
+      onOpenMobileSidebar: !isStudentRole ? () => setMobileSidebarOpen(true) : undefined,
     }),
     [isStudentRole],
   );
@@ -1464,7 +1501,7 @@ const AppPageContent = () => {
                       ) : null}
 
                       <div className={`${layoutStyles.mainColumn} ${!isDesktop ? layoutStyles.mainColumnMobile : ''}`}>
-                        {!isDesktop ? (
+                        {!isDesktop && !isTeacherHomeworkEditorRoute && !isTeacherTemplateEditRoute && !isTeacherHomeworksRootRoute ? (
                           <MobileTopbar
                             profileName={mobileProfileName}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
@@ -1473,13 +1510,15 @@ const AppPageContent = () => {
                           />
                         ) : null}
 
-                        {isDesktop && !isStudentRole && !isTeacherHomeworkReviewRoute ? (
+                        {isDesktop && !isStudentRole && !isTeacherHomeworkReviewRoute && !isTeacherHomeworkEditorRoute && !isTeacherTemplateEditRoute && !isTeacherHomeworksRootRoute ? (
                           <Topbar
                             teacher={teacher}
-                            title={desktopTopbarResolvedTitle}
-                            subtitle={desktopTopbarResolvedSubtitle}
+                            title={desktopTopbarTitleWithOverrides}
+                            subtitle={desktopTopbarSubtitleWithOverrides}
+                            variant={isDesktopHomeworksLibraryChrome ? 'homeworks' : 'default'}
                             showCreateLesson={
                               hasTeacherAccess &&
+                              !hasDesktopHomeworkDetailChrome &&
                               !isTeacherAnyHomeworkEditorRoute &&
                               (
                                 activeTab === 'dashboard' ||
@@ -1498,14 +1537,19 @@ const AppPageContent = () => {
                             createButtonIconAccent={
                               activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
                             }
+                            reserveCreateButtonSpace={!hasDesktopHomeworkDetailChrome}
                             createMenuItems={activeTab === 'homeworks' ? homeworkTopbarCreateMenuItems : undefined}
-                            showEditorActions={isTeacherAnyHomeworkEditorRoute}
+                            showEditorActions={isTeacherAnyHomeworkEditorRoute && !isHomeworkDetailTopbarVisible}
                             showEditorSecondaryAction={showEditorSecondaryAction}
                             showEditorPrimaryAction={templateCreateTopbarState.showPrimaryAction}
-                            showBackButton={isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
+                            showBackButton={hasDesktopHomeworkDetailChrome || isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
                             onBack={() =>
                               guardedNavigate(
-                                isTeacherAnyHomeworkEditorRoute ? teacherHomeworkEditorBackPath : tabPathById.students,
+                                hasDesktopHomeworkDetailChrome
+                                  ? tabPathById.homeworks
+                                  : isTeacherAnyHomeworkEditorRoute
+                                    ? teacherHomeworkEditorBackPath
+                                    : tabPathById.students,
                               )
                             }
                             backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
@@ -1522,13 +1566,23 @@ const AppPageContent = () => {
                             showScheduleViewToggle={activeTab === 'schedule'}
                             scheduleView={scheduleView}
                             onScheduleViewChange={setScheduleView}
+                            statusBadgeLabel={homeworkDetailTopbarState?.statusLabel ?? null}
+                            statusBadgeTone={homeworkDetailTopbarState?.statusTone}
+                            showPrintAction={Boolean(homeworkDetailTopbarState)}
+                            onPrintAction={() => {
+                              if (typeof window !== 'undefined') {
+                                window.print();
+                              }
+                            }}
+                            notificationDotVisible={homeworkDetailTopbarState?.hasAttentionDot ?? true}
+                            showProfile={!isDesktopHomeworksLibraryChrome}
                           />
                         ) : null}
 
                         <main
-                            className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
-                            isTeacherAnyHomeworkEditorRoute ? layoutStyles.contentNoScroll : ''
-                          }`}
+                          className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
+                            !isDesktop && isTeacherHomeworksRootRoute ? layoutStyles.contentMobileHomeworks : ''
+                          } ${isTeacherAnyHomeworkEditorRoute ? layoutStyles.contentNoScroll : ''}`}
                         >
                           <AppRoutes
                             key={isStudentRole ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}` : 'teacher'}

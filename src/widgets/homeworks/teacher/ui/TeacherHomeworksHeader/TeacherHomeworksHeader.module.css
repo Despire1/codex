@@ -1,0 +1,208 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 64px;
+  padding: 10px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.titleBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-self: start;
+}
+
+.title {
+  margin: 0;
+  color: #161c2d;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.separator {
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  justify-self: end;
+}
+
+.iconButton {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #667085;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
+}
+
+.iconButton:hover {
+  background: #f8fafc;
+  color: #111827;
+}
+
+.notificationDot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ef4444;
+}
+
+.createButton {
+  min-height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: #05070b;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+}
+
+.createButton:hover {
+  background: #111827;
+}
+
+.createButtonIconAccent {
+  color: #b9fa51;
+}
+
+.tabsWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid #eef2f7;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
+}
+
+.tabButton {
+  min-height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #5e6678;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tabButton:hover {
+  background: #f8fafc;
+  color: #111827;
+}
+
+.tabButtonActive {
+  background: #080b12;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+}
+
+@media (max-width: 960px) {
+  .header {
+    min-height: 0;
+    padding: 12px 14px;
+    border-radius: 18px;
+  }
+
+  .topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .titleBlock {
+    gap: 8px;
+  }
+
+  .actions {
+    justify-content: space-between;
+    justify-self: stretch;
+  }
+
+  .tabsWrap {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabsWrap::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+  }
+
+  .tabButton {
+    min-height: 34px;
+    padding: 0 16px;
+    font-size: 13px;
+  }
+}

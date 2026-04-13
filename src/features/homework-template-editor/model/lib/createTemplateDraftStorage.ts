@@ -115,10 +115,10 @@ export const buildStoredCreateTemplateDraftSummary = (
     .reduce((sum, block) => sum + (block.questions?.length ?? 0), 0);
 
   const firstText = value.draft.blocks.find((block) => block.type === 'TEXT')?.content?.trim() ?? '';
-  const preview = firstText.length > 0 ? firstText.slice(0, 120) : 'Черновик шаблона без описания';
+  const preview = firstText.length > 0 ? firstText.slice(0, 120) : 'Черновик домашнего задания без описания';
 
   return {
-    title: value.draft.title.trim() || 'Новый шаблон (черновик)',
+    title: value.draft.title.trim() || 'Новое домашнее задание (черновик)',
     preview,
     savedAt: value.savedAt,
     savedAtLabel: formatStoredDraftTimeLabel(value.savedAt),

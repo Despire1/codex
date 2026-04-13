@@ -5,7 +5,6 @@ export LOCAL_AUTH_BYPASS="${LOCAL_AUTH_BYPASS:-true}"
 export VITE_LOCAL_AUTH_BYPASS="${VITE_LOCAL_AUTH_BYPASS:-true}"
 api_port="${API_PORT:-4000}"
 
-npm run prisma:migrate
 npm run prisma:generate
 
 npm run api &

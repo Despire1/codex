@@ -68,7 +68,7 @@ const renderQuestionPreview = (question: HomeworkBlockTest['questions'][number],
 
 export const TemplatePreviewModal: FC<TemplatePreviewModalProps> = ({ open, draft, onClose }) => {
   return (
-    <Modal open={open} onClose={onClose} title="Предпросмотр шаблона">
+    <Modal open={open} onClose={onClose} title="Предпросмотр домашнего задания">
       <div className={styles.previewContent}>
         <header>
           <h3>{draft.title || 'Без названия'}</h3>

@@ -1,0 +1,266 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.filtersCard {
+  border-radius: 32px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.06);
+  padding: 14px 16px 16px;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.searchField {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid #edf1f6;
+  background: #f8fafc;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.searchFieldCompact {
+  flex: 0 0 clamp(220px, 25vw, 320px);
+}
+
+.searchField:focus-within {
+  border-color: #dce2eb;
+  background: #fff;
+}
+
+.searchIcon {
+  color: #9aa2b2;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #1a2030;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.searchInput::placeholder {
+  color: #a4acbb;
+}
+
+.searchActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.iconButton {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid #edf1f6;
+  background: #fff;
+  color: #667085;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+}
+
+.iconButton:hover {
+  background: #f8fafc;
+  color: #111827;
+}
+
+.viewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 16px;
+  border: 1px solid #edf1f6;
+  background: #fff;
+  padding: 4px;
+}
+
+.viewToggleButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #98a0af;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.viewToggleButtonActive {
+  background: #f3f5f8;
+  color: #1a2030;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.metaRow {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.scopeTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.scopeTab {
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #5e6678;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scopeTab:hover {
+  color: #111827;
+  background: #f8fafc;
+}
+
+.scopeTabActive {
+  background: #080b12;
+  color: #fff;
+}
+
+.scopeCount {
+  border-radius: 999px;
+  background: #edf1f6;
+  color: #798293;
+  min-width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.scopeCountActive {
+  background: #b9fa51;
+  color: #10131a;
+}
+
+.librarySection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.libraryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: #171d2d;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cardsList {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stateCard {
+  border-radius: 28px;
+  border: 1px solid #eef2f7;
+  background: #fff;
+  padding: 32px 24px;
+  color: #687385;
+  font-size: 14px;
+  line-height: 1.5;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
+}
+
+@media (max-width: 1280px) {
+  .cardsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .searchRow,
+  .libraryHead,
+  .metaRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchActions {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .searchFieldCompact {
+    flex-basis: 100%;
+  }
+
+  .cardsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .filtersCard {
+    border-radius: 24px;
+    padding: 14px;
+  }
+
+  .cardsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -32,6 +32,7 @@ export const buildPreviewHomeworkAssignment = ({
     title: draft.title.trim() || 'Домашнее задание без названия',
     status: 'SENT',
     sendMode: draft.assignment.sendMode,
+    scheduledFor: draft.assignment.scheduledFor,
     deadlineAt: draft.assignment.deadlineAt,
     sentAt: nowIso,
     contentSnapshot: draft.blocks,

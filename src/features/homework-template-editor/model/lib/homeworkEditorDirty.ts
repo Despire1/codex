@@ -36,6 +36,7 @@ const normalizeDraft = (draft: HomeworkEditorDraft) => ({
     studentId: draft.assignment.studentId ?? null,
     lessonId: draft.assignment.lessonId ?? null,
     groupId: draft.assignment.groupId ?? null,
+    scheduledFor: draft.assignment.scheduledFor ?? null,
     deadlineAt: draft.assignment.deadlineAt ?? null,
     sendMode: draft.assignment.sendMode,
     sourceTemplateId: draft.assignment.sourceTemplateId ?? null,

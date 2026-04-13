@@ -27,6 +27,7 @@ import {
   createQuestionByKind,
   getQuestionKind,
   isQuestionMultipleChoice,
+  setQuestionKind,
   setQuestionRequired,
   toggleQuestionMultipleChoice,
 } from '../../model/lib/createTemplateScreen';
@@ -49,14 +50,18 @@ import {
   HomeworkXMarkIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
 import { Checkbox } from '../../../../shared/ui/Checkbox/Checkbox';
+import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from './TemplateQuestionsSection.module.css';
 
 interface TemplateQuestionsSectionProps {
+  surface?: 'card' | 'plain';
   testBlock: HomeworkBlockTest | null;
   testBlockPath: FormValidationPath | null;
   getIssueForPath: (path: FormValidationPath) => FormValidationIssue | null;
   onFieldEdit: (path: FormValidationPath) => void;
   onTestBlockChange: (nextBlock: HomeworkBlockTest) => void;
+  addQuestionMode?: 'dropdown' | 'default-choice';
+  enableQuestionKindSelect?: boolean;
 }
 
 type QuestionCreateOption = {
@@ -141,6 +146,23 @@ const QUESTION_CREATE_OPTIONS: QuestionCreateOption[] = [
   ...QUESTION_CREATE_OPTIONS_ADVANCED,
 ];
 
+const QUESTION_CREATE_GROUPS: Array<{ id: string; title: string; options: QuestionCreateOption[] }> = [
+  {
+    id: 'test',
+    title: 'Тестовые вопросы',
+    options: ['CHOICE', 'FILL_WORD', 'MATCHING', 'ORDERING', 'TABLE']
+      .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
+      .filter((option): option is QuestionCreateOption => Boolean(option)),
+  },
+  {
+    id: 'response',
+    title: 'Открытые ответы',
+    options: ['SHORT_TEXT', 'LONG_TEXT', 'AUDIO', 'FILE']
+      .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
+      .filter((option): option is QuestionCreateOption => Boolean(option)),
+  },
+];
+
 const resolveDropdownIconToneClass = (tone: QuestionCreateOption['tone']) => {
   if (tone === 'blue') return styles.dropdownIconBlue;
   if (tone === 'purple') return styles.dropdownIconPurple;
@@ -182,6 +204,9 @@ const createDefaultTableConfig = (): HomeworkTestTableConfig => ({
 
 const resolveQuestionKindTitle = (kind: CreateQuestionKind) =>
   QUESTION_CREATE_OPTIONS.find((option) => option.id === kind)?.title ?? 'Вопрос';
+
+const resolveQuestionKindOption = (kind: CreateQuestionKind) =>
+  QUESTION_CREATE_OPTIONS.find((option) => option.id === kind) ?? QUESTION_CREATE_OPTIONS[0];
 
 const enforceQuestionInvariants = (question: HomeworkTestQuestion): HomeworkTestQuestion => {
   let nextQuestion = question;
@@ -301,6 +326,8 @@ interface QuestionEditorCardProps {
   question: HomeworkTestQuestion;
   questionIndex: number;
   questionKind: CreateQuestionKind;
+  showQuestionKindLabel?: boolean;
+  questionKindControl?: ReactNode;
   promptPathKey: string;
   promptClassName: string;
   promptError: ReactNode;
@@ -321,6 +348,8 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
   question,
   questionIndex,
   questionKind,
+  showQuestionKindLabel = true,
+  questionKindControl,
   promptPathKey,
   promptClassName,
   promptError,
@@ -352,9 +381,13 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
         >
           <HomeworkGripVerticalIcon size={12} />
         </button>
-        <span className={styles.questionIndex}>
-          Вопрос {questionIndex + 1} • {resolveQuestionKindTitle(questionKind)}
-        </span>
+        <div className={styles.questionHeaderMeta}>
+          <span className={styles.questionIndex}>
+            {showQuestionKindLabel ? `Вопрос ${questionIndex + 1} • ${resolveQuestionKindTitle(questionKind)}` : `Вопрос ${questionIndex + 1}`}
+          </span>
+          {!showQuestionKindLabel && questionKindControl ? <span className={styles.questionMetaDot} aria-hidden /> : null}
+          {questionKindControl}
+        </div>
       </div>
 
       <div className={styles.questionActions}>
@@ -420,11 +453,14 @@ interface SortableQuestionCardProps
   extends Omit<
     QuestionEditorCardProps,
     'style' | 'dragging' | 'itemRef' | 'handleRef' | 'handleProps'
-  > {}
+  > {
+  onItemRef?: (node: HTMLElement | null) => void;
+}
 
 const SortableQuestionCard: FC<SortableQuestionCardProps> = (props) => {
+  const { onItemRef, ...cardProps } = props;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: props.question.id,
+    id: cardProps.question.id,
   });
 
   const style = {
@@ -434,10 +470,13 @@ const SortableQuestionCard: FC<SortableQuestionCardProps> = (props) => {
 
   return (
     <QuestionEditorCard
-      {...props}
+      {...cardProps}
       style={style}
       dragging={isDragging}
-      itemRef={setNodeRef}
+      itemRef={(node) => {
+        setNodeRef(node);
+        onItemRef?.(node);
+      }}
       handleRef={setActivatorNodeRef}
       handleProps={{ ...attributes, ...listeners }}
     />
@@ -471,16 +510,22 @@ const QuestionDragOverlayCard: FC<QuestionDragOverlayCardProps> = ({
 );
 
 export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
+  surface = 'card',
   testBlock,
   testBlockPath,
   getIssueForPath,
   onFieldEdit,
   onTestBlockChange,
+  addQuestionMode = 'dropdown',
+  enableQuestionKindSelect = false,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
+  const [questionKindMenuQuestionId, setQuestionKindMenuQuestionId] = useState<string | null>(null);
   const [dragOrderingState, setDragOrderingState] = useState<{ questionId: string; itemIndex: number } | null>(null);
-  const dropdownWrapRef = useRef<HTMLDivElement | null>(null);
+  const questionKindMenuWrapRef = useRef<HTMLDivElement | null>(null);
+  const questionNodeMapRef = useRef(new Map<string, HTMLElement>());
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -590,6 +635,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
 
   const addQuestion = (kind: CreateQuestionKind) => {
     const nextQuestion = enforceQuestionInvariants(createQuestionByKind(kind));
+    setPendingScrollQuestionId(nextQuestion.id);
 
     if (!testBlock) {
       const nextBlock = createTestBlock();
@@ -611,19 +657,34 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   };
 
   useEffect(() => {
-    if (!dropdownOpen) return undefined;
+    if (!questionKindMenuQuestionId) return undefined;
 
     const handleOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (dropdownWrapRef.current?.contains(target)) return;
-      setDropdownOpen(false);
+      if (questionKindMenuWrapRef.current?.contains(target)) return;
+      setQuestionKindMenuQuestionId(null);
     };
 
     document.addEventListener('mousedown', handleOutside);
     return () => {
       document.removeEventListener('mousedown', handleOutside);
     };
-  }, [dropdownOpen]);
+  }, [questionKindMenuQuestionId]);
+
+  useEffect(() => {
+    if (!pendingScrollQuestionId) return undefined;
+    if (!questionIds.includes(pendingScrollQuestionId)) return undefined;
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      const node = questionNodeMapRef.current.get(pendingScrollQuestionId);
+      node?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      setPendingScrollQuestionId(null);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [pendingScrollQuestionId, questionIds]);
 
   const removeQuestion = (questionIndex: number) => {
     if (!testBlock) return;
@@ -1471,55 +1532,73 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   };
 
   return (
-    <section className={styles.section}>
+    <section className={`${styles.section} ${surface === 'plain' ? styles.sectionPlain : ''}`}>
       <div className={styles.sectionHeader}>
         <div>
           <h2 className={styles.sectionTitle}>Вопросы</h2>
           <p className={styles.sectionSubtitle}>Добавьте вопросы для теста</p>
         </div>
-        <div ref={dropdownWrapRef} className={styles.dropdownWrap}>
-          <button
-            id="add-question-btn"
-            type="button"
-            className={styles.addQuestionButton}
-            onClick={() => setDropdownOpen((prev) => !prev)}
-          >
-            <HomeworkPlusIcon size={12} />
-            <span>Добавить вопрос</span>
-            <HomeworkChevronDownIcon size={11} />
-          </button>
-
-          {dropdownOpen ? (
-            <div className={styles.dropdown}>
-              <div className={styles.dropdownHeader}>Выберите тип вопроса</div>
-              {QUESTION_CREATE_OPTIONS_PRIMARY.map((option) => (
-                <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
-                  <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
-                  <span>
-                    <span className={styles.dropdownTitle}>{option.title}</span>
-                    <span className={styles.dropdownDescription}>{option.description}</span>
-                  </span>
-                </button>
-              ))}
-              <div className={styles.dropdownDivider} />
-              {QUESTION_CREATE_OPTIONS_ADVANCED.map((option) => (
-                <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
-                  <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
-                  <span>
-                    <span className={styles.dropdownTitle}>{option.title}</span>
-                    <span className={styles.dropdownDescription}>{option.description}</span>
-                  </span>
-                </button>
+        <AdaptivePopover
+          isOpen={addQuestionMode === 'dropdown' && dropdownOpen}
+          onClose={() => setDropdownOpen(false)}
+          side="bottom"
+          align="end"
+          offset={10}
+          rootClassName={styles.dropdownWrap}
+          className={styles.dropdown}
+          trigger={
+            <button
+              id="add-question-btn"
+              type="button"
+              className={styles.addQuestionButton}
+              onClick={() => {
+                if (addQuestionMode === 'default-choice') {
+                  addQuestion('CHOICE');
+                  return;
+                }
+                setDropdownOpen((prev) => !prev);
+              }}
+              aria-haspopup={addQuestionMode === 'dropdown' ? 'dialog' : undefined}
+              aria-expanded={addQuestionMode === 'dropdown' ? dropdownOpen : undefined}
+            >
+              <HomeworkPlusIcon size={12} />
+              <span>Добавить вопрос</span>
+              {addQuestionMode === 'dropdown' ? <HomeworkChevronDownIcon size={11} /> : null}
+            </button>
+          }
+        >
+          <div className={styles.dropdownPanel}>
+            <div className={styles.dropdownHeader}>Выберите тип вопроса</div>
+            <div className={styles.dropdownColumns}>
+              {QUESTION_CREATE_GROUPS.map((group) => (
+                <div key={group.id} className={styles.dropdownGroup}>
+                  <div className={styles.dropdownGroupTitle}>{group.title}</div>
+                  <div className={styles.dropdownGroupList}>
+                    {group.options.map((option) => (
+                      <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
+                        <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
+                        <span className={styles.dropdownItemMeta}>
+                          <span className={styles.dropdownTitle}>{option.title}</span>
+                          <span className={styles.dropdownDescription}>{option.description}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-          ) : null}
-        </div>
+          </div>
+        </AdaptivePopover>
       </div>
 
       {questions.length === 0 ? (
         <div className={styles.emptyState}>
           <span className={styles.validationAnchor} data-validation-path={pathToKey(questionsRootPath)} aria-hidden />
-          <p>Пока нет вопросов. Добавьте первый вопрос из меню сверху.</p>
+          <p>
+            {addQuestionMode === 'default-choice'
+              ? 'Пока нет вопросов. Добавьте первый вопрос кнопкой сверху.'
+              : 'Пока нет вопросов. Добавьте первый вопрос из меню сверху.'}
+          </p>
           {renderFieldError(questionsRootPath)}
         </div>
       ) : (
@@ -1535,6 +1614,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
             <div className={styles.questionsList}>
               {questions.map((question, questionIndex) => {
                 const questionKind = getQuestionKind(question);
+                const questionKindOption = resolveQuestionKindOption(questionKind);
                 const promptPath = resolveFieldPath(questionIndex, 'prompt');
 
                 return (
@@ -1543,6 +1623,51 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                     question={question}
                     questionIndex={questionIndex}
                     questionKind={questionKind}
+                    showQuestionKindLabel={!enableQuestionKindSelect}
+                    questionKindControl={
+                      enableQuestionKindSelect ? (
+                        <div
+                          ref={questionKindMenuQuestionId === question.id ? questionKindMenuWrapRef : null}
+                          className={styles.questionKindDropdownWrap}
+                        >
+                          <button
+                            type="button"
+                            className={`${styles.questionKindButton} ${resolveDropdownIconToneClass(questionKindOption.tone)}`}
+                            onClick={() =>
+                              setQuestionKindMenuQuestionId((current) => (current === question.id ? null : question.id))
+                            }
+                          >
+                            <span className={styles.questionKindButtonIcon}>{questionKindOption.icon}</span>
+                            <span>{questionKindOption.title}</span>
+                            <HomeworkChevronDownIcon size={10} />
+                          </button>
+
+                          {questionKindMenuQuestionId === question.id ? (
+                            <div className={styles.questionKindDropdown}>
+                              {QUESTION_CREATE_OPTIONS.map((option) => (
+                                <button
+                                  key={`${question.id}-${option.id}`}
+                                  type="button"
+                                  className={styles.questionKindDropdownItem}
+                                  onClick={() => {
+                                    updateQuestion(questionIndex, (previousQuestion) => setQuestionKind(previousQuestion, option.id));
+                                    setQuestionKindMenuQuestionId(null);
+                                  }}
+                                >
+                                  <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>
+                                    {option.icon}
+                                  </span>
+                                  <span className={styles.questionKindDropdownMeta}>
+                                    <span className={styles.dropdownTitle}>{option.title}</span>
+                                    <span className={styles.dropdownDescription}>{option.description}</span>
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null
+                    }
                     promptPathKey={pathToKey(promptPath)}
                     promptClassName={getFieldClassName(styles.questionPrompt, promptPath)}
                     promptError={renderFieldError(promptPath)}
@@ -1569,13 +1694,30 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                         points: value ? Number(value) : 1,
                       }))
                     }
+                    onItemRef={(node) => {
+                      if (node) {
+                        questionNodeMapRef.current.set(question.id, node);
+                        return;
+                      }
+                      questionNodeMapRef.current.delete(question.id);
+                    }}
                   >
                     {renderQuestionSpecificFields(question, questionIndex)}
                   </SortableQuestionCard>
                 );
               })}
 
-              <button type="button" className={styles.bottomAddButton} onClick={() => setDropdownOpen(true)}>
+              <button
+                type="button"
+                className={styles.bottomAddButton}
+                onClick={() => {
+                  if (addQuestionMode === 'default-choice') {
+                    addQuestion('CHOICE');
+                    return;
+                  }
+                  setDropdownOpen(true);
+                }}
+              >
                 <HomeworkPlusIcon size={12} />
                 <span>Добавить еще вопрос</span>
               </button>

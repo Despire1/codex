@@ -19,6 +19,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev --skip-generate",
+    "prisma:migrate:local": "./scripts/prisma-migrate-local.sh",
     "prisma:reset": "prisma migrate reset --force --skip-generate",
     "prisma:repair": "./scripts/prisma-repair.sh",
     "prisma:generate": "prisma generate",

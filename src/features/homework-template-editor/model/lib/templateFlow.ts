@@ -37,7 +37,7 @@ export const HOMEWORK_TEMPLATE_PRESETS: HomeworkTemplatePreset[] = [
   {
     id: 'MIXED',
     title: 'Смешанный формат',
-    description: 'Текст, тест и свободный ответ в одном шаблоне',
+    description: 'Текст, тест и свободный ответ в одной домашке',
     outcomeHint: 'Максимально гибкий сценарий',
   },
 ];
@@ -183,7 +183,7 @@ export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBl
   const summary = summarizeTemplateBlocks(draft.blocks);
 
   if (!draft.title.trim()) {
-    errors.push('Добавьте название шаблона.');
+    errors.push('Добавьте название домашнего задания.');
   }
   if (summary.blockCount === 0) {
     errors.push('Добавьте хотя бы один блок задания.');

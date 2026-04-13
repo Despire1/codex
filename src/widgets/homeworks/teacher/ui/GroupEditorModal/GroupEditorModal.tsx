@@ -175,7 +175,7 @@ export const GroupEditorModal = ({
           <div className={styles.header}>
             <div className={styles.headerText}>
               <h2 className={styles.title}>{mode === 'create' ? 'Создать группу' : 'Редактировать группу'}</h2>
-              <p className={styles.subtitle}>Организуйте задания и шаблоны в одном месте</p>
+              <p className={styles.subtitle}>Организуйте домашние задания и выдачи в одном месте</p>
             </div>
             <button type="button" className={styles.closeButton} aria-label="Закрыть" onClick={onClose}>
               <HomeworkXMarkIcon size={14} />
@@ -240,7 +240,7 @@ export const GroupEditorModal = ({
             </div>
 
             <div className={styles.itemsSection}>
-              <label className={styles.label}>Добавить задания и шаблоны</label>
+              <label className={styles.label}>Добавить домашние задания и выдачи</label>
               <p className={styles.sectionHint}>Выберите сущности, которые войдут в группу сразу при создании</p>
 
               <div className={styles.pickerCard}>
@@ -250,7 +250,7 @@ export const GroupEditorModal = ({
                     className={`${styles.tabButton} ${activeTab === 'templates' ? styles.tabButtonActive : ''}`}
                     onClick={() => setActiveTab('templates')}
                   >
-                    Шаблоны
+                    Домашки
                     <span className={styles.tabCounter}>{visibleTemplates.length}</span>
                   </button>
                   <button
@@ -258,7 +258,7 @@ export const GroupEditorModal = ({
                     className={`${styles.tabButton} ${activeTab === 'homework' ? styles.tabButtonActive : ''}`}
                     onClick={() => setActiveTab('homework')}
                   >
-                    Домашки
+                    Выдачи
                     <span className={styles.tabCounter}>{visibleAssignments.length}</span>
                   </button>
                 </div>
@@ -298,9 +298,9 @@ export const GroupEditorModal = ({
                                 <div className={styles.itemHead}>
                                   <div>
                                     <h4 className={styles.itemTitle}>{template.title}</h4>
-                                    <p className={styles.itemDescription}>{template.subject || 'Шаблон домашнего задания'}</p>
+                                    <p className={styles.itemDescription}>{template.subject || 'Домашнее задание'}</p>
                                   </div>
-                                  <span className={styles.templateBadge}>Шаблон</span>
+                                  <span className={styles.templateBadge}>Домашка</span>
                                 </div>
                                 <div className={styles.itemMeta}>
                                   <span className={styles.itemMetaLine}>
@@ -362,7 +362,7 @@ export const GroupEditorModal = ({
                         })}
 
                     {activeTab === 'templates' && visibleTemplates.length === 0 ? (
-                      <div className={styles.emptyState}>Шаблоны не найдены</div>
+                      <div className={styles.emptyState}>Домашние задания не найдены</div>
                     ) : null}
                     {activeTab === 'homework' && visibleAssignments.length === 0 ? (
                       <div className={styles.emptyState}>Домашки не найдены</div>

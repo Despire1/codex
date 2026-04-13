@@ -145,11 +145,6 @@ body.telegram-webapp select {
   color: var(--text);
 }
 
-body.telegram-webapp button[class*='primaryButton'] {
-  color: var(--primary-button-text, var(--color-white)) !important;
-  -webkit-text-fill-color: var(--primary-button-text, var(--color-white));
-}
-
 body.telegram-webapp [class*='tabbar'] button {
   color: var(--color-slate-300) !important;
   -webkit-text-fill-color: var(--color-slate-300);

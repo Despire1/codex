@@ -34,6 +34,7 @@ export const ASSIGNMENT_STATUS_LABELS: Record<HomeworkAssignment['status'], stri
 export const SEND_MODE_LABELS: Record<HomeworkAssignment['sendMode'], string> = {
   MANUAL: 'Вручную',
   AUTO_AFTER_LESSON_DONE: 'После завершения урока',
+  SCHEDULED: 'По расписанию',
 };
 
 export const resolveAssignmentEffectiveStatus = (assignment: HomeworkAssignment, now = new Date()) =>

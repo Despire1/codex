@@ -26,7 +26,7 @@ const isHomeworkEditorTaskType = (value: unknown): value is HomeworkEditorTaskTy
   value === 'EXTERNAL';
 
 const isHomeworkSendMode = (value: unknown): value is HomeworkSendMode =>
-  value === 'MANUAL' || value === 'AUTO_AFTER_LESSON_DONE';
+  value === 'MANUAL' || value === 'AUTO_AFTER_LESSON_DONE' || value === 'SCHEDULED';
 
 const toNullableNumber = (value: unknown) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
@@ -53,6 +53,7 @@ const toDraft = (value: unknown): HomeworkEditorDraft | null => {
       studentId: toNullableNumber(assignment.studentId),
       lessonId: toNullableNumber(assignment.lessonId),
       groupId: toNullableNumber(assignment.groupId),
+      scheduledFor: toNullableString(assignment.scheduledFor),
       deadlineAt: toNullableString(assignment.deadlineAt),
       sendMode: isHomeworkSendMode(assignment.sendMode) ? assignment.sendMode : 'MANUAL',
       sourceTemplateId: toNullableNumber(assignment.sourceTemplateId),

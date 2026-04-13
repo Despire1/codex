@@ -90,15 +90,28 @@ test('allows reissue only from reviewed state', () => {
   assert.equal(inReview.canReissue, false);
 });
 
-test('teacher can edit only draft assignments', () => {
+test('teacher can edit draft and scheduled assignments before issue', () => {
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'DRAFT' }), true);
-  assert.equal(canTeacherEditHomeworkAssignment({ status: 'SCHEDULED' }), false);
+  assert.equal(canTeacherEditHomeworkAssignment({ status: 'SCHEDULED' }), true);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'SENT' }), false);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'OVERDUE' }), false);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'SUBMITTED' }), false);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'IN_REVIEW' }), false);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'RETURNED' }), false);
   assert.equal(canTeacherEditHomeworkAssignment({ status: 'REVIEWED' }), false);
+});
+
+test('marks scheduled send without date as configuration error', () => {
+  const workflow = resolveHomeworkAssignmentWorkflow(
+    {
+      status: 'SCHEDULED',
+      sendMode: 'SCHEDULED',
+      scheduledFor: null,
+    },
+    NOW,
+  );
+
+  assert.equal(workflow.hasConfigError, true);
 });
 
 test('normalizes structured review result payload', () => {

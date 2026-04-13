@@ -27,6 +27,8 @@ export type StudentHomeworkSummary = {
 export type TeacherHomeworkStudentOption = {
   id: number;
   name: string;
+  level?: string | null;
+  uiColor?: string | null;
 };
 
 export type TeacherTemplateUpsertPayload = {
@@ -42,6 +44,7 @@ export type TeacherAssignmentEditorPrefill = {
   lessonId?: number | null;
   templateId?: number | null;
   groupId?: number | null;
+  scheduledFor?: string | null;
   deadlineAt: string | null;
   sendMode: HomeworkAssignment['sendMode'];
 };
@@ -51,6 +54,8 @@ export type TeacherAssignModalRequest = {
   open: boolean;
   studentId: number | null;
   lessonId: number | null;
+  templateId?: number | null;
+  groupId?: number | null;
 };
 
 export type TeacherBulkAction = 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
@@ -103,8 +108,8 @@ export interface TeacherHomeworksViewModel {
   onSortChange: (value: TeacherHomeworkSort) => void;
   onToggleProblemFilter: (filter: TeacherHomeworkProblemFilter) => void;
   onSelectedStudentIdChange: (studentId: number | null) => void;
-  onOpenCreateAssignmentScreen: () => void;
   onOpenCreateTemplateScreen: () => void;
+  onOpenTemplateDetailScreen: (templateId: number) => void;
   onOpenEditTemplateScreen: (templateId: number) => void;
   onCreateGroup: (payload: {
     title: string;
@@ -131,6 +136,7 @@ export interface TeacherHomeworksViewModel {
   onDuplicateTemplate: (template: HomeworkTemplate) => Promise<void>;
   onArchiveTemplate: (template: HomeworkTemplate) => Promise<void>;
   onRestoreTemplate: (template: HomeworkTemplate) => Promise<void>;
+  onDeleteTemplate: (template: HomeworkTemplate) => Promise<void>;
   onToggleTemplateFavorite: (template: HomeworkTemplate) => Promise<void>;
   onCreateAssignment: (payload: TeacherAssignmentEditorPrefill) => Promise<boolean>;
   onSendAssignmentNow: (assignment: HomeworkAssignment) => Promise<void>;
@@ -161,6 +167,7 @@ export interface TeacherHomeworksViewModel {
   onRefresh: () => void;
   onLoadHomeworkActivity: () => void;
   onMarkHomeworkActivitySeen: (seenThrough?: string) => Promise<void>;
+  onOpenMobileSidebar?: () => void;
 }
 
 export interface StudentHomeworksViewModel {

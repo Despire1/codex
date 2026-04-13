@@ -1,14 +1,10 @@
 import { type FC, type RefObject, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faChartLine,
-  faClock,
   faFilter,
   faGrip,
   faList,
   faPlus,
-  faUserCheck,
-  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import { StudentListItem } from '../../../../entities/types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
@@ -79,8 +75,6 @@ const viewModeOptions: Array<{
 
 export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   students,
-  totalStudents,
-  summary,
   isLoading,
   hasMore,
   listRef,
@@ -156,54 +150,6 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
     <div className={styles.screen}>
       <div className={styles.scrollArea} ref={listRef}>
         <div className={styles.inner}>
-          <section className={styles.overviewGrid}>
-            <article className={styles.statCard}>
-              <div className={styles.statHeaderRow}>
-                <span className={`${styles.statIconWrap} ${styles.statIconBlue}`}>
-                  <FontAwesomeIcon icon={faUsers} />
-                </span>
-                <span className={styles.statBadgePositive}>+12%</span>
-              </div>
-              <div className={styles.statValue}>{totalStudents}</div>
-              <div className={styles.statLabel}>Всего учеников</div>
-            </article>
-
-            <article className={styles.statCard}>
-              <div className={styles.statHeaderRow}>
-                <span className={`${styles.statIconWrap} ${styles.statIconGreen}`}>
-                  <FontAwesomeIcon icon={faUserCheck} />
-                </span>
-                <span className={styles.statBadgePositive}>
-                  {totalStudents > 0 ? `${Math.round((summary.active / totalStudents) * 100)}%` : '0%'}
-                </span>
-              </div>
-              <div className={styles.statValue}>{summary.active}</div>
-              <div className={styles.statLabel}>Активных</div>
-            </article>
-
-            <article className={styles.statCard}>
-              <div className={styles.statHeaderRow}>
-                <span className={`${styles.statIconWrap} ${styles.statIconViolet}`}>
-                  <FontAwesomeIcon icon={faClock} />
-                </span>
-                <span className={styles.statBadgeNeutral}>{summary.lessonsToday} сегодня</span>
-              </div>
-              <div className={styles.statValue}>{summary.lessonsThisWeek}</div>
-              <div className={styles.statLabel}>Занятий на неделе</div>
-            </article>
-
-            <article className={styles.statCard}>
-              <div className={styles.statHeaderRow}>
-                <span className={`${styles.statIconWrap} ${styles.statIconOrange}`}>
-                  <FontAwesomeIcon icon={faChartLine} />
-                </span>
-                <span className={styles.statBadgePositive}>+8%</span>
-              </div>
-              <div className={styles.statValue}>{summary.averageAttendance ?? 0}%</div>
-              <div className={styles.statLabel}>Средняя успеваемость</div>
-            </article>
-          </section>
-
           <section className={styles.filtersCard}>
             <div className={styles.filtersRow}>
               <div className={styles.tabRow}>
@@ -243,17 +189,19 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                 <div className={styles.viewModeGroup} role="group" aria-label="Режим карточек учеников">
                   {viewModeOptions.map((option) => (
                     <Tooltip key={option.value} content={option.label} side="top" align="center">
-                      <button
-                        type="button"
-                        className={`${styles.viewModeButton} ${
-                          studentsListViewMode === option.value ? styles.viewModeButtonActive : ''
-                        }`}
-                        aria-label={option.label}
-                        aria-pressed={studentsListViewMode === option.value}
-                        onClick={() => setStudentsListViewMode(option.value)}
-                      >
-                        <FontAwesomeIcon icon={option.icon} />
-                      </button>
+                      <span className={styles.viewModeTooltipTarget}>
+                        <button
+                          type="button"
+                          className={`${styles.viewModeButton} ${
+                            studentsListViewMode === option.value ? styles.viewModeButtonActive : ''
+                          }`}
+                          aria-label={option.label}
+                          aria-pressed={studentsListViewMode === option.value}
+                          onClick={() => setStudentsListViewMode(option.value)}
+                        >
+                          <FontAwesomeIcon icon={option.icon} />
+                        </button>
+                      </span>
                     </Tooltip>
                   ))}
                 </div>

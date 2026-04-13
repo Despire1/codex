@@ -1,0 +1,81 @@
+.card {
+  padding: 32px;
+  border: 1px solid #edf0f6;
+  border-radius: 32px;
+  background: #fff;
+}
+
+.cardPlain {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field + .field {
+  margin-top: 22px;
+}
+
+.label {
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 800;
+  color: #111827;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #e6eaf1;
+  border-radius: 18px;
+  background: #f7f8fc;
+  padding: 15px 18px;
+  font: inherit;
+  color: #111827;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.input::placeholder {
+  color: #9aa3b2;
+}
+
+.input:focus {
+  border-color: #a3e635;
+  box-shadow: 0 0 0 4px rgba(163, 230, 53, 0.18);
+  background: #fff;
+}
+
+.inputError {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+
+.textarea {
+  min-height: 132px;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.errorText {
+  margin: 0;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+@media (max-width: 720px) {
+  .card {
+    padding: 22px 18px;
+    border-radius: 24px;
+  }
+}

@@ -33,6 +33,7 @@ import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './TemplateMaterialsSection.module.css';
 
 interface TemplateMaterialsSectionProps {
+  surface?: 'card' | 'plain';
   disabled?: boolean;
   mediaBlock: HomeworkBlockMedia;
   onMediaBlockChange: (nextBlock: HomeworkBlockMedia) => void;
@@ -68,6 +69,7 @@ const resolveTypeIcon = (kind: TemplateMaterialKind) => {
 };
 
 export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
+  surface = 'card',
   disabled = false,
   mediaBlock,
   onMediaBlockChange,
@@ -242,7 +244,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
   );
 
   return (
-    <section className={styles.section}>
+    <section className={`${styles.section} ${surface === 'plain' ? styles.sectionPlain : ''}`}>
       <div className={styles.sectionHeader}>
         <span className={styles.sectionIcon}>
           <HomeworkPaperclipIcon size={15} />

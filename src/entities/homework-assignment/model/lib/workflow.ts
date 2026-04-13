@@ -30,6 +30,7 @@ export type HomeworkWorkflowSource = Pick<
   deadlineAt?: DateLike;
   sendMode?: HomeworkSendMode;
   lessonId?: number | null;
+  scheduledFor?: DateLike;
   latestSubmissionSubmittedAt?: DateLike;
   reviewedAt?: DateLike;
 };
@@ -93,7 +94,7 @@ export const normalizeHomeworkSubmissionStatus = (value: unknown): HomeworkSubmi
 };
 
 export const normalizeHomeworkSendMode = (value: unknown): HomeworkSendMode =>
-  value === 'AUTO_AFTER_LESSON_DONE' ? 'AUTO_AFTER_LESSON_DONE' : 'MANUAL';
+  value === 'AUTO_AFTER_LESSON_DONE' || value === 'SCHEDULED' ? value : 'MANUAL';
 
 export const hasRealHomeworkSubmissionStatus = (status: HomeworkSubmissionStatus | null | undefined) =>
   status === 'SUBMITTED' || status === 'REVIEWED';
@@ -119,13 +120,14 @@ export const resolveHomeworkAssignmentWorkflow = (
     ? normalizeHomeworkSubmissionStatus(assignment.latestSubmissionStatus)
     : null;
   const deadlineAt = toValidDate(assignment.deadlineAt);
+  const scheduledFor = toValidDate(assignment.scheduledFor);
   const latestSubmissionSubmittedAt = toValidDate(assignment.latestSubmissionSubmittedAt);
   const reviewedAt = toValidDate(assignment.reviewedAt);
   const baseStatus = resolveLegacyOverdueStatus(persistedStatus, normalizedSubmissionStatus, reviewedAt);
   const needsStudentAction = baseStatus === 'SENT' || baseStatus === 'RETURNED';
   const isOverdue = needsStudentAction && Boolean(deadlineAt && deadlineAt.getTime() < now.getTime());
   const status = isOverdue ? 'OVERDUE' : baseStatus;
-  const canTeacherEditAssignment = persistedStatus === 'DRAFT';
+  const canTeacherEditAssignment = persistedStatus === 'DRAFT' || persistedStatus === 'SCHEDULED';
   const lateState =
     deadlineAt && latestSubmissionSubmittedAt
       ? latestSubmissionSubmittedAt.getTime() > deadlineAt.getTime()
@@ -133,8 +135,9 @@ export const resolveHomeworkAssignmentWorkflow = (
         : 'ON_TIME'
       : null;
   const hasConfigError =
-    normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' &&
-    (assignment.lessonId === null || assignment.lessonId === undefined);
+    (normalizeHomeworkSendMode(assignment.sendMode) === 'AUTO_AFTER_LESSON_DONE' &&
+      (assignment.lessonId === null || assignment.lessonId === undefined)) ||
+    (normalizeHomeworkSendMode(assignment.sendMode) === 'SCHEDULED' && !scheduledFor);
   const problemFlags = Array.from(
     new Set(
       [

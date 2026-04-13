@@ -271,7 +271,7 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
   const studentName = assignment?.studentName ?? students.find((item) => item.id === draft.assignment.studentId)?.name ?? 'Не выбран';
   const groupTitle = assignment?.groupTitle ?? groups.find((item) => item.id === draft.assignment.groupId)?.title ?? 'Без группы';
   const templateTitle =
-    assignment?.templateTitle ?? templates.find((item) => item.id === draft.assignment.sourceTemplateId)?.title ?? 'Без шаблона';
+    assignment?.templateTitle ?? templates.find((item) => item.id === draft.assignment.sourceTemplateId)?.title ?? 'Без базовой домашки';
   const estimatedMinutes = extractEstimatedMinutes(draft.template.level);
   const blocks = draft.blocks;
   const testBlock = blocks.find((block): block is HomeworkBlockTest => block.type === 'TEST') ?? null;
@@ -298,12 +298,14 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
         value:
           draft.assignment.sendMode === 'AUTO_AFTER_LESSON_DONE'
             ? `Автоматически после урока${assignment?.lessonStartAt ? ` · ${formatDateTime(assignment.lessonStartAt, timeZone)}` : ''}`
+            : draft.assignment.sendMode === 'SCHEDULED'
+              ? `По расписанию${draft.assignment.scheduledFor ? ` · ${formatDateTime(draft.assignment.scheduledFor, timeZone)}` : ''}`
             : 'Вручную',
         icon: <HomeworkPaperPlaneIcon size={14} />,
       },
       {
         id: 'template',
-        label: 'Шаблон',
+        label: 'Источник',
         value: templateTitle,
         icon: <HomeworkFileLinesIcon size={14} />,
       },
@@ -323,6 +325,7 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
     [
       assignment?.lessonStartAt,
       draft.assignment.deadlineAt,
+      draft.assignment.scheduledFor,
       draft.assignment.sendMode,
       estimatedMinutes,
       groupTitle,

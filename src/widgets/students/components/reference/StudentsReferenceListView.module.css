@@ -335,6 +335,12 @@
   flex-shrink: 0;
 }
 
+.viewModeTooltipTarget {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .viewModeButton {
   border: none;
   background: transparent;

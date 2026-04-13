@@ -200,6 +200,9 @@ export interface HomeworkTemplate {
   level?: string | null;
   blocks: HomeworkBlock[];
   isArchived: boolean;
+  issuedAssignmentsCount?: number;
+  canTeacherEdit?: boolean;
+  canTeacherDelete?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -243,7 +246,7 @@ export type HomeworkAssignmentStatus =
   | 'REVIEWED'
   | 'OVERDUE';
 
-export type HomeworkSendMode = 'AUTO_AFTER_LESSON_DONE' | 'MANUAL';
+export type HomeworkSendMode = 'AUTO_AFTER_LESSON_DONE' | 'MANUAL' | 'SCHEDULED';
 export type HomeworkAssignmentProblemFlag = 'OVERDUE' | 'RETURNED' | 'CONFIG_ERROR' | 'SUBMITTED' | 'IN_REVIEW';
 export type HomeworkLateState = 'ON_TIME' | 'LATE';
 
@@ -274,6 +277,7 @@ export interface HomeworkAssignment {
   hasConfigError?: boolean;
   problemFlags?: HomeworkAssignmentProblemFlag[];
   sendMode: HomeworkSendMode;
+  scheduledFor?: string | null;
   deadlineAt?: string | null;
   sentAt?: string | null;
   contentSnapshot: HomeworkBlock[];

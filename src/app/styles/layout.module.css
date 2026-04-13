@@ -63,6 +63,11 @@
   padding: 16px 16px calc(92px + var(--app-safe-bottom));
 }
 
+.contentMobileHomeworks {
+  gap: 0;
+  padding: 0 0 calc(92px + var(--app-safe-bottom));
+}
+
 .contentMobile.contentNoScroll {
   overflow-y: auto;
   overflow-x: hidden;
@@ -80,5 +85,9 @@
 
   .contentMobile {
     padding: 14px 14px calc(73px + var(--app-safe-bottom));
+  }
+
+  .contentMobileHomeworks {
+    padding: 0 0 calc(73px + var(--app-safe-bottom));
   }
 }

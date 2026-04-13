@@ -223,7 +223,7 @@ export const TemplateSettingsSidebar: FC<TemplateSettingsSidebarProps> = ({
       </section>
 
       <section className={styles.statsCard}>
-        <h3>Статистика шаблона</h3>
+        <h3>Статистика домашнего задания</h3>
         <div className={styles.statsList}>
           <div>
             <span>Всего вопросов</span>

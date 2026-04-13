@@ -19,15 +19,51 @@
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 12px;
   text-align: left;
   cursor: pointer;
 }
 
 .menuItem:hover {
   background: #f8fafc;
+}
+
+.menuItemIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.menuItemIconDark {
+  background: #0f172a;
+  color: #b8fa4e;
+}
+
+.menuItemIconLime {
+  background: #effaed;
+  color: #5f9f3c;
+}
+
+.menuItemIconBlue {
+  background: #eef4ff;
+  color: #5f85ff;
+}
+
+.menuItemIconNeutral {
+  background: #f3f4f7;
+  color: #6b7280;
+}
+
+.menuItemText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .menuLabel {

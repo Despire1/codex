@@ -799,9 +799,14 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  deleteHomeworkTemplateV2: (templateId: number) =>
+    apiFetch<{ deletedId: number }>(`/api/v2/homework/templates/${templateId}`, {
+      method: 'DELETE',
+    }),
   listHomeworkAssignmentsV2: (params?: {
     studentId?: number;
     lessonId?: number;
+    templateId?: number;
     groupId?: number;
     ungrouped?: boolean;
     status?: string;
@@ -816,6 +821,7 @@ export const api = {
     const search = new URLSearchParams();
     if (typeof params?.studentId === 'number') search.set('studentId', String(params.studentId));
     if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
+    if (typeof params?.templateId === 'number') search.set('templateId', String(params.templateId));
     if (typeof params?.groupId === 'number') search.set('groupId', String(params.groupId));
     if (params?.ungrouped) search.set('ungrouped', '1');
     if (params?.status) search.set('status', params.status);
@@ -849,6 +855,7 @@ export const api = {
     groupId?: number | null;
     title?: string;
     sendMode?: HomeworkAssignment['sendMode'];
+    scheduledFor?: string | null;
     deadlineAt?: string | null;
     contentSnapshot?: HomeworkBlock[];
     legacyHomeworkId?: number | null;
@@ -867,6 +874,7 @@ export const api = {
       lessonId: number | null;
       templateId: number | null;
       groupId: number | null;
+      scheduledFor: string | null;
       deadlineAt: string | null;
       contentSnapshot: HomeworkBlock[];
     }>,
