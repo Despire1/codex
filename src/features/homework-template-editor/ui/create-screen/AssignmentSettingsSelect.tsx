@@ -25,6 +25,11 @@ interface AssignmentSettingsSelectProps {
   allowClear?: boolean;
   invalid?: boolean;
   validationPath?: string;
+  leadingIcon?: ReactNode;
+  rootClassName?: string;
+  triggerClassName?: string;
+  popoverClassName?: string;
+  matchTriggerWidth?: boolean;
 }
 
 export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
@@ -38,6 +43,11 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
   allowClear = false,
   invalid = false,
   validationPath,
+  leadingIcon,
+  rootClassName = '',
+  triggerClassName = '',
+  popoverClassName = '',
+  matchTriggerWidth = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -58,12 +68,12 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
       side="bottom"
       align="start"
       offset={10}
-      rootClassName={styles.root}
+      rootClassName={`${styles.root} ${rootClassName}`.trim()}
       trigger={
         <div className={styles.triggerShell}>
           <button
             type="button"
-            className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''} ${compact ? styles.triggerButtonCompact : ''} ${invalid ? styles.triggerButtonInvalid : ''}`}
+            className={`${styles.triggerButton} ${isOpen ? styles.triggerButtonOpen : ''} ${compact ? styles.triggerButtonCompact : ''} ${invalid ? styles.triggerButtonInvalid : ''} ${triggerClassName}`.trim()}
             onClick={() => {
               if (disabled) return;
               setIsOpen((prev) => !prev);
@@ -76,7 +86,9 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
             data-validation-path={validationPath}
           >
             <span className={styles.triggerContent}>
-              {selectedOption?.icon ? <span className={styles.triggerIcon}>{selectedOption.icon}</span> : null}
+              {selectedOption?.icon ?? leadingIcon ? (
+                <span className={styles.triggerIcon}>{selectedOption?.icon ?? leadingIcon}</span>
+              ) : null}
               <span className={`${styles.triggerLabel} ${selectedOption ? styles.triggerLabelFilled : styles.triggerLabelPlaceholder}`}>
                 {selectedOption?.label ?? placeholder}
               </span>
@@ -100,7 +112,8 @@ export const AssignmentSettingsSelect: FC<AssignmentSettingsSelectProps> = ({
           ) : null}
         </div>
       }
-      className={styles.popover}
+      className={`${styles.popover} ${popoverClassName}`.trim()}
+      matchTriggerWidth={matchTriggerWidth}
     >
       <div className={styles.optionsList} role="listbox" aria-label={ariaLabel}>
         {options.map((option) => {

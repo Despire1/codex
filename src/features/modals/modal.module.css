@@ -11,9 +11,9 @@
 }
 
 .modal {
-  --primary-button-bg: #a3e635;
-  --primary-button-hover-bg: #94d82d;
-  --primary-button-text: #111;
+  --primary-button-bg: var(--accent-primary);
+  --primary-button-hover-bg: var(--accent-primary-hover);
+  --primary-button-text: var(--accent-primary-text);
   background: var(--color-white);
   border-radius: 16px;
   max-width: 640px;

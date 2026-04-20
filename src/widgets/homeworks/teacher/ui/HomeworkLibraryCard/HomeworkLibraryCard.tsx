@@ -1,12 +1,11 @@
 import { FC, KeyboardEvent, MouseEvent, ReactNode, useMemo, useState } from 'react';
 import {
-  canTeacherDeleteHomeworkTemplate,
   canTeacherEditHomeworkTemplate,
+  canTeacherDeleteHomeworkTemplate,
 } from '../../../../../entities/homework-template/model/lib/workflow';
 import { HomeworkTemplate } from '../../../../../entities/types';
 import { AnchoredPopover } from '../../../../../shared/ui/AnchoredPopover/AnchoredPopover';
 import {
-  HomeworkArrowUpRightFromSquareIcon,
   HomeworkClockIcon,
   HomeworkCopyIcon,
   HomeworkEllipsisVerticalIcon,
@@ -98,7 +97,8 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
   const issuedCount = resolveHomeworkLibraryIssuedCount(template);
   const updatedLabel = resolveHomeworkLibraryUpdatedLabel(template.updatedAt);
 
-  const actionLabel = template.isArchived ? 'Вернуть в библиотеку' : 'Выдать';
+  const actionLabel = template.isArchived ? 'Вернуть' : 'Выдать';
+  const actionAriaLabel = template.isArchived ? 'Вернуть задание в библиотеку' : 'Выдать домашнее задание';
 
   const menuItems = useMemo(
     () => {
@@ -206,14 +206,25 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
             </button>
           </div>
 
-          <button
-            type="button"
-            className={styles.menuButton}
-            onClick={handleMenuClick}
-            aria-label="Открыть меню задания"
-          >
-            <HomeworkEllipsisVerticalIcon size={12} />
-          </button>
+          <div className={styles.headActions}>
+            <button
+              type="button"
+              className={styles.issueButton}
+              onClick={handleActionClick}
+              aria-label={actionAriaLabel}
+            >
+              <span>{actionLabel}</span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.menuButton}
+              onClick={handleMenuClick}
+              aria-label="Открыть меню задания"
+            >
+              <HomeworkEllipsisVerticalIcon size={12} />
+            </button>
+          </div>
         </div>
 
         <div className={styles.content}>
@@ -250,13 +261,6 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
             <span>{issuedCount}</span>
           </span>
         </div>
-      </div>
-
-      <div className={`${styles.hoverActions} ${viewMode === 'list' ? styles.hoverActionsList : ''}`}>
-        <button type="button" className={styles.issueButton} onClick={handleActionClick}>
-          <HomeworkArrowUpRightFromSquareIcon size={12} />
-          <span>{actionLabel}</span>
-        </button>
       </div>
 
       <AnchoredPopover

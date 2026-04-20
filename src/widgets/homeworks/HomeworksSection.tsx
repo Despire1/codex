@@ -37,14 +37,15 @@ import {
 } from '../../features/homework-template-editor/model/lib/homeworkEditorDraftStorage';
 import {
   areHomeworkEditorDraftsEqual,
+  cloneHomeworkEditorDraft,
   hasHomeworkEditorContent,
+  resolveOpenedHomeworkEditorDraft,
 } from '../../features/homework-template-editor/model/lib/homeworkEditorDirty';
 import {
   HomeworkTemplateCreateScreen,
   HomeworkTemplateCreateSubmitResult,
 } from '../../features/homework-template-editor/ui/HomeworkTemplateCreateScreen';
 import { HomeworkReviewScreen } from '../../features/homework-review/ui/HomeworkReviewScreen';
-import { HomeworkTemplateDetailScreen } from '../../features/homework-template-view/ui/HomeworkTemplateDetailScreen';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { StudentHomeworksView } from './student/StudentHomeworksView';
 import { TeacherHomeworksView } from './teacher/TeacherHomeworksView';
@@ -75,10 +76,6 @@ type HomeworksNavigationState = {
   lessonId?: number | null;
   templateId?: number | null;
   groupId?: number | null;
-};
-
-type HomeworkEditorNavigationState = {
-  editorPrefill?: TeacherAssignmentEditorPrefill | null;
 };
 
 const TEACHER_PAGE_SIZE = 10;
@@ -195,6 +192,38 @@ const mergeHomeworkTemplate = (items: HomeworkTemplate[], nextTemplate: Homework
   ...items.filter((template) => template.id !== nextTemplate.id),
 ];
 
+const HOMEWORK_COPY_TITLE_REGEX = /\s+\(копия(?:\s+(\d+))?\)$/iu;
+
+const normalizeHomeworkCopyBaseTitle = (title: string) => {
+  const normalizedTitle = title.trim() || 'Домашнее задание';
+  return normalizedTitle.replace(HOMEWORK_COPY_TITLE_REGEX, '').trim() || 'Домашнее задание';
+};
+
+const buildHomeworkCopyTitle = (title: string, existingTitles: string[]) => {
+  const baseTitle = normalizeHomeworkCopyBaseTitle(title);
+  let maxCopyIndex = -1;
+
+  existingTitles.forEach((existingTitle) => {
+    const normalizedExistingTitle = existingTitle.trim();
+    if (!normalizedExistingTitle) return;
+
+    const match = normalizedExistingTitle.match(HOMEWORK_COPY_TITLE_REGEX);
+    if (!match) return;
+
+    const existingBaseTitle = normalizeHomeworkCopyBaseTitle(normalizedExistingTitle);
+    if (existingBaseTitle !== baseTitle) return;
+
+    const rawIndex = match[1];
+    const resolvedIndex = rawIndex === undefined ? 0 : Number.parseInt(rawIndex, 10);
+    if (!Number.isFinite(resolvedIndex)) return;
+
+    maxCopyIndex = Math.max(maxCopyIndex, resolvedIndex);
+  });
+
+  const nextCopyIndex = maxCopyIndex + 1;
+  return nextCopyIndex === 0 ? `${baseTitle} (копия)` : `${baseTitle} (копия ${nextCopyIndex})`;
+};
+
 export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobileSidebar }) => {
   const { showToast } = useToast();
   const { setEntry, clearEntry, requestNavigationBypass } = useUnsavedChanges();
@@ -219,6 +248,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     templateId > 0 &&
     /^\/homeworks\/\d+\/?$/.test(location.pathname);
   const isTeacherAssignmentCreateRoute = mode === 'teacher' && /^\/homeworks\/new\/?$/.test(location.pathname);
+  const teacherAssignmentDetailRouteMatch =
+    mode === 'teacher' ? location.pathname.match(/^\/homeworks\/assignments\/(\d+)\/?$/) : null;
+  const detailAssignmentId = teacherAssignmentDetailRouteMatch ? Number(teacherAssignmentDetailRouteMatch[1]) : null;
+  const hasTeacherAssignmentDetailId =
+    mode === 'teacher' &&
+    typeof detailAssignmentId === 'number' &&
+    Number.isFinite(detailAssignmentId) &&
+    detailAssignmentId > 0;
   const teacherAssignmentEditRouteMatch =
     mode === 'teacher' ? location.pathname.match(/^\/homeworks\/assignments\/(\d+)\/edit\/?$/) : null;
   const editingAssignmentId = teacherAssignmentEditRouteMatch ? Number(teacherAssignmentEditRouteMatch[1]) : null;
@@ -227,7 +264,12 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     typeof editingAssignmentId === 'number' &&
     Number.isFinite(editingAssignmentId) &&
     editingAssignmentId > 0;
-  const isTeacherAssignmentEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute;
+  const isTeacherAssignmentEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute || hasTeacherAssignmentDetailId;
+  const activeTeacherAssignmentId = isTeacherAssignmentEditRoute
+    ? editingAssignmentId
+    : hasTeacherAssignmentDetailId
+      ? detailAssignmentId
+      : null;
   const isTeacherTemplateCreateRoute = mode === 'teacher' && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const teacherTemplateEditRouteMatch =
     mode === 'teacher' ? location.pathname.match(/^\/homeworks\/(\d+)\/edit\/?$/) : null;
@@ -239,6 +281,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     editingTemplateId > 0;
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
   const teacherTemplateListPath = '/homeworks';
+  const navigateBackInHistory = useCallback((fallbackPath = '/homeworks') => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    navigate(fallbackPath);
+  }, [navigate]);
   const templateEditorDraftStorageKey = isTeacherTemplateEditRoute && editingTemplateId
     ? buildHomeworkEditorDraftStorageKey({
         variant: 'template',
@@ -328,6 +378,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   const [homeworkActivityHasUnread, setHomeworkActivityHasUnread] = useState(false);
 
   const [templateEditorDraft, setTemplateEditorDraft] = useState<HomeworkEditorDraft>(createInitialHomeworkEditorDraft());
+  const [templateEditorInitialDraft, setTemplateEditorInitialDraft] = useState<HomeworkEditorDraft>(
+    createInitialHomeworkEditorDraft(),
+  );
   const [templateEditorTemplate, setTemplateEditorTemplate] = useState<HomeworkTemplate | null>(null);
   const [templateEditorLoading, setTemplateEditorLoading] = useState(false);
   const [templateEditorError, setTemplateEditorError] = useState<string | null>(null);
@@ -341,6 +394,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   const [assignmentEditorServerAssignment, setAssignmentEditorServerAssignment] = useState<HomeworkAssignment | null>(null);
   const [savingAssignmentAsTemplate, setSavingAssignmentAsTemplate] = useState(false);
   const [pendingAssignmentTemplate, setPendingAssignmentTemplate] = useState<HomeworkTemplate | null>(null);
+  const [pendingTemplateEditCopy, setPendingTemplateEditCopy] = useState<{
+    template: HomeworkTemplate;
+    cancelPath: string | null;
+  } | null>(null);
   const [deleteTemplateTarget, setDeleteTemplateTarget] = useState<HomeworkTemplate | null>(null);
   const [cancelIssueAssignment, setCancelIssueAssignment] = useState<HomeworkAssignment | null>(null);
   const [cancelIssueSubmitting, setCancelIssueSubmitting] = useState(false);
@@ -368,11 +425,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       isTeacherTemplateEditRoute &&
       !templateEditorReadOnly &&
       templateEditorTemplate !== null &&
-      !areHomeworkEditorDraftsEqual(
-        templateEditorDraft,
-        createHomeworkEditorDraftFromTemplate(templateEditorTemplate),
-      ),
-    [isTeacherTemplateEditRoute, templateEditorDraft, templateEditorReadOnly, templateEditorTemplate],
+      !areHomeworkEditorDraftsEqual(templateEditorDraft, templateEditorInitialDraft),
+    [isTeacherTemplateEditRoute, templateEditorDraft, templateEditorInitialDraft, templateEditorReadOnly, templateEditorTemplate],
   );
 
   useEffect(() => {
@@ -385,16 +439,30 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   useEffect(() => {
     if (mode !== 'teacher') return;
     if (isTeacherTemplateCreateRoute) {
-      setTemplateEditorDraft(createInitialHomeworkEditorDraft());
+      const initialDraft = createInitialHomeworkEditorDraft();
+      setTemplateEditorDraft(initialDraft);
+      setTemplateEditorInitialDraft(initialDraft);
       setTemplateEditorTemplate(null);
       setTemplateEditorLoading(false);
       setTemplateEditorError(null);
     } else if (!isTeacherTemplateEditorRoute) {
+      setTemplateEditorInitialDraft(createInitialHomeworkEditorDraft());
       setTemplateEditorTemplate(null);
       setTemplateEditorLoading(false);
       setTemplateEditorError(null);
     }
   }, [isTeacherTemplateCreateRoute, isTeacherTemplateEditorRoute, mode]);
+
+  useEffect(() => {
+    if (!isTeacherAssignmentCreateRoute || !assignmentEditorDraftStorageKey) return;
+
+    // The create-assignment route is always a fresh flow, never a restored draft.
+    clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
+
+    return () => {
+      clearStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey);
+    };
+  }, [assignmentEditorDraftStorageKey, isTeacherAssignmentCreateRoute]);
 
   useEffect(() => {
     hasSkippedTemplateEditorAutoSaveRef.current = false;
@@ -421,8 +489,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const storedDraft = templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(existingTemplate)
         ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
         : null;
+      const openedDraft = cloneHomeworkEditorDraft(resolveOpenedHomeworkEditorDraft(nextDraft, storedDraft?.draft));
       setTemplateEditorTemplate(existingTemplate);
-      setTemplateEditorDraft(storedDraft?.draft ?? nextDraft);
+      setTemplateEditorInitialDraft(cloneHomeworkEditorDraft(openedDraft));
+      setTemplateEditorDraft(openedDraft);
       setTemplateEditorError(null);
       setTemplateEditorLoading(false);
       return;
@@ -446,8 +516,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         const storedDraft = templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(targetTemplate)
           ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
           : null;
+        const openedDraft = cloneHomeworkEditorDraft(resolveOpenedHomeworkEditorDraft(nextDraft, storedDraft?.draft));
         setTemplateEditorTemplate(targetTemplate);
-        setTemplateEditorDraft(storedDraft?.draft ?? nextDraft);
+        setTemplateEditorInitialDraft(cloneHomeworkEditorDraft(openedDraft));
+        setTemplateEditorDraft(openedDraft);
       })
       .catch((error) => {
         // eslint-disable-next-line no-console
@@ -467,6 +539,37 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   }, [editingTemplateId, isTeacherTemplateEditRoute, mode, templateEditorDraftStorageKey, templates]);
 
   useEffect(() => {
+    if (
+      mode !== 'teacher' ||
+      !isTeacherTemplateEditRoute ||
+      templateEditorLoading ||
+      templateEditorError ||
+      !templateEditorTemplate ||
+      canTeacherEditHomeworkTemplate(templateEditorTemplate)
+    ) {
+      return;
+    }
+
+    const cancelPath = `/homeworks/${templateEditorTemplate.id}`;
+    setPendingTemplateEditCopy((current) => {
+      if (current?.template.id === templateEditorTemplate.id && current.cancelPath === cancelPath) {
+        return current;
+      }
+
+      return {
+        template: templateEditorTemplate,
+        cancelPath,
+      };
+    });
+  }, [
+    isTeacherTemplateEditRoute,
+    mode,
+    templateEditorError,
+    templateEditorLoading,
+    templateEditorTemplate,
+  ]);
+
+  useEffect(() => {
     if (mode !== 'teacher') return;
     if (!isTeacherAssignmentCreateRoute) {
       if (!isTeacherAssignmentEditRoute) {
@@ -476,90 +579,18 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       return;
     }
 
-    let isCancelled = false;
-    const navigationState = (location.state ?? null) as HomeworkEditorNavigationState | null;
-    const prefill = navigationState?.editorPrefill ?? null;
-
-    const applyDraft = (template: HomeworkTemplate | null) => {
-      const nextDraft = template
-        ? createHomeworkEditorDraftFromTemplate(template, {
-            studentId: prefill?.studentId ?? null,
-            lessonId: prefill?.lessonId ?? null,
-            groupId: prefill?.groupId ?? null,
-            scheduledFor: prefill?.scheduledFor ?? null,
-            deadlineAt: prefill?.deadlineAt ?? null,
-            sendMode: prefill?.sendMode ?? 'MANUAL',
-          })
-        : {
-            ...createInitialHomeworkEditorDraft(),
-            assignment: {
-              ...createInitialHomeworkEditorDraft().assignment,
-              studentId: prefill?.studentId ?? null,
-              lessonId: prefill?.lessonId ?? null,
-              groupId: prefill?.groupId ?? null,
-              scheduledFor: prefill?.scheduledFor ?? null,
-              deadlineAt: prefill?.deadlineAt ?? null,
-              sendMode: prefill?.sendMode ?? 'MANUAL',
-              sourceTemplateId: prefill?.templateId ?? null,
-            },
-          };
-      const storedDraft = assignmentEditorDraftStorageKey
-        ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
-        : null;
-      setAssignmentEditorInitialDraft(nextDraft);
-      setAssignmentEditorDraft(storedDraft?.draft ?? nextDraft);
-      setAssignmentEditorOriginalStatus(null);
-      setAssignmentEditorServerAssignment(null);
-      setAssignmentEditorError(null);
-      setAssignmentEditorLoading(false);
-    };
-
-    const existingTemplate =
-      typeof prefill?.templateId === 'number'
-        ? templates.find((template) => template.id === prefill.templateId) ?? null
-        : null;
-    if (prefill?.templateId && !existingTemplate) {
-      setAssignmentEditorLoading(true);
-      setAssignmentEditorError(null);
-      void api
-        .listHomeworkTemplatesV2({ includeArchived: true })
-        .then((response) => {
-          if (isCancelled) return;
-          setTemplates(response.items);
-          const targetTemplate = response.items.find((template) => template.id === prefill.templateId) ?? null;
-          if (!targetTemplate) {
-            setAssignmentEditorError('Домашнее задание не найдено');
-            applyDraft(null);
-            return;
-          }
-          applyDraft(targetTemplate);
-        })
-        .catch((error) => {
-          // eslint-disable-next-line no-console
-          console.error('Failed to load template for assignment create screen', error);
-          if (isCancelled) return;
-          setAssignmentEditorError('Не удалось загрузить домашнее задание');
-          applyDraft(null);
-        });
-    } else {
-      applyDraft(existingTemplate);
-    }
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [
-    assignmentEditorDraftStorageKey,
-    isTeacherAssignmentCreateRoute,
-    isTeacherAssignmentEditRoute,
-    location.state,
-    mode,
-    templates,
-  ]);
+    const nextDraft = cloneHomeworkEditorDraft(createInitialHomeworkEditorDraft());
+    setAssignmentEditorInitialDraft(cloneHomeworkEditorDraft(nextDraft));
+    setAssignmentEditorDraft(nextDraft);
+    setAssignmentEditorOriginalStatus(null);
+    setAssignmentEditorServerAssignment(null);
+    setAssignmentEditorError(null);
+    setAssignmentEditorLoading(false);
+  }, [isTeacherAssignmentCreateRoute, isTeacherAssignmentEditRoute, mode]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
-    if (!isTeacherAssignmentEditRoute || editingAssignmentId === null) {
+    if (activeTeacherAssignmentId === null) {
       setAssignmentEditorServerAssignment(null);
       return;
     }
@@ -569,7 +600,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     setAssignmentEditorError(null);
 
     void api
-      .getHomeworkAssignmentV2(editingAssignmentId)
+      .getHomeworkAssignmentV2(activeTeacherAssignmentId)
       .then(async (response) => {
         if (isCancelled) return;
         const assignment = response.assignment;
@@ -590,8 +621,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           assignmentEditorDraftStorageKey && canTeacherEditHomeworkAssignment(assignment)
             ? loadStoredHomeworkEditorDraft(assignmentEditorDraftStorageKey)
             : null;
-        setAssignmentEditorInitialDraft(nextDraft);
-        setAssignmentEditorDraft(storedDraft?.draft ?? nextDraft);
+        const openedDraft = cloneHomeworkEditorDraft(resolveOpenedHomeworkEditorDraft(nextDraft, storedDraft?.draft));
+        setAssignmentEditorInitialDraft(cloneHomeworkEditorDraft(openedDraft));
+        setAssignmentEditorDraft(openedDraft);
         setAssignmentEditorOriginalStatus(assignment.status);
         setAssignmentEditorServerAssignment(response.assignment);
       })
@@ -611,8 +643,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     };
   }, [
     assignmentEditorDraftStorageKey,
-    editingAssignmentId,
-    isTeacherAssignmentEditRoute,
+    activeTeacherAssignmentId,
     mode,
     templates,
   ]);
@@ -687,10 +718,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
   const assignmentEditorReadOnly = useMemo(
     () =>
-      isTeacherAssignmentEditRoute &&
-      assignmentEditorServerAssignment !== null &&
-      !canTeacherEditHomeworkAssignment(assignmentEditorServerAssignment),
-    [assignmentEditorServerAssignment, isTeacherAssignmentEditRoute],
+      hasTeacherAssignmentDetailId ||
+      (isTeacherAssignmentEditRoute &&
+        assignmentEditorServerAssignment !== null &&
+        !canTeacherEditHomeworkAssignment(assignmentEditorServerAssignment)),
+    [assignmentEditorServerAssignment, hasTeacherAssignmentDetailId, isTeacherAssignmentEditRoute],
   );
 
   const assignmentEditorHasUnsavedChanges = useMemo(
@@ -1335,15 +1367,15 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     (draftValue: HomeworkEditorDraft): TeacherTemplateUpsertPayload => {
       const templateDraft = projectHomeworkEditorToTemplateDraft(draftValue);
       return {
-      title: templateDraft.title,
-      tags: templateDraft.tagsText
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
-      subject: templateDraft.subject.trim() || null,
-      level: templateDraft.level.trim() || null,
-      blocks: templateDraft.blocks,
-    };
+        title: templateDraft.title,
+        tags: templateDraft.tagsText
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+        subject: templateDraft.subject.trim() || null,
+        level: templateDraft.level.trim() || null,
+        blocks: templateDraft.blocks,
+      };
     },
     [],
   );
@@ -1371,6 +1403,73 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     },
     [showToast],
   );
+
+  const createTemplateCopy = useCallback(async (template: HomeworkTemplate) => {
+    const existingTemplatesResponse = await api.listHomeworkTemplatesV2({ includeArchived: true });
+    const nextCopyTitle = buildHomeworkCopyTitle(
+      template.title,
+      existingTemplatesResponse.items.map((item) => item.title),
+    );
+    const response = await api.createHomeworkTemplateV2({
+      title: nextCopyTitle,
+      tags: template.tags,
+      subject: template.subject ?? null,
+      level: template.level ?? null,
+      blocks: template.blocks,
+    });
+    setTemplates((current) => mergeHomeworkTemplate(current, response.template));
+    return response.template;
+  }, []);
+
+  const handleRequestTemplateEdit = useCallback(
+    (template: HomeworkTemplate) => {
+      if (canTeacherEditHomeworkTemplate(template)) {
+        requestNavigationBypass();
+        navigate(`/homeworks/${template.id}/edit`);
+        return;
+      }
+
+      setPendingTemplateEditCopy({
+        template,
+        cancelPath: null,
+      });
+    },
+    [navigate, requestNavigationBypass],
+  );
+
+  const handleConfirmTemplateEditCopy = useCallback(async () => {
+    if (!pendingTemplateEditCopy) return;
+
+    const { template, cancelPath } = pendingTemplateEditCopy;
+    setSubmittingTemplate(true);
+    try {
+      const copiedTemplate = await createTemplateCopy(template);
+      setPendingTemplateEditCopy(null);
+      void loadTeacherTemplates();
+      showToast({
+        message: 'Создали копию домашнего задания. Исходная версия осталась без изменений.',
+        variant: 'success',
+      });
+      requestNavigationBypass();
+      navigate(`/homeworks/${copiedTemplate.id}/edit`, { replace: cancelPath !== null });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to create editable copy of homework template', error);
+      showToast({ message: 'Не удалось создать копию домашнего задания', variant: 'error' });
+    } finally {
+      setSubmittingTemplate(false);
+    }
+  }, [createTemplateCopy, loadTeacherTemplates, navigate, pendingTemplateEditCopy, requestNavigationBypass, showToast]);
+
+  const handleCancelTemplateEditCopy = useCallback(async () => {
+    const cancelPath = pendingTemplateEditCopy?.cancelPath ?? null;
+    setPendingTemplateEditCopy(null);
+
+    if (cancelPath) {
+      requestNavigationBypass();
+      navigate(cancelPath, { replace: true });
+    }
+  }, [navigate, pendingTemplateEditCopy, requestNavigationBypass]);
 
   const handleCreateTemplateFromScreen = useCallback(async (): Promise<HomeworkTemplateCreateSubmitResult> => {
     const payload = buildTemplateUpsertPayload(templateEditorDraft);
@@ -1529,15 +1628,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     async (template: HomeworkTemplate) => {
       setSubmittingTemplate(true);
       try {
-        await api.createHomeworkTemplateV2({
-          title: `${template.title} (копия)`,
-          tags: template.tags,
-          subject: template.subject ?? null,
-          level: template.level ?? null,
-          blocks: template.blocks,
-        });
+        await createTemplateCopy(template);
+        void loadTeacherTemplates();
         showToast({ message: 'Домашнее задание продублировано', variant: 'success' });
-        await loadTeacherTemplates();
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to duplicate homework template', error);
@@ -1546,23 +1639,18 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         setSubmittingTemplate(false);
       }
     },
-    [loadTeacherTemplates, showToast],
+    [createTemplateCopy, loadTeacherTemplates, showToast],
   );
 
   const handleCreateHomeworkBasedOnTemplate = useCallback(
     async (template: HomeworkTemplate) => {
       setSubmittingTemplate(true);
       try {
-        const response = await api.createHomeworkTemplateV2({
-          title: `${template.title} (копия)`,
-          tags: template.tags,
-          subject: template.subject ?? null,
-          level: template.level ?? null,
-          blocks: template.blocks,
-        });
-        await loadTeacherTemplates();
+        const copiedTemplate = await createTemplateCopy(template);
+        void loadTeacherTemplates();
         showToast({ message: 'Создана новая домашка на основе текущей', variant: 'success' });
-        navigate(`/homeworks/${response.template.id}/edit`);
+        requestNavigationBypass();
+        navigate(`/homeworks/${copiedTemplate.id}/edit`);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to create homework based on template', error);
@@ -1571,7 +1659,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         setSubmittingTemplate(false);
       }
     },
-    [loadTeacherTemplates, navigate, showToast],
+    [createTemplateCopy, loadTeacherTemplates, navigate, requestNavigationBypass, showToast],
   );
 
   const handleArchiveTemplate = useCallback(
@@ -1813,18 +1901,57 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
   const handleCreateAssignment = useCallback(
     async (payload: TeacherAssignmentEditorPrefill) => {
-      navigate('/homeworks', {
-        state: {
-          openAssignModal: true,
-          studentId: payload.studentId ?? null,
-          lessonId: payload.lessonId ?? null,
-          templateId: payload.templateId ?? null,
-          groupId: payload.groupId ?? null,
-        } satisfies HomeworksNavigationState,
-      });
-      return true;
+      if (!payload.studentId || !payload.templateId) {
+        showToast({ message: 'Выберите ученика и домашнее задание', variant: 'error' });
+        return false;
+      }
+
+      setSubmittingAssignment(true);
+      try {
+        let assignmentResponse = await api.createHomeworkAssignmentV2({
+          studentId: payload.studentId,
+          lessonId: payload.lessonId ?? undefined,
+          templateId: payload.templateId,
+          groupId: payload.groupId ?? undefined,
+          sendMode: payload.sendMode,
+          scheduledFor: payload.scheduledFor ?? null,
+          deadlineAt: payload.deadlineAt,
+        });
+
+        if (
+          payload.sendMode === 'MANUAL' &&
+          (assignmentResponse.assignment.status === 'DRAFT' || assignmentResponse.assignment.status === 'SCHEDULED')
+        ) {
+          assignmentResponse = await api.sendHomeworkAssignmentV2(assignmentResponse.assignment.id);
+        }
+
+        void Promise.allSettled([
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+          loadTeacherGroups(),
+          loadTeacherTemplates(),
+        ]);
+
+        showToast({
+          message:
+            payload.sendMode === 'MANUAL'
+              ? 'Домашнее задание выдано'
+              : payload.sendMode === 'AUTO_AFTER_LESSON_DONE'
+                ? 'Выдача домашнего задания запланирована после урока'
+                : 'Выдача домашнего задания запланирована на дату',
+          variant: 'success',
+        });
+        return true;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to create homework assignment from side sheet', error);
+        showToast({ message: 'Не удалось выдать домашнее задание', variant: 'error' });
+        return false;
+      } finally {
+        setSubmittingAssignment(false);
+      }
     },
-    [navigate],
+    [fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, loadTeacherTemplates, showToast],
   );
 
   const buildAssignmentDraftFromTemplate = useCallback(
@@ -1952,6 +2079,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           fetchTeacherAssignments({ offset: 0, append: false }),
           loadTeacherSummary(),
           loadTeacherGroups(),
+          loadTeacherTemplates(),
         ]);
 
         showToast({
@@ -1971,9 +2099,16 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }
         clearEntry(ASSIGNMENT_EDITOR_UNSAVED_ENTRY_KEY);
 
+        const targetAssignmentPath = canTeacherEditHomeworkAssignment(finalAssignment)
+          ? `/homeworks/assignments/${finalAssignment.id}/edit`
+          : `/homeworks/assignments/${finalAssignment.id}`;
+
         if (!isTeacherAssignmentEditRoute) {
           requestNavigationBypass();
-          navigate(`/homeworks/assignments/${finalAssignment.id}/edit`, { replace: true });
+          navigate(targetAssignmentPath, { replace: true });
+        } else if (!canTeacherEditHomeworkAssignment(finalAssignment)) {
+          requestNavigationBypass();
+          navigate(targetAssignmentPath, { replace: true });
         }
 
         return { success: true, closeOnSuccess: false };
@@ -1996,6 +2131,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       isTeacherAssignmentEditRoute,
       loadTeacherGroups,
       loadTeacherSummary,
+      loadTeacherTemplates,
       clearEntry,
       navigate,
       requestNavigationBypass,
@@ -2003,7 +2139,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     ],
   );
 
-  const handleSaveAssignmentAsTemplate = useCallback(async () => {
+  const handleSaveAssignmentAsTemplate = useCallback(async (): Promise<HomeworkTemplateCreateSubmitResult> => {
     const payload = buildTemplateUpsertPayload(assignmentEditorDraft);
     setSavingAssignmentAsTemplate(true);
     try {
@@ -2031,10 +2167,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         requestNavigationBypass();
         navigate(`/homeworks/${response.template.id}/edit`, { replace: true });
       }
+      return { success: true, closeOnSuccess: false };
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to save assignment as template', error);
-      showToast({ message: 'Не удалось сохранить домашнее задание в библиотеку', variant: 'error' });
+      return resolveTemplateSubmitFailure(error);
     } finally {
       setSavingAssignmentAsTemplate(false);
     }
@@ -2046,6 +2183,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     isTeacherAssignmentEditRoute,
     navigate,
     requestNavigationBypass,
+    resolveTemplateSubmitFailure,
     showToast,
   ]);
 
@@ -2054,14 +2192,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       try {
         await api.sendHomeworkAssignmentV2(assignment.id);
         showToast({ message: 'Домашка отправлена ученику', variant: 'success' });
-        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary(), loadTeacherTemplates()]);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to send assignment now', error);
         showToast({ message: 'Не удалось отправить домашку', variant: 'error' });
       }
     },
-    [fetchTeacherAssignments, loadTeacherSummary, showToast],
+    [fetchTeacherAssignments, loadTeacherSummary, loadTeacherTemplates, showToast],
   );
 
   const handleReissueAssignment = useCallback(
@@ -2100,6 +2238,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         fetchTeacherAssignments({ offset: 0, append: false }),
         loadTeacherSummary(),
         loadTeacherGroups(),
+        loadTeacherTemplates(),
       ]);
       resetGroupAssignmentsState();
     } catch (error) {
@@ -2123,6 +2262,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     isTeacherAssignmentEditRoute,
     loadTeacherGroups,
     loadTeacherSummary,
+    loadTeacherTemplates,
     resetGroupAssignmentsState,
     showToast,
   ]);
@@ -2298,7 +2438,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   );
 
   const handleOpenDetail = useCallback(async (assignment: HomeworkAssignment) => {
-    navigate(`/homeworks/assignments/${assignment.id}/edit`);
+    navigate(
+      canTeacherEditHomeworkAssignment(assignment)
+        ? `/homeworks/assignments/${assignment.id}/edit`
+        : `/homeworks/assignments/${assignment.id}`,
+    );
   }, [navigate]);
 
   const handleSubmitReview = useCallback(
@@ -2444,7 +2588,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await loadStudentDetail();
       await loadStudentList({ append: false });
       showToast({
-        message: 'Таймер запущен',
+        message: 'Попытка начата',
         variant: 'success',
       });
       return true;
@@ -2513,7 +2657,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         onSelectedStudentIdChange={setSelectedStudentId}
         onOpenCreateTemplateScreen={() => navigate('/homeworks/new')}
         onOpenTemplateDetailScreen={(templateId) => navigate(`/homeworks/${templateId}`)}
-        onOpenEditTemplateScreen={(templateId) => navigate(`/homeworks/${templateId}/edit`)}
+        onOpenEditTemplateScreen={(template) => {
+          handleRequestTemplateEdit(template);
+        }}
         onCreateGroup={handleCreateGroup}
         onUpdateGroup={handleUpdateGroup}
         onDeleteGroup={handleDeleteGroup}
@@ -2600,6 +2746,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       handleOpenAssignmentLessonDay,
       handleOpenStudentProfile,
       handleOpenReview,
+      handleRequestTemplateEdit,
       handleReissueAssignment,
       handleRebindAssignmentGroup,
       handleRebindAssignmentsGroup,
@@ -2694,6 +2841,28 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     />
   );
 
+  const editTemplateCopyDialog = (
+    <DialogModal
+      open={pendingTemplateEditCopy !== null}
+      title="Создать копию для редактирования?"
+      description={
+        pendingTemplateEditCopy
+          ? `Домашнее задание «${pendingTemplateEditCopy.template.title}» уже выдавалось ученикам. Мы создадим копию с названием «${buildHomeworkCopyTitle(
+              pendingTemplateEditCopy.template.title,
+              templates.map((template) => template.title),
+            )}», а текущая домашка и все уже выданные версии останутся без изменений.`
+          : ''
+      }
+      confirmText={submittingTemplate ? 'Создаю копию…' : 'Создать копию'}
+      cancelText="Отмена"
+      onClose={() => {
+        void handleCancelTemplateEditCopy();
+      }}
+      onConfirm={handleConfirmTemplateEditCopy}
+      onCancel={handleCancelTemplateEditCopy}
+    />
+  );
+
   if (mode === 'teacher') {
     if (hasTeacherReviewAssignmentId) {
       return (
@@ -2706,7 +2875,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
             requestError={reviewError}
             submitting={reviewSubmitting}
             onBack={() => {
-              navigate('/homeworks');
+              navigateBackInHistory();
             }}
             onDraftChange={(draft, meta) => {
               setReviewCurrentDraft(draft);
@@ -2720,6 +2889,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           />
           {cancelIssueDialog}
           {deleteTemplateDialog}
+          {editTemplateCopyDialog}
         </>
       );
     }
@@ -2733,7 +2903,17 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         return (
           <section>
             <p>{assignmentEditorError}</p>
-            <button type="button" onClick={() => navigate('/homeworks')}>
+            <button
+              type="button"
+              onClick={() => {
+                if (hasTeacherAssignmentDetailId) {
+                  navigateBackInHistory();
+                  return;
+                }
+
+                navigate('/homeworks');
+              }}
+            >
               Назад
             </button>
           </section>
@@ -2766,7 +2946,19 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
               if (!assignmentEditorServerAssignment) return;
               await handleCancelAssignmentIssue(assignmentEditorServerAssignment);
             }}
-            onBack={() => navigate('/homeworks')}
+            onReadOnlyEdit={() => {
+              if (!activeTeacherAssignmentId) return;
+              navigate(`/homeworks/assignments/${activeTeacherAssignmentId}/edit`);
+            }}
+            onBack={() => {
+              if (hasTeacherAssignmentDetailId) {
+                navigateBackInHistory();
+                return;
+              }
+
+              navigate('/homeworks');
+            }}
+            onOpenMobileSidebar={onOpenMobileSidebar}
           />
 
           <DialogModal
@@ -2785,6 +2977,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           />
           {cancelIssueDialog}
           {deleteTemplateDialog}
+          {editTemplateCopyDialog}
         </>
       );
     }
@@ -2827,9 +3020,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
               return handleCreateTemplateFromScreen();
             }}
             onBack={() => navigate(teacherTemplateListPath)}
+            onOpenMobileSidebar={onOpenMobileSidebar}
           />
           {cancelIssueDialog}
           {deleteTemplateDialog}
+          {editTemplateCopyDialog}
         </>
       );
     }
@@ -2843,7 +3038,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         return (
           <section>
             <p>{homeworkDetailError ?? 'Домашнее задание не найдено'}</p>
-            <button type="button" onClick={() => navigate('/homeworks')}>
+            <button type="button" onClick={() => navigateBackInHistory()}>
               Назад
             </button>
           </section>
@@ -2852,34 +3047,26 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
       return (
         <>
-          <HomeworkTemplateDetailScreen
-            homework={homeworkDetailTemplate}
-            assignments={homeworkDetailAssignments}
-            onBack={() => navigate('/homeworks')}
-            onEdit={() => navigate(`/homeworks/${homeworkDetailTemplate.id}/edit`)}
-            onCreateBasedOn={() => {
-              void handleCreateHomeworkBasedOnTemplate(homeworkDetailTemplate);
+          <HomeworkTemplateCreateScreen
+            mode="edit"
+            variant="template"
+            draft={createHomeworkEditorDraftFromTemplate(homeworkDetailTemplate)}
+            submitting={false}
+            readOnly
+            readOnlyAssignments={homeworkDetailAssignments}
+            readOnlyAssignmentsCount={homeworkDetailTemplate.issuedAssignmentsCount ?? 0}
+            students={students}
+            onDraftChange={() => undefined}
+            onSubmit={() => Promise.resolve({ success: true })}
+            onReadOnlyEdit={() => {
+              handleRequestTemplateEdit(homeworkDetailTemplate);
             }}
-            onAssign={() => {
-              void handleCreateAssignment({
-                studentId: selectedStudentId,
-                lessonId: null,
-                templateId: homeworkDetailTemplate.id,
-                groupId: null,
-                deadlineAt: null,
-                sendMode: 'MANUAL',
-              });
-            }}
-            onArchive={() => {
-              if (homeworkDetailTemplate.isArchived) {
-                void handleRestoreTemplate(homeworkDetailTemplate);
-                return;
-              }
-              void handleArchiveTemplate(homeworkDetailTemplate);
-            }}
+            onBack={() => navigateBackInHistory()}
+            onOpenMobileSidebar={onOpenMobileSidebar}
           />
           {cancelIssueDialog}
           {deleteTemplateDialog}
+          {editTemplateCopyDialog}
         </>
       );
     }
@@ -2889,6 +3076,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         {teacherView}
         {cancelIssueDialog}
         {deleteTemplateDialog}
+        {editTemplateCopyDialog}
       </>
     );
   }
@@ -2901,7 +3089,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         loading={studentDetailLoading}
         submitting={studentDetailSubmitting}
         requestError={studentDetailError}
-        onBack={() => navigate('/homeworks')}
+        onBack={() => navigateBackInHistory()}
         onRefresh={() => {
           void loadStudentDetail();
         }}

@@ -1,0 +1,236 @@
+.section {
+  --issued-student-card-width: 138px;
+  position: relative;
+  display: grid;
+  gap: 12px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: #374151;
+}
+
+.row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.studentCard,
+.moreButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: var(--issued-student-card-width);
+  min-width: var(--issued-student-card-width);
+  max-width: var(--issued-student-card-width);
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.studentCard {
+  padding: 8px 12px;
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.studentCard:hover {
+  border-color: #d7dde8;
+  background: #f5f7fb;
+}
+
+.studentCard:focus-visible {
+  outline: none;
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.studentCard:active {
+  transform: translateY(1px);
+}
+
+.avatarFrame {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: #e5e7eb;
+}
+
+.avatarImage,
+.avatarFallback {
+  width: 100%;
+  height: 100%;
+}
+
+.avatarImage {
+  display: block;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.studentMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.studentName,
+.studentStatus {
+  margin: 0;
+}
+
+.studentName {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #111827;
+}
+
+.studentStatus {
+  margin-top: 2px;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.studentStatus_success {
+  color: #16a34a;
+}
+
+.studentStatus_warning {
+  color: #ea580c;
+}
+
+.studentStatus_muted {
+  color: #6b7280;
+}
+
+.moreButton {
+  justify-content: center;
+  padding: 8px 14px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.popover {
+  padding: 12px;
+  border: 1px solid rgba(229, 231, 235, 0.96);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.popoverContent {
+  display: grid;
+  gap: 12px;
+  min-width: min(340px, calc(100vw - 48px));
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.popoverHeader strong {
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #111827;
+}
+
+.popoverHeader span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.popoverList {
+  display: grid;
+  gap: 10px;
+  max-height: min(320px, calc(100vh - 220px));
+  overflow-y: auto;
+}
+
+.popoverList .studentCard {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .section {
+    --issued-student-card-width: 132px;
+  }
+
+  .row {
+    gap: 10px;
+  }
+
+  .studentCard,
+  .moreButton {
+    min-height: 50px;
+    border-radius: 14px;
+  }
+
+  .studentCard {
+    padding: 8px 10px;
+  }
+
+  .studentName {
+    font-size: 13px;
+  }
+
+  .popoverContent {
+    min-width: min(300px, calc(100vw - 36px));
+  }
+}

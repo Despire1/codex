@@ -6,14 +6,27 @@ import { useTimeZone } from '../../../../shared/lib/timezoneContext';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import {
+  HomeworkBookOpenIcon,
   HomeworkCheckIcon,
   HomeworkChevronDownIcon,
   HomeworkRobotIcon,
   HomeworkUserCheckIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
 import { HomeworkEditorAssignmentContext } from '../../model/types';
-import { HomeworkTemplateQuizSettings } from '../../../../entities/homework-template/model/lib/quizSettings';
+import {
+  HOMEWORK_ATTEMPTS_DEFAULT,
+  HOMEWORK_ATTEMPTS_MAX,
+  HOMEWORK_ATTEMPTS_MIN,
+  HOMEWORK_TIMER_DEFAULT_MINUTES,
+  HOMEWORK_TIMER_MAX_MINUTES,
+  HOMEWORK_TIMER_MIN_MINUTES,
+  HomeworkTemplateQuizSettings,
+  normalizeHomeworkAttemptsLimit,
+  normalizeHomeworkTimerDurationMinutes,
+} from '../../../../entities/homework-template/model/lib/quizSettings';
+import { HomeworkQuizCapabilities } from '../../../../entities/homework-template/model/lib/quizProgress';
 import { createQuickDeadlineValue, toLocalDateTimeValue, toUtcIsoFromLocal } from '../../../homework-assign/model/lib/assignmentStarter';
+import controls from '../../../../shared/styles/controls.module.css';
 import {
   AssignmentStudentOption,
   buildStudentInitials,
@@ -29,6 +42,7 @@ interface AssignmentPlanningSidebarProps {
   assignment: HomeworkEditorAssignmentContext;
   students: AssignmentStudentOption[];
   quizSettings: HomeworkTemplateQuizSettings;
+  quizCapabilities: HomeworkQuizCapabilities;
   studentLocked?: boolean;
   studentRequired?: boolean;
   studentError?: string | null;
@@ -46,6 +60,7 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
   assignment,
   students,
   quizSettings,
+  quizCapabilities,
   studentLocked = false,
   studentRequired = true,
   studentError = null,
@@ -86,6 +101,11 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
     if (!assignment.deadlineAt) return '';
     return toLocalDateTimeValue(assignment.deadlineAt, timeZone);
   }, [assignment.deadlineAt, timeZone]);
+  const attemptsValue = quizSettings.attemptsLimit ?? HOMEWORK_ATTEMPTS_DEFAULT;
+  const attemptsDisabled = !quizCapabilities.attemptsSupported || !quizSettings.autoCheckEnabled;
+  const correctAnswersDisabled =
+    !quizCapabilities.correctAnswersSupported || !quizSettings.autoCheckEnabled || attemptsValue > 1;
+  const correctAnswersChecked = attemptsValue > 1 ? false : quizSettings.showCorrectAnswers;
 
   const resolveFutureLessons = useCallback(async (studentId: number) => {
     const requestId = requestIdRef.current + 1;
@@ -498,6 +518,105 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
           </div>
         </div>
 
+        <div className={styles.divider} />
+
+        <div className={styles.field}>
+          <label className={styles.label}>Таймер попытки</label>
+          <label className={styles.toggleRow}>
+            <span className={styles.settingMeta}>
+              <strong>Ограничить время</strong>
+              <span>Стартует после нажатия «Начать».</span>
+            </span>
+            <span className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={quizSettings.timerEnabled}
+                onChange={(event) =>
+                  onQuizSettingsChange({
+                    ...quizSettings,
+                    timerEnabled: event.target.checked,
+                    timerDurationMinutes: event.target.checked
+                      ? quizSettings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES
+                    : quizSettings.timerDurationMinutes,
+                  })
+                }
+              />
+              <span className={`${controls.slider} ${styles.switchSlider}`} />
+            </span>
+          </label>
+          {quizSettings.timerEnabled ? (
+            <div className={styles.inlineInputRow}>
+              <input
+                type="number"
+                min={HOMEWORK_TIMER_MIN_MINUTES}
+                max={HOMEWORK_TIMER_MAX_MINUTES}
+                value={quizSettings.timerDurationMinutes ?? ''}
+                onChange={(event) =>
+                  onQuizSettingsChange({
+                    ...quizSettings,
+                    timerDurationMinutes: normalizeHomeworkTimerDurationMinutes(event.target.value),
+                  })
+                }
+              />
+              <span>минут</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className={styles.divider} />
+
+        <div className={styles.field}>
+          <label className={styles.label}>Автопроверяемый результат</label>
+          <div className={styles.settingGroup}>
+            <label className={styles.settingRow}>
+              <span className={styles.settingMeta}>
+                <strong>Количество попыток</strong>
+                <span>Только для автопроверяемого теста.</span>
+              </span>
+              <div className={styles.inlineInputRow}>
+                <input
+                  type="number"
+                  min={HOMEWORK_ATTEMPTS_MIN}
+                  max={HOMEWORK_ATTEMPTS_MAX}
+                  value={attemptsValue}
+                  disabled={attemptsDisabled}
+                  onChange={(event) => {
+                    const nextAttemptsLimit =
+                      normalizeHomeworkAttemptsLimit(event.target.value) ?? HOMEWORK_ATTEMPTS_DEFAULT;
+                    onQuizSettingsChange({
+                      ...quizSettings,
+                      attemptsLimit: nextAttemptsLimit,
+                      showCorrectAnswers: nextAttemptsLimit > 1 ? false : quizSettings.showCorrectAnswers,
+                    });
+                  }}
+                />
+                <span>шт</span>
+              </div>
+            </label>
+
+            <label className={styles.settingRow}>
+              <span className={styles.settingMeta}>
+                <strong>Показывать правильные ответы</strong>
+                <span>После финального результата.</span>
+              </span>
+              <span className={`${controls.switch} ${styles.switchControl}`}>
+                <input
+                  type="checkbox"
+                  checked={correctAnswersChecked}
+                  disabled={correctAnswersDisabled}
+                  onChange={(event) =>
+                    onQuizSettingsChange({
+                      ...quizSettings,
+                      showCorrectAnswers: event.target.checked,
+                    })
+                  }
+                />
+                <span className={`${controls.slider} ${styles.switchSlider}`} />
+              </span>
+            </label>
+          </div>
+        </div>
+
         {showCancelIssueAction ? (
           <>
             <div className={styles.divider} />
@@ -512,6 +631,18 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
           </>
         ) : null}
       </section>
+
+      {!hasSelectedStudent && !studentRequired ? (
+        <section className={styles.hintCard}>
+          <div className={styles.hintIcon}>
+            <HomeworkBookOpenIcon size={14} />
+          </div>
+          <div>
+            <strong>Без ученика это библиотека</strong>
+            <p>Если не выбирать ученика, задание сохранится во вкладке «Библиотека». Чтобы сразу создать назначение, сначала выберите ученика.</p>
+          </div>
+        </section>
+      ) : null}
 
     </aside>
   );

@@ -2,6 +2,10 @@ import { HomeworkBlock, HomeworkBlockTest } from '../../../types';
 
 export const HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY = 'templateSettings';
 
+export const HOMEWORK_ATTEMPTS_MIN = 1;
+export const HOMEWORK_ATTEMPTS_MAX = 10;
+export const HOMEWORK_ATTEMPTS_DEFAULT = 1;
+
 export const HOMEWORK_TIMER_MIN_MINUTES = 1;
 export const HOMEWORK_TIMER_MAX_MINUTES = 720;
 export const HOMEWORK_TIMER_DEFAULT_MINUTES = 30;
@@ -9,7 +13,7 @@ export const HOMEWORK_TIMER_DEFAULT_MINUTES = 30;
 export interface HomeworkTemplateQuizSettings {
   autoCheckEnabled: boolean;
   passingScorePercent: number;
-  attemptsLimit: 1 | 2 | null;
+  attemptsLimit: number | null;
   showCorrectAnswers: boolean;
   shuffleQuestions: boolean;
   timerEnabled: boolean;
@@ -25,7 +29,7 @@ export interface HomeworkAttemptTimerConfig {
 export const DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS: HomeworkTemplateQuizSettings = {
   autoCheckEnabled: true,
   passingScorePercent: 70,
-  attemptsLimit: null,
+  attemptsLimit: HOMEWORK_ATTEMPTS_DEFAULT,
   showCorrectAnswers: false,
   shuffleQuestions: true,
   timerEnabled: false,
@@ -42,6 +46,15 @@ const clampPassingScorePercent = (value: number) => {
   return Math.max(0, Math.min(100, Math.round(value)));
 };
 
+export const normalizeHomeworkAttemptsLimit = (value: unknown): number | null => {
+  if (value === null) return null;
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return HOMEWORK_ATTEMPTS_DEFAULT;
+
+  return Math.max(HOMEWORK_ATTEMPTS_MIN, Math.min(HOMEWORK_ATTEMPTS_MAX, Math.round(numeric)));
+};
+
 export const normalizeHomeworkTimerDurationMinutes = (value: unknown): number | null => {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
@@ -55,10 +68,12 @@ export const normalizeHomeworkTemplateQuizSettings = (value: unknown): HomeworkT
   if (!isRecord(value)) return { ...DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS };
 
   const attemptsLimitRaw = value.attemptsLimit;
-  let attemptsLimit: 1 | 2 | null = DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS.attemptsLimit;
-  if (attemptsLimitRaw === 1 || attemptsLimitRaw === 2 || attemptsLimitRaw === null) {
-    attemptsLimit = attemptsLimitRaw as 1 | 2 | null;
-  }
+  const attemptsLimit =
+    attemptsLimitRaw === null
+      ? null
+      : attemptsLimitRaw === undefined
+        ? DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS.attemptsLimit
+        : normalizeHomeworkAttemptsLimit(attemptsLimitRaw);
 
   return {
     autoCheckEnabled:
@@ -81,6 +96,18 @@ export const normalizeHomeworkTemplateQuizSettings = (value: unknown): HomeworkT
     timerEnabled:
       typeof value.timerEnabled === 'boolean' ? value.timerEnabled : DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS.timerEnabled,
     timerDurationMinutes: normalizeHomeworkTimerDurationMinutes(value.timerDurationMinutes),
+  };
+};
+
+export const sanitizeHomeworkTemplateQuizSettingsForSave = (
+  settings: HomeworkTemplateQuizSettings,
+): HomeworkTemplateQuizSettings => {
+  const normalized = normalizeHomeworkTemplateQuizSettings(settings);
+  const attemptsLimit = normalized.attemptsLimit ?? HOMEWORK_ATTEMPTS_DEFAULT;
+  return {
+    ...normalized,
+    attemptsLimit,
+    showCorrectAnswers: attemptsLimit > 1 ? false : normalized.showCorrectAnswers,
   };
 };
 
@@ -108,7 +135,7 @@ export const writeHomeworkTemplateQuizSettingsToBlocks = (
 
   const nextTestBlock = {
     ...toRecord(blocks[testBlockIndex]),
-    [HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY]: normalizeHomeworkTemplateQuizSettings(settings),
+    [HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY]: sanitizeHomeworkTemplateQuizSettingsForSave(settings),
   } as unknown as HomeworkBlockTest;
 
   return blocks.map((block, index) => (index === testBlockIndex ? nextTestBlock : block));

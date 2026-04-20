@@ -1,10 +1,15 @@
 import { CSSProperties, FC } from 'react';
 import {
+  HOMEWORK_ATTEMPTS_DEFAULT,
+  HOMEWORK_ATTEMPTS_MAX,
+  HOMEWORK_ATTEMPTS_MIN,
   HOMEWORK_TIMER_DEFAULT_MINUTES,
   HOMEWORK_TIMER_MAX_MINUTES,
   HOMEWORK_TIMER_MIN_MINUTES,
+  normalizeHomeworkAttemptsLimit,
   normalizeHomeworkTimerDurationMinutes,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
+import { HomeworkQuizCapabilities } from '../../../../entities/homework-template/model/lib/quizProgress';
 import {
   TemplateCreateStats,
   TemplateQuizSettings,
@@ -15,10 +20,12 @@ import {
   HomeworkRobotIcon,
   HomeworkSlidersIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
+import controls from '../../../../shared/styles/controls.module.css';
 import styles from './TemplateSettingsSidebar.module.css';
 
 interface TemplateSettingsSidebarProps {
   settings: TemplateQuizSettings;
+  capabilities: HomeworkQuizCapabilities;
   stats: TemplateCreateStats;
   validationErrors: string[];
   validationWarnings: string[];
@@ -28,12 +35,19 @@ interface TemplateSettingsSidebarProps {
 
 export const TemplateSettingsSidebar: FC<TemplateSettingsSidebarProps> = ({
   settings,
+  capabilities,
   stats,
   validationErrors,
   validationWarnings,
   onOpenPreview,
   onSettingsChange,
 }) => {
+  const attemptsValue = settings.attemptsLimit ?? HOMEWORK_ATTEMPTS_DEFAULT;
+  const attemptsDisabled = !capabilities.attemptsSupported || !settings.autoCheckEnabled;
+  const correctAnswersDisabled =
+    !capabilities.correctAnswersSupported || !settings.autoCheckEnabled || attemptsValue > 1;
+  const correctAnswersChecked = attemptsValue > 1 ? false : settings.showCorrectAnswers;
+
   return (
     <div className={styles.sidebar}>
       <section className={styles.settingsCard}>
@@ -56,16 +70,19 @@ export const TemplateSettingsSidebar: FC<TemplateSettingsSidebarProps> = ({
                 <small>Автоматическая оценка</small>
               </span>
             </span>
-            <input
-              type="checkbox"
-              checked={settings.autoCheckEnabled}
-              onChange={(event) =>
-                onSettingsChange({
-                  ...settings,
-                  autoCheckEnabled: event.target.checked,
-                })
-              }
-            />
+            <span className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={settings.autoCheckEnabled}
+                onChange={(event) =>
+                  onSettingsChange({
+                    ...settings,
+                    autoCheckEnabled: event.target.checked,
+                  })
+                }
+              />
+              <span className={`${controls.slider} ${styles.switchSlider}`} />
+            </span>
           </label>
         </div>
 
@@ -97,89 +114,97 @@ export const TemplateSettingsSidebar: FC<TemplateSettingsSidebarProps> = ({
 
         <div className={styles.settingsGroup}>
           <h3>Попытки</h3>
-          <div className={styles.attemptsRow}>
-            {[1, 2].map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.attemptButton} ${settings.attemptsLimit === value ? styles.attemptButtonActive : ''}`}
-                onClick={() =>
-                  onSettingsChange({
-                    ...settings,
-                    attemptsLimit: value as 1 | 2,
-                  })
-                }
-              >
-                {value}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={`${styles.attemptButton} ${settings.attemptsLimit === null ? styles.attemptButtonActive : ''}`}
-              onClick={() =>
+          <div className={styles.numberInputRow}>
+            <input
+              type="number"
+              min={HOMEWORK_ATTEMPTS_MIN}
+              max={HOMEWORK_ATTEMPTS_MAX}
+              value={attemptsValue}
+              disabled={attemptsDisabled}
+              onChange={(event) => {
+                const nextAttemptsLimit = normalizeHomeworkAttemptsLimit(event.target.value) ?? HOMEWORK_ATTEMPTS_DEFAULT;
                 onSettingsChange({
                   ...settings,
-                  attemptsLimit: null,
-                })
-              }
-            >
-              ∞
-            </button>
+                  attemptsLimit: nextAttemptsLimit,
+                  showCorrectAnswers: nextAttemptsLimit > 1 ? false : settings.showCorrectAnswers,
+                });
+              }}
+            />
+            <span>попыток</span>
           </div>
         </div>
 
         <label className={styles.toggleRowPlain}>
           <span>
             <strong>Показывать правильные ответы</strong>
-            <small>После сдачи задания</small>
+            <small>После финального результата</small>
           </span>
-          <input
-            type="checkbox"
-            checked={settings.showCorrectAnswers}
-            onChange={(event) =>
-              onSettingsChange({
-                ...settings,
-                showCorrectAnswers: event.target.checked,
-              })
-            }
-          />
+          <span className={`${controls.switch} ${styles.switchControl}`}>
+            <input
+              type="checkbox"
+              checked={correctAnswersChecked}
+              disabled={correctAnswersDisabled}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  showCorrectAnswers: event.target.checked,
+                })
+              }
+            />
+            <span className={`${controls.slider} ${styles.switchSlider}`} />
+          </span>
         </label>
+        {correctAnswersDisabled ? (
+          <p className={styles.settingHint}>
+            {!capabilities.correctAnswersSupported
+              ? 'Показ правильных ответов доступен только для полностью автопроверяемого теста.'
+              : !settings.autoCheckEnabled
+                ? 'Сначала включите автопроверку.'
+                : 'При нескольких попытках правильные ответы скрыты автоматически.'}
+          </p>
+        ) : null}
 
         <label className={styles.toggleRowPlain}>
           <span>
             <strong>Перемешивать вопросы</strong>
             <small>Случайный порядок</small>
           </span>
-          <input
-            type="checkbox"
-            checked={settings.shuffleQuestions}
-            onChange={(event) =>
-              onSettingsChange({
-                ...settings,
-                shuffleQuestions: event.target.checked,
-              })
-            }
-          />
+          <span className={`${controls.switch} ${styles.switchControl}`}>
+            <input
+              type="checkbox"
+              checked={settings.shuffleQuestions}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  shuffleQuestions: event.target.checked,
+                })
+              }
+            />
+            <span className={`${controls.slider} ${styles.switchSlider}`} />
+          </span>
         </label>
 
         <label className={styles.toggleRowPlain}>
           <span>
             <strong>Таймер</strong>
-            <small>Ограничение времени</small>
+            <small>Ограничение по времени</small>
           </span>
-          <input
-            type="checkbox"
-            checked={settings.timerEnabled}
-            onChange={(event) =>
-              onSettingsChange({
-                ...settings,
-                timerEnabled: event.target.checked,
-                timerDurationMinutes: event.target.checked
-                  ? settings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES
+          <span className={`${controls.switch} ${styles.switchControl}`}>
+            <input
+              type="checkbox"
+              checked={settings.timerEnabled}
+              onChange={(event) =>
+                onSettingsChange({
+                  ...settings,
+                  timerEnabled: event.target.checked,
+                  timerDurationMinutes: event.target.checked
+                    ? settings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES
                   : settings.timerDurationMinutes,
-              })
-            }
-          />
+                })
+              }
+            />
+            <span className={`${controls.slider} ${styles.switchSlider}`} />
+          </span>
         </label>
 
         {settings.timerEnabled ? (

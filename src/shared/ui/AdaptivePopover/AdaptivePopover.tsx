@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { isElementFullyOutsideViewport } from '@/shared/lib/isElementFullyOutsideViewport';
 import styles from './AdaptivePopover.module.css';
@@ -22,6 +22,30 @@ interface AdaptivePopoverProps {
 
 const DEFAULT_OFFSET = 8;
 const VIEWPORT_PADDING = 8;
+const MIN_SPACE = 0;
+
+type PopoverMeasurement = {
+  width: number;
+  height: number;
+};
+
+type PopoverPositionState = {
+  top: number;
+  left: number;
+  width: number;
+  maxWidth: number;
+  maxHeight: number;
+  resolvedSide: PopoverSide;
+};
+
+const getPopoverMeasurement = (element: HTMLDivElement): PopoverMeasurement => {
+  const rect = element.getBoundingClientRect();
+
+  return {
+    width: Math.ceil(Math.max(rect.width, element.scrollWidth)),
+    height: Math.ceil(Math.max(rect.height, element.scrollHeight)),
+  };
+};
 
 const getOppositeSide = (side: PopoverSide): PopoverSide => {
   switch (side) {
@@ -40,6 +64,59 @@ const getOppositeSide = (side: PopoverSide): PopoverSide => {
 
 const uniqueSides = (sides: PopoverSide[]) => Array.from(new Set(sides));
 
+const clampPosition = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getViewportBounds = () => ({
+  width: Math.max(window.innerWidth - VIEWPORT_PADDING * 2, MIN_SPACE),
+  height: Math.max(window.innerHeight - VIEWPORT_PADDING * 2, MIN_SPACE),
+});
+
+const getAvailableSpace = (direction: PopoverSide, triggerRect: DOMRect, offset: number) => {
+  const viewport = getViewportBounds();
+  const topSpace = Math.max(triggerRect.top - VIEWPORT_PADDING - offset, MIN_SPACE);
+  const bottomSpace = Math.max(window.innerHeight - triggerRect.bottom - VIEWPORT_PADDING - offset, MIN_SPACE);
+  const leftSpace = Math.max(triggerRect.left - VIEWPORT_PADDING - offset, MIN_SPACE);
+  const rightSpace = Math.max(window.innerWidth - triggerRect.right - VIEWPORT_PADDING - offset, MIN_SPACE);
+
+  switch (direction) {
+    case 'top':
+      return { width: viewport.width, height: topSpace };
+    case 'bottom':
+      return { width: viewport.width, height: bottomSpace };
+    case 'left':
+      return { width: leftSpace, height: viewport.height };
+    case 'right':
+    default:
+      return { width: rightSpace, height: viewport.height };
+  }
+};
+
+const resolveConstrainedSize = (
+  direction: PopoverSide,
+  measurement: PopoverMeasurement,
+  availableSpace: PopoverMeasurement,
+): PopoverMeasurement => {
+  const maxWidth = direction === 'left' || direction === 'right' ? availableSpace.width : getViewportBounds().width;
+  const maxHeight = direction === 'top' || direction === 'bottom' ? availableSpace.height : getViewportBounds().height;
+
+  return {
+    width: Math.min(measurement.width, Math.max(maxWidth, MIN_SPACE)),
+    height: Math.min(measurement.height, Math.max(maxHeight, MIN_SPACE)),
+  };
+};
+
+const fitsWithinAvailableSpace = (
+  direction: PopoverSide,
+  measurement: PopoverMeasurement,
+  availableSpace: PopoverMeasurement,
+) => {
+  if (direction === 'top' || direction === 'bottom') {
+    return measurement.height <= availableSpace.height && measurement.width <= getViewportBounds().width;
+  }
+
+  return measurement.width <= availableSpace.width && measurement.height <= getViewportBounds().height;
+};
+
 export const AdaptivePopover = ({
   isOpen,
   onClose,
@@ -55,14 +132,21 @@ export const AdaptivePopover = ({
 }: AdaptivePopoverProps) => {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [position, setPosition] = useState<PopoverPositionState>({
+    top: 0,
+    left: 0,
+    width: 0,
+    maxWidth: 0,
+    maxHeight: 0,
+    resolvedSide: side,
+  });
 
   const candidates = useMemo(
     () => uniqueSides([side, getOppositeSide(side), 'bottom', 'top', 'right', 'left']),
     [side],
   );
 
-  const getAlignedLeft = (triggerRect: DOMRect, popoverRect: DOMRect) => {
+  const getAlignedLeft = (triggerRect: DOMRect, popoverRect: PopoverMeasurement) => {
     if (align === 'center') {
       return triggerRect.left + (triggerRect.width - popoverRect.width) / 2;
     }
@@ -72,7 +156,7 @@ export const AdaptivePopover = ({
     return triggerRect.left;
   };
 
-  const getAlignedTop = (triggerRect: DOMRect, popoverRect: DOMRect) => {
+  const getAlignedTop = (triggerRect: DOMRect, popoverRect: PopoverMeasurement) => {
     if (align === 'center') {
       return triggerRect.top + (triggerRect.height - popoverRect.height) / 2;
     }
@@ -82,7 +166,7 @@ export const AdaptivePopover = ({
     return triggerRect.top;
   };
 
-  const getPosition = (direction: PopoverSide, triggerRect: DOMRect, popoverRect: DOMRect) => {
+  const getPosition = (direction: PopoverSide, triggerRect: DOMRect, popoverRect: PopoverMeasurement) => {
     switch (direction) {
       case 'top':
         return {
@@ -108,19 +192,6 @@ export const AdaptivePopover = ({
     }
   };
 
-  const clampPosition = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-  const isWithinViewport = (nextPosition: { top: number; left: number }, popoverRect: DOMRect) => {
-    const maxLeft = window.innerWidth - popoverRect.width - VIEWPORT_PADDING;
-    const maxTop = window.innerHeight - popoverRect.height - VIEWPORT_PADDING;
-    return (
-      nextPosition.left >= VIEWPORT_PADDING &&
-      nextPosition.top >= VIEWPORT_PADDING &&
-      nextPosition.left <= maxLeft &&
-      nextPosition.top <= maxTop
-    );
-  };
-
   const updatePosition = () => {
     if (!triggerRef.current || !popoverRef.current) return;
 
@@ -130,38 +201,57 @@ export const AdaptivePopover = ({
     }
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
-    const popoverRect = popoverRef.current.getBoundingClientRect();
+    const measurement = getPopoverMeasurement(popoverRef.current);
 
-    let nextPosition = getPosition(side, triggerRect, popoverRect);
-    let resolvedSide = side;
+    const layouts = candidates.map((candidate) => {
+      const availableSpace = getAvailableSpace(candidate, triggerRect, offset);
+      const constrainedSize = resolveConstrainedSize(candidate, measurement, availableSpace);
+      const candidatePosition = getPosition(candidate, triggerRect, constrainedSize);
+      const maxLeft = Math.max(window.innerWidth - constrainedSize.width - VIEWPORT_PADDING, VIEWPORT_PADDING);
+      const maxTop = Math.max(window.innerHeight - constrainedSize.height - VIEWPORT_PADDING, VIEWPORT_PADDING);
 
-    for (const candidate of candidates) {
-      const candidatePosition = getPosition(candidate, triggerRect, popoverRect);
-      if (isWithinViewport(candidatePosition, popoverRect)) {
-        nextPosition = candidatePosition;
-        resolvedSide = candidate;
-        break;
-      }
-    }
-
-    if (!isWithinViewport(nextPosition, popoverRect)) {
-      const maxLeft = window.innerWidth - popoverRect.width - VIEWPORT_PADDING;
-      const maxTop = window.innerHeight - popoverRect.height - VIEWPORT_PADDING;
-      nextPosition = {
-        top: clampPosition(nextPosition.top, VIEWPORT_PADDING, maxTop),
-        left: clampPosition(nextPosition.left, VIEWPORT_PADDING, maxLeft),
+      return {
+        side: candidate,
+        availableSpace,
+        constrainedSize,
+        position: {
+          top: clampPosition(candidatePosition.top, VIEWPORT_PADDING, maxTop),
+          left: clampPosition(candidatePosition.left, VIEWPORT_PADDING, maxLeft),
+        },
+        fitsNaturally: fitsWithinAvailableSpace(candidate, measurement, availableSpace),
       };
-    }
+    });
 
-    if (resolvedSide !== side) {
-      popoverRef.current.dataset.side = resolvedSide;
-    } else {
-      delete popoverRef.current.dataset.side;
-    }
+    const resolvedLayout =
+      layouts.find((layout) => layout.fitsNaturally) ??
+      layouts.reduce((best, current) => {
+        const bestPrimary =
+          best.side === 'top' || best.side === 'bottom' ? best.availableSpace.height : best.availableSpace.width;
+        const currentPrimary =
+          current.side === 'top' || current.side === 'bottom'
+            ? current.availableSpace.height
+            : current.availableSpace.width;
+
+        if (currentPrimary !== bestPrimary) {
+          return currentPrimary > bestPrimary ? current : best;
+        }
+
+        const bestSecondary =
+          best.side === 'top' || best.side === 'bottom' ? best.availableSpace.width : best.availableSpace.height;
+        const currentSecondary =
+          current.side === 'top' || current.side === 'bottom'
+            ? current.availableSpace.width
+            : current.availableSpace.height;
+
+        return currentSecondary > bestSecondary ? current : best;
+      });
 
     setPosition({
-      ...nextPosition,
+      ...resolvedLayout.position,
       width: triggerRect.width,
+      maxWidth: resolvedLayout.constrainedSize.width,
+      maxHeight: resolvedLayout.constrainedSize.height,
+      resolvedSide: resolvedLayout.side,
     });
   };
 
@@ -199,6 +289,28 @@ export const AdaptivePopover = ({
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen || typeof ResizeObserver === 'undefined') return undefined;
+
+    const observer = new ResizeObserver(() => updatePosition());
+
+    if (triggerRef.current) observer.observe(triggerRef.current);
+    if (popoverRef.current) observer.observe(popoverRef.current);
+
+    return () => observer.disconnect();
+  }, [isOpen, children, side, align, offset, onClose]);
+
+  const popoverStyle = {
+    top: `${position.top}px`,
+    left: `${position.left}px`,
+    width: matchTriggerWidth ? `${Math.min(position.width, position.maxWidth)}px` : undefined,
+    maxWidth: position.maxWidth ? `${position.maxWidth}px` : undefined,
+    maxHeight: position.maxHeight ? `${position.maxHeight}px` : undefined,
+  } as CSSProperties & Record<'--adaptive-popover-available-width' | '--adaptive-popover-available-height', string | undefined>;
+
+  popoverStyle['--adaptive-popover-available-width'] = position.maxWidth ? `${position.maxWidth}px` : undefined;
+  popoverStyle['--adaptive-popover-available-height'] = position.maxHeight ? `${position.maxHeight}px` : undefined;
+
   return (
     <span className={`${styles.root} ${rootClassName}`.trim()}>
       <span ref={triggerRef} className={`${styles.trigger} ${triggerClassName}`.trim()}>
@@ -209,11 +321,8 @@ export const AdaptivePopover = ({
           <div
             ref={popoverRef}
             className={`${styles.popover} ${className}`}
-            style={{
-              top: `${position.top}px`,
-              left: `${position.left}px`,
-              width: matchTriggerWidth ? `${position.width}px` : undefined,
-            }}
+            data-side={position.resolvedSide !== side ? position.resolvedSide : undefined}
+            style={popoverStyle}
           >
             {children}
           </div>,

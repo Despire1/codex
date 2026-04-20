@@ -32,6 +32,7 @@ import {
   HomeworkTestQuestionKind,
 } from '../../../entities/types';
 import { readHomeworkTemplateQuizSettingsFromBlocks, resolveHomeworkAttemptTimerConfig } from '../../../entities/homework-template/model/lib/quizSettings';
+import { resolveHomeworkQuizAttemptState } from '../../../entities/homework-template/model/lib/quizProgress';
 import styles from './StudentHomeworkDetailView.module.css';
 import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/model/lib/assignmentBuckets';
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
@@ -352,6 +353,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     () => readHomeworkTemplateQuizSettingsFromBlocks(assignment?.contentSnapshot ?? []),
     [assignment?.contentSnapshot],
   );
+  const quizAttemptState = useMemo(
+    () => resolveHomeworkQuizAttemptState(assignment?.contentSnapshot ?? [], submissions),
+    [assignment?.contentSnapshot, submissions],
+  );
   const timerConfig = useMemo(
     () => resolveHomeworkAttemptTimerConfig(assignment?.contentSnapshot ?? []),
     [assignment?.contentSnapshot],
@@ -364,9 +369,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const timedAttemptRemainingMs =
     timedAttemptDeadlineTs === null ? null : Math.max(0, timedAttemptDeadlineTs - nowTs);
   const requiresTimedAttemptStart = timerConfig.enabled && canEdit && timedAttemptStartedAtTs === null;
+  const canStartFreshAttempt = canEdit && !timerConfig.enabled && !latestDraftSubmission && quizAttemptState.canRetry;
+  const requiresAttemptStart = requiresTimedAttemptStart || canStartFreshAttempt;
   const isTimedAttemptExpired =
     timerConfig.enabled && timedAttemptDeadlineTs !== null && timedAttemptDeadlineTs <= nowTs;
-  const canInteractWithAttempt = canEdit && !requiresTimedAttemptStart && !isTimedAttemptExpired;
+  const canInteractWithAttempt = canEdit && !requiresAttemptStart && !isTimedAttemptExpired;
 
   const canEditTest = canInteractWithAttempt && Boolean(responseConfig?.hasTest);
   const canUploadAttachments =
@@ -378,7 +385,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const canUploadVoice = Boolean(responseConfig?.allowVoice);
   const canEditText = canInteractWithAttempt && Boolean(responseConfig?.allowText);
   const activeReviewSubmission =
-    assignment?.status === 'RETURNED' || assignment?.status === 'REVIEWED' ? latestReviewedSubmission : null;
+    quizAttemptState.isFinalAutoResult && quizAttemptState.latestResolvedSubmission
+      ? quizAttemptState.latestResolvedSubmission
+      : assignment?.status === 'RETURNED' || assignment?.status === 'REVIEWED'
+        ? latestReviewedSubmission
+        : null;
   const reviewResult = useMemo<HomeworkReviewResult | null>(
     () => (activeReviewSubmission ? getSubmissionReviewResult(activeReviewSubmission) : null),
     [activeReviewSubmission],
@@ -390,10 +401,17 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     );
   }, [activeReviewSubmission, assignment]);
   const showCorrectAnswers =
-    Boolean(assignment && (assignment.status === 'RETURNED' || assignment.status === 'REVIEWED')) &&
-    quizSettings.showCorrectAnswers &&
-    Boolean(activeReviewSubmission);
-  const latestEditableSubmission = latestDraftSubmission ?? (assignment?.status === 'RETURNED' ? latestReviewedSubmission : latestSubmission);
+    Boolean(activeReviewSubmission) &&
+    (quizAttemptState.shouldShowCorrectAnswers ||
+      (Boolean(assignment && (assignment.status === 'RETURNED' || assignment.status === 'REVIEWED')) &&
+        quizSettings.showCorrectAnswers));
+  const latestEditableSubmission =
+    latestDraftSubmission ??
+    (assignment?.status === 'RETURNED'
+      ? latestReviewedSubmission
+      : quizAttemptState.canRetry
+        ? null
+        : latestSubmission);
   const canEditReviewItem = (itemId: string) => canInteractWithAttempt && !isReviewItemAccepted(reviewResult, itemId);
 
   const [answerText, setAnswerText] = useState('');
@@ -753,13 +771,15 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     }));
   };
 
-  const handleStartTimedAttempt = async () => {
-    if (!requiresTimedAttemptStart || startingAttempt) return;
+  const handleStartAttempt = async () => {
+    if (!requiresAttemptStart || startingAttempt) return;
     setLocalError(null);
     setStartingAttempt(true);
     const success = await onStartAttempt();
     if (!success) {
-      setLocalError('Не удалось запустить таймер. Попробуйте еще раз.');
+      setLocalError(
+        requiresTimedAttemptStart ? 'Не удалось запустить таймер. Попробуйте еще раз.' : 'Не удалось начать новую попытку.',
+      );
     }
     setStartingAttempt(false);
   };
@@ -770,8 +790,12 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       preview?.onFinish();
       return;
     }
-    if (requiresTimedAttemptStart) {
-      setLocalError('Сначала нажмите «Начать», чтобы запустить таймер.');
+    if (requiresAttemptStart) {
+      setLocalError(
+        requiresTimedAttemptStart
+          ? 'Сначала нажмите «Начать», чтобы запустить таймер.'
+          : 'Сначала начните новую попытку.',
+      );
       return;
     }
     if (!canInteractWithAttempt) return;
@@ -824,7 +848,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const timeoutKey = String(latestDraftSubmission.id);
     if (handledTimeoutAttemptKeyRef.current === timeoutKey) return;
     handledTimeoutAttemptKeyRef.current = timeoutKey;
-    setLocalError('Время вышло. Попытка автоматически завершена как проваленная.');
+    setLocalError('Время вышло. Ответы отправлены автоматически, редактирование заблокировано.');
     onRefresh();
   }, [canEdit, isTimedAttemptExpired, latestDraftSubmission, onRefresh]);
 
@@ -918,14 +942,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const maxPoints = questionCards.reduce((sum, card) => sum + card.points, 0);
   const displayMaxPoints = maxPoints > 0 ? maxPoints : 10;
 
-  const latestScore = assignment
-    ? (() => {
-        const raw = assignment.score.finalScore ?? assignment.score.manualScore ?? assignment.score.autoScore ?? null;
-        if (!Number.isFinite(raw)) return null;
-        const normalizedRaw = Number(raw);
-        return normalizedRaw > 10 ? normalizedRaw / 10 : normalizedRaw;
-      })()
-    : null;
+  const latestScore = quizAttemptState.latestResolvedScore;
 
   const estimatedMinutes = Math.max(10, totalQuestions * 3);
   const essayWordCount = countWords(answerText);
@@ -943,6 +960,8 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     ? requiresTimedAttemptStart
       ? 'таймер запустится после нажатия «Начать»'
       : 'до конца попытки'
+    : canStartFreshAttempt
+      ? 'для новой попытки сначала нажмите «Начать»'
     : deadlineRemainingMs === null
       ? 'без ограничения по времени'
       : 'до дедлайна';
@@ -968,6 +987,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     }
     return deadlineRemainingMs && deadlineRemainingMs > 0 ? 100 : 0;
   }, [
+    canStartFreshAttempt,
     deadlineRemainingMs,
     deadlineTs,
     nowTs,
@@ -982,6 +1002,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const passingScorePercent = quizSettings.passingScorePercent;
   const attemptsLabel = quizSettings.attemptsLimit === null ? '∞' : String(quizSettings.attemptsLimit);
+  const currentAttemptLabel = latestDraftSubmission?.attemptNo ?? (quizAttemptState.latestResolvedSubmission?.attemptNo ?? 1);
 
   const submitButtonLabel = isPreview
     ? 'Завершить предпросмотр'
@@ -1379,18 +1400,18 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
           </div>
 
           {canEdit ? (
-            requiresTimedAttemptStart ? (
+            requiresAttemptStart ? (
               <>
                 <button
                   type="button"
                   className={styles.headerStartButton}
                   disabled={startingAttempt || submitting || uploading}
                   onClick={() => {
-                    void handleStartTimedAttempt();
+                    void handleStartAttempt();
                   }}
                 >
                   <FontAwesomeIcon icon={faPlay} />
-                  <span>{startingAttempt ? 'Запускаем...' : 'Начать'}</span>
+                  <span>{startingAttempt ? 'Запускаем...' : canStartFreshAttempt ? 'Новая попытка' : 'Начать'}</span>
                 </button>
                 {isPreview ? (
                   <button type="button" className={styles.headerDraftButton} onClick={preview?.onFinish}>
@@ -1451,28 +1472,29 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             </div>
           ) : null}
 
-          {requiresTimedAttemptStart ? (
+          {requiresAttemptStart ? (
             <div className={`${styles.notice} ${styles.noticeInfo}`}>
               <span className={styles.noticeText}>
-                После нажатия «Начать» запустится таймер на {formatMinutesLabel(timerConfig.durationMinutes ?? 0)}.
-                Остановить его нельзя, а при окончании попытка считается проваленной.
+                {requiresTimedAttemptStart
+                  ? `После нажатия «Начать» запустится таймер на ${formatMinutesLabel(timerConfig.durationMinutes ?? 0)}. Ответы отправятся автоматически, когда время закончится.`
+                  : 'У вас есть еще одна попытка. Нажмите «Начать», чтобы открыть новый проход и продолжить выполнение.'}
               </span>
               <button
                 type="button"
                 className={styles.noticeAction}
                 disabled={startingAttempt || submitting || uploading}
                 onClick={() => {
-                  void handleStartTimedAttempt();
+                  void handleStartAttempt();
                 }}
               >
-                {startingAttempt ? 'Запускаем...' : 'Начать'}
+                {startingAttempt ? 'Запускаем...' : canStartFreshAttempt ? 'Начать новую попытку' : 'Начать'}
               </button>
             </div>
           ) : null}
 
           {latestScore !== null ? (
             <div className={`${styles.notice} ${styles.noticeSuccess}`}>
-              Последний результат: {Number.isInteger(latestScore) ? latestScore : latestScore.toFixed(1)}/10
+              Последний результат: {latestScore}%{quizAttemptState.latestAttemptPassed ? ' • проходной балл достигнут' : ''}
             </div>
           ) : null}
 
@@ -1526,6 +1548,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   <span className={styles.heroStatLabel}>Попытки</span>
                 </div>
                 <p className={styles.heroStatValue}>{attemptsLabel}</p>
+                <p className={styles.heroStatHint}>
+                  {quizAttemptState.attemptsRemaining === null
+                    ? `Текущая попытка №${currentAttemptLabel}`
+                    : `Осталось ${quizAttemptState.attemptsRemaining}`}
+                </p>
               </div>
             </div>
           </section>
@@ -1795,18 +1822,18 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   </p>
                 </div>
                 {canEdit ? (
-                  requiresTimedAttemptStart ? (
+                  requiresAttemptStart ? (
                     <div className={styles.submitSectionActions}>
                       <button
                         type="button"
                         className={styles.bottomStartButton}
                         disabled={startingAttempt || submitting || uploading}
                         onClick={() => {
-                          void handleStartTimedAttempt();
+                          void handleStartAttempt();
                         }}
                       >
                         <FontAwesomeIcon icon={faPlay} />
-                        <span>{startingAttempt ? 'Запускаем...' : 'Начать попытку'}</span>
+                        <span>{startingAttempt ? 'Запускаем...' : canStartFreshAttempt ? 'Начать новую попытку' : 'Начать попытку'}</span>
                       </button>
                       {isPreview ? (
                         <button type="button" className={styles.bottomPreviewButton} onClick={preview?.onFinish}>
@@ -1897,6 +1924,16 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                 <div className={styles.timerBody}>
                   <p className={styles.timerValue}>{timeLabel}</p>
                   <p className={styles.timerNote}>{timeHint}</p>
+                  <div className={styles.attemptMetaList}>
+                    <div className={styles.attemptMetaRow}>
+                      <span>Текущая попытка</span>
+                      <strong>№{currentAttemptLabel}</strong>
+                    </div>
+                    <div className={styles.attemptMetaRow}>
+                      <span>Осталось</span>
+                      <strong>{quizAttemptState.attemptsRemaining === null ? '∞' : quizAttemptState.attemptsRemaining}</strong>
+                    </div>
+                  </div>
                 </div>
 
                 <div className={styles.timerTrack}>

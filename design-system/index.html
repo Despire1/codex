@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codex — Карта дизайн-системы</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="nav" id="nav"></aside>
+    <main class="main">
+
+      <section id="page-overview" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Карта дизайн-системы</div>
+          <h1 class="page-title">Codex Design System</h1>
+          <p class="page-desc">Жиая карта токенов, компонентов и паттернов, реально используемых в репозитории Codex. Все превью сделаны из того же кода, что в <code>src/shared</code> и <code>src/app/styles</code>.</p>
+        </div>
+      </section>
+
+      <section id="page-principles" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Принципы</h1>
+          <p class="page-desc">Правила, по которым строятся новые экраны. Короткие, чтобы легко запомнить.</p>
+        </div>
+      </section>
+
+      <section id="page-issues" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Audit</div>
+          <h1 class="page-title">Inconsistencies</h1>
+          <p class="page-desc">Места, где кодовая дизайн-система расходится сама с собой. Отсортированы по уровню влияния.</p>
+        </div>
+      </section>
+
+      <section id="page-colors" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Цвета и токены</h1>
+          <p class="page-desc">65+ CSS-переменных из <code>global.css</code>, сгруппированных по ролям. Кликните по swatch, чтобы скопировать hex.</p>
+        </div>
+      </section>
+
+      <section id="page-typography" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Типографика</h1>
+          <p class="page-desc">Inter — единственный шрифт в продукте. 11 наблюдаемых ступеней размеров.</p>
+        </div>
+      </section>
+
+      <section id="page-spacing" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Spacing и радиусы</h1>
+          <p class="page-desc">Фактические значения из CSS-модулей. Spacing-шкала в коде пока не формализована.</p>
+        </div>
+      </section>
+
+      <section id="page-shadows" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Тени</h1>
+          <p class="page-desc">8 теневых паттернов. Все нейтральные — никаких цветных glow, кроме одного legacy-primary.</p>
+        </div>
+      </section>
+
+      <section id="page-icons" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Foundations</div>
+          <h1 class="page-title">Иконки</h1>
+          <p class="page-desc">Абстрактные placeholders 24×24 в штриховом стиле для категорий из реального кода (используются MUI Icons и FontAwesome).</p>
+        </div>
+      </section>
+
+      <section id="page-buttons" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Buttons</h1>
+          <p class="page-desc">Primary lime, secondary, danger, ghost, icon и legacy shared Button.</p>
+        </div>
+      </section>
+
+      <section id="page-inputs" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Inputs &amp; Select</h1>
+          <p class="page-desc">Текстовое поле, поле с ошибкой, select. Focus-ring — один из источников inconsistency.</p>
+        </div>
+      </section>
+
+      <section id="page-checkbox" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Checkbox, Radio &amp; Switch</h1>
+          <p class="page-desc">Контролы выбора. Checkbox и radio-marker используют lime; switch — blue-600 по умолчанию.</p>
+        </div>
+      </section>
+
+      <section id="page-cards" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Cards</h1>
+          <p class="page-desc">Три роли: legacy shared Card, modern product card, lime stats hero.</p>
+        </div>
+      </section>
+
+      <section id="page-badges" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Badges</h1>
+          <p class="page-desc">Badge (payment/group/pending) и большие live-badges для заголовков homework.</p>
+        </div>
+      </section>
+
+      <section id="page-modal" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Modal &amp; Sheet</h1>
+          <p class="page-desc">Desktop Modal и mobile BottomSheet. Оба переопределяют primary-button в lime.</p>
+        </div>
+      </section>
+
+      <section id="page-toast" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Toast</h1>
+          <p class="page-desc">Небольшое нотификационное сообщение. Sky-фон, radius 14, primary shadow.</p>
+        </div>
+      </section>
+
+      <section id="page-avatar" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Components</div>
+          <h1 class="page-title">Avatar &amp; Tooltip</h1>
+          <p class="page-desc">Инициалы-аватар и slate-tooltip через portal.</p>
+        </div>
+      </section>
+
+      <section id="page-layout" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Patterns</div>
+          <h1 class="page-title">Layout &amp; Sidebar</h1>
+          <p class="page-desc">App shell с sidebar (256/64 collapsed) и список-паттерн расписания.</p>
+        </div>
+      </section>
+
+      <section id="page-screens" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Patterns</div>
+          <h1 class="page-title">Экраны</h1>
+          <p class="page-desc">Мини-превью ключевых экранов, собранные из продуктовых токенов и компонентов.</p>
+        </div>
+      </section>
+
+      <section id="page-motion" class="page">
+        <div class="page-header">
+          <div class="page-eyebrow">Patterns</div>
+          <h1 class="page-title">Анимации</h1>
+          <p class="page-desc">Durations и easings из кода. В репозитории единственный формализованный easing — в Sidebar.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

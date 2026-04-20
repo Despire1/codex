@@ -732,7 +732,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     {
       id: 'create_homework',
       label: 'Создать домашнее задание',
-      description: 'Открыть новый экран создания домашки с настройкой срока и отправки.',
+      description: 'Создать новое задание в библиотеке, чтобы потом выдать его ученику.',
       onSelect: onOpenCreateTemplateScreen,
       icon: <HomeworkFileLinesIcon size={12} />,
       iconTone: 'dark' as const,
@@ -740,7 +740,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     {
       id: 'assign_homework',
       label: 'Отправить домашнее задание',
-      description: 'Выдать уже готовую домашку ученику или группе учеников.',
+      description: 'Создать или открыть назначение для конкретного ученика.',
       onSelect: () => openAssignModal(),
       icon: <HomeworkLinkIcon size={12} />,
       iconTone: 'lime' as const,
@@ -954,7 +954,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           onOpenCreateTemplateScreen={onOpenCreateTemplateScreen}
           onOpenAssignModal={() => openAssignModal()}
           onOpenTemplate={(template) => onOpenTemplateDetailScreen(template.id)}
-          onEditTemplate={(template) => onOpenEditTemplateScreen(template.id)}
+          onEditTemplate={(template) => onOpenEditTemplateScreen(template)}
           onIssueTemplate={(template) => openAssignModal({ templateId: template.id })}
           onToggleFavorite={(template) => {
             void onToggleTemplateFavorite(template);
@@ -998,7 +998,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       ) : (
         <>
           <TeacherHomeworksHeader
-            title="Задания"
+            title="Домашние задания"
             subtitle={headerSubtitle}
             workspaceMode={workspaceMode === 'groups' ? 'templates' : workspaceMode}
             hasUnreadActivity={homeworkActivityHasUnread}
@@ -1013,7 +1013,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
               loading={loadingTemplates}
               error={templatesError}
               onOpenTemplate={(template) => onOpenTemplateDetailScreen(template.id)}
-              onEditTemplate={(template) => onOpenEditTemplateScreen(template.id)}
+              onEditTemplate={(template) => onOpenEditTemplateScreen(template)}
               onIssueTemplate={(template) => openAssignModal({ templateId: template.id })}
               onToggleFavorite={(template) => {
                 void onToggleTemplateFavorite(template);
@@ -1312,6 +1312,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
 
       <HomeworkAssignModal
         open={isAssignmentModalOpen}
+        variant={isMobile ? 'sheet' : 'side-sheet'}
         templates={templates.filter((item) => !item.isArchived)}
         groups={groups}
         students={students}

@@ -1,5 +1,6 @@
 import { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HomeworkAssignment, HomeworkGroupListItem, HomeworkTemplate } from '../../../entities/types';
+import { canTeacherEditHomeworkAssignment } from '../../../entities/homework-assignment/model/lib/workflow';
 import { HomeworkEditorDraft, HomeworkEditorVariant } from '../model/types';
 import {
   buildTemplateCreateStats,
@@ -18,15 +19,14 @@ import {
   writeTemplateQuizSettings,
   type TemplateQuizSettings,
 } from '../model/lib/createTemplateScreen';
+import { resolveHomeworkQuizCapabilities } from '../../../entities/homework-template/model/lib/quizProgress';
 import {
-  applyTemplateDraftToHomeworkEditorDraft,
   createMediaBlock,
   projectHomeworkEditorToTemplateDraft,
 } from '../model/lib/blocks';
 import {
   clearStoredCreateTemplateDraft,
   formatStoredDraftTimeLabel,
-  loadStoredCreateTemplateDraft,
   saveStoredCreateTemplateDraft,
 } from '../model/lib/createTemplateDraftStorage';
 import {
@@ -46,10 +46,13 @@ import { TemplateMaterialsSection } from './create-screen/TemplateMaterialsSecti
 import { TemplateSettingsSidebar } from './create-screen/TemplateSettingsSidebar';
 import { TemplatePreviewModal } from './create-screen/TemplatePreviewModal';
 import { AssignmentPreviewScreen } from './create-screen/AssignmentPreviewScreen';
-import { AssignmentReadOnlyScreen } from './create-screen/AssignmentReadOnlyScreen';
 import { AssignmentCreateHeader } from './create-screen/AssignmentCreateHeader';
 import { AssignmentBasicsSection } from './create-screen/AssignmentBasicsSection';
 import { AssignmentPlanningSidebar } from './create-screen/AssignmentPlanningSidebar';
+import { AssignmentBasicsReadOnlySection } from './create-screen/AssignmentBasicsReadOnlySection';
+import { AssignmentQuestionsReadOnlySection } from './create-screen/AssignmentQuestionsReadOnlySection';
+import { AssignmentMaterialsReadOnlySection } from './create-screen/AssignmentMaterialsReadOnlySection';
+import { AssignmentPlanningReadOnlySidebar } from './create-screen/AssignmentPlanningReadOnlySidebar';
 import assignmentScreenStyles from './create-screen/AssignmentCreateScreen.module.css';
 import styles from './HomeworkTemplateCreateScreen.module.css';
 
@@ -66,6 +69,8 @@ interface HomeworkTemplateCreateScreenProps {
   submitting: boolean;
   readOnly?: boolean;
   readOnlyAssignment?: HomeworkAssignment | null;
+  readOnlyAssignments?: HomeworkAssignment[];
+  readOnlyAssignmentsCount?: number;
   saveAsTemplateSubmitting?: boolean;
   students?: Array<{ id: number; name: string; level?: string | null }>;
   groups?: HomeworkGroupListItem[];
@@ -78,24 +83,13 @@ interface HomeworkTemplateCreateScreenProps {
   cancelIssueSubmitting?: boolean;
   onDraftChange: (draft: HomeworkEditorDraft) => void;
   onSubmit: (action: 'save' | 'submit') => Promise<HomeworkTemplateCreateSubmitResult>;
-  onSaveAsTemplate?: () => Promise<void>;
+  onSaveAsTemplate?: () => Promise<HomeworkTemplateCreateSubmitResult>;
   onAssignmentTemplateSelect?: (templateId: number | null) => void;
   onCancelIssue?: () => Promise<void>;
+  onReadOnlyEdit?: () => void;
   onBack: () => void;
+  onOpenMobileSidebar?: () => void;
 }
-
-const isInitialTemplateDraft = (draft: HomeworkEditorDraft) => {
-  const templateDraft = projectHomeworkEditorToTemplateDraft(draft);
-  return (
-    !templateDraft.title.trim() &&
-    !templateDraft.tagsText.trim() &&
-    !templateDraft.subject.trim() &&
-    !templateDraft.level.trim() &&
-    templateDraft.blocks.length === 1 &&
-    templateDraft.blocks[0]?.type === 'TEXT' &&
-    !templateDraft.blocks[0].content.trim()
-  );
-};
 
 export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps> = ({
   variant = 'template',
@@ -104,6 +98,8 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   submitting,
   readOnly = false,
   readOnlyAssignment = null,
+  readOnlyAssignments = [],
+  readOnlyAssignmentsCount = 0,
   saveAsTemplateSubmitting = false,
   students = [],
   groups = [],
@@ -119,9 +115,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   onSaveAsTemplate,
   onAssignmentTemplateSelect,
   onCancelIssue,
+  onReadOnlyEdit,
   onBack,
+  onOpenMobileSidebar,
 }) => {
-  const hasRestoredDraftRef = useRef(false);
   const hasSkippedTemplateAutoSaveRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [activeSubmitAction, setActiveSubmitAction] = useState<'save' | 'submit' | null>(null);
@@ -130,7 +127,9 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   const [isPreviewOpen, setPreviewOpen] = useState(false);
   const [serverIssues, setServerIssues] = useState<FormValidationIssue[]>([]);
   const [isAssignmentMenuOpen, setAssignmentMenuOpen] = useState(false);
+  const [isAssignmentHeaderCompact, setAssignmentHeaderCompact] = useState(false);
   const isDesktop = useIsDesktop();
+  const assignmentScrollBodyRef = useRef<HTMLDivElement | null>(null);
   const templateDraft = useMemo(() => projectHomeworkEditorToTemplateDraft(draft), [draft]);
   const usesAssignmentLayout = variant === 'assignment' || (variant === 'template' && mode === 'edit');
   const assignmentHasSelectedStudent = draft.assignment.studentId !== null;
@@ -216,6 +215,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   const tags = useMemo(() => parseTagsText(templateDraft.tagsText), [templateDraft.tagsText]);
   const estimatedMinutes = useMemo(() => extractEstimatedMinutes(templateDraft.level), [templateDraft.level]);
   const stats = useMemo(() => buildTemplateCreateStats(templateDraft, quizSettings), [quizSettings, templateDraft]);
+  const quizCapabilities = useMemo(() => resolveHomeworkQuizCapabilities(draft.blocks), [draft.blocks]);
   const primaryTestEntry = useMemo(() => getPrimaryTestBlockEntry(draft.blocks), [draft.blocks]);
   const primaryMediaEntry = useMemo(() => getPrimaryMediaBlockEntry(draft.blocks), [draft.blocks]);
   const titlePath = useMemo<FormValidationPath>(() => ['title'], []);
@@ -272,31 +272,27 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   }, [clearIssueAtPath, clearServerIssueByPath]);
 
   useEffect(() => {
-    hasRestoredDraftRef.current = false;
     setServerIssues([]);
     resetValidationSession();
+
     if (mode !== 'create' || variant !== 'template') {
       setDraftSavedAtLabel(null);
+      return;
     }
+
+    // Each fresh visit to template creation must start from a clean state.
+    clearStoredCreateTemplateDraft();
+    setDraftSavedAtLabel(null);
+
+    return () => {
+      clearStoredCreateTemplateDraft();
+    };
   }, [mode, resetValidationSession, variant]);
 
   useEffect(() => {
     if (!draft.blocks.some((block) => block.type === 'TEST')) return;
     setQuizSettings(readTemplateQuizSettings(draft.blocks));
   }, [draft.blocks]);
-
-  useEffect(() => {
-    if (mode !== 'create' || variant !== 'template') return;
-    if (hasRestoredDraftRef.current) return;
-    hasRestoredDraftRef.current = true;
-    if (!isInitialTemplateDraft(draft)) return;
-
-    const storedDraft = loadStoredCreateTemplateDraft();
-    if (!storedDraft) return;
-
-    onDraftChange(applyTemplateDraftToHomeworkEditorDraft(draft, storedDraft.draft));
-    setDraftSavedAtLabel(formatStoredDraftTimeLabel(storedDraft.savedAt));
-  }, [draft, mode, onDraftChange, variant]);
 
   const updateDraft = (nextDraft: HomeworkEditorDraft) => {
     onDraftChange(nextDraft);
@@ -403,9 +399,14 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       return;
     }
 
+    const submitHandler =
+      assignmentPrimarySavesHomework && action === 'save' && onSaveAsTemplate
+        ? onSaveAsTemplate
+        : () => onSubmit(action);
+
     setActiveSubmitAction(action);
     try {
-      const result = await onSubmit(action);
+      const result = await submitHandler();
       if (!result.success) {
         const nextServerIssues = result.issues ?? [];
         if (nextServerIssues.length > 0) {
@@ -432,11 +433,13 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     }
   }, [
     assignmentValidationIssues,
+    assignmentPrimarySavesHomework,
     focusPathInput,
     hasAssignmentValidationErrors,
     markSubmitAttempt,
     mode,
     onBack,
+    onSaveAsTemplate,
     onSubmit,
     resetValidationSession,
     validationErrorIssues,
@@ -454,20 +457,16 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
 
   const handlePrimaryAction = useCallback(() => {
     if (readOnly) return;
-    if (assignmentPrimarySavesHomework) {
-      void onSaveAsTemplate?.();
-      return;
-    }
     if (variant === 'assignment' && assignmentPrimaryActionMode === 'save') {
       void runValidatedAction('save');
       return;
     }
-    void runValidatedAction('submit');
-  }, [assignmentPrimaryActionMode, assignmentPrimarySavesHomework, onSaveAsTemplate, readOnly, runValidatedAction, variant]);
+    void runValidatedAction(assignmentPrimarySavesHomework ? 'save' : 'submit');
+  }, [assignmentPrimaryActionMode, assignmentPrimarySavesHomework, readOnly, runValidatedAction, variant]);
 
   const assignmentPrimaryActionLabel =
     assignmentPrimarySavesHomework
-      ? 'Сохранить домашку'
+      ? 'Сохранить в библиотеку'
       : assignmentPrimaryActionMode === 'create'
       ? 'Создать'
       : assignmentPrimaryActionMode === 'save'
@@ -475,7 +474,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         : 'Выдать';
   const assignmentPrimarySubmittingLabel =
     assignmentPrimarySavesHomework
-      ? 'Сохраняю…'
+      ? 'Сохраняю в библиотеку…'
       : assignmentPrimaryActionMode === 'create'
       ? 'Создаю…'
       : assignmentPrimaryActionMode === 'save'
@@ -566,36 +565,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     };
   }, []);
 
-  if (variant === 'assignment' && readOnly) {
-    return (
-      <section className={styles.page}>
-        <AssignmentReadOnlyScreen
-          draft={draft}
-          assignment={readOnlyAssignment}
-          students={students}
-          groups={groups}
-          templates={templates}
-          previewDisabled={previewDisabled}
-          showCancelIssueAction={showCancelIssueAction}
-          cancelIssueSubmitting={cancelIssueSubmitting}
-          onOpenPreview={() => {
-            if (previewDisabled) return;
-            setPreviewOpen(true);
-          }}
-          onCancelIssue={() => {
-            void onCancelIssue?.();
-          }}
-          onBack={onBack}
-        />
-
-        {isPreviewOpen ? (
-          <div className={styles.previewOverlay}>
-            <AssignmentPreviewScreen draft={draft} students={students} groups={groups} onClose={() => setPreviewOpen(false)} />
-          </div>
-        ) : null}
-      </section>
-    );
-  }
+  const handleAssignmentScroll = useCallback(() => {
+    const nextCompact = !isDesktop && (assignmentScrollBodyRef.current?.scrollTop ?? 0) > 28;
+    setAssignmentHeaderCompact((current) => (current === nextCompact ? current : nextCompact));
+  }, [isDesktop]);
 
   if (usesAssignmentLayout) {
     const assignmentEstimatedMinutes = Math.max(stats.estimatedMinutes, previewQuestionsCount > 0 ? previewQuestionsCount * 3 : 5);
@@ -605,7 +578,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           ? 'Задать домашку'
           : 'Сохранить изменения'
         : assignmentPrimarySavesHomework
-          ? 'Сохранить домашку'
+          ? 'Сохранить в библиотеку'
         : assignmentPrimaryActionMode === 'create'
           ? 'Задать домашку'
           : assignmentPrimaryActionMode === 'issue'
@@ -617,7 +590,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           ? templateEditAssignSubmittingLabel
           : 'Сохраняем…'
         : assignmentPrimarySavesHomework
-          ? 'Сохраняем…'
+          ? 'Сохраняем в библиотеку…'
         : activeSubmitAction === 'save'
           ? 'Сохраняем…'
           : draft.assignment.sendMode === 'SCHEDULED'
@@ -637,6 +610,69 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     const assignmentHeaderSubtitle =
       variant === 'template' ? 'Поля предзаполнены • Сохраните изменения после редактирования' : undefined;
     const shouldShowAssignmentSidebarErrors = submitAttempted && shouldValidateAssignmentFields;
+    const isTemplateReadOnlyView = variant === 'template' && readOnly;
+    const isAssignmentReadOnlyView = variant === 'assignment' && readOnly;
+    const canEditReadOnlyAssignment = Boolean(
+      isAssignmentReadOnlyView && readOnlyAssignment && canTeacherEditHomeworkAssignment(readOnlyAssignment),
+    );
+
+    if (isTemplateReadOnlyView || isAssignmentReadOnlyView) {
+      return (
+        <section className={assignmentScreenStyles.page}>
+          <AssignmentCreateHeader
+            questionCount={stats.questionCount}
+            totalPoints={stats.totalPoints}
+            estimatedMinutes={assignmentEstimatedMinutes}
+            title="Просмотр домашнего задания"
+            subtitle={
+              isTemplateReadOnlyView
+                ? 'Тот же поток, что в создании и редактировании, но без изменений'
+                : 'Просмотр выданного задания в новом формате'
+            }
+            primaryActionLabel=""
+            primarySubmittingLabel=""
+            submitting={false}
+            actionsDisabled={false}
+            menuOpen={false}
+            showSecondaryAction={canEditReadOnlyAssignment || isTemplateReadOnlyView}
+            showPreviewAction={false}
+          showMenuAction={false}
+          showPrimaryAction={false}
+          onBack={onBack}
+          onSecondaryAction={onReadOnlyEdit}
+          onOpenSidebar={onOpenMobileSidebar}
+        />
+
+          <div className={assignmentScreenStyles.scrollBody}>
+            <div className={assignmentScreenStyles.container}>
+              <div className={assignmentScreenStyles.grid}>
+                <div className={assignmentScreenStyles.mainColumn}>
+                  <AssignmentBasicsReadOnlySection
+                    title={draft.title}
+                    description={description}
+                    issuedAssignments={isTemplateReadOnlyView ? readOnlyAssignments : []}
+                    issuedAssignmentsCount={isTemplateReadOnlyView ? readOnlyAssignmentsCount : 0}
+                  />
+
+                  <AssignmentQuestionsReadOnlySection testBlock={primaryTestEntry?.block ?? null} />
+
+                  <AssignmentMaterialsReadOnlySection mediaBlock={mediaBlock} />
+                </div>
+
+                <div className={assignmentScreenStyles.sidebarColumn}>
+                  <AssignmentPlanningReadOnlySidebar
+                    assignment={draft.assignment}
+                    students={students}
+                    quizSettings={quizSettings}
+                    quizCapabilities={quizCapabilities}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
 
     return (
       <section className={assignmentScreenStyles.page}>
@@ -655,8 +691,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
               ? assignmentPrimaryActionDisabled
               : primaryActionDisabled
           }
+          compact={!isDesktop && isAssignmentHeaderCompact}
           menuOpen={isAssignmentMenuOpen}
           onBack={onBack}
+          onOpenSidebar={onOpenMobileSidebar}
           onPreview={() => {
             if (previewDisabled) return;
             setPreviewOpen(true);
@@ -665,7 +703,11 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           onPrimaryAction={handlePrimaryAction}
         />
 
-        <div className={assignmentScreenStyles.scrollBody}>
+        <div
+          ref={assignmentScrollBodyRef}
+          className={assignmentScreenStyles.scrollBody}
+          onScroll={handleAssignmentScroll}
+        >
           <div className={assignmentScreenStyles.container}>
             <div className={assignmentScreenStyles.grid}>
               <div className={assignmentScreenStyles.mainColumn}>
@@ -705,6 +747,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
                   assignment={draft.assignment}
                   students={students}
                   quizSettings={quizSettings}
+                  quizCapabilities={quizCapabilities}
                   studentLocked={variant === 'assignment' ? lockAssignmentStudent : false}
                   studentRequired={variant === 'assignment' && mode === 'edit'}
                   studentError={
@@ -740,14 +783,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           </div>
         </div>
 
-        {variant === 'assignment' && isPreviewOpen ? (
+        {isPreviewOpen ? (
           <div className={styles.previewOverlay}>
             <AssignmentPreviewScreen draft={draft} students={students} groups={groups} onClose={() => setPreviewOpen(false)} />
           </div>
-        ) : null}
-
-        {variant === 'template' ? (
-          <TemplatePreviewModal open={isPreviewOpen} draft={templateDraft} onClose={() => setPreviewOpen(false)} />
         ) : null}
       </section>
     );
@@ -869,6 +908,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         <aside className={styles.sidebarColumn}>
           <TemplateSettingsSidebar
             settings={quizSettings}
+            capabilities={quizCapabilities}
             stats={stats}
             validationErrors={validationErrorMessages}
             validationWarnings={validationWarningMessages}

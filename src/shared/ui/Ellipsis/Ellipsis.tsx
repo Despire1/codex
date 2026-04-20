@@ -44,7 +44,12 @@ export const Ellipsis = ({
   }, [children, className, title]);
 
   return (
-    <Tooltip content={isTruncated ? title : undefined} align={tooltipAlign} side={tooltipSide}>
+    <Tooltip
+      content={isTruncated ? title : undefined}
+      align={tooltipAlign}
+      side={tooltipSide}
+      className={styles.wrapper}
+    >
       <span ref={textRef} className={`${styles.ellipsis} ${className}`}>
         {children}
       </span>

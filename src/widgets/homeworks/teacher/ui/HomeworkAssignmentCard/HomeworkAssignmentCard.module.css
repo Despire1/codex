@@ -248,61 +248,6 @@
   font-weight: 700;
 }
 
-.hoverActions {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: stretch;
-  padding: 10px 22px 18px;
-  background: #fff;
-  z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(8px);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.card:hover .hoverActions,
-.card:focus-within .hoverActions,
-.hoverActionsList {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.hoverActionsList {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  padding: 28px 22px 18px;
-  background: #fff;
-}
-
-.issueButton {
-  width: 100%;
-  min-height: 44px;
-  border: none;
-  border-radius: 16px;
-  background: #0d1017;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  padding: 0 18px;
-  font-size: 14px;
-  line-height: 1;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.issueButton:hover {
-  background: #000;
-}
-
 .menuPopover {
   min-width: 216px;
   border-radius: 18px;
@@ -358,17 +303,5 @@
 
   .cardBody {
     padding: 18px 18px 16px;
-  }
-
-  .hoverActions,
-  .hoverActionsList {
-    position: absolute;
-    inset-inline: 0;
-    bottom: 0;
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-    padding: 24px 18px 16px;
-    background: #fff;
   }
 }

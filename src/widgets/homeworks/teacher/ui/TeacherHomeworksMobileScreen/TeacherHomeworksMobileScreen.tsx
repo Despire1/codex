@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FC } from 'react';
 import {
   canTeacherDeleteHomeworkTemplate,
-  canTeacherEditHomeworkTemplate,
 } from '../../../../../entities/homework-template/model/lib/workflow';
 import { HomeworkAssignment, HomeworkTemplate } from '../../../../../entities/types';
 import { BottomSheet } from '../../../../../shared/ui/BottomSheet/BottomSheet';
@@ -607,7 +606,7 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
               role="tab"
               aria-selected={!isAssignmentsTab}
             >
-              Задания
+              Библиотека
             </button>
             <button
               type="button"
@@ -1095,15 +1094,13 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
               }}>
                 <span className={styles.sheetRowText}>Открыть</span>
               </button>
-              {canTeacherEditHomeworkTemplate(activeMenu.template) ? (
-                <button type="button" className={styles.sheetRow} onClick={() => {
-                  const { template } = activeMenu;
-                  setActiveMenu(null);
-                  onEditTemplate(template);
-                }}>
-                  <span className={styles.sheetRowText}>Редактировать</span>
-                </button>
-              ) : null}
+              <button type="button" className={styles.sheetRow} onClick={() => {
+                const { template } = activeMenu;
+                setActiveMenu(null);
+                onEditTemplate(template);
+              }}>
+                <span className={styles.sheetRowText}>Редактировать</span>
+              </button>
               <button type="button" className={styles.sheetRow} onClick={() => {
                 const { template } = activeMenu;
                 setActiveMenu(null);

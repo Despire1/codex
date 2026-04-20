@@ -51,3 +51,11 @@ export const areHomeworkEditorDraftsEqual = (left: HomeworkEditorDraft, right: H
 
 export const hasHomeworkEditorContent = (draft: HomeworkEditorDraft) =>
   serializeDraftContent(draft) !== serializeDraftContent(createInitialHomeworkEditorDraft());
+
+export const cloneHomeworkEditorDraft = (draft: HomeworkEditorDraft): HomeworkEditorDraft =>
+  JSON.parse(JSON.stringify(draft)) as HomeworkEditorDraft;
+
+export const resolveOpenedHomeworkEditorDraft = (
+  sourceDraft: HomeworkEditorDraft,
+  restoredDraft?: HomeworkEditorDraft | null,
+) => restoredDraft ?? sourceDraft;

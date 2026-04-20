@@ -14,7 +14,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:4000',
-      '/auth': 'http://localhost:4000',
+      '^/auth/session$': 'http://localhost:4000',
+      '^/auth/logout$': 'http://localhost:4000',
+      '^/auth/telegram/browser-config$': 'http://localhost:4000',
+      '^/auth/telegram/browser-login$': 'http://localhost:4000',
+      '^/auth/telegram/webapp$': 'http://localhost:4000',
     },
     allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.politdev.ru'],
   },

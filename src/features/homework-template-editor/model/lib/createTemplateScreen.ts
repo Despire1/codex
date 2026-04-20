@@ -14,6 +14,7 @@ import {
   HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY,
   HomeworkTemplateQuizSettings,
   readHomeworkTemplateQuizSettingsFromBlocks,
+  sanitizeHomeworkTemplateQuizSettingsForSave,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
 import { HomeworkEditorTaskType, HomeworkTemplateEditorDraft } from '../types';
 import {
@@ -424,7 +425,7 @@ export const writeTemplateQuizSettings = (
 
   const nextTestBlock = {
     ...toRecord(testEntry.block),
-    [HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY]: settings,
+    [HOMEWORK_TEMPLATE_TEST_SETTINGS_KEY]: sanitizeHomeworkTemplateQuizSettingsForSave(settings),
   } as unknown as HomeworkBlockTest;
 
   return blocks.map((block, index) => (index === testEntry.index ? nextTestBlock : block));

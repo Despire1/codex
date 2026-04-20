@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { addDays } from 'date-fns';
-import type { HomeworkAssignment, HomeworkBlock, HomeworkSubmission } from '../../../../entities/types';
+import type { HomeworkAssignment, HomeworkBlock, HomeworkSubmission, HomeworkTestQuestion } from '../../../../entities/types';
 import {
   HomeworkAssignmentBucketId,
   HomeworkAssignmentsTabId,
@@ -15,6 +15,10 @@ import {
   readHomeworkTemplateQuizSettingsFromBlocks,
   resolveHomeworkAttemptTimerConfig,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
+import {
+  isHomeworkQuestionAutoGradable,
+  resolveHomeworkQuizCapabilities,
+} from '../../../../entities/homework-template/model/lib/quizProgress';
 import { buildHomeworkReviewItems, normalizeReviewPoints } from '../../../../features/homework-review/model/lib/questionReview';
 import {
   formatInTimeZone,
@@ -646,6 +650,58 @@ export const resolveTimedAttemptState = (assignmentContentSnapshot: unknown, sta
   };
 };
 
+export const resolveHomeworkAutoScoreForSubmission = (
+  assignmentContentSnapshot: unknown,
+  testAnswersRaw: unknown,
+): number | null => {
+  const blocks = normalizeHomeworkBlocks(assignmentContentSnapshot) as unknown as HomeworkBlock[];
+  const quizCapabilities = resolveHomeworkQuizCapabilities(blocks);
+  if (!quizCapabilities.autoCheckActive) return null;
+  return calculateHomeworkAutoScore(blocks as unknown as Record<string, unknown>[], testAnswersRaw);
+};
+
+export const resolveHomeworkSubmittedAttemptState = ({
+  assignmentContentSnapshot,
+  attemptNo,
+  autoScore,
+  submittedAt,
+}: {
+  assignmentContentSnapshot: unknown;
+  attemptNo: number;
+  autoScore: number | null;
+  submittedAt: Date;
+}) => {
+  const blocks = normalizeHomeworkBlocks(assignmentContentSnapshot) as unknown as HomeworkBlock[];
+  const quizSettings = readHomeworkTemplateQuizSettingsFromBlocks(blocks);
+  const quizCapabilities = resolveHomeworkQuizCapabilities(blocks);
+
+  if (!quizCapabilities.autoCheckActive || autoScore === null) {
+    return {
+      submissionStatus: 'SUBMITTED' as const,
+      submissionReviewedAt: null,
+      assignmentStatus: 'SUBMITTED' as const,
+      assignmentReviewedAt: null,
+      autoScore: null,
+      finalScore: null,
+      isFinalAutoResult: false,
+    };
+  }
+
+  const latestAttemptPassed = autoScore >= quizSettings.passingScorePercent;
+  const attemptsExhausted = quizSettings.attemptsLimit !== null && attemptNo >= quizSettings.attemptsLimit;
+  const isFinalAutoResult = latestAttemptPassed || attemptsExhausted;
+
+  return {
+    submissionStatus: 'REVIEWED' as const,
+    submissionReviewedAt: submittedAt,
+    assignmentStatus: isFinalAutoResult ? ('REVIEWED' as const) : ('SENT' as const),
+    assignmentReviewedAt: isFinalAutoResult ? submittedAt : null,
+    autoScore,
+    finalScore: autoScore,
+    isFinalAutoResult,
+  };
+};
+
 const isAssignmentAcceptingStudentWork = (status: unknown) => {
   const normalized = normalizeHomeworkAssignmentStatus(status);
   return normalized === 'SENT' || normalized === 'RETURNED' || normalized === 'OVERDUE';
@@ -664,24 +720,34 @@ export const finalizeTimedOutDraftSubmission = async (
   if (!timerState.enabled || !timerState.isExpired) return null;
 
   const submittedAt = timerState.expiresAt ?? now;
+  const autoScore = resolveHomeworkAutoScoreForSubmission(assignment.contentSnapshot, draftSubmission.testAnswers);
+  const attemptState = resolveHomeworkSubmittedAttemptState({
+    assignmentContentSnapshot: assignment.contentSnapshot,
+    attemptNo: Number(draftSubmission.attemptNo ?? 1),
+    autoScore,
+    submittedAt,
+  });
   const [updatedSubmission, updatedAssignment] = await Promise.all([
     (prisma as any).homeworkSubmission.update({
       where: { id: draftSubmission.id },
       data: {
-        status: 'SUBMITTED',
+        status: attemptState.submissionStatus,
         submittedAt,
-        autoScore: 0,
+        reviewedAt: attemptState.submissionReviewedAt,
+        autoScore: attemptState.autoScore,
         manualScore: null,
-        finalScore: 0,
+        finalScore: attemptState.finalScore,
       },
     }),
     (prisma as any).homeworkAssignment.update({
       where: { id: assignment.id },
       data: {
-        status: 'SUBMITTED',
-        autoScore: 0,
+        status: attemptState.assignmentStatus,
+        autoScore: attemptState.autoScore,
         manualScore: null,
-        finalScore: 0,
+        finalScore: attemptState.finalScore,
+        reviewedAt: attemptState.assignmentReviewedAt,
+        teacherComment: null,
       },
     }),
   ]);
@@ -715,8 +781,7 @@ const normalizeQuestionPoints = (question: Record<string, unknown>) => {
 };
 
 export const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswersRaw: unknown): number | null => {
-  const answers = parseObjectRecord(testAnswersRaw);
-  if (!answers) return null;
+  const answers = parseObjectRecord(testAnswersRaw) ?? {};
   const questions = blocks
     .filter((block) => block.type === 'TEST')
     .flatMap((block) => {
@@ -725,13 +790,9 @@ export const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], te
     })
     .filter((question): question is Record<string, unknown> => typeof question === 'object' && question !== null);
 
-  const autoQuestions = questions.filter((question) => {
-    const type = String(question.type ?? '');
-    if (type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE' || type === 'MATCHING') return true;
-    if (type !== 'SHORT_ANSWER') return false;
-    const kind = typeof question.uiQuestionKind === 'string' ? question.uiQuestionKind : '';
-    return kind === 'FILL_WORD' || kind === 'ORDERING' || kind === 'TABLE';
-  });
+  const autoQuestions = questions.filter((question) =>
+    isHomeworkQuestionAutoGradable(question as unknown as HomeworkTestQuestion),
+  );
   if (autoQuestions.length === 0) return null;
 
   let earned = 0;

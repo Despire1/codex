@@ -1,3 +1,10 @@
+.wrapper {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
 .ellipsis {
   display: block;
   min-width: 0;

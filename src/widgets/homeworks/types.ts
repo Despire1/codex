@@ -110,7 +110,7 @@ export interface TeacherHomeworksViewModel {
   onSelectedStudentIdChange: (studentId: number | null) => void;
   onOpenCreateTemplateScreen: () => void;
   onOpenTemplateDetailScreen: (templateId: number) => void;
-  onOpenEditTemplateScreen: (templateId: number) => void;
+  onOpenEditTemplateScreen: (template: HomeworkTemplate) => void;
   onCreateGroup: (payload: {
     title: string;
     description?: string | null;

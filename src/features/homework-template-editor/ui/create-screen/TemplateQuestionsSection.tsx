@@ -72,6 +72,12 @@ type QuestionCreateOption = {
   tone: 'blue' | 'purple' | 'indigo' | 'green' | 'orange' | 'amber' | 'cyan' | 'rose' | 'violet';
 };
 
+type QuestionCreateGroup = {
+  id: string;
+  title: string;
+  options: QuestionCreateOption[];
+};
+
 const QUESTION_CREATE_OPTIONS_PRIMARY: QuestionCreateOption[] = [
   {
     id: 'CHOICE',
@@ -89,8 +95,8 @@ const QUESTION_CREATE_OPTIONS_PRIMARY: QuestionCreateOption[] = [
   },
   {
     id: 'LONG_TEXT',
-    title: 'Эссе / Длинный текст',
-    description: 'Развернутый ответ',
+    title: 'Развернутый ответ',
+    description: 'SC / эссе в свободной форме',
     icon: <HomeworkAlignLeftIcon size={15} />,
     tone: 'indigo',
   },
@@ -146,17 +152,17 @@ const QUESTION_CREATE_OPTIONS: QuestionCreateOption[] = [
   ...QUESTION_CREATE_OPTIONS_ADVANCED,
 ];
 
-const QUESTION_CREATE_GROUPS: Array<{ id: string; title: string; options: QuestionCreateOption[] }> = [
+const QUESTION_CREATE_GROUPS: QuestionCreateGroup[] = [
   {
     id: 'test',
-    title: 'Тестовые вопросы',
+    title: 'Тестовые',
     options: ['CHOICE', 'FILL_WORD', 'MATCHING', 'ORDERING', 'TABLE']
       .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
       .filter((option): option is QuestionCreateOption => Boolean(option)),
   },
   {
     id: 'response',
-    title: 'Открытые ответы',
+    title: 'Кастомные',
     options: ['SHORT_TEXT', 'LONG_TEXT', 'AUDIO', 'FILE']
       .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
       .filter((option): option is QuestionCreateOption => Boolean(option)),
@@ -519,12 +525,11 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   addQuestionMode = 'dropdown',
   enableQuestionKindSelect = false,
 }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [addQuestionTrigger, setAddQuestionTrigger] = useState<'header' | 'fab' | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
   const [questionKindMenuQuestionId, setQuestionKindMenuQuestionId] = useState<string | null>(null);
   const [dragOrderingState, setDragOrderingState] = useState<{ questionId: string; itemIndex: number } | null>(null);
-  const questionKindMenuWrapRef = useRef<HTMLDivElement | null>(null);
   const questionNodeMapRef = useRef(new Map<string, HTMLElement>());
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -557,6 +562,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   const hasFieldError = (path: FormValidationPath) => Boolean(getIssueForPath(path));
   const getFieldClassName = (baseClassName: string, path: FormValidationPath) =>
     `${baseClassName} ${hasFieldError(path) ? styles.inputError : ''}`;
+  const isAddQuestionDropdownOpen = addQuestionMode === 'dropdown' && addQuestionTrigger !== null;
 
   useEffect(() => {
     if (!testBlock) return;
@@ -644,7 +650,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
         ...nextBlock,
         questions: [nextQuestion],
       });
-      setDropdownOpen(false);
+      setAddQuestionTrigger(null);
       return;
     }
 
@@ -653,23 +659,42 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
       ...testBlock,
       questions: [...testBlock.questions, nextQuestion],
     });
-    setDropdownOpen(false);
+    setAddQuestionTrigger(null);
   };
 
-  useEffect(() => {
-    if (!questionKindMenuQuestionId) return undefined;
+  const handleAddQuestionTriggerClick = (trigger: 'header' | 'fab') => {
+    if (addQuestionMode === 'default-choice') {
+      addQuestion('CHOICE');
+      return;
+    }
 
-    const handleOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (questionKindMenuWrapRef.current?.contains(target)) return;
-      setQuestionKindMenuQuestionId(null);
-    };
+    setAddQuestionTrigger((current) => (current === trigger ? null : trigger));
+  };
 
-    document.addEventListener('mousedown', handleOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleOutside);
-    };
-  }, [questionKindMenuQuestionId]);
+  const renderAddQuestionPopoverContent = () => (
+    <div className={styles.dropdownPanel}>
+      <div className={styles.dropdownBody}>
+        <div className={styles.dropdownColumns}>
+          {QUESTION_CREATE_GROUPS.map((group) => (
+            <div key={group.id} className={styles.dropdownGroup}>
+              <div className={styles.dropdownGroupTitle}>{group.title}</div>
+              <div className={styles.dropdownGroupList}>
+                {group.options.map((option) => (
+                  <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
+                    <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
+                    <span className={styles.dropdownItemMeta}>
+                      <span className={styles.dropdownTitle}>{option.title}</span>
+                      <span className={styles.dropdownDescription}>{option.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!pendingScrollQuestionId) return undefined;
@@ -1539,8 +1564,8 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
           <p className={styles.sectionSubtitle}>Добавьте вопросы для теста</p>
         </div>
         <AdaptivePopover
-          isOpen={addQuestionMode === 'dropdown' && dropdownOpen}
-          onClose={() => setDropdownOpen(false)}
+          isOpen={addQuestionTrigger === 'header'}
+          onClose={() => setAddQuestionTrigger(null)}
           side="bottom"
           align="end"
           offset={10}
@@ -1551,15 +1576,9 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
               id="add-question-btn"
               type="button"
               className={styles.addQuestionButton}
-              onClick={() => {
-                if (addQuestionMode === 'default-choice') {
-                  addQuestion('CHOICE');
-                  return;
-                }
-                setDropdownOpen((prev) => !prev);
-              }}
+              onClick={() => handleAddQuestionTriggerClick('header')}
               aria-haspopup={addQuestionMode === 'dropdown' ? 'dialog' : undefined}
-              aria-expanded={addQuestionMode === 'dropdown' ? dropdownOpen : undefined}
+              aria-expanded={isAddQuestionDropdownOpen && addQuestionTrigger === 'header'}
             >
               <HomeworkPlusIcon size={12} />
               <span>Добавить вопрос</span>
@@ -1567,27 +1586,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
             </button>
           }
         >
-          <div className={styles.dropdownPanel}>
-            <div className={styles.dropdownHeader}>Выберите тип вопроса</div>
-            <div className={styles.dropdownColumns}>
-              {QUESTION_CREATE_GROUPS.map((group) => (
-                <div key={group.id} className={styles.dropdownGroup}>
-                  <div className={styles.dropdownGroupTitle}>{group.title}</div>
-                  <div className={styles.dropdownGroupList}>
-                    {group.options.map((option) => (
-                      <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
-                        <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
-                        <span className={styles.dropdownItemMeta}>
-                          <span className={styles.dropdownTitle}>{option.title}</span>
-                          <span className={styles.dropdownDescription}>{option.description}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {renderAddQuestionPopoverContent()}
         </AdaptivePopover>
       </div>
 
@@ -1626,46 +1625,68 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                     showQuestionKindLabel={!enableQuestionKindSelect}
                     questionKindControl={
                       enableQuestionKindSelect ? (
-                        <div
-                          ref={questionKindMenuQuestionId === question.id ? questionKindMenuWrapRef : null}
-                          className={styles.questionKindDropdownWrap}
+                        <AdaptivePopover
+                          isOpen={questionKindMenuQuestionId === question.id}
+                          onClose={() => setQuestionKindMenuQuestionId(null)}
+                          side="bottom"
+                          align="start"
+                          offset={8}
+                          className={styles.questionKindPopover}
+                          rootClassName={styles.questionKindDropdownWrap}
+                          triggerClassName={styles.questionKindTrigger}
+                          trigger={
+                            <button
+                              type="button"
+                              className={`${styles.questionKindButton} ${resolveDropdownIconToneClass(questionKindOption.tone)}`}
+                              onClick={() =>
+                                setQuestionKindMenuQuestionId((current) => (current === question.id ? null : question.id))
+                              }
+                              aria-haspopup="dialog"
+                              aria-expanded={questionKindMenuQuestionId === question.id}
+                            >
+                              <span className={styles.questionKindButtonIcon}>{questionKindOption.icon}</span>
+                              <span className={styles.questionKindButtonLabel}>{questionKindOption.title}</span>
+                              <HomeworkChevronDownIcon size={10} />
+                            </button>
+                          }
                         >
-                          <button
-                            type="button"
-                            className={`${styles.questionKindButton} ${resolveDropdownIconToneClass(questionKindOption.tone)}`}
-                            onClick={() =>
-                              setQuestionKindMenuQuestionId((current) => (current === question.id ? null : question.id))
-                            }
-                          >
-                            <span className={styles.questionKindButtonIcon}>{questionKindOption.icon}</span>
-                            <span>{questionKindOption.title}</span>
-                            <HomeworkChevronDownIcon size={10} />
-                          </button>
-
-                          {questionKindMenuQuestionId === question.id ? (
-                            <div className={styles.questionKindDropdown}>
-                              {QUESTION_CREATE_OPTIONS.map((option) => (
-                                <button
-                                  key={`${question.id}-${option.id}`}
-                                  type="button"
-                                  className={styles.questionKindDropdownItem}
-                                  onClick={() => {
-                                    updateQuestion(questionIndex, (previousQuestion) => setQuestionKind(previousQuestion, option.id));
-                                    setQuestionKindMenuQuestionId(null);
-                                  }}
-                                >
-                                  <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>
-                                    {option.icon}
-                                  </span>
-                                  <span className={styles.questionKindDropdownMeta}>
-                                    <span className={styles.dropdownTitle}>{option.title}</span>
-                                    <span className={styles.dropdownDescription}>{option.description}</span>
-                                  </span>
-                                </button>
-                              ))}
+                          <div className={styles.questionKindPopoverPanel}>
+                            <div className={styles.questionKindPopoverBody}>
+                              <div className={styles.questionKindPopoverColumns}>
+                                {QUESTION_CREATE_GROUPS.map((group) => (
+                                  <div key={`${question.id}-${group.id}`} className={styles.dropdownGroup}>
+                                    <div className={styles.dropdownGroupTitle}>{group.title}</div>
+                                    <div className={styles.dropdownGroupList}>
+                                      {group.options.map((option) => (
+                                        <button
+                                          key={`${question.id}-${option.id}`}
+                                          type="button"
+                                          className={`${styles.questionKindDropdownItem} ${
+                                            option.id === questionKind ? styles.questionKindDropdownItemActive : ''
+                                          }`}
+                                          onClick={() => {
+                                            updateQuestion(questionIndex, (previousQuestion) =>
+                                              setQuestionKind(previousQuestion, option.id),
+                                            );
+                                            setQuestionKindMenuQuestionId(null);
+                                          }}
+                                        >
+                                          <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>
+                                            {option.icon}
+                                          </span>
+                                          <span className={styles.questionKindDropdownMeta}>
+                                            <span className={styles.dropdownTitle}>{option.title}</span>
+                                            <span className={styles.dropdownDescription}>{option.description}</span>
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          ) : null}
-                        </div>
+                          </div>
+                        </AdaptivePopover>
                       ) : null
                     }
                     promptPathKey={pathToKey(promptPath)}
@@ -1711,11 +1732,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                 type="button"
                 className={styles.bottomAddButton}
                 onClick={() => {
-                  if (addQuestionMode === 'default-choice') {
-                    addQuestion('CHOICE');
-                    return;
-                  }
-                  setDropdownOpen(true);
+                  handleAddQuestionTriggerClick('header');
                 }}
               >
                 <HomeworkPlusIcon size={12} />
@@ -1741,6 +1758,30 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
       )}
 
       <div className={styles.summary}>Максимум баллов: {pointsSummary}</div>
+
+      <AdaptivePopover
+        isOpen={addQuestionTrigger === 'fab'}
+        onClose={() => setAddQuestionTrigger(null)}
+        side="top"
+        align="end"
+        offset={12}
+        rootClassName={styles.mobileFabWrap}
+        className={styles.dropdown}
+        trigger={
+          <button
+            type="button"
+            className={styles.mobileFabButton}
+            onClick={() => handleAddQuestionTriggerClick('fab')}
+            aria-label="Добавить вопрос"
+            aria-haspopup={addQuestionMode === 'dropdown' ? 'dialog' : undefined}
+            aria-expanded={isAddQuestionDropdownOpen && addQuestionTrigger === 'fab'}
+          >
+            <HomeworkPlusIcon size={20} />
+          </button>
+        }
+      >
+        {renderAddQuestionPopoverContent()}
+      </AdaptivePopover>
     </section>
   );
 };

@@ -832,22 +832,38 @@
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1023px) {
+  .page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding-bottom: calc(96px + var(--app-safe-bottom));
+  }
+
   .layout {
     grid-template-columns: 1fr;
+    min-height: auto;
+    flex: 0 0 auto;
     overflow: visible;
   }
 
   .moduleShell {
+    width: 100%;
+    min-height: auto;
     overflow: visible;
     padding-right: 0;
+    padding-bottom: calc(96px + var(--app-safe-bottom));
+  }
+
+  .mobileOverview {
+    overflow: visible;
+    padding-bottom: calc(96px + var(--app-safe-bottom));
   }
 }
 
 @media (max-width: 720px) {
   .page {
     gap: 18px;
-    overflow: visible;
   }
 
   .pageHeader {

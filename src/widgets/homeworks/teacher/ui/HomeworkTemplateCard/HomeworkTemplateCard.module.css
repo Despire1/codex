@@ -65,8 +65,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 0;
   cursor: pointer;
   transition: color 0.2s ease, background 0.2s ease;
+}
+
+.favoriteButton > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .favoriteButton:hover {

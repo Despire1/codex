@@ -7,10 +7,21 @@
   border: 1px solid var(--color-gray-100);
   border-radius: 26px;
   padding: 16px 22px;
+}
+
+.headerCompact {
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.desktopHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+.mobileHeader {
+  display: none;
 }
 
 .left {
@@ -33,13 +44,18 @@
   border: 1px solid var(--color-gray-200);
   background: var(--color-white);
   color: var(--color-gray-500);
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .mobileMenuButton:hover,
 .backButton:hover,
 .iconButton:hover {
   background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
 }
 
 .mobileMenuButton {
@@ -59,6 +75,7 @@
   flex-direction: column;
   gap: 0;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .title {
@@ -67,6 +84,7 @@
   line-height: 1;
   font-weight: 700;
   color: var(--color-gray-900);
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
@@ -83,6 +101,7 @@
   height: 8px;
   border-radius: 999px;
   background: #22c55e;
+  flex-shrink: 0;
 }
 
 .actions {
@@ -126,27 +145,48 @@
   margin-left: 6px;
 }
 
-.previewButton {
+.previewButton,
+.secondaryButton,
+.primaryButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 0 16px;
-  height: 42px;
-  border: 1px solid var(--color-gray-200);
+  min-height: 42px;
   border-radius: 16px;
-  background: var(--color-white);
-  color: var(--color-gray-700);
   font-size: 13px;
   font-weight: 700;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
-.previewButton:hover {
+.previewButton,
+.secondaryButton {
+  border: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  padding: 0 16px;
+}
+
+.previewButton:hover,
+.secondaryButton:hover {
   background: var(--color-gray-50);
+}
+
+.previewIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-style: normal;
 }
 
 .menuWrap {
   position: relative;
+  flex-shrink: 0;
 }
 
 .menu {
@@ -158,6 +198,7 @@
   border: 1px solid #e7ebf1;
   border-radius: 24px;
   background: #fff;
+  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.12);
 }
 
 .menuItem {
@@ -184,17 +225,10 @@
 }
 
 .primaryButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   border: 1px solid var(--color-gray-900);
   background: var(--color-gray-900);
   color: var(--color-white);
-  border-radius: 16px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  transition: background-color 160ms ease;
+  padding: 0 16px;
 }
 
 .primaryActionIcon {
@@ -205,15 +239,61 @@
   background: #1f2937;
 }
 
-.primaryButton:disabled {
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.previewButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.navCluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.topActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  max-height: 160px;
+  opacity: 1;
+  transform: translateY(0);
+  transform-origin: top;
+  overflow: hidden;
+  transition:
+    max-height 240ms ease,
+    opacity 200ms ease,
+    transform 220ms ease,
+    margin 220ms ease;
 }
 
 @media (max-width: 960px) {
   .header {
     border-radius: 20px;
     padding: 14px;
+  }
+
+  .desktopHeader {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -233,10 +313,6 @@
     margin-left: 50px;
   }
 
-  .mobileMenuButton {
-    display: inline-flex;
-  }
-
   .title {
     font-size: 24px;
   }
@@ -244,24 +320,90 @@
 
 @media (max-width: 640px) {
   .header {
-    padding: 12px;
-    gap: 12px;
-    border-radius: 18px;
-  }
-
-  .left {
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .titleGroup {
+    position: sticky;
+    top: 0;
     gap: 10px;
+    padding: 12px 14px 10px;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    border-radius: 0 0 24px 24px;
+    box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .headerCompact {
+    padding: 10px 12px 9px;
+    border-radius: 0 0 20px 20px;
+  }
+
+  .desktopHeader {
+    display: none;
+  }
+
+  .mobileHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mobileMenuButton {
+    display: inline-flex;
+  }
+
+  .actions {
+    display: none;
+  }
+
+  .previewButton,
+  .secondaryButton,
+  .primaryButton {
+    min-height: 40px;
+    border-radius: 14px;
+    font-size: 12px;
+    line-height: 1;
+    gap: 8px;
+  }
+
+  .previewButtonIconOnly {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  .previewButtonIconOnly .previewLabel {
+    display: none;
+  }
+
+  .primaryButton {
+    padding: 0 14px;
+    min-width: 0;
+  }
+
+  .secondaryButton {
+    padding: 0 12px;
+  }
+
+  .title {
+    font-size: 20px;
+    line-height: 1.05;
+  }
+
+  .body {
+    flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
+  }
+
+  .subtitle {
+    display: none;
   }
 
   .stats {
+    margin-left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 6px;
-    margin-left: 46px;
     font-size: 12px;
   }
 
@@ -269,22 +411,13 @@
     gap: 6px;
   }
 
-  .previewButton {
-    padding: 0 14px;
+  .statDivider {
+    margin-left: 4px;
   }
 
-  .actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .previewButton,
-  .primaryButton {
-    width: 100%;
-    min-height: 44px;
-    justify-content: center;
-    padding: 11px 14px;
+  .headerCompact .body {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }

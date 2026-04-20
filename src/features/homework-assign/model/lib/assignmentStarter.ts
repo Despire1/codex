@@ -2,10 +2,30 @@ import { format } from 'date-fns';
 import { Lesson } from '../../../../entities/types';
 import { formatInTimeZone, toUtcDateFromTimeZone, toZonedDate } from '../../../../shared/lib/timezoneDates';
 
-export const createQuickDeadlineValue = (daysFromNow: number, timeZone: string) => {
+export const createQuickDateTimeValue = (
+  daysFromNow: number,
+  timeZone: string,
+  options?: { hours?: number; minutes?: number },
+) => {
   const now = toZonedDate(new Date(), timeZone);
   now.setDate(now.getDate() + daysFromNow);
+  now.setHours(options?.hours ?? 20, options?.minutes ?? 0, 0, 0);
+  return format(now, "yyyy-MM-dd'T'HH:mm");
+};
+
+export const createQuickDeadlineValue = (daysFromNow: number, timeZone: string) =>
+  createQuickDateTimeValue(daysFromNow, timeZone, { hours: 20, minutes: 0 });
+
+export const createEndOfWeekDeadlineValue = (timeZone: string) => {
+  const now = toZonedDate(new Date(), timeZone);
+  const daysUntilSunday = (7 - now.getDay()) % 7;
+  now.setDate(now.getDate() + daysUntilSunday);
   now.setHours(20, 0, 0, 0);
+
+  if (now.getTime() <= Date.now()) {
+    now.setDate(now.getDate() + 7);
+  }
+
   return format(now, "yyyy-MM-dd'T'HH:mm");
 };
 

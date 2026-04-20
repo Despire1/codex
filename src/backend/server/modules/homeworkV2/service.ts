@@ -29,7 +29,6 @@ import {
   attachLatestSubmissionMetaToAssignments,
   assignmentWasExplicitlyReissued,
   buildHomeworkReviewResultV2,
-  calculateHomeworkAutoScore,
   clampHomeworkScore,
   createHttpError,
   DEFAULT_HOMEWORK_GROUP_BG_COLOR,
@@ -51,9 +50,10 @@ import {
   normalizeHomeworkReviewDraftV2,
   normalizeHomeworkTemplateTags,
   parseObjectRecord,
+  resolveHomeworkAutoScoreForSubmission,
   resolveHomeworkAttemptLimit,
-  resolveHomeworkFallbackDeadline,
   resolveHomeworkGroupForTeacherV2,
+  resolveHomeworkSubmittedAttemptState,
   serializeHomeworkAssignmentV2,
   serializeHomeworkGroupListItemV2,
   serializeHomeworkGroupV2,
@@ -86,6 +86,11 @@ type CreateHomeworkV2ServiceDeps = {
   ensureTeacher: EnsureTeacher;
   ensureStudentAccessLink: EnsureStudentAccessLink;
   ensureTeacherStudentLinkV2: EnsureTeacherStudentLinkV2;
+  resolveHomeworkDefaultDeadline: (
+    teacherId: bigint,
+    studentId: number,
+    lessonId?: number | null,
+  ) => Promise<{ deadlineAt: Date; warning: string | null }>;
   safeLogActivityEvent: SafeLogActivityEvent;
   filterSuppressedLessons: FilterSuppressedLessons;
   validateHomeworkTemplatePayload: ValidateHomeworkTemplatePayload;
@@ -97,6 +102,7 @@ export const createHomeworkV2Service = ({
   ensureTeacher,
   ensureStudentAccessLink,
   ensureTeacherStudentLinkV2,
+  resolveHomeworkDefaultDeadline,
   safeLogActivityEvent,
   filterSuppressedLessons,
   validateHomeworkTemplatePayload,
@@ -119,36 +125,6 @@ export const createHomeworkV2Service = ({
       throw new Error('Запланированная отправка должна быть в будущем');
     }
     return value;
-  };
-
-  const resolveHomeworkDefaultDeadline = async (teacherId: bigint, studentId: number, lessonId?: number | null) => {
-    const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
-    let referenceDate = new Date();
-    if (lessonId) {
-      const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
-      if (lesson && lesson.teacherId === teacherId) {
-        referenceDate = lesson.startAt;
-      }
-    }
-    const nextLessons = await prisma.lesson.findMany({
-      where: {
-        teacherId,
-        isSuppressed: false,
-        status: { not: 'CANCELED' },
-        startAt: { gt: referenceDate },
-        OR: [{ studentId }, { participants: { some: { studentId } } }],
-      },
-      orderBy: { startAt: 'asc' },
-      take: 25,
-    });
-    const [nextLesson] = await filterSuppressedLessons(prisma, nextLessons);
-    if (nextLesson) {
-      return { deadlineAt: nextLesson.startAt, warning: null as string | null };
-    }
-    return {
-      deadlineAt: resolveHomeworkFallbackDeadline(referenceDate, teacher?.timezone ?? null),
-      warning: 'NO_NEXT_LESSON',
-    };
   };
 
   const sendManualHomeworkReminderForAssignmentV2 = async (teacher: any, assignment: any) => {
@@ -318,6 +294,7 @@ export const createHomeworkV2Service = ({
       select: {
         id: true,
         templateId: true,
+        studentId: true,
         status: true,
         deadlineAt: true,
         sendMode: true,
@@ -346,12 +323,24 @@ export const createHomeworkV2Service = ({
       const templateAssignments = assignmentsByTemplateId.get(templateId) ?? [];
       if (!templateAssignments.length) return;
 
+      const issuedStudentIds = new Set<number>();
+      templateAssignments.forEach((assignment) => {
+        const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
+        if (workflow.persistedStatus === 'DRAFT' || workflow.persistedStatus === 'SCHEDULED') {
+          return;
+        }
+
+        const studentId = Number(assignment.studentId);
+        if (!Number.isFinite(studentId) || studentId <= 0) return;
+        issuedStudentIds.add(studentId);
+      });
+
       const canTeacherDelete = templateAssignments.every(
         (assignment) => resolveHomeworkAssignmentWorkflow(assignment, now).status === 'REVIEWED',
       );
 
       defaultMetaByTemplateId.set(templateId, {
-        issuedAssignmentsCount: templateAssignments.length,
+        issuedAssignmentsCount: issuedStudentIds.size,
         canTeacherEdit: false,
         canTeacherDelete,
       });
@@ -1511,6 +1500,16 @@ export const createHomeworkV2Service = ({
 
     const attemptsLimit = resolveHomeworkAttemptLimit(assignment.contentSnapshot);
     const isReissueAttempt = assignmentWasExplicitlyReissued(assignment, latest);
+    const latestResolvedScore = clampHomeworkScore(latest?.finalScore ?? latest?.manualScore ?? latest?.autoScore);
+    const latestAttemptState =
+      latest && latestStatus !== 'DRAFT'
+        ? resolveHomeworkSubmittedAttemptState({
+            assignmentContentSnapshot: assignment.contentSnapshot,
+            attemptNo: Number(latest.attemptNo ?? 1),
+            autoScore: latestResolvedScore,
+            submittedAt: new Date(latest.submittedAt ?? latest.reviewedAt ?? latest.updatedAt ?? Date.now()),
+          })
+        : null;
 
     let targetAttempt = latest?.attemptNo ?? 1;
     let mode: 'create' | 'update' = 'create';
@@ -1518,7 +1517,12 @@ export const createHomeworkV2Service = ({
       targetAttempt = latest.attemptNo;
       mode = 'update';
     } else if (latest && normalizeHomeworkSubmissionStatus(latest.status) !== 'DRAFT') {
-      if (!isReissueAttempt && workflow.persistedStatus !== 'RETURNED') {
+      const canRetryAutoCheckedAttempt =
+        latestAttemptState?.assignmentStatus === 'SENT' &&
+        latestAttemptState.submissionStatus === 'REVIEWED' &&
+        workflow.persistedStatus !== 'RETURNED';
+
+      if (!canRetryAutoCheckedAttempt && !isReissueAttempt && workflow.persistedStatus !== 'RETURNED') {
         throw new Error('Домашка уже сдана. Новая попытка доступна после возврата на доработку или переоткрытия.');
       }
       targetAttempt = latest.attemptNo + 1;
@@ -1537,7 +1541,16 @@ export const createHomeworkV2Service = ({
     const attachments = normalizeHomeworkAttachments(body.attachments);
     const voice = normalizeHomeworkAttachments(body.voice);
     const testAnswers = parseObjectRecord(body.testAnswers);
-    const autoScore = calculateHomeworkAutoScore(normalizeHomeworkBlocks(assignment.contentSnapshot), testAnswers);
+    const autoScore = resolveHomeworkAutoScoreForSubmission(assignment.contentSnapshot, testAnswers);
+    const submittedAt = new Date();
+    const submittedAttemptState = shouldSubmit
+      ? resolveHomeworkSubmittedAttemptState({
+          assignmentContentSnapshot: assignment.contentSnapshot,
+          attemptNo: targetAttempt,
+          autoScore,
+          submittedAt,
+        })
+      : null;
 
     const submissionPayload: Record<string, unknown> = {
       answerText,
@@ -1548,8 +1561,10 @@ export const createHomeworkV2Service = ({
     };
 
     if (shouldSubmit) {
-      submissionPayload.status = 'SUBMITTED';
-      submissionPayload.submittedAt = new Date();
+      submissionPayload.status = submittedAttemptState?.submissionStatus ?? 'SUBMITTED';
+      submissionPayload.submittedAt = submittedAt;
+      submissionPayload.reviewedAt = submittedAttemptState?.submissionReviewedAt ?? null;
+      submissionPayload.finalScore = submittedAttemptState?.finalScore ?? null;
     } else {
       submissionPayload.status = 'DRAFT';
     }
@@ -1571,13 +1586,13 @@ export const createHomeworkV2Service = ({
 
     const assignmentUpdateData: Record<string, unknown> = {};
     if (shouldSubmit) {
-      assignmentUpdateData.status = 'SUBMITTED';
+      assignmentUpdateData.status = submittedAttemptState?.assignmentStatus ?? 'SUBMITTED';
       assignmentUpdateData.teacherComment = null;
-      assignmentUpdateData.reviewedAt = null;
-      assignmentUpdateData.autoScore = autoScore;
+      assignmentUpdateData.reviewedAt = submittedAttemptState?.assignmentReviewedAt ?? null;
+      assignmentUpdateData.autoScore = submittedAttemptState?.autoScore ?? null;
       assignmentUpdateData.manualScore = null;
-      assignmentUpdateData.finalScore = autoScore;
-      assignmentUpdateData.updatedAt = new Date();
+      assignmentUpdateData.finalScore = submittedAttemptState?.finalScore ?? null;
+      assignmentUpdateData.updatedAt = submittedAt;
     }
 
     const updatedAssignment =

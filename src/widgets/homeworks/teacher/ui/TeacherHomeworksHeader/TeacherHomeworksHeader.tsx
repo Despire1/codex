@@ -17,7 +17,7 @@ interface TeacherHomeworksHeaderProps {
 }
 
 const WORKSPACE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
-  { id: 'templates', label: 'Задания' },
+  { id: 'templates', label: 'Библиотека' },
   { id: 'list', label: 'Назначенные' },
   { id: 'drafts', label: 'Черновики' },
 ];

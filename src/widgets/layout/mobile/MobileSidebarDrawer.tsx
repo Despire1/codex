@@ -13,6 +13,7 @@ export interface MobileSidebarDrawerProps {
   profilePhotoUrl?: string | null;
   onClose: () => void;
   onNavigate: (item: MobileNavItem) => void;
+  onOpenSettings: () => void;
 }
 
 const resolveInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'T';
@@ -26,6 +27,7 @@ export const MobileSidebarDrawer: FC<MobileSidebarDrawerProps> = ({
   profilePhotoUrl,
   onClose,
   onNavigate,
+  onOpenSettings,
 }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -97,7 +99,7 @@ export const MobileSidebarDrawer: FC<MobileSidebarDrawerProps> = ({
           </nav>
 
           <div className={styles.footer}>
-            <button type="button" className={styles.profileCard}>
+            <button type="button" className={styles.profileCard} onClick={onOpenSettings}>
               <span className={styles.avatar} aria-hidden>
                 {profilePhotoUrl ? (
                   <img src={profilePhotoUrl} alt={profileName} className={styles.avatarImage} />

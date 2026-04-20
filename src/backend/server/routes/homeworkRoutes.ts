@@ -4,7 +4,7 @@ import { readBody, sendJson } from '../lib/http';
 type HomeworkRoutesHandlers = {
   createHomework: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   updateHomework: (user: unknown, homeworkId: number, body: Record<string, unknown>) => Promise<unknown>;
-  takeHomeworkInWork: (homeworkId: number, req: IncomingMessage) => Promise<unknown>;
+  takeHomeworkInWork: (user: unknown, homeworkId: number) => Promise<unknown>;
   sendHomeworkToStudent: (user: unknown, homeworkId: number) => Promise<unknown>;
   deleteHomework: (user: unknown, homeworkId: number) => Promise<unknown>;
   toggleHomework: (user: unknown, homeworkId: number) => Promise<unknown>;
@@ -46,7 +46,7 @@ export const tryHandleHomeworkRoutes = async ({
   const takeInWorkMatch = pathname.match(/^\/api\/homeworks\/(\d+)\/take-in-work$/);
   if (req.method === 'POST' && takeInWorkMatch) {
     const homeworkId = Number(takeInWorkMatch[1]);
-    const homework = await handlers.takeHomeworkInWork(homeworkId, req);
+    const homework = await handlers.takeHomeworkInWork(requireApiUser(), homeworkId);
     sendJson(res, 200, { homework });
     return true;
   }

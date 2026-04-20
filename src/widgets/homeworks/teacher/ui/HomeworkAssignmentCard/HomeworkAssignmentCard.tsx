@@ -4,12 +4,10 @@ import {
 } from '../../../../../entities/homework-assignment/model/lib/assignmentIssuance';
 import {
   canReissueHomeworkAssignment,
-  resolveHomeworkAssignmentWorkflow,
 } from '../../../../../entities/homework-assignment/model/lib/workflow';
 import { HomeworkAssignment } from '../../../../../entities/types';
 import { AnchoredPopover } from '../../../../../shared/ui/AnchoredPopover/AnchoredPopover';
 import {
-  HomeworkArrowUpRightFromSquareIcon,
   HomeworkClockIcon,
   HomeworkEllipsisVerticalIcon,
   HomeworkFileLinesIcon,
@@ -24,7 +22,6 @@ import {
 } from '../../../../../shared/ui/icons/HomeworkFaIcons';
 import { UserGroupIcon } from '../../../../../icons/MaterialIcons';
 import {
-  resolveHomeworkAssignmentActionLabel,
   resolveHomeworkAssignmentCardBadges,
   resolveHomeworkAssignmentCardCategoryLabel,
   resolveHomeworkAssignmentCardCategoryTone,
@@ -76,9 +73,7 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
   assignment,
   viewMode,
   onOpen,
-  onReview,
   onSendNow,
-  onFixConfigError,
   onCancelIssue,
   onReissue,
   onRemind,
@@ -91,10 +86,7 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
   const badges = resolveHomeworkAssignmentCardBadges(assignment);
   const metrics = resolveHomeworkAssignmentCardMetrics(assignment);
   const updatedLabel = resolveHomeworkAssignmentCardUpdatedLabel(assignment);
-  const actionLabel = resolveHomeworkAssignmentActionLabel(assignment);
 
-  const workflow = resolveHomeworkAssignmentWorkflow(assignment);
-  const canReview = workflow.canTeacherReview;
   const canSendNow = assignment.status === 'DRAFT' || assignment.status === 'SCHEDULED';
   const canCancelIssue = canCancelHomeworkAssignmentIssue(assignment);
   const canReissue = canReissueHomeworkAssignment(assignment);
@@ -170,23 +162,6 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
     setMenuAnchorEl(event.currentTarget);
   };
 
-  const handleActionClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    if (assignment.hasConfigError) {
-      onFixConfigError(assignment);
-      return;
-    }
-    if (canReview) {
-      onReview(assignment);
-      return;
-    }
-    if (canSendNow) {
-      onSendNow(assignment);
-      return;
-    }
-    onOpen(assignment);
-  };
-
   return (
     <article
       className={`${styles.card} ${viewMode === 'list' ? styles.cardList : ''}`}
@@ -248,13 +223,6 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
             <span>1</span>
           </span>
         </div>
-      </div>
-
-      <div className={`${styles.hoverActions} ${viewMode === 'list' ? styles.hoverActionsList : ''}`}>
-        <button type="button" className={styles.issueButton} onClick={handleActionClick}>
-          <HomeworkArrowUpRightFromSquareIcon size={13} />
-          <span>{actionLabel}</span>
-        </button>
       </div>
 
       <AnchoredPopover

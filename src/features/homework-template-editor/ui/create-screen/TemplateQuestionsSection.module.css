@@ -37,12 +37,16 @@
   display: inline-flex;
 }
 
+.mobileFabWrap {
+  display: none;
+}
+
 .addQuestionButton {
-  border: 1px solid #a3e635;
+  border: 1px solid var(--accent-primary);
   border-radius: 16px;
-  background: #a3e635;
-  color: #111;
-  -webkit-text-fill-color: #111;
+  background: var(--accent-primary);
+  color: var(--accent-primary-text);
+  -webkit-text-fill-color: var(--accent-primary-text);
   padding: 10px 18px;
   display: inline-flex;
   align-items: center;
@@ -55,50 +59,40 @@
 }
 
 .addQuestionButton:hover {
-  background: #94d82d;
+  background: var(--accent-primary-hover);
 }
 
 .dropdown {
-  width: min(680px, calc(100vw - 24px));
+  width: min(780px, calc(100vw - 20px));
   border: 1px solid rgba(226, 232, 240, 0.96);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 24px 52px rgba(15, 23, 42, 0.16);
   backdrop-filter: blur(14px);
-  padding: 8px;
+  padding: 10px;
 }
 
 .dropdownPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: block;
 }
 
-.dropdownHeader {
-  padding: 8px 10px 2px;
-  font-size: 12px;
-  color: var(--color-slate-500);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 800;
+.dropdownBody {
+  display: block;
 }
 
 .dropdownColumns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 24px;
 }
 
 .dropdownGroup {
   min-width: 0;
-  border: 1px solid var(--color-gray-100);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
-  padding: 8px;
+  padding: 0;
 }
 
 .dropdownGroupTitle {
-  padding: 8px 8px 10px;
+  margin: 0 0 8px;
   font-size: 11px;
   color: var(--color-slate-500);
   text-transform: uppercase;
@@ -117,25 +111,22 @@
   border: none;
   background: transparent;
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
   border-radius: 14px;
+  transition: background 0.18s ease;
 }
 
 .dropdownItem:hover {
   background: var(--color-gray-50);
 }
 
-.dropdownItemMeta {
-  min-width: 0;
-}
-
 .dropdownIcon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
@@ -192,7 +183,8 @@
 
 .dropdownTitle {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--color-gray-900);
   font-weight: 700;
 }
@@ -201,7 +193,14 @@
   display: block;
   margin-top: 2px;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--color-slate-500);
+}
+
+.dropdownItemMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .emptyState {
@@ -256,18 +255,23 @@
 }
 
 .questionHeaderLeft {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .questionHeaderMeta {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .questionMetaDot {
@@ -305,19 +309,35 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .questionKindDropdownWrap {
-  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 100%;
+}
+
+.questionKindTrigger {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
 }
 
 .questionKindButton {
   border: none;
   border-radius: 999px;
   padding: 6px 10px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
   font-size: 12px;
   line-height: 1;
   font-weight: 700;
@@ -328,19 +348,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.questionKindDropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  min-width: 260px;
-  max-width: min(320px, calc(100vw - 48px));
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
-  border-radius: 16px;
+.questionKindButtonLabel {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
-  z-index: 20;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.questionKindPopover {
+  width: min(780px, calc(100vw - 20px));
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  padding: 10px;
+}
+
+.questionKindPopoverPanel {
+  display: block;
+}
+
+.questionKindPopoverBody {
+  display: block;
+}
+
+.questionKindPopoverColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
 }
 
 .questionKindDropdownItem {
@@ -348,19 +389,27 @@
   border: none;
   background: transparent;
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   cursor: pointer;
+  border-radius: 14px;
+  transition: background 0.18s ease;
 }
 
 .questionKindDropdownItem:hover {
   background: var(--color-gray-50);
 }
 
+.questionKindDropdownItemActive {
+  background: linear-gradient(180deg, #eff6ff 0%, #eef2ff 100%);
+}
+
 .questionKindDropdownMeta {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .questionActions {
@@ -814,8 +863,7 @@
   }
 
   .sectionHeader {
-    flex-direction: column;
-    align-items: stretch;
+    align-items: center;
   }
 
   .sectionTitle {
@@ -825,13 +873,17 @@
 
 @media (max-width: 860px) {
   .dropdownWrap {
-    width: 100%;
+    width: auto;
+    margin-left: auto;
   }
 
   .addQuestionButton {
-    width: 100%;
-    min-height: 44px;
+    width: auto;
+    min-height: 38px;
     justify-content: center;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 13px;
   }
 
   .dropdown {
@@ -844,32 +896,34 @@
   }
 
   .questionHeader {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
   }
 
   .questionHeaderLeft {
-    justify-content: space-between;
-    flex-wrap: wrap;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .questionActions {
-    align-self: flex-end;
+    align-self: auto;
+    flex-shrink: 0;
   }
 
-  .questionKindDropdown {
-    left: 0;
-    right: auto;
-    min-width: min(280px, calc(100vw - 56px));
+  .questionHeaderMeta {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .questionKindPopover {
+    width: min(560px, calc(100vw - 20px));
   }
 
   .choiceOptionRow {
-    grid-template-columns: 1fr;
-  }
-
-  .choiceControl {
-    justify-content: flex-start;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
   }
 
   .twoColumnRow {
@@ -903,12 +957,61 @@
 }
 
 @media (max-width: 767px) {
+  .sectionHeader {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .dropdownWrap {
+    align-self: flex-start;
+    margin-left: auto;
+  }
+
+  .questionKindPopoverBody {
+    max-height: min(380px, calc(var(--adaptive-popover-available-height, 100vh) - 68px));
+  }
+
+  .questionKindPopoverColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .dropdownBody {
+    max-height: min(380px, calc(var(--adaptive-popover-available-height, 100vh) - 68px));
+  }
+
   .dropdownColumns {
     grid-template-columns: 1fr;
   }
 
   .section {
     padding: 18px;
+  }
+
+  .mobileFabWrap {
+    position: fixed;
+    right: 16px;
+    bottom: calc(88px + var(--app-safe-bottom));
+    display: inline-flex;
+    z-index: 36;
+  }
+
+  .mobileFabButton {
+    width: 58px;
+    height: 58px;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent-primary);
+    color: #111;
+    -webkit-text-fill-color: #111;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18);
+    cursor: pointer;
+  }
+
+  .mobileFabButton:hover {
+    background: var(--accent-primary-hover);
   }
 
   .sectionHeader {
@@ -947,6 +1050,27 @@
     line-height: 1.35;
   }
 
+  .questionHeaderMeta {
+    gap: 6px;
+  }
+
+  .choiceOptionRow,
+  .choiceOptionRowLocked {
+    gap: 6px;
+  }
+
+  .choiceOptionRow {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .choiceOptionRowLocked {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .correctBadge {
+    padding: 3px 6px;
+  }
+
   .questionKindButton {
     min-height: 32px;
   }
@@ -962,5 +1086,6 @@
   .summary {
     text-align: center;
     font-size: 13px;
+    padding-bottom: 0;
   }
 }

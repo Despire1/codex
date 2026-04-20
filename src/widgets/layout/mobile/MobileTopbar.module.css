@@ -51,6 +51,16 @@
   white-space: nowrap;
 }
 
+.titleText {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-gray-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .right {
   display: inline-flex;
   align-items: center;

@@ -393,6 +393,12 @@
   font-weight: 800;
 }
 
+.heroStatHint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .mainGrid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
@@ -1327,6 +1333,26 @@
   margin: 8px 0 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.82);
+}
+
+.attemptMetaList {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.attemptMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.attemptMetaRow strong {
+  color: var(--color-white);
+  font-size: 14px;
 }
 
 .timerTrack {

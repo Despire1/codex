@@ -5,6 +5,7 @@ import {
   HomeworkTestQuestion,
 } from '../../../../entities/types';
 import { readHomeworkTemplateQuizSettingsFromTestBlock } from '../../../../entities/homework-template/model/lib/quizSettings';
+import { resolveHomeworkQuizCapabilities } from '../../../../entities/homework-template/model/lib/quizProgress';
 import { FormValidationIssue, FormValidationPath } from '../../../../shared/lib/form-validation/types';
 import { getQuestionKind } from './createTemplateScreen';
 import { summarizeTemplateBlocks } from './templateFlow';
@@ -325,6 +326,7 @@ export interface TemplateValidationResult {
 export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBlock[] }): TemplateValidationResult => {
   const issues: FormValidationIssue[] = [];
   const summary = summarizeTemplateBlocks(draft.blocks);
+  const quizCapabilities = resolveHomeworkQuizCapabilities(draft.blocks);
 
   if (!draft.title.trim()) {
     pushIssue(issues, ['title'], 'template_title_required', REQUIRED_FIELD_MESSAGE);
@@ -372,6 +374,24 @@ export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBl
         ['blocks', blockIndex, 'templateSettings', 'timerDurationMinutes'],
         'template_timer_duration_required',
         'Укажите время для таймера (в минутах).',
+      );
+    }
+
+    if (quizSettings.showCorrectAnswers && quizSettings.attemptsLimit !== null && quizSettings.attemptsLimit > 1) {
+      pushIssue(
+        issues,
+        ['blocks', blockIndex, 'templateSettings', 'showCorrectAnswers'],
+        'template_correct_answers_requires_single_attempt',
+        'Правильные ответы можно показывать только при одной попытке.',
+      );
+    }
+
+    if (quizSettings.showCorrectAnswers && !quizCapabilities.correctAnswersSupported) {
+      pushIssue(
+        issues,
+        ['blocks', blockIndex, 'templateSettings', 'showCorrectAnswers'],
+        'template_correct_answers_not_supported',
+        'Показ правильных ответов доступен только для полностью автопроверяемого теста.',
       );
     }
   });

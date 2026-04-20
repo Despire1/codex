@@ -68,6 +68,11 @@
   padding: 0 0 calc(92px + var(--app-safe-bottom));
 }
 
+.contentMobileHomeworkEditor {
+  gap: 0;
+  padding: 0 0 calc(92px + var(--app-safe-bottom));
+}
+
 .contentMobile.contentNoScroll {
   overflow-y: auto;
   overflow-x: hidden;
@@ -88,6 +93,10 @@
   }
 
   .contentMobileHomeworks {
+    padding: 0 0 calc(73px + var(--app-safe-bottom));
+  }
+
+  .contentMobileHomeworkEditor {
     padding: 0 0 calc(73px + var(--app-safe-bottom));
   }
 }
