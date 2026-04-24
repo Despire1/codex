@@ -6,3 +6,9 @@ dist
 prisma/*.db
 prisma/**/*.db
 prisma/**/*.db-journal
+.idea/
+tmp/
+output/
+.playwright-cli/
+.claude/agent-runtime/outputs/
+.claude/agent-runtime/shared/
