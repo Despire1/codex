@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { ru } from 'date-fns/locale';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { useTimeZone } from '../../../../shared/lib/timezoneContext';
 import {
@@ -28,7 +29,7 @@ interface AssignmentPlanningReadOnlySidebarProps {
 const formatDateTime = (value: string | null | undefined, timeZone: string) => {
   if (!value) return 'Не указано';
   try {
-    return formatInTimeZone(value, 'd MMMM yyyy, HH:mm', { timeZone });
+    return formatInTimeZone(value, 'd MMMM yyyy, HH:mm', { timeZone, locale: ru });
   } catch {
     return 'Не указано';
   }

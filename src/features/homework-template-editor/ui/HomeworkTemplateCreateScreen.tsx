@@ -103,7 +103,6 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   saveAsTemplateSubmitting = false,
   students = [],
   groups = [],
-  templates = [],
   lockAssignmentStudent = false,
   assignmentPrimaryActionMode = 'create',
   assignmentPrimaryActionDisabled = false,
@@ -113,7 +112,6 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   onDraftChange,
   onSubmit,
   onSaveAsTemplate,
-  onAssignmentTemplateSelect,
   onCancelIssue,
   onReadOnlyEdit,
   onBack,
@@ -160,7 +158,6 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     resetValidationSession,
     hasVisibleErrors,
     submitAttempted,
-    visibleErrorIssues,
   } = validationSession;
   const validationErrorIssues = useMemo(
     () => filterIssuesBySeverity(mergedIssues, 'error'),
@@ -294,9 +291,12 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     setQuizSettings(readTemplateQuizSettings(draft.blocks));
   }, [draft.blocks]);
 
-  const updateDraft = (nextDraft: HomeworkEditorDraft) => {
-    onDraftChange(nextDraft);
-  };
+  const updateDraft = useCallback(
+    (nextDraft: HomeworkEditorDraft) => {
+      onDraftChange(nextDraft);
+    },
+    [onDraftChange],
+  );
 
   const updateBlocks = (nextBlocks: HomeworkEditorDraft['blocks']) => {
     updateDraft({
@@ -315,7 +315,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
         },
       });
     },
-    [draft],
+    [draft, updateDraft],
   );
 
   const updatePrimaryTestBlock = (nextBlock: NonNullable<typeof primaryTestEntry>['block']) => {
@@ -535,6 +535,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     assignmentPrimarySubmittingLabel,
     assignmentPrimarySavesHomework,
     assignmentHasSelectedStudent,
+    showAssignmentValidationErrors,
     assignmentReadOnlyNotice,
     draftSavedAtLabel,
     hasAssignmentValidationErrors,

@@ -538,159 +538,162 @@ export const createLessonOperationsService = ({
     options?: { cancelBehavior?: PaymentCancelBehavior; writeOffBalance?: boolean },
   ) => {
     const teacher = await ensureTeacher(user);
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: lessonId },
-      include: { participants: true },
-    });
 
-    if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+    return prisma.$transaction(async (tx: any) => {
+      const lesson = await tx.lesson.findUnique({
+        where: { id: lessonId },
+        include: { participants: true },
+      });
 
-    const link = await prisma.teacherStudent.findUnique({
-      where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
-      include: { student: true },
-    });
+      if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
 
-    if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+      const link = await tx.teacherStudent.findUnique({
+        where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+        include: { student: true },
+      });
 
-    const participant = lesson.participants.find((entry: any) => entry.studentId === studentId);
-    if (!participant) throw new Error('Участник урока не найден');
+      if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
-    const existingPayment = await prisma.payment.findUnique({
-      where: { teacherStudentId_lessonId: { teacherStudentId: link.id, lessonId } },
-    });
+      const participant = lesson.participants.find((entry: any) => entry.studentId === studentId);
+      if (!participant) throw new Error('Участник урока не найден');
 
-    let updatedLink = link;
-    let nextPaidSource = lesson.paidSource ?? 'NONE';
+      const existingPayment = await tx.payment.findUnique({
+        where: { teacherStudentId_lessonId: { teacherStudentId: link.id, lessonId } },
+      });
 
-    if (participant.isPaid || lesson.isPaid) {
-      const cancelBehavior = normalizeCancelBehavior(options?.cancelBehavior);
-      const shouldRefund = cancelBehavior === 'refund';
-      const deltaChange = shouldRefund ? 1 : 0;
-      const priceSnapshot =
-        [link.pricePerLesson, participant.price, lesson.price].find(
-          (value) => typeof value === 'number' && value > 0,
-        ) ?? 0;
-      if (existingPayment) {
-        await prisma.payment.delete({ where: { id: existingPayment.id } });
-      }
-      if (shouldRefund) {
-        updatedLink = await prisma.teacherStudent.update({
-          where: { id: link.id },
-          data: { balanceLessons: link.balanceLessons + 1 },
+      let updatedLink = link;
+      let nextPaidSource = lesson.paidSource ?? 'NONE';
+
+      if (participant.isPaid || lesson.isPaid) {
+        const cancelBehavior = normalizeCancelBehavior(options?.cancelBehavior);
+        const shouldRefund = cancelBehavior === 'refund';
+        const deltaChange = shouldRefund ? 1 : 0;
+        const priceSnapshot =
+          [link.pricePerLesson, participant.price, lesson.price].find(
+            (value) => typeof value === 'number' && value > 0,
+          ) ?? 0;
+        if (existingPayment) {
+          await tx.payment.delete({ where: { id: existingPayment.id } });
+        }
+        if (shouldRefund) {
+          updatedLink = await tx.teacherStudent.update({
+            where: { id: link.id },
+            data: { balanceLessons: link.balanceLessons + 1 },
+          });
+        }
+        await tx.paymentEvent.create({
+          data: {
+            studentId,
+            teacherId: teacher.chatId,
+            lessonId,
+            type: 'ADJUSTMENT',
+            lessonsDelta: deltaChange,
+            priceSnapshot,
+            moneyAmount: null,
+            createdBy: 'TEACHER',
+            reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
+          },
         });
+
+        await tx.lessonParticipant.update({
+          where: { lessonId_studentId: { lessonId, studentId } },
+          data: { isPaid: false },
+        });
+        if (studentId === lesson.studentId) {
+          nextPaidSource = 'NONE';
+        }
+      } else {
+        const amount =
+          [link.pricePerLesson, participant.price, lesson.price].find(
+            (value) => typeof value === 'number' && value > 0,
+          ) ?? 0;
+        const shouldWriteOffBalance = Boolean(options?.writeOffBalance && link.balanceLessons > 0);
+        const balanceDelta = shouldWriteOffBalance ? -1 : 0;
+        const paymentReason = shouldWriteOffBalance ? 'BALANCE_PAYMENT' : null;
+        if (shouldWriteOffBalance) {
+          updatedLink = await tx.teacherStudent.update({
+            where: { id: link.id },
+            data: { balanceLessons: link.balanceLessons - 1 },
+          });
+        }
+        await tx.payment.create({
+          data: {
+            lessonId,
+            teacherStudentId: link.id,
+            amount,
+            paidAt: new Date(),
+            comment: null,
+          },
+        });
+        await tx.paymentEvent.create({
+          data: {
+            studentId,
+            teacherId: teacher.chatId,
+            lessonId,
+            type: 'MANUAL_PAID',
+            lessonsDelta: balanceDelta,
+            priceSnapshot: amount,
+            moneyAmount: shouldWriteOffBalance ? null : amount,
+            createdBy: 'TEACHER',
+            reason: paymentReason,
+          },
+        });
+
+        if (link.balanceLessons < 0) {
+          updatedLink = await tx.teacherStudent.update({
+            where: { id: link.id },
+            data: { balanceLessons: Math.min(link.balanceLessons + 1, 0) },
+          });
+        }
+
+        await tx.lessonParticipant.update({
+          where: { lessonId_studentId: { lessonId, studentId } },
+          data: { isPaid: true, price: amount },
+        });
+
+        if (studentId === lesson.studentId) {
+          await tx.lesson.update({ where: { id: lessonId }, data: { price: amount } });
+          nextPaidSource = shouldWriteOffBalance ? 'BALANCE' : 'MANUAL';
+        }
       }
-      await prisma.paymentEvent.create({
-        data: {
-          studentId,
-          teacherId: teacher.chatId,
-          lessonId,
-          type: 'ADJUSTMENT',
-          lessonsDelta: deltaChange,
-          priceSnapshot,
-          moneyAmount: null,
-          createdBy: 'TEACHER',
-          reason: shouldRefund ? 'PAYMENT_REVERT_REFUND' : 'PAYMENT_REVERT_WRITE_OFF',
-        },
+
+      const participants = await tx.lessonParticipant.findMany({
+        where: { lessonId },
+        include: { student: true },
       });
 
-      await prisma.lessonParticipant.update({
-        where: { lessonId_studentId: { lessonId, studentId } },
-        data: { isPaid: false },
-      });
-      if (studentId === lesson.studentId) {
+      const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
+      const primaryParticipant = participants.find((item: any) => item.studentId === lesson.studentId);
+      const primaryPaid = Boolean(primaryParticipant?.isPaid);
+      const nextPaymentStatus = primaryPaid ? 'PAID' : 'UNPAID';
+      if (!primaryPaid) {
         nextPaidSource = 'NONE';
+      } else if (nextPaidSource === 'NONE') {
+        nextPaidSource = 'MANUAL';
       }
-    } else {
-      const amount =
-        [link.pricePerLesson, participant.price, lesson.price].find(
-          (value) => typeof value === 'number' && value > 0,
-        ) ?? 0;
-      const shouldWriteOffBalance = Boolean(options?.writeOffBalance && link.balanceLessons > 0);
-      const balanceDelta = shouldWriteOffBalance ? -1 : 0;
-      const paymentReason = shouldWriteOffBalance ? 'BALANCE_PAYMENT' : null;
-      if (shouldWriteOffBalance) {
-        updatedLink = await prisma.teacherStudent.update({
-          where: { id: link.id },
-          data: { balanceLessons: link.balanceLessons - 1 },
-        });
-      }
-      await prisma.payment.create({
+
+      const paidAt = participantsPaid ? lesson.paidAt ?? new Date() : null;
+
+      const normalizedLesson = await tx.lesson.update({
+        where: { id: lessonId },
         data: {
-          lessonId,
-          teacherStudentId: link.id,
-          amount,
-          paidAt: new Date(),
-          comment: null,
+          isPaid: participantsPaid,
+          status: lesson.status,
+          completedAt: lesson.status === 'COMPLETED' ? lesson.completedAt ?? new Date() : null,
+          paidAt,
+          paymentStatus: nextPaymentStatus,
+          paidSource: nextPaidSource,
         },
-      });
-      await prisma.paymentEvent.create({
-        data: {
-          studentId,
-          teacherId: teacher.chatId,
-          lessonId,
-          type: 'MANUAL_PAID',
-          lessonsDelta: balanceDelta,
-          priceSnapshot: amount,
-          moneyAmount: shouldWriteOffBalance ? null : amount,
-          createdBy: 'TEACHER',
-          reason: paymentReason,
+        include: {
+          participants: {
+            include: { student: true },
+          },
         },
       });
 
-      if (link.balanceLessons < 0) {
-        updatedLink = await prisma.teacherStudent.update({
-          where: { id: link.id },
-          data: { balanceLessons: Math.min(link.balanceLessons + 1, 0) },
-        });
-      }
-
-      await prisma.lessonParticipant.update({
-        where: { lessonId_studentId: { lessonId, studentId } },
-        data: { isPaid: true, price: amount },
-      });
-
-      if (studentId === lesson.studentId) {
-        await prisma.lesson.update({ where: { id: lessonId }, data: { price: amount } });
-        nextPaidSource = shouldWriteOffBalance ? 'BALANCE' : 'MANUAL';
-      }
-    }
-
-    const participants = await prisma.lessonParticipant.findMany({
-      where: { lessonId },
-      include: { student: true },
+      const updatedParticipant = normalizedLesson.participants.find((item: any) => item.studentId === studentId);
+      return { lesson: normalizedLesson, participant: updatedParticipant, link: updatedLink };
     });
-
-    const participantsPaid = participants.length ? participants.every((item: any) => item.isPaid) : false;
-    const primaryParticipant = participants.find((item: any) => item.studentId === lesson.studentId);
-    const primaryPaid = Boolean(primaryParticipant?.isPaid);
-    const nextPaymentStatus = primaryPaid ? 'PAID' : 'UNPAID';
-    if (!primaryPaid) {
-      nextPaidSource = 'NONE';
-    } else if (nextPaidSource === 'NONE') {
-      nextPaidSource = 'MANUAL';
-    }
-
-    const paidAt = participantsPaid ? lesson.paidAt ?? new Date() : null;
-
-    const normalizedLesson = await prisma.lesson.update({
-      where: { id: lessonId },
-      data: {
-        isPaid: participantsPaid,
-        status: lesson.status,
-        completedAt: lesson.status === 'COMPLETED' ? lesson.completedAt ?? new Date() : null,
-        paidAt,
-        paymentStatus: nextPaymentStatus,
-        paidSource: nextPaidSource,
-      },
-      include: {
-        participants: {
-          include: { student: true },
-        },
-      },
-    });
-
-    const updatedParticipant = normalizedLesson.participants.find((item: any) => item.studentId === studentId);
-    return { lesson: normalizedLesson, participant: updatedParticipant, link: updatedLink };
   };
 
   const toggleLessonPaid = async (

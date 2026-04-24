@@ -28,8 +28,6 @@ const homeworkOverdueMaxOptions = [1, 2, 3, 5];
 export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange, onSaveNow }) => {
   const [activePane, setActivePane] = useState<NotificationsPane>('me');
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
-  const paymentRemindersDisabled = !teacher.globalPaymentRemindersEnabled;
-  const homeworkRemindersDisabled = !teacher.homeworkNotifyOnAssign;
 
   return (
     <div className={styles.moduleStack}>

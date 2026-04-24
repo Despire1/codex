@@ -32,7 +32,7 @@ export const useNotificationChannelStatus = () => {
         configured: data.configured,
         reason: data.reason,
       });
-    } catch (error) {
+    } catch (_error) {
       setState((prev) => ({ ...prev, status: 'error', configured: false }));
     }
   }, []);

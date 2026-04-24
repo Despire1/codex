@@ -172,16 +172,25 @@ export const syncTelegramAuthUser = async (
   return { ok: true, user, isNewUser: !existingUser } as const;
 };
 
+const resolveLocalDevRole = (): 'TEACHER' | 'STUDENT' => {
+  const raw = (process.env.LOCAL_DEV_ROLE ?? '').trim().toUpperCase();
+  return raw === 'STUDENT' ? 'STUDENT' : 'TEACHER';
+};
+
 const ensureLocalDevUser = async (localDevUser: LocalDevUserConfig) => {
+  const desiredRole = resolveLocalDevRole();
   const existing = await prisma.user.findUnique({ where: { telegramUserId: localDevUser.telegramUserId } });
   if (existing) {
+    const updates: Record<string, unknown> = {};
     if (!existing.subscriptionStartAt) {
-      return prisma.user.update({
-        where: { id: existing.id },
-        data: { subscriptionStartAt: new Date(), subscriptionEndAt: null },
-      });
+      updates.subscriptionStartAt = new Date();
+      updates.subscriptionEndAt = null;
     }
-    return existing;
+    if (existing.role !== desiredRole) {
+      updates.role = desiredRole;
+    }
+    if (Object.keys(updates).length === 0) return existing;
+    return prisma.user.update({ where: { id: existing.id }, data: updates });
   }
   return prisma.user.create({
     data: {
@@ -189,7 +198,7 @@ const ensureLocalDevUser = async (localDevUser: LocalDevUserConfig) => {
       username: localDevUser.username,
       firstName: localDevUser.firstName,
       lastName: localDevUser.lastName,
-      role: 'TEACHER',
+      role: desiredRole,
       subscriptionStartAt: new Date(),
     },
   });
@@ -304,6 +313,30 @@ export const createAuthService = (config: AuthServiceConfig) => {
       const session = await findActiveSession(tokenHash);
       if (session) {
         const activeSession = await renewSessionIfNeeded(req, res, token, session);
+        // Обновляем lastSeenAt не чаще раза в минуту — чтобы в настройках
+        // безопасности «Последняя активность» реально отражала текущее время.
+        const lastSeen = (activeSession as SessionWithUser & { lastSeenAt?: Date }).lastSeenAt;
+        if (!lastSeen || Date.now() - new Date(lastSeen).getTime() > 60_000) {
+          prisma.session
+            .update({
+              where: { id: activeSession.id },
+              data: { lastSeenAt: new Date() },
+            })
+            .catch((error) => {
+
+              console.warn('Failed to update session lastSeenAt', error);
+            });
+        }
+        if (config.localAuthBypass && isLocalhostRequest(req)) {
+          const desiredRole = resolveLocalDevRole();
+          if (activeSession.user.role !== desiredRole) {
+            const updated = await prisma.user.update({
+              where: { id: activeSession.user.id },
+              data: { role: desiredRole },
+            });
+            return updated;
+          }
+        }
         return activeSession.user;
       }
       clearSessionCookie(req, res);

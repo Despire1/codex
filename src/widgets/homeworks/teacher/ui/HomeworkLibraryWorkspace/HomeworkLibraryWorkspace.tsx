@@ -213,7 +213,7 @@ export const HomeworkLibraryWorkspace: FC<HomeworkLibraryWorkspaceProps> = ({
                 <input
                   type="search"
                   className={styles.searchInput}
-                  placeholder="Поиск по названию, теме или коллекции..."
+                  placeholder="Поиск по библиотеке…"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                 />
@@ -289,6 +289,13 @@ export const HomeworkLibraryWorkspace: FC<HomeworkLibraryWorkspaceProps> = ({
                   onDelete={onDeleteTemplate}
                 />
               ))}
+            </div>
+          ) : scope === 'archived' && !searchQuery && selectedCollection === 'all' ? (
+            <div className={styles.stateCard}>
+              <p className={styles.stateTitle}>В архиве пусто</p>
+              <p className={styles.stateText}>
+                Архивируйте неактуальные задания через меню ⋯ → «Архивировать» на карточке. Архив не удаляет шаблоны — их можно восстановить.
+              </p>
             </div>
           ) : (
             <div className={styles.stateCard}>

@@ -5,3 +5,101 @@
   min-height: 0;
   overflow: hidden;
 }
+
+.notFoundPage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 24px 16px;
+}
+
+.notFoundCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 480px;
+  width: 100%;
+  padding: 36px 28px;
+  background: #fff;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
+  text-align: center;
+}
+
+.notFoundIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-500, #64748b);
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.notFoundTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-slate-900, #0f172a);
+  letter-spacing: -0.01em;
+}
+
+.notFoundDescription {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-slate-600, #475569);
+}
+
+.notFoundActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.notFoundPrimaryButton,
+.notFoundSecondaryButton {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.notFoundPrimaryButton {
+  background: var(--accent-primary, #a3e635);
+  color: #111827;
+}
+
+.notFoundPrimaryButton:hover {
+  background: var(--accent-primary-hover, #94d82d);
+}
+
+.notFoundSecondaryButton {
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-700, #334155);
+}
+
+.notFoundSecondaryButton:hover {
+  background: var(--color-slate-200, #e2e8f0);
+}
+
+.notFoundLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  color: var(--color-slate-500, #64748b);
+  font-size: 14px;
+}

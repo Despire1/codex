@@ -65,11 +65,9 @@ export const StudentHero: FC<StudentHeroProps> = ({
   onSavePrice,
   onCancelPriceEdit,
   onTogglePaymentReminders,
-  onAdjustBalance,
   onOpenBalanceTopup,
   onEditStudent,
   onRequestDeleteStudent,
-  onRequestDebtDetails,
   onRemindLessonPayment,
   onTogglePaid,
 }) => {
@@ -256,8 +254,6 @@ export const StudentHero: FC<StudentHeroProps> = ({
     typeof effectiveDebtTotal === 'number' && effectiveDebtTotal > 0
       ? `${effectiveDebtTotal} ₽${effectiveDebtCount > 0 ? ` (${formatLessonCount(effectiveDebtCount)})` : ''}`
       : formatLessonCount(effectiveDebtCount);
-  const paymentReminderLabel = paymentRemindersEnabled ? 'Включены' : 'Выключены';
-
   return (
     <div
       ref={headerRef}

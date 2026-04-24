@@ -2,10 +2,8 @@ import { FC, SVGProps, useCallback, useEffect, useMemo, useRef, useState } from 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Teacher, TeacherStudent, WeekendConflictPreview } from '../../entities/types';
 import {
-  BarsIcon,
   CalendarIcon,
   CheckCircleOutlineIcon,
-  ChevronLeftIcon,
   NotificationsNoneOutlinedIcon,
   PersonOutlineIcon,
   SettingsIcon,
@@ -160,12 +158,14 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   onLessonsRemoved,
   onNavigate,
 }) => {
-  const navigate = onNavigate ?? useNavigate();
+  const routerNavigate = useNavigate();
+  const navigate = onNavigate ?? routerNavigate;
   const location = useLocation();
   const { showToast } = useToast();
   const isMobile = useIsMobile(720);
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const teacherRef = useRef(teacher);
   const pendingPatchRef = useRef<SettingsPatch>({});
   const saveTimerRef = useRef<number | null>(null);
@@ -204,6 +204,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       setWeekendConflict(null);
       setPendingWeekendWeekdays(null);
       setSaveStatus('idle');
+      setLastSavedAt(Date.now());
       showToast({ message: successMessage, variant: 'success' });
     },
     [applyTeacherPatch, onLessonsRemoved, onLinksPatched, showToast],
@@ -225,7 +226,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       }
       applySettingsSuccess(data);
       return { ok: true } as const;
-    } catch (error) {
+    } catch (_error) {
       setSaveStatus('error');
       showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
       return { ok: false, error: 'save_failed' } as const;
@@ -267,7 +268,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         }
         applySettingsSuccess(data);
         return { ok: true } as const;
-      } catch (error) {
+      } catch (_error) {
         setSaveStatus('error');
         showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
         return { ok: false, error: 'save_failed' } as const;
@@ -325,7 +326,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
             : 'Выходные сохранены';
         applySettingsSuccess(data, successMessage);
         return true;
-      } catch (error) {
+      } catch (_error) {
         setSaveStatus('error');
         showToast({ message: 'Не удалось сохранить выходные дни', variant: 'error' });
         return false;
@@ -340,7 +341,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       const data = await api.getSettings();
       applyTeacherPatch(data.settings);
       setLoadStatus('ready');
-    } catch (error) {
+    } catch (_error) {
       setLoadStatus('error');
     }
   }, [applyTeacherPatch]);
@@ -475,6 +476,15 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
           {!isMobile && <aside className={styles.sidebar}>{sidebarNav}</aside>}
 
           <div className={styles.moduleShell}>
+            <div className={styles.autosaveBar} aria-live="polite">
+              {saveStatus === 'saving'
+                ? 'Сохраняем изменения…'
+                : saveStatus === 'error'
+                  ? 'Не удалось сохранить — проверьте подключение'
+                  : lastSavedAt
+                    ? `Автосохранение: ${new Date(lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Изменения сохраняются автоматически'}
+            </div>
             {renderModule()}
             {saveStatus === 'error' && <div className={styles.saveErrorNote}>Ошибка сохранения. Попробуйте ещё раз.</div>}
           </div>

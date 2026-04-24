@@ -258,6 +258,8 @@ export const AdaptivePopover = ({
   useLayoutEffect(() => {
     if (!isOpen) return;
     updatePosition();
+    // updatePosition пересоздаётся каждый рендер, но читает только refs/props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, side, align, offset, children, onClose]);
 
   useEffect(() => {
@@ -287,6 +289,8 @@ export const AdaptivePopover = ({
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
+    // updatePosition пересоздаётся каждый рендер, но читает только refs/props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -298,6 +302,8 @@ export const AdaptivePopover = ({
     if (popoverRef.current) observer.observe(popoverRef.current);
 
     return () => observer.disconnect();
+    // updatePosition пересоздаётся каждый рендер, но читает только refs/props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, children, side, align, offset, onClose]);
 
   const popoverStyle = {

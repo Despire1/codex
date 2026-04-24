@@ -226,7 +226,7 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
                         setIsActionsOpen(false);
                       }}
                     >
-                      Перенести занятие
+                      Перенести урок
                     </button>
                   </Tooltip>
                   <Tooltip content={editDisabledReason}>
@@ -280,7 +280,7 @@ export const MonthSidebarLessonItem: FC<MonthSidebarLessonItemProps> = ({
                     setIsActionsOpen(false);
                   }}
                 >
-                  Удалить занятие
+                  Удалить урок
                 </button>
               </Tooltip>
             </div>

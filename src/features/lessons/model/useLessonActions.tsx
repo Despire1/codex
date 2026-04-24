@@ -298,7 +298,6 @@ export const useLessonActionsInternal = ({
   showInfoDialog,
   showToast,
   openConfirmDialog,
-  openRecurringDeleteDialog,
   openPaymentCancelDialog,
   openPaymentBalanceDialog,
   openLessonEditPaymentResetDialog,
@@ -740,7 +739,7 @@ export const useLessonActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
         showInfoDialog('Ошибка', message);
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete lesson', error);
       }
     },
@@ -748,7 +747,6 @@ export const useLessonActionsInternal = ({
       closeLessonModal,
       editingLessonId,
       editingLessonOriginal,
-      editingLessonOriginal?.recurrenceGroupId,
       loadDashboardUnpaidLessons,
       loadStudentLessons,
       loadStudentLessonsSummary,
@@ -958,7 +956,7 @@ export const useLessonActionsInternal = ({
                 .catch((error) => {
                   const message = error instanceof Error ? error.message : 'Не удалось сохранить изменения';
                   showInfoDialog('Ошибка', message);
-                  // eslint-disable-next-line no-console
+                   
                   console.error('Failed to update lesson', error);
                 })
                 .finally(() => {
@@ -999,7 +997,7 @@ export const useLessonActionsInternal = ({
           if (!editingLessonId && lessonsInRange.length > 0) {
             onLessonCreated?.({ lesson: lessonsInRange[0], source: lessonModalContext.source });
             if (isOnboardingSource) {
-              showToast({ message: 'Занятие создано. Теперь напоминание 🔔', variant: 'success' });
+              showToast({ message: 'Урок создан. Теперь напоминание 🔔', variant: 'success' });
             }
           }
         } else {
@@ -1018,7 +1016,7 @@ export const useLessonActionsInternal = ({
           if (!editingLessonId) {
             onLessonCreated?.({ lesson: normalizedLesson, source: lessonModalContext.source });
             if (isOnboardingSource) {
-              showToast({ message: 'Занятие создано. Теперь напоминание 🔔', variant: 'success' });
+              showToast({ message: 'Урок создан. Теперь напоминание 🔔', variant: 'success' });
             }
           }
         }
@@ -1034,7 +1032,7 @@ export const useLessonActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось создать урок';
         showInfoDialog('Ошибка', message);
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to create lesson', error);
         if (!editingLessonId) {
           onLessonCreateError?.(error, lessonModalContext.source);
@@ -1124,7 +1122,7 @@ export const useLessonActionsInternal = ({
           },
         });
         setRescheduleModalOpen(false);
-      } catch (error) {
+      } catch (_error) {
         showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
       } finally {
         setRescheduleModalSubmitting(false);
@@ -1171,7 +1169,7 @@ export const useLessonActionsInternal = ({
             })
             .catch((error) => {
               showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-              // eslint-disable-next-line no-console
+               
               console.error('Failed to reschedule lesson', error);
             })
             .finally(() => {
@@ -1184,7 +1182,7 @@ export const useLessonActionsInternal = ({
       }
     } catch (error) {
       showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to reschedule lesson', error);
       setRescheduleModalSubmitting(false);
     }
@@ -1245,7 +1243,7 @@ export const useLessonActionsInternal = ({
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete lesson', error);
       }
     },
@@ -1330,7 +1328,7 @@ export const useLessonActionsInternal = ({
           message: 'Не удалось отметить занятие проведённым',
           variant: 'error',
         });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to complete lesson', error);
       }
     },
@@ -1383,7 +1381,7 @@ export const useLessonActionsInternal = ({
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to update lesson status', error);
       }
     },
@@ -1421,48 +1419,11 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось изменить время', variant: 'error' });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to shift lesson time', error);
       }
     },
     [showToast, updateLessonTiming],
-  );
-
-  const updateLessonStatusScoped = useCallback(
-    async (lesson: Lesson, scope: LessonSeriesScope, status: Lesson['status']) => {
-      const targets =
-        scope !== 'SINGLE' && lesson.recurrenceGroupId
-          ? lessons.filter(
-              (item) =>
-                item.recurrenceGroupId === lesson.recurrenceGroupId &&
-                new Date(item.startAt).getTime() >= new Date(lesson.startAt).getTime(),
-            )
-          : [lesson];
-
-      const results = await Promise.all(
-        targets.map(async (target) => {
-          const data = await api.updateLessonStatus(target.id, status);
-          return { data, target };
-        }),
-      );
-
-      results.forEach(({ data, target }) => {
-        applyLessonUpdateResult({ lesson: data.lesson }, target);
-        applyLinksUpdate(data.links);
-      });
-
-      await loadStudentLessons();
-      await loadStudentLessonsSummary();
-      await loadDashboardUnpaidLessons();
-    },
-    [
-      applyLessonUpdateResult,
-      applyLinksUpdate,
-      lessons,
-      loadDashboardUnpaidLessons,
-      loadStudentLessons,
-      loadStudentLessonsSummary,
-    ],
   );
 
   const restoreLesson = useCallback(
@@ -1480,7 +1441,7 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось восстановить урок', variant: 'error' });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to restore lesson', error);
       }
     },
@@ -1523,7 +1484,7 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось отменить урок', variant: 'error' });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to cancel lesson', error);
       }
     },
@@ -1570,7 +1531,7 @@ export const useLessonActionsInternal = ({
               })
               .catch((error) => {
                 showToast({ message: 'Не удалось удалить урок', variant: 'error' });
-                // eslint-disable-next-line no-console
+                 
                 console.error('Failed to confirm lesson series scope', error);
                 if (state.reopenModal === 'reschedule') {
                   setRescheduleModalOpen(true);
@@ -1625,7 +1586,7 @@ export const useLessonActionsInternal = ({
                   ? 'Не удалось перенести урок'
                   : 'Не удалось сохранить изменения';
               showToast({ message, variant: 'error' });
-              // eslint-disable-next-line no-console
+               
               console.error('Failed to confirm lesson series scope', error);
               if (state.reopenModal === 'reschedule') {
                 setRescheduleModalOpen(true);
@@ -1726,7 +1687,7 @@ export const useLessonActionsInternal = ({
         await loadStudentLessons();
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
-      } catch (error) {
+      } catch (_error) {
         showToast({
           message: 'Не удалось обновить оплату',
           variant: 'error',
@@ -1863,7 +1824,7 @@ export const useLessonActionsInternal = ({
             ? 'Ученик не активировал бота — отправка напоминаний невозможна'
             : 'Не удалось отправить напоминание';
         showToast({ message, variant: 'error' });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to send payment reminder', error);
         return { status: 'error' as const };
       }
@@ -1922,7 +1883,6 @@ export const useLessonActionsInternal = ({
       closeRescheduleModal,
       editingLessonId,
       editingLessonOriginal,
-      editingLessonOriginal?.isRecurring,
       handleLessonDraftChange,
       lessonDraft,
       lessonModalSubmitting,

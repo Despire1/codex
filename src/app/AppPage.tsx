@@ -20,6 +20,7 @@ import {
 } from '../shared/lib/pwaNotifications';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar, type TopbarCreateMenuItem } from '../widgets/layout/Topbar';
+import { NotificationsBellButton } from '../features/notifications/bellDropdown/NotificationsBellButton';
 import { Sidebar } from '../widgets/layout/Sidebar';
 import { buildSidebarNavItems, type SidebarNavItem } from '../widgets/layout/model/navigation';
 import { MobileBottomTabs } from '../widgets/layout/mobile/MobileBottomTabs';
@@ -437,6 +438,28 @@ const AppPageContent = () => {
     setMobileSidebarOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!hasAccess) return;
+    if (!location.search) return;
+    const params = new URLSearchParams(location.search);
+    const assignmentId = params.get('assignmentId');
+    const lessonId = params.get('lessonId');
+    if (assignmentId && /^\d+$/.test(assignmentId)) {
+      const target = isStudentRole
+        ? `/homeworks/${assignmentId}`
+        : `/homeworks/assignments/${assignmentId}`;
+      navigate(target, { replace: true });
+      return;
+    }
+    if (lessonId && /^\d+$/.test(lessonId) && location.pathname !== tabPathById.schedule) {
+      if (isStudentRole) {
+        navigate(tabPathById.dashboard, { replace: true });
+        return;
+      }
+      navigate(`${tabPathById.schedule}?lessonId=${encodeURIComponent(lessonId)}`, { replace: true });
+    }
+  }, [hasAccess, isStudentRole, location.pathname, location.search, navigate]);
+
   const activeTabNeedsRoster =
     activeTabByPath === 'dashboard' || activeTabByPath === 'schedule' || activeTabByPath === 'students';
   const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
@@ -579,6 +602,8 @@ const AppPageContent = () => {
   const refreshDashboardSummaryIfActive = useCallback(() => {
     if (activeTabByPath !== 'dashboard') return;
     dashboardSummary.refresh();
+    // dashboardSummary — объект-результат хука, пересоздаётся каждый рендер; стабильна именно .refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabByPath, dashboardSummary.refresh]);
 
   const openDashboardHomeworkAssignModal = useCallback(
@@ -635,7 +660,7 @@ const AppPageContent = () => {
         });
         return true;
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to create homework assignment from dashboard sheet', error);
         showToast({ message: 'Не удалось выдать домашнее задание', variant: 'error' });
         return false;
@@ -664,7 +689,7 @@ const AppPageContent = () => {
         setHomeworkAssignStudents(studentsResponse);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to preload homework assign modal data', error);
         if (isCancelled) return;
         showToast({ message: 'Не удалось загрузить данные для домашки', variant: 'error' });
@@ -744,6 +769,8 @@ const AppPageContent = () => {
   const loadDashboardUnpaidLessonsIfDashboardTab = useCallback(async () => {
     if (activeTabByPath !== 'dashboard') return;
     await dashboardState.loadUnpaidLessons();
+    // dashboardState — объект-результат хука, пересоздаётся каждый рендер; стабильна именно .loadUnpaidLessons.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabByPath, dashboardState.loadUnpaidLessons]);
 
   const refreshPaymentsIfStudentsTab = useCallback(
@@ -816,7 +843,7 @@ const AppPageContent = () => {
   const openCreateLesson = useCallback(
     (date?: Date) => {
       const lessonDate = date ?? new Date();
-      const lessonIso = date
+      let lessonIso = date
         ? format(lessonDate, 'yyyy-MM-dd')
         : formatInTimeZone(lessonDate, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
 
@@ -828,9 +855,35 @@ const AppPageContent = () => {
         setSelectedMonthDay(lessonIso);
       }
 
+      const durationForDefault =
+        typeof teacher.defaultLessonDuration === 'number' && teacher.defaultLessonDuration > 0
+          ? teacher.defaultLessonDuration
+          : 60;
+
+      const roundedStartTime = (() => {
+        if (date) return undefined;
+        const now = new Date();
+        const currentMinutes = Number(formatInTimeZone(now, 'm', { timeZone: resolvedTimeZone }));
+        const currentHours = Number(formatInTimeZone(now, 'H', { timeZone: resolvedTimeZone }));
+        let slotHours = currentHours;
+        let slotMinutes = currentMinutes < 30 ? 30 : 0;
+        if (currentMinutes >= 30) {
+          slotHours = currentHours + 1;
+        }
+        // Если слот не вмещает урок полной длительности до полуночи — переносим на 9:00 следующего дня.
+        const slotStartMinutes = slotHours * 60 + slotMinutes;
+        if (slotStartMinutes + durationForDefault > 24 * 60) {
+          slotHours = 9;
+          slotMinutes = 0;
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          lessonIso = formatInTimeZone(tomorrow, 'yyyy-MM-dd', { timeZone: resolvedTimeZone });
+        }
+        return `${String(slotHours).padStart(2, '0')}:${String(slotMinutes).padStart(2, '0')}`;
+      })();
+
       openLessonModal(
         lessonIso,
-        date ? undefined : formatInTimeZone(new Date(), 'HH:mm', { timeZone: resolvedTimeZone }),
+        roundedStartTime,
         undefined,
         { skipNavigation: true, variant: isDesktop ? 'modal' : 'sheet' },
       );
@@ -844,6 +897,7 @@ const AppPageContent = () => {
       setMonthOffset,
       setScheduleView,
       setSelectedMonthDay,
+      teacher.defaultLessonDuration,
     ],
   );
 
@@ -969,6 +1023,24 @@ const AppPageContent = () => {
     guardedNavigate('/settings/notifications');
   }, [activeTabByPath, guardedNavigate, isMobile, requestPwaNotifications]);
 
+  const renderNotificationBell = useCallback(
+    (triggerClassName: string) => (
+      <NotificationsBellButton
+        timeZone={resolvedTimeZone}
+        triggerClassName={triggerClassName}
+        enabled={hasAccess}
+        onOpen={() => {
+          if (isMobile && activeTabByPath === 'dashboard') {
+            void requestPwaNotifications('bell');
+          }
+        }}
+        onNavigateAll={() => guardedNavigate('/dashboard')}
+        onNavigateSettings={() => guardedNavigate('/settings/notifications')}
+      />
+    ),
+    [activeTabByPath, guardedNavigate, hasAccess, isMobile, requestPwaNotifications, resolvedTimeZone],
+  );
+
   const sidebarItems = useMemo(() => buildSidebarNavItems(availableTabs), [availableTabs]);
   const homeworksBadgeCount = useMemo(() => {
     if (!hasTeacherAccess) return undefined;
@@ -1058,7 +1130,7 @@ const AppPageContent = () => {
         applyStudentContext(byStorage ?? byBackend ?? fallbackContext);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load student context', error);
         if (cancelled) return;
         setStudentContexts([]);
@@ -1120,12 +1192,14 @@ const AppPageContent = () => {
         }
 
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to bootstrap app', error);
       }
     };
 
     loadInitial();
+    // studentsHomework — объект-результат хука; зависим от конкретного .replaceHomeworks, сам объект не нужен.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeTabByPath,
     activeTabNeedsDashboardHomeworks,
@@ -1167,12 +1241,14 @@ const AppPageContent = () => {
         }
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to bootstrap roster', error);
       })
       .finally(() => {
         rosterBootstrapInFlightRef.current = false;
       });
+    // studentsHomework — объект-результат хука; зависим от конкретного .replaceHomeworks, сам объект не нужен.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeTabByPath,
     activeTabNeedsDashboardHomeworks,
@@ -1200,12 +1276,14 @@ const AppPageContent = () => {
         studentsHomework.replaceHomeworks(data.homeworks ?? []);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to bootstrap dashboard homeworks', error);
       })
       .finally(() => {
         dashboardHomeworksBootstrapInFlightRef.current = false;
       });
+    // studentsHomework — объект-результат хука; зависим от конкретного .replaceHomeworks, сам объект не нужен.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabNeedsDashboardHomeworks, hasTeacherAccess, studentsHomework.replaceHomeworks]);
 
   const resolveLastVisitedPath = useCallback(() => {
@@ -1366,9 +1444,17 @@ const AppPageContent = () => {
       teacher,
       lessons,
       onActiveTabChange: setStudentActiveTab,
+      onOpenHomeworkAssign: onDashboardOpenHomeworkAssign,
       studentListReloadKey,
     }),
-    [hasTeacherAccess, lessons, setStudentActiveTab, studentListReloadKey, teacher],
+    [
+      hasTeacherAccess,
+      lessons,
+      onDashboardOpenHomeworkAssign,
+      setStudentActiveTab,
+      studentListReloadKey,
+      teacher,
+    ],
   );
 
   const scheduleRouteProps = useMemo(
@@ -1398,6 +1484,8 @@ const AppPageContent = () => {
       removeLessonsFromRanges({ ids: lessonIds });
       dashboardSummary.refresh();
     },
+    // dashboardSummary — объект-результат хука, пересоздаётся каждый рендер; стабильна именно .refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [dashboardSummary.refresh, removeLessonsFromRanges],
   );
 
@@ -1456,22 +1544,6 @@ const AppPageContent = () => {
           <div className={layoutStyles.pageInner}>
             <main className={layoutStyles.content}>
               <div className={layoutStyles.content}>Загружаем контекст ученика…</div>
-            </main>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isStudentRole && studentContexts.length === 0) {
-    return (
-      <div id="app" className={`${layoutStyles.page} app-content`}>
-        <div className="app-surface">
-          <div className={layoutStyles.pageInner}>
-            <main className={layoutStyles.content}>
-              <div className={layoutStyles.content}>
-                Вы не привязаны ни к одному преподавателю. Попросите преподавателя добавить ваш Telegram username.
-              </div>
             </main>
           </div>
         </div>
@@ -1563,6 +1635,7 @@ const AppPageContent = () => {
                             title={isMobileSettingsDetailRoute ? mobileSettingsDetail?.label ?? 'Настройки' : 'Настройки'}
                             onOpenSidebar={() => setMobileSidebarOpen(true)}
                             onOpenNotifications={onOpenNotifications}
+                            renderNotificationBell={renderNotificationBell}
                             onBack={isMobileSettingsDetailRoute ? () => guardedNavigate(tabPathById.settings) : undefined}
                           />
                         ) : null}
@@ -1596,7 +1669,7 @@ const AppPageContent = () => {
                                 ? 'Добавить'
                                 : activeTab === 'students'
                                   ? 'Добавить ученика'
-                                  : 'Новое занятие'
+                                  : 'Новый урок'
                             }
                             createButtonIconAccent={
                               activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
@@ -1625,6 +1698,7 @@ const AppPageContent = () => {
                             editorPrimaryActionLabel={editorPrimaryActionLabel}
                             editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}
                             onOpenNotifications={onOpenNotifications}
+                            renderNotificationBell={renderNotificationBell}
                             onCreateLesson={onTopbarCreateAction}
                             profilePhotoUrl={sessionUser?.photoUrl ?? null}
                             showScheduleViewToggle={activeTab === 'schedule'}

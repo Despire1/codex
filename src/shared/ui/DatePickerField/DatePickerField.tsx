@@ -98,9 +98,13 @@ export const DatePickerField = ({
 
   const selectedDate = useMemo(
     () => (mode === 'datetime' ? parseDateTime(value) : parseDate(value)),
+    // parse* пересоздаются каждый рендер, но читают только mode/timeZone (уже в deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, value, timeZone, normalizedMinuteStep],
   );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const minDate = useMemo(() => parseBoundary(min), [min, mode, timeZone, normalizedMinuteStep]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const maxDate = useMemo(() => parseBoundary(max), [max, mode, timeZone, normalizedMinuteStep]);
   const today = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
   const initialMonth = useMemo(() => {

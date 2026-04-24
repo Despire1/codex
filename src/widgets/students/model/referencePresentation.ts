@@ -61,6 +61,7 @@ export type StudentCompactTablePresentation = {
   nextLessonTone: NextLessonTone;
   statusLabel: string;
   statusTone: StudentCompactTableStatusTone;
+  activationLabel: string | null;
   uiColor: string;
 };
 
@@ -125,8 +126,8 @@ const resolveAverageScore = (item: StudentListItem) => {
 const resolveNextLessonPresentation = (nextLessonAt: string | null | undefined, timeZone: string) => {
   if (!nextLessonAt) {
     return {
-      label: 'Следующее занятие: Нет занятий',
-      shortLabel: 'Без занятий',
+      label: 'Следующий урок: Нет уроков',
+      shortLabel: 'Нет уроков',
       tone: 'none' as NextLessonTone,
     };
   }
@@ -136,7 +137,7 @@ const resolveNextLessonPresentation = (nextLessonAt: string | null | undefined, 
 
   if (isSameDay(lessonDate, now)) {
     return {
-      label: `Следующее занятие: Сегодня ${timeLabel}`,
+      label: `Следующий урок: Сегодня ${timeLabel}`,
       shortLabel: `Сегодня ${timeLabel}`,
       tone: 'today' as NextLessonTone,
     };
@@ -144,7 +145,7 @@ const resolveNextLessonPresentation = (nextLessonAt: string | null | undefined, 
 
   if (isSameDay(lessonDate, addDays(now, 1))) {
     return {
-      label: `Следующее занятие: Завтра ${timeLabel}`,
+      label: `Следующий урок: Завтра ${timeLabel}`,
       shortLabel: `Завтра ${timeLabel}`,
       tone: 'future' as NextLessonTone,
     };
@@ -153,7 +154,7 @@ const resolveNextLessonPresentation = (nextLessonAt: string | null | undefined, 
   const shortDateLabel = format(lessonDate, 'd MMM', { locale: ru }).replace('.', '');
 
   return {
-    label: `Следующее занятие: ${format(lessonDate, 'd MMM HH:mm', { locale: ru })}`,
+    label: `Следующий урок: ${format(lessonDate, 'd MMM HH:mm', { locale: ru })}`,
     shortLabel: `${shortDateLabel}, ${timeLabel}`,
     tone: 'future' as NextLessonTone,
   };
@@ -286,23 +287,8 @@ export const buildCompactStudentTablePresentation = (
           ? 'Завершил'
           : presentation.nextLessonShortLabel;
 
-  if (item.student.isActivated === false) {
-    return {
-      levelLabel: presentation.levelLabel,
-      lessonsCount,
-      attendanceLabel: attendanceValue === null ? '—' : `${attendanceValue}%`,
-      attendanceTone: resolveCompactAttendanceTone(attendanceValue),
-      averageScoreLabel: averageScoreValue === null ? '—' : averageScoreValue.toFixed(1),
-      averageScoreValue,
-      nextLessonLabel,
-      nextLessonTone: presentation.nextLessonTone,
-      statusLabel: 'Не активирован',
-      statusTone: 'inactive',
-      uiColor: presentation.uiColor,
-    };
-  }
-
   const statusMeta = getStatusUiMeta(presentation.status);
+  const activationLabel = item.student.isActivated === false ? 'Telegram не привязан' : null;
 
   return {
     levelLabel: presentation.levelLabel,
@@ -315,18 +301,19 @@ export const buildCompactStudentTablePresentation = (
     nextLessonTone: presentation.nextLessonTone,
     statusLabel: statusMeta.label,
     statusTone: statusMeta.tone,
+    activationLabel,
     uiColor: presentation.uiColor,
   };
 };
 
 export const getStatusUiMeta = (status: StudentLifecycleStatus) => {
   if (status === 'ACTIVE') {
-    return { label: 'Активен', tone: 'active' as const };
+    return { label: 'Ученик активен', tone: 'active' as const };
   }
   if (status === 'PAUSED') {
-    return { label: 'Пауза', tone: 'paused' as const };
+    return { label: 'Ученик на паузе', tone: 'paused' as const };
   }
-  return { label: 'Завершили', tone: 'completed' as const };
+  return { label: 'Обучение завершено', tone: 'completed' as const };
 };
 
 export const buildProfileStats = (

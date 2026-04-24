@@ -11,6 +11,10 @@ export const StudentReferenceCompactCard: FC<StudentReferenceCardProps> = ({
   onOpenStudent,
   onEditStudent,
   onDeleteStudent,
+  onScheduleLesson,
+  onWriteStudent,
+  onTopUpBalance,
+  onAssignHomework,
 }) => {
   const presentation = useMemo(() => buildCompactStudentCardPresentation(item, timeZone), [item, timeZone]);
   const hasAlerts = presentation.alerts.length > 0;
@@ -103,6 +107,11 @@ export const StudentReferenceCompactCard: FC<StudentReferenceCardProps> = ({
             studentId={item.student.id}
             onEditStudent={onEditStudent}
             onDeleteStudent={onDeleteStudent}
+            onScheduleLesson={onScheduleLesson}
+            onWriteStudent={onWriteStudent}
+            onTopUpBalance={onTopUpBalance}
+            onAssignHomework={onAssignHomework}
+            hasTelegram={Boolean(item.student.username) || item.student.isActivated}
           />
         </div>
 

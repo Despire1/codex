@@ -93,6 +93,7 @@ export type UpdateSettingsResponse = UpdateSettingsSuccessResponse | UpdateSetti
 export type SessionSummary = {
   id: number;
   createdAt: string;
+  lastSeenAt?: string | null;
   ip: string | null;
   userAgent: string | null;
   isCurrent: boolean;

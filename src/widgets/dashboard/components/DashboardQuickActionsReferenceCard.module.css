@@ -61,19 +61,19 @@
 }
 
 .actionButton:focus-visible {
-  outline: 2px solid #22c55e;
+  outline: 2px solid var(--accent-primary, #a3e635);
   outline-offset: 2px;
 }
 
 .actionButtonPrimary {
-  background: linear-gradient(to right, #000 0%, #1f2937 100%);
-  color: #fff;
+  background: var(--accent-primary, #a3e635);
+  color: #111827;
   border: none;
 }
 
 .actionButtonPrimary:hover {
   box-shadow: none;
-  background: linear-gradient(to right, #000 0%, #1f2937 100%);
+  background: var(--accent-primary-hover, #94d82d);
 }
 
 .actionMain {
@@ -95,14 +95,14 @@
 }
 
 .actionIconPrimary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(17, 24, 39, 0.12);
+  color: #111827;
   transition: all 0.2s ease;
 }
 
 .actionButtonPrimary:hover .actionIconPrimary {
-  background: #22c55e;
-  color: #000;
+  background: #111827;
+  color: var(--accent-primary, #a3e635);
 }
 
 .actionIconBlue {
@@ -134,7 +134,7 @@
 }
 
 .actionLabelPrimary {
-  color: #fff;
+  color: #111827;
 }
 
 .actionArrow {
@@ -149,11 +149,11 @@
 }
 
 .actionArrowPrimary {
-  color: #fff;
+  color: #111827;
 }
 
 .actionButtonPrimary:hover .actionArrowPrimary {
-  color: #fff;
+  color: #111827;
 }
 
 .tipSection {

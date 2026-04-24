@@ -8,6 +8,7 @@ import {
   ExpandLessOutlinedIcon,
   ExpandMoreOutlinedIcon,
 } from '../../../icons/MaterialIcons';
+import { useToast } from '../../../shared/lib/toast';
 import { useUnsavedChanges } from '../../../shared/lib/unsavedChanges';
 import { formatWeekdayShortList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
 import controls from '../../../shared/styles/controls.module.css';
@@ -30,6 +31,7 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   onComingSoonClick,
 }) => {
   const { setEntry, clearEntry } = useUnsavedChanges();
+  const { showToast } = useToast();
   const [weekendsExpanded, setWeekendsExpanded] = useState(Boolean(teacher.weekendWeekdays.length));
   const [weekendDraft, setWeekendDraft] = useState(() => normalizeWeekdayList(teacher.weekendWeekdays));
   const isWeekendDirty = useMemo(() => {
@@ -86,24 +88,38 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
             <input
               className={`${controls.input} ${styles.fieldInput}`}
               type="number"
+              inputMode="numeric"
               min={15}
               max={240}
               step={5}
               value={teacher.defaultLessonDuration}
+              onKeyDown={(event) => {
+                if (event.key === '-' || event.key === 'e' || event.key === 'E') {
+                  event.preventDefault();
+                }
+              }}
               onChange={(event) => {
                 const numeric = Number(event.target.value);
                 if (!Number.isFinite(numeric)) return;
-                const clamped = Math.min(Math.max(Math.round(numeric), 15), 240);
+                const rounded = Math.round(numeric);
+                const clamped = Math.min(Math.max(rounded, 15), 240);
                 onChange({ defaultLessonDuration: clamped });
+                if (rounded !== clamped) {
+                  const hint = rounded > 240
+                    ? 'Установлено максимальное значение 240 минут'
+                    : 'Установлено минимальное значение 15 минут';
+                  showToast({ message: hint, variant: 'success' });
+                }
               }}
             />
+            <p className={styles.fieldHint}>Допустимо 15–240 минут.</p>
           </div>
 
           <div className={styles.infoRow}>
             <div>
-              <div className={styles.infoRowTitle}>Автоматически отмечать занятия как проведённые</div>
+              <div className={styles.infoRowTitle}>Автоматически отмечать уроки как проведённые</div>
               <div className={styles.infoRowDescription}>
-                Если выключено, занятия нужно подтверждать вручную.
+                Если выключено, уроки нужно подтверждать вручную.
               </div>
             </div>
             <label className={`${controls.switch} ${styles.switchControl}`}>
@@ -149,10 +165,16 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
 
             <WeekdayToggleGroup value={weekendDraft} onChange={setWeekendDraft} ariaLabel="Выберите выходные дни" />
 
+            {weekendDraft.length >= 7 ? (
+              <p className={styles.sectionDescription}>
+                Все 7 дней отмечены как выходные — должен остаться хотя бы один рабочий день, иначе планировать уроки не получится.
+              </p>
+            ) : null}
+
             <button
               type="button"
               className={`${controls.primaryButton} ${styles.darkActionButton}`}
-              disabled={isWeekendSaving || !isWeekendDirty}
+              disabled={isWeekendSaving || !isWeekendDirty || weekendDraft.length >= 7}
               onClick={() => void onSaveWeekendWeekdays(weekendDraft)}
             >
               <CheckCircleOutlineIcon width={16} height={16} />

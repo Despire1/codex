@@ -1,15 +1,7 @@
 import { faCalendarPlus } from '@fortawesome/free-regular-svg-icons';
-import {
-  faArrowRight,
-  faBolt,
-  faFileInvoiceDollar,
-  faFolderPlus,
-  faLightbulb,
-  faPlus,
-} from '@fortawesome/free-solid-svg-icons';
+import { faArrowRight, faBolt, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { type FC } from 'react';
-import { useToast } from '@/shared/lib/toast';
 import styles from './DashboardQuickActionsReferenceCard.module.css';
 
 interface DashboardQuickActionsReferenceCardProps {
@@ -27,15 +19,6 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
   onCreateLesson,
   onAddStudent,
 }) => {
-  const { showToast } = useToast();
-
-  const handleStubClick = (label: string) => {
-    showToast({
-      message: `${label} скоро будет доступно`,
-      variant: 'success',
-    });
-  };
-
   return (
     <section id="quick-actions-section" className={resolveClassName(className)}>
       <div className={styles.header}>
@@ -46,22 +29,22 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={`${styles.actionButton} ${styles.actionButtonPrimary}`} onClick={onCreateHomework}>
+        <button type="button" className={`${styles.actionButton} ${styles.actionButtonPrimary}`} onClick={() => onCreateLesson()}>
           <div className={styles.actionMain}>
             <div className={`${styles.actionIconWrap} ${styles.actionIconPrimary}`}>
-              <FontAwesomeIcon icon={faPlus} />
+              <FontAwesomeIcon icon={faCalendarPlus} />
             </div>
-            <span className={`${styles.actionLabel} ${styles.actionLabelPrimary}`}>Создать задание</span>
+            <span className={`${styles.actionLabel} ${styles.actionLabelPrimary}`}>Добавить урок</span>
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={`${styles.actionArrow} ${styles.actionArrowPrimary}`} />
         </button>
 
-        <button type="button" className={styles.actionButton} onClick={() => onCreateLesson()}>
+        <button type="button" className={styles.actionButton} onClick={onCreateHomework}>
           <div className={styles.actionMain}>
             <div className={`${styles.actionIconWrap} ${styles.actionIconBlue}`}>
-              <FontAwesomeIcon icon={faCalendarPlus} />
+              <FontAwesomeIcon icon={faPlus} />
             </div>
-            <span className={styles.actionLabel}>Добавить урок</span>
+            <span className={styles.actionLabel}>Создать домашнее задание</span>
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>
@@ -71,7 +54,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
             <div className={`${styles.actionIconWrap} ${styles.actionIconGreen}`}>
               <FontAwesomeIcon icon={faPlus} />
             </div>
-            <span className={styles.actionLabel}>Новый ученик</span>
+            <span className={styles.actionLabel}>Добавить ученика</span>
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>

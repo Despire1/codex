@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { type FC, type ReactNode } from 'react';
 import { Teacher } from '../../entities/types';
 import {
   AddOutlinedIcon,
@@ -41,6 +41,7 @@ interface TopbarProps {
   editorPrimaryActionLabel?: string;
   editorPrimarySubmittingLabel?: string;
   onOpenNotifications: () => void;
+  renderNotificationBell?: (triggerClassName: string) => ReactNode;
   onCreateLesson: () => void;
   profilePhotoUrl?: string | null;
   showScheduleViewToggle?: boolean;
@@ -62,7 +63,7 @@ export const Topbar: FC<TopbarProps> = ({
   subtitle,
   variant = 'default',
   showCreateLesson,
-  createButtonLabel = 'Новое занятие',
+  createButtonLabel = 'Новый урок',
   createButtonIconAccent = false,
   reserveCreateButtonSpace = true,
   createMenuItems,
@@ -80,6 +81,7 @@ export const Topbar: FC<TopbarProps> = ({
   editorPrimaryActionLabel = 'Создать шаблон',
   editorPrimarySubmittingLabel = 'Сохраняю…',
   onOpenNotifications,
+  renderNotificationBell,
   onCreateLesson,
   profilePhotoUrl,
   showScheduleViewToggle = false,
@@ -165,15 +167,19 @@ export const Topbar: FC<TopbarProps> = ({
 
         {showEditorActions ? (
           <>
-            <button
-              type="button"
-              className={styles.iconButton}
-              aria-label="Открыть уведомления"
-              onClick={onOpenNotifications}
-            >
-              <NotificationsNoneOutlinedIcon width={20} height={20} />
-              {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
-            </button>
+            {renderNotificationBell ? (
+              renderNotificationBell(styles.iconButton)
+            ) : (
+              <button
+                type="button"
+                className={styles.iconButton}
+                aria-label="Открыть уведомления"
+                onClick={onOpenNotifications}
+              >
+                <NotificationsNoneOutlinedIcon width={20} height={20} />
+                {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
+              </button>
+            )}
 
             {showEditorSecondaryAction ? (
               <button
@@ -216,15 +222,19 @@ export const Topbar: FC<TopbarProps> = ({
               </span>
             ) : null}
 
-            <button
-              type="button"
-              className={styles.iconButton}
-              aria-label="Открыть уведомления"
-              onClick={onOpenNotifications}
-            >
-              <NotificationsNoneOutlinedIcon width={20} height={20} />
-              {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
-            </button>
+            {renderNotificationBell ? (
+              renderNotificationBell(styles.iconButton)
+            ) : (
+              <button
+                type="button"
+                className={styles.iconButton}
+                aria-label="Открыть уведомления"
+                onClick={onOpenNotifications}
+              >
+                <NotificationsNoneOutlinedIcon width={20} height={20} />
+                {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
+              </button>
+            )}
 
             {showPrintAction ? (
               <button type="button" className={styles.printButton} onClick={onPrintAction}>

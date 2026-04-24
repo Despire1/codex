@@ -33,6 +33,19 @@
   border-style: dashed;
 }
 
+.completed {
+  background: #f6fef9;
+  border-color: color-mix(in srgb, #10b981 32%, #ffffff);
+}
+
+.completed .title {
+  color: #475569;
+}
+
+.completed .timeBadge {
+  color: #059669;
+}
+
 .content {
   padding: 20px;
   display: flex;
@@ -269,6 +282,24 @@
 
 .canceledBadge:hover {
   color: #6b7280;
+}
+
+.completedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: default;
+}
+
+.completedBadge:hover {
+  color: #047857;
 }
 
 .actionsPopover {

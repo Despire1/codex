@@ -218,13 +218,11 @@ export const createStudentsService = ({
     const link = await prisma.teacherStudent.findUnique({
       where: { teacherId_studentId: { teacherId, studentId } },
     });
-    const now = new Date();
     let lessons = await prisma.lesson.findMany({
       where: {
         teacherId,
         isSuppressed: false,
-        status: { not: 'CANCELED' },
-        OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
+        status: 'COMPLETED',
         participants: {
           some: {
             studentId,

@@ -17,14 +17,20 @@
     "stop:prod": "npx pm2 stop ecosystem.config.cjs",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev --skip-generate",
     "prisma:migrate:local": "./scripts/prisma-migrate-local.sh",
     "prisma:reset": "prisma migrate reset --force --skip-generate",
     "prisma:repair": "./scripts/prisma-repair.sh",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "backfill:homework:v2": "tsx scripts/backfill-homework-v2.ts"
+    "backfill:homework:v2": "tsx scripts/backfill-homework-v2.ts",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -54,14 +60,20 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^20.5.6",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.7",
     "@types/react-select": "^5.0.0",
     "@vitejs/plugin-react": "^4.1.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^15.15.0",
     "prisma": "^5.20.0",
     "tsx": "^4.19.0",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^8.59.0",
     "vite": "^4.5.0"
   }
 }

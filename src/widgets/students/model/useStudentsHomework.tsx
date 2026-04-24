@@ -140,7 +140,7 @@ export const useStudentsHomeworkInternal = ({
             void sendHomeworkToStudent(homeworkId);
           },
         });
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to send homework to student', error);
       }
     },
@@ -174,7 +174,7 @@ export const useStudentsHomeworkInternal = ({
       }
       setNewHomeworkDraft(createEmptyDraft());
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to add homework', error);
     }
   }, [
@@ -209,7 +209,7 @@ export const useStudentsHomeworkInternal = ({
         triggerStudentsListReload();
         showInfoDialog('Черновик создан', 'Копия задания сохранена в черновики.');
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to duplicate homework', error);
       }
     },
@@ -226,7 +226,7 @@ export const useStudentsHomeworkInternal = ({
         void loadStudentHomeworks();
         triggerStudentsListReload();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to toggle homework', error);
       }
     },
@@ -249,7 +249,7 @@ export const useStudentsHomeworkInternal = ({
         void loadStudentHomeworks();
         triggerStudentsListReload();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to update homework', error);
       }
     },
@@ -264,7 +264,7 @@ export const useStudentsHomeworkInternal = ({
         void loadStudentHomeworks();
         triggerStudentsListReload();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete homework', error);
       }
     },
@@ -278,7 +278,7 @@ export const useStudentsHomeworkInternal = ({
         showInfoDialog('Напоминание отправлено', `Напоминание отправлено ученику #${studentId}`);
       } catch (error) {
         showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to send reminder', error);
       }
     },
@@ -295,7 +295,7 @@ export const useStudentsHomeworkInternal = ({
         showInfoDialog('Напоминание отправлено', 'Мы отправим ученику напоминание.');
       } catch (error) {
         showInfoDialog('Не удалось отправить напоминание', 'Попробуйте ещё раз чуть позже.');
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to send homework reminder', error);
       }
     },

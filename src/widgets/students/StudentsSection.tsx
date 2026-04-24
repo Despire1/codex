@@ -28,6 +28,7 @@ interface StudentsSectionProps {
   lessons: Lesson[];
   onActiveTabChange?: (tab: StudentTabId) => void;
   onRequestDebtDetails?: () => void;
+  onOpenHomeworkAssign?: (studentId?: number | null, lessonId?: number | null) => void;
   studentListReloadKey: number;
 }
 
@@ -44,6 +45,7 @@ const resolveTabFromSearch = (search: string): ProfileTabId => {
 export const StudentsSection: FC<StudentsSectionProps> = ({
   hasAccess,
   onActiveTabChange,
+  onOpenHomeworkAssign,
   studentListReloadKey,
 }) => {
   const navigate = useNavigate();
@@ -409,6 +411,35 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     requestDeleteStudent(studentId);
   };
 
+  const handleScheduleLessonFromList = (studentId: number) => {
+    setSelectedStudentId(studentId);
+    openCreateLessonForStudent(studentId, {
+      variant: isMobile ? 'sheet' : 'modal',
+      skipNavigation: true,
+    });
+  };
+
+  const handleTopUpBalanceFromList = (studentId: number) => {
+    setSelectedStudentId(studentId);
+    navigate(`${tabPathById.students}/${studentId}`);
+    setIsBalanceTopupOpen(true);
+  };
+
+  const handleAssignHomeworkFromList = (studentId: number) => {
+    onOpenHomeworkAssign?.(studentId, null);
+  };
+
+  const handleWriteToStudentFromList = (studentId: number) => {
+    const entry = studentListItems.find((item) => item.student.id === studentId);
+    const username = entry?.student.username?.trim();
+    if (!username) {
+      showToast({ message: 'У ученика нет Telegram-юзернейма', variant: 'error' });
+      return;
+    }
+    const normalized = username.startsWith('@') ? username.slice(1) : username;
+    window.location.href = `tg://resolve?domain=${normalized}`;
+  };
+
   const handleEditStudent = (options?: { focusField?: 'price' }) => {
     const profileStudentId = selectedStudentEntry?.student.id ?? routeStudentId ?? selectedStudentId;
     if (!profileStudentId) return;
@@ -519,12 +550,44 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onAddStudent={handleAddStudent}
           onEditStudent={handleEditStudentFromList}
           onDeleteStudent={handleDeleteStudentFromList}
+          onScheduleLesson={handleScheduleLessonFromList}
+          onTopUpBalance={handleTopUpBalanceFromList}
+          onAssignHomework={onOpenHomeworkAssign ? handleAssignHomeworkFromList : undefined}
+          onWriteStudent={handleWriteToStudentFromList}
           timeZone={timeZone}
         />
       ) : !selectedStudentEntry ? (
-        <div>
-          {routeStudentEntryLoading ? 'Загружаем карточку ученика…' : 'Ученик не найден.'}
-        </div>
+        routeStudentEntryLoading ? (
+          <div className={styles.notFoundLoading}>Загружаем карточку ученика…</div>
+        ) : (
+          <div className={styles.notFoundPage}>
+            <div className={styles.notFoundCard}>
+              <div className={styles.notFoundIcon} aria-hidden>
+                ?
+              </div>
+              <h2 className={styles.notFoundTitle}>Ученик не найден</h2>
+              <p className={styles.notFoundDescription}>
+                Возможно, ученик был удалён или вы перешли по устаревшей ссылке. Проверьте URL или вернитесь к списку.
+              </p>
+              <div className={styles.notFoundActions}>
+                <button
+                  type="button"
+                  className={styles.notFoundSecondaryButton}
+                  onClick={handleBackToList}
+                >
+                  К списку учеников
+                </button>
+                <button
+                  type="button"
+                  className={styles.notFoundPrimaryButton}
+                  onClick={handleAddStudent}
+                >
+                  Добавить ученика
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         <StudentsReferenceProfileView
           studentEntry={selectedStudentEntry}

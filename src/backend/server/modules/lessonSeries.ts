@@ -31,7 +31,6 @@ type LessonSeriesDependencies = {
 };
 
 export const createLessonSeriesService = ({
-  prisma,
   resolveTimeZone,
   parseWeekdays,
   filterSuppressedLessons,

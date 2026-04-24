@@ -12,7 +12,7 @@ export const teacherTabs = [
   { id: 'students', label: 'Ученики', icon: PeopleIcon, path: '/students' },
   { id: 'schedule', label: 'Расписание', icon: EventNoteIcon, path: '/schedule' },
   { id: 'homeworks', label: 'Домашки', icon: TaskAltIcon, path: '/homeworks' },
-  { id: 'analytics', label: 'Аналитика', icon: AnalyticsIcon, path: '/analytics' },
+  { id: 'analytics', label: 'Аналитика', icon: AnalyticsIcon, path: '/analytics', hidden: true },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon, path: '/settings' },
 ] as const;
 
@@ -26,10 +26,12 @@ export const tabs = teacherTabs;
 
 export type TabId = (typeof teacherTabs)[number]['id'];
 export type AppRole = 'TEACHER' | 'STUDENT';
-export type AppTab = (typeof teacherTabs)[number];
+export type AppTab = (typeof teacherTabs)[number] & { hidden?: boolean };
 
 export const getTabsByRole = (role: AppRole): AppTab[] =>
-  (role === 'STUDENT' ? studentTabs : teacherTabs).map((tab) => ({ ...tab }));
+  (role === 'STUDENT' ? studentTabs : teacherTabs)
+    .filter((tab) => !('hidden' in tab && tab.hidden === true))
+    .map((tab) => ({ ...tab }));
 
 export const tabPathById: Record<TabId, string> = teacherTabs.reduce(
   (acc, tab) => ({ ...acc, [tab.id]: tab.path }),

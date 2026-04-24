@@ -102,6 +102,11 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
           >
             {presentation.statusLabel}
           </span>
+          {presentation.activationLabel ? (
+            <span className={`${styles.statusText} ${styles.statusInactive}`}>
+              {presentation.activationLabel}
+            </span>
+          ) : null}
         </div>
       </div>
     </article>

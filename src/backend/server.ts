@@ -152,7 +152,7 @@ const LOCAL_DEV_TELEGRAM_ID = (() => {
   if (!raw) return 999_999_999n;
   try {
     return BigInt(raw);
-  } catch (error) {
+  } catch (_error) {
     return 999_999_999n;
   }
 })();
@@ -320,7 +320,7 @@ const safeLogActivityEvent = async (payload: Parameters<typeof logActivityEvent>
   try {
     await logActivityEvent(payload);
   } catch (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('Failed to log activity event', error);
   }
 };
@@ -496,7 +496,6 @@ const lessonSchedulingService = createLessonSchedulingService({
 });
 const {
   buildRecurringOccurrences,
-  syncLessonParticipants,
   syncSeriesParticipants,
   upsertLessonSeriesException,
   createLessonSeriesRecord,
@@ -575,7 +574,6 @@ const lessonSeriesService = createLessonSeriesService({
 });
 const {
   hasLessonPaidParticipant,
-  findLessonIdsWithProtectedDependents,
   findLessonIdsWithHardDependents,
   buildLessonMutationPreview,
   resolveRecurringEditableLessons,
@@ -1182,7 +1180,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
 setInterval(() => {
   runLessonAutomationTick().catch((error) => {
-    // eslint-disable-next-line no-console
+     
     console.error('Не удалось выполнить автоматические сценарии', error);
   });
 }, AUTOMATION_TICK_MS);
@@ -1191,7 +1189,7 @@ void runLessonAutomationTick();
 
 setInterval(() => {
   runNotificationTick().catch((error) => {
-    // eslint-disable-next-line no-console
+     
     console.error('Не удалось отправить уведомления', error);
   });
 }, NOTIFICATION_TICK_MS);
@@ -1200,13 +1198,13 @@ void runNotificationTick();
 
 setInterval(() => {
   runOnboardingNudgeTick().catch((error) => {
-    // eslint-disable-next-line no-console
+     
     console.error('Не удалось отправить напоминание по онбордингу', error);
   });
 }, ONBOARDING_NUDGE_TICK_MS);
 
 void runOnboardingNudgeTick().catch((error) => {
-  // eslint-disable-next-line no-console
+   
   console.error('Не удалось отправить напоминание по онбордингу', error);
 });
 
@@ -1221,6 +1219,6 @@ server.keepAliveTimeout = API_KEEP_ALIVE_TIMEOUT_MS;
 server.maxHeadersCount = 100;
 
 server.listen(PORT, () => {
-  // eslint-disable-next-line no-console
+   
   console.log(`API server running on http://localhost:${PORT}`);
 });

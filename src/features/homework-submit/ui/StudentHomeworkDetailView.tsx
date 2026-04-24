@@ -255,7 +255,7 @@ const resolveQuestionPoints = (question: HomeworkTestQuestion) => {
   if (typeof question.points === 'number' && Number.isFinite(question.points) && question.points > 0) {
     return Math.round(question.points);
   }
-  return question.type === 'SHORT_ANSWER' ? 2 : 2;
+  return 1;
 };
 
 const isTestQuestionAnswered = (question: HomeworkTestQuestion, value: unknown) => {
@@ -569,11 +569,12 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   };
 
   useEffect(() => {
+    const previewUrls = previewObjectUrlsRef.current;
     return () => {
-      previewObjectUrlsRef.current.forEach((url) => {
+      previewUrls.forEach((url) => {
         URL.revokeObjectURL(url);
       });
-      previewObjectUrlsRef.current.clear();
+      previewUrls.clear();
       clearRecordingDurationTicker();
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -741,7 +742,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       recorder.start();
       startRecordingDurationTicker();
       setRecording(true);
-    } catch (error) {
+    } catch (_error) {
       clearRecordingDurationTicker();
       setLocalError('Не удалось начать запись голосового');
     }
@@ -987,7 +988,6 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     }
     return deadlineRemainingMs && deadlineRemainingMs > 0 ? 100 : 0;
   }, [
-    canStartFreshAttempt,
     deadlineRemainingMs,
     deadlineTs,
     nowTs,

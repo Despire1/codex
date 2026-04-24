@@ -96,7 +96,7 @@ const QUESTION_CREATE_OPTIONS_PRIMARY: QuestionCreateOption[] = [
   {
     id: 'LONG_TEXT',
     title: 'Развернутый ответ',
-    description: 'SC / эссе в свободной форме',
+    description: 'Эссе в свободной форме',
     icon: <HomeworkAlignLeftIcon size={15} />,
     tone: 'indigo',
   },
@@ -120,14 +120,14 @@ const QUESTION_CREATE_OPTIONS_ADVANCED: QuestionCreateOption[] = [
   {
     id: 'FILL_WORD',
     title: 'Вставить слово',
-    description: 'Fill in the blank',
+    description: 'Пропуск в тексте для заполнения',
     icon: <HomeworkSpellCheckIcon size={15} />,
     tone: 'amber',
   },
   {
     id: 'MATCHING',
     title: 'Сопоставление',
-    description: 'Matching pairs',
+    description: 'Соединить пары',
     icon: <HomeworkArrowsLeftRightIcon size={15} />,
     tone: 'cyan',
   },
@@ -539,7 +539,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
     }),
   );
 
-  const questions = testBlock?.questions ?? [];
+  const questions = useMemo(() => testBlock?.questions ?? [], [testBlock?.questions]);
   const questionIds = useMemo(() => questions.map((question) => question.id), [questions]);
   const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question] as const)), [questions]);
   const activeQuestion = activeQuestionId ? questionById.get(activeQuestionId) ?? null : null;

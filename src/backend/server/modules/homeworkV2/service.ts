@@ -104,7 +104,6 @@ export const createHomeworkV2Service = ({
   ensureTeacherStudentLinkV2,
   resolveHomeworkDefaultDeadline,
   safeLogActivityEvent,
-  filterSuppressedLessons,
   validateHomeworkTemplatePayload,
 }: CreateHomeworkV2ServiceDeps) => {
   const normalizeAssignmentSendModeInput = (value: unknown): HomeworkSendMode => {
@@ -134,6 +133,7 @@ export const createHomeworkV2Service = ({
       type: 'HOMEWORK_REMINDER_MANUAL',
       dedupeKey: `HOMEWORK_REMINDER_MANUAL:${assignment.id}:${Date.now()}`,
       text: buildHomeworkNotificationText('MANUAL_REMINDER', assignment, teacher.timezone),
+      assignmentId: assignment.id,
     });
 
     await safeLogActivityEvent({
@@ -846,6 +846,36 @@ export const createHomeworkV2Service = ({
     const deadlineAt =
       toValidDate(body.deadlineAt) ??
       (await resolveHomeworkDefaultDeadline(teacher.chatId, studentId, lessonId)).deadlineAt;
+
+    // TEA-24: Идемпотентность создания черновика из шаблона.
+    // Если для (teacher, student, template) уже есть неотправленный DRAFT — переиспользуем его,
+    // чтобы не плодить дубликатов (частый сценарий: открыли «Выдать из шаблона» дважды).
+    if (template?.id && resolvedStatus === 'DRAFT') {
+      const existingDraft = await (prisma as any).homeworkAssignment.findFirst({
+        where: {
+          teacherId: teacher.chatId,
+          studentId,
+          templateId: template.id,
+          status: 'DRAFT',
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (existingDraft) {
+        const updated = await (prisma as any).homeworkAssignment.update({
+          where: { id: existingDraft.id },
+          data: {
+            lessonId,
+            groupId,
+            title: resolvedTitle,
+            sendMode,
+            deadlineAt,
+            contentSnapshot: JSON.stringify(snapshot),
+          },
+        });
+        return { assignment: serializeHomeworkAssignmentV2(updated) };
+      }
+    }
+
     const assignment = await (prisma as any).homeworkAssignment.create({
       data: {
         teacherId: teacher.chatId,
@@ -1025,6 +1055,7 @@ export const createHomeworkV2Service = ({
         type: 'HOMEWORK_ASSIGNED',
         dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
         text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+        assignmentId: updated.id,
       });
     }
 
@@ -1128,6 +1159,7 @@ export const createHomeworkV2Service = ({
       type: 'HOMEWORK_UNISSUED',
       dedupeKey: `HOMEWORK_UNISSUED:${refreshedAssignment.id}:${Date.now()}`,
       text: buildHomeworkNotificationText('UNISSUED', refreshedAssignment, teacher.timezone),
+      assignmentId: refreshedAssignment.id,
     });
 
     await safeLogActivityEvent({
@@ -1191,6 +1223,7 @@ export const createHomeworkV2Service = ({
         type: 'HOMEWORK_ASSIGNED',
         dedupeKey: `HOMEWORK_ASSIGNED:REISSUE:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
         text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+        assignmentId: updated.id,
       });
     }
 
@@ -1690,6 +1723,7 @@ export const createHomeworkV2Service = ({
         { ...updatedAssignment, teacherComment: teacherComment || null },
         teacher.timezone,
       ),
+      assignmentId: updatedAssignment.id,
     });
 
     return {
@@ -1791,7 +1825,7 @@ export const createHomeworkV2Service = ({
     });
 
     const todayKey = formatInTimeZone(now, 'yyyy-MM-dd', {
-      timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
+      timeZone: resolveTimeZone(active.student?.timezone ?? active.teacher?.timezone),
     });
     let activeCount = 0;
     let overdueCount = 0;
@@ -1808,7 +1842,7 @@ export const createHomeworkV2Service = ({
       if (workflow.needsStudentAction || workflow.needsTeacherAction) activeCount += 1;
       if (item.deadlineAt) {
         const deadlineKey = formatInTimeZone(item.deadlineAt, 'yyyy-MM-dd', {
-          timeZone: resolveTimeZone((active.student as any)?.timezone ?? active.teacher?.timezone),
+          timeZone: resolveTimeZone(active.student?.timezone ?? active.teacher?.timezone),
         });
         if (deadlineKey === todayKey && workflow.needsStudentAction) {
           dueTodayCount += 1;
@@ -1857,6 +1891,7 @@ export const createHomeworkV2Service = ({
         type: 'HOMEWORK_ASSIGNED',
         dedupeKey: `HOMEWORK_ASSIGNED:${assignment.id}`,
         text: buildHomeworkNotificationText('ASSIGNED', assignment, assignment.teacher?.timezone ?? null),
+        assignmentId: assignment.id,
       });
     }
   };
@@ -1883,6 +1918,7 @@ export const createHomeworkV2Service = ({
         type: 'HOMEWORK_ASSIGNED',
         dedupeKey: `HOMEWORK_ASSIGNED:SCHEDULED:${assignment.id}`,
         text: buildHomeworkNotificationText('ASSIGNED', assignment, teacher.timezone),
+        assignmentId: assignment.id,
       });
     }
   };
@@ -1939,6 +1975,7 @@ export const createHomeworkV2Service = ({
           type: 'HOMEWORK_REMINDER_24H',
           dedupeKey: `HOMEWORK_REMINDER_24H:${assignment.id}`,
           text: buildHomeworkNotificationText('REMINDER_24H', assignment, studentTimeZone),
+          assignmentId: assignment.id,
         });
         if (result.status === 'sent') {
           await (prisma as any).homeworkAssignment.update({
@@ -1960,6 +1997,7 @@ export const createHomeworkV2Service = ({
           type: 'HOMEWORK_REMINDER_3H',
           dedupeKey: `HOMEWORK_REMINDER_3H:${assignment.id}`,
           text: buildHomeworkNotificationText('REMINDER_3H', assignment, studentTimeZone),
+          assignmentId: assignment.id,
         });
         if (result.status === 'sent') {
           await (prisma as any).homeworkAssignment.update({
@@ -1981,6 +2019,7 @@ export const createHomeworkV2Service = ({
           type: 'HOMEWORK_REMINDER_MORNING',
           dedupeKey: `HOMEWORK_REMINDER_MORNING:${assignment.id}`,
           text: buildHomeworkNotificationText('REMINDER_MORNING', assignment, studentTimeZone),
+          assignmentId: assignment.id,
         });
         if (result.status === 'sent') {
           await (prisma as any).homeworkAssignment.update({
@@ -2006,6 +2045,7 @@ export const createHomeworkV2Service = ({
             type: 'HOMEWORK_OVERDUE',
             dedupeKey: `HOMEWORK_OVERDUE:${assignment.id}:${nowDateKey}`,
             text: buildHomeworkNotificationText('OVERDUE', assignment, studentTimeZone),
+            assignmentId: assignment.id,
           });
           if (result.status === 'sent') {
             await (prisma as any).homeworkAssignment.update({

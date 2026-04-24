@@ -132,6 +132,123 @@ const resolveStudentDisplayName = (
 
 const uniqueStrings = (values: string[]) => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 
+const SETTINGS_FIELD_LABELS: Record<string, string> = {
+  timezone: 'Часовой пояс',
+  defaultLessonDuration: 'Длительность урока по умолчанию',
+  lessonReminderEnabled: 'Напоминания об уроке',
+  lessonReminderMinutes: 'Когда напоминать об уроке',
+  dailySummaryEnabled: 'Сводка на сегодня',
+  dailySummaryTime: 'Время сводки на сегодня',
+  tomorrowSummaryEnabled: 'Сводка на завтра',
+  tomorrowSummaryTime: 'Время сводки на завтра',
+  weekendWeekdays: 'Выходные дни',
+  studentNotificationsEnabled: 'Напоминания ученикам',
+  studentUpcomingLessonTemplate: 'Шаблон напоминания об уроке ученику',
+  studentPaymentDueTemplate: 'Шаблон напоминания об оплате ученику',
+  autoConfirmLessons: 'Автоподтверждение уроков',
+  globalPaymentRemindersEnabled: 'Автоматические напоминания об оплате',
+  paymentReminderDelayHours: 'Отправлять напоминание об оплате через',
+  paymentReminderRepeatHours: 'Повторять напоминание об оплате',
+  paymentReminderMaxCount: 'Максимум напоминаний об оплате',
+  notifyTeacherOnAutoPaymentReminder: 'Уведомлять меня об авто-напоминаниях об оплате',
+  notifyTeacherOnManualPaymentReminder: 'Уведомлять меня о ручных напоминаниях об оплате',
+  homeworkNotifyOnAssign: 'Уведомлять при выдаче домашки',
+  homeworkReminder24hEnabled: 'Напоминание о ДЗ за 24 часа',
+  homeworkReminderMorningEnabled: 'Утреннее напоминание о ДЗ',
+  homeworkReminderMorningTime: 'Время утреннего напоминания о ДЗ',
+  homeworkReminder3hEnabled: 'Напоминание о ДЗ за 3 часа',
+  homeworkOverdueRemindersEnabled: 'Напоминания о просроченной ДЗ',
+  homeworkOverdueReminderTime: 'Время напоминания о просрочке ДЗ',
+  homeworkOverdueReminderMaxCount: 'Максимум напоминаний о просрочке ДЗ',
+  receiptEmail: 'Email для чеков',
+};
+
+const SETTINGS_VALUE_UNITS: Record<string, 'minutes' | 'hours' | 'count'> = {
+  defaultLessonDuration: 'minutes',
+  lessonReminderMinutes: 'minutes',
+  paymentReminderDelayHours: 'hours',
+  paymentReminderRepeatHours: 'hours',
+  paymentReminderMaxCount: 'count',
+  homeworkOverdueReminderMaxCount: 'count',
+};
+
+const WEEKDAY_LABELS_RU = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+const pluralizeMinutes = (value: number): string => {
+  const abs = Math.abs(value) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return `${value} минут`;
+  if (last === 1) return `${value} минута`;
+  if (last >= 2 && last <= 4) return `${value} минуты`;
+  return `${value} минут`;
+};
+
+const pluralizeHours = (value: number): string => {
+  const abs = Math.abs(value) % 100;
+  const last = abs % 10;
+  if (abs >= 11 && abs <= 14) return `${value} часов`;
+  if (last === 1) return `${value} час`;
+  if (last >= 2 && last <= 4) return `${value} часа`;
+  return `${value} часов`;
+};
+
+const formatSettingsValue = (key: string, value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'включено' : 'выключено';
+  if (key === 'weekendWeekdays') {
+    const raw = typeof value === 'string' ? value : '';
+    const indexes = raw
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isInteger(item) && item >= 0 && item <= 6);
+    if (!indexes.length) return 'нет';
+    return indexes.map((index) => WEEKDAY_LABELS_RU[index]).join(', ');
+  }
+  if (typeof value === 'number') {
+    const unit = SETTINGS_VALUE_UNITS[key];
+    if (unit === 'minutes') return pluralizeMinutes(value);
+    if (unit === 'hours') return pluralizeHours(value);
+    return String(value);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length > 60) return `${trimmed.slice(0, 57)}…`;
+    return trimmed || '—';
+  }
+  return String(value);
+};
+
+const buildSettingsChangeDetails = (
+  changedTeacherKeys: string[],
+  changedUserKeys: string[],
+  oldTeacher: Record<string, unknown>,
+  newTeacher: Record<string, unknown>,
+  oldUser: Record<string, unknown>,
+  newUser: Record<string, unknown>,
+): string => {
+  const parts: string[] = [];
+
+  const describe = (key: string, oldSource: Record<string, unknown>, newSource: Record<string, unknown>) => {
+    const label = SETTINGS_FIELD_LABELS[key];
+    if (!label) return null;
+    const oldValue = formatSettingsValue(key, oldSource[key]);
+    const newValue = formatSettingsValue(key, newSource[key]);
+    if (oldValue === newValue) return `${label}: ${newValue}`;
+    return `${label}: ${oldValue} → ${newValue}`;
+  };
+
+  for (const key of changedTeacherKeys) {
+    const line = describe(key, oldTeacher, newTeacher);
+    if (line) parts.push(line);
+  }
+  for (const key of changedUserKeys) {
+    const line = describe(key, oldUser, newUser);
+    if (line) parts.push(line);
+  }
+
+  return parts.join('; ');
+};
+
 export const createSettingsService = ({
   prisma,
   ensureTeacher,
@@ -548,6 +665,14 @@ export const createSettingsService = ({
     );
     const changedUserKeys = Object.keys(userData).filter((key) => (user as any)[key] !== (result.updatedUser as any)[key]);
     if (changedTeacherKeys.length > 0 || changedUserKeys.length > 0) {
+      const details = buildSettingsChangeDetails(
+        changedTeacherKeys,
+        changedUserKeys,
+        teacher as Record<string, unknown>,
+        result.updatedTeacher as Record<string, unknown>,
+        user as Record<string, unknown>,
+        result.updatedUser as Record<string, unknown>,
+      );
       await safeLogActivityEvent({
         teacherId: teacher.chatId,
         category: 'SETTINGS',
@@ -555,12 +680,7 @@ export const createSettingsService = ({
         status: 'SUCCESS',
         source: 'USER',
         title: 'Обновлены настройки',
-        details: [
-          changedTeacherKeys.length > 0 ? `Teacher: ${changedTeacherKeys.join(', ')}` : null,
-          changedUserKeys.length > 0 ? `Profile: ${changedUserKeys.join(', ')}` : null,
-        ]
-          .filter(Boolean)
-          .join('; '),
+        details,
         payload: {
           changedTeacherKeys,
           changedUserKeys,

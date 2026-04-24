@@ -16,10 +16,17 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
   onOpenStudent,
   onEditStudent,
   onDeleteStudent,
+  onScheduleLesson,
+  onWriteStudent,
+  onTopUpBalance,
+  onAssignHomework,
 }) => {
   const presentation = useMemo(() => buildStudentCardPresentation(item, timeZone), [item, timeZone]);
   const statusMeta = getStatusUiMeta(presentation.status);
-  const hasDebt = (typeof item.debtRub === 'number' && item.debtRub > 0) || (item.debtLessonCount ?? 0) > 0;
+  const hasDebt =
+    (typeof item.debtRub === 'number' && item.debtRub > 0) ||
+    (item.debtLessonCount ?? 0) > 0 ||
+    (typeof item.link.balanceLessons === 'number' && item.link.balanceLessons < 0);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -55,6 +62,15 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
                   <span className={styles.debtBadge}>Долг</span>
                 </Tooltip>
               ) : null}
+              {item.student.isActivated === false ? (
+                <Tooltip
+                  content="Ученик ещё не нажал Start в Telegram-боте — напоминания ему отправлять нельзя"
+                  side="bottom"
+                  align="start"
+                >
+                  <span className={styles.inactiveBadge}>Telegram не привязан</span>
+                </Tooltip>
+              ) : null}
             </div>
             {presentation.levelLabel ? <p className={styles.level}>{presentation.levelLabel}</p> : null}
           </div>
@@ -63,13 +79,18 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
           studentId={item.student.id}
           onEditStudent={onEditStudent}
           onDeleteStudent={onDeleteStudent}
+          onScheduleLesson={onScheduleLesson}
+          onWriteStudent={onWriteStudent}
+          onTopUpBalance={onTopUpBalance}
+          onAssignHomework={onAssignHomework}
+          hasTelegram={Boolean(item.student.username) || item.student.isActivated}
         />
       </div>
 
       <div className={styles.metricsGrid}>
         <div className={styles.metricCell}>
           <div className={styles.metricValue}>{presentation.lessonsConducted}</div>
-          <div className={styles.metricLabel}>Занятий проведено</div>
+          <div className={styles.metricLabel}>Уроков проведено</div>
         </div>
         <div className={styles.metricCell}>
           <div className={`${styles.metricValue} ${styles.metricGreen}`}>{presentation.attendanceRate}%</div>

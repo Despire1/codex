@@ -177,6 +177,25 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const [selectedDayHomeworkAssignmentsByLessonId, setSelectedDayHomeworkAssignmentsByLessonId] = useState<
     Record<number, HomeworkAssignment[]>
   >({});
+  const deepLinkLessonHandledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const lessonIdParam = params.get('lessonId');
+    if (!lessonIdParam) {
+      deepLinkLessonHandledRef.current = null;
+      return;
+    }
+    if (deepLinkLessonHandledRef.current === lessonIdParam) return;
+    const found = lessons.find((lesson) => String(lesson.id) === lessonIdParam);
+    if (!found) return;
+    deepLinkLessonHandledRef.current = lessonIdParam;
+    const zonedStart = toZonedDate(found.startAt, timeZone);
+    const dayIso = format(zonedStart, 'yyyy-MM-dd');
+    const timeLabel = format(zonedStart, 'HH:mm');
+    openLessonModal(dayIso, timeLabel, found);
+    navigate('/schedule', { replace: true });
+  }, [location.search, lessons, timeZone, openLessonModal, navigate]);
 
   const lessonsByDay = useMemo(() => {
     return lessons.reduce<Record<string, Lesson[]>>((acc, lesson) => {
@@ -244,15 +263,10 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`;
   }, [dayViewDate]);
 
-  const dayLabel = useMemo(() => format(dayViewDate, 'EE, d MMMM', { locale: ru }), [dayViewDate]);
+  const dayLabel = useMemo(() => format(dayViewDate, 'EEEE, d MMMM', { locale: ru }), [dayViewDate]);
 
   const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
   const weekDayShortLabels = useMemo(() => ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'], []);
-
-  const defaultWeekDayIso = useMemo(() => {
-    const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
-    return weekDays.find((day) => day.iso === todayIso)?.iso ?? weekDays[0]?.iso ?? todayIso;
-  }, [timeZone, weekDays]);
 
   const capitalizedDayLabel = useMemo(
     () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
@@ -284,14 +298,47 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   }, [dayPickerOpen]);
 
   useEffect(() => {
-    if (scheduleView === 'week' && weekScrollRef.current) {
-      weekScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
-    }
+    const resolveScrollTopForDay = (): number => {
+      const dayIso = format(dayViewDate, 'yyyy-MM-dd');
+      const todayIso = formatInTimeZone(new Date(), 'yyyy-MM-dd', { timeZone });
+      const dayLessons = lessons
+        .filter((lesson) => formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone }) === dayIso)
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
-    if ((scheduleView === 'day' || (scheduleView === 'week' && isMobileViewport)) && dayScrollRef.current) {
-      dayScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
-    }
-  }, [scheduleView, dayViewDate, isMobileViewport]);
+      if (dayLessons.length > 0) {
+        const earliestLessonTime = formatInTimeZone(dayLessons[0].startAt, 'HH:mm', { timeZone });
+        const [hourStr] = earliestLessonTime.split(':');
+        const lessonHour = Math.max(0, Number(hourStr) - 1);
+        return lessonHour * HOUR_BLOCK_HEIGHT;
+      }
+
+      if (dayIso === todayIso) {
+        const currentHour = Number(formatInTimeZone(new Date(), 'H', { timeZone }));
+        return Math.max(0, currentHour - 1) * HOUR_BLOCK_HEIGHT;
+      }
+
+      return DEFAULT_SCROLL_TOP;
+    };
+
+    const applyScroll = () => {
+      if (scheduleView === 'week' && weekScrollRef.current) {
+        weekScrollRef.current.scrollTop = DEFAULT_SCROLL_TOP;
+      }
+
+      if ((scheduleView === 'day' || (scheduleView === 'week' && isMobileViewport)) && dayScrollRef.current) {
+        dayScrollRef.current.scrollTop = resolveScrollTopForDay();
+      }
+    };
+
+    applyScroll();
+    // rAF повторно, чтобы дать DOM смонтироваться при первом переходе на вкладку
+    const rafId = typeof window !== 'undefined' ? window.requestAnimationFrame(applyScroll) : null;
+    return () => {
+      if (rafId !== null && typeof window !== 'undefined') {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [scheduleView, dayViewDate, isMobileViewport, lessons, timeZone]);
 
   useEffect(() => {
     if (scheduleView !== 'month' || effectiveSelectedMonthDay) return;
@@ -498,14 +545,19 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return lessonEnd < Date.now();
   };
 
-  const renderPaymentBadges = (lessonId: number, participants: any[], isGroupLesson: boolean) => {
+  const renderPaymentBadges = (lesson: Lesson, participants: any[], isGroupLesson: boolean) => {
     const paidCount = participants.filter((participant: any) => participant.isPaid).length;
     const unpaidCount = participants.length - paidCount;
+    // Для будущих запланированных уроков оплата ещё не ожидается — скрываем плашку «Не оплачено».
+    const isFutureScheduled =
+      lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
 
     if (isGroupLesson) {
       const badges = [] as Array<{ label: string; variant: 'groupPaid' | 'groupUnpaid' }>;
       if (paidCount > 0) badges.push({ label: `${paidCount} оплачено`, variant: 'groupPaid' });
-      if (unpaidCount > 0) badges.push({ label: `${unpaidCount} не оплачено`, variant: 'groupUnpaid' });
+      if (unpaidCount > 0 && !isFutureScheduled) {
+        badges.push({ label: `${unpaidCount} не оплачено`, variant: 'groupUnpaid' });
+      }
 
       return badges.map((badge) => (
         <Badge key={`${badge.variant}-${badge.label}`} label={badge.label} variant={badge.variant} withDot />
@@ -514,6 +566,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
     const participant = participants[0];
     const isPaid = !!participant?.isPaid;
+    if (!isPaid && isFutureScheduled) {
+      return null;
+    }
 
     return (
       <Tooltip content={isPaid ? 'Оплачено' : 'Не оплачено'}>
@@ -522,7 +577,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           className={`${styles.paymentBadge} ${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaid}`}
           onClick={(event) => {
             event.stopPropagation();
-            togglePaid(lessonId, participant?.studentId);
+            togglePaid(lesson.id, participant?.studentId);
           }}
         >
           <span className={styles.paymentBadgeIcon} aria-hidden="true" />
@@ -672,7 +727,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         </div>
         <div className={styles.statusBadges}>
           {awaitingConfirmation && <Badge label="Ожидает подтверждения" variant="pending" />}
-          {renderPaymentBadges(lesson.id, participants, isGroupLesson)}
+          {renderPaymentBadges(lesson, participants, isGroupLesson)}
         </div>
         {lessonMeta && <div className={styles.weekLessonMeta}>{lessonMeta}</div>}
       </div>
@@ -831,10 +886,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     return (
         <div className={styles.dayView}>
           <div key={dayLabelKey} className={styles.dayHeading}>
-            <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM', { locale: ru })}</div>
-            {!isMobileViewport && (
-              <div className={styles.weekDayDate}>{format(dayViewDate, 'yyyy-MM-dd')}</div>
-            )}
+            <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM yyyy', { locale: ru })}</div>
           </div>
         <div className={styles.dayGridScroll} ref={dayScrollRef}>
           <div className={styles.dayGrid}>
@@ -921,7 +973,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         return { lessonId, items };
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load homework assignments for lesson', error);
         return { lessonId, items: [] as HomeworkAssignment[] };
       }
@@ -1130,7 +1182,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 disabled={selectedDayIsWeekend}
               >
                 <AddOutlinedIcon className={styles.dayPanelAddButtonIcon} />
-                {selectedDayIsWeekend ? 'Выходной день' : 'Добавить занятие'}
+                {selectedDayIsWeekend ? 'Выходной день' : 'Добавить урок'}
               </button>
             </div>
           </div>

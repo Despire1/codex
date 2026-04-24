@@ -33,8 +33,8 @@ export const LessonActionsSheet = ({
   onEdit,
   onDelete,
 }: LessonActionsSheetProps) => {
-  if (!lesson) return null;
   const timeZone = useTimeZone();
+  if (!lesson) return null;
 
   const lessonDate = formatInTimeZone(lesson.startAt, 'd MMM yyyy, HH:mm', { locale: ru, timeZone });
   const durationLabel = lesson.durationMinutes ? `${lesson.durationMinutes} мин` : '—';
@@ -85,7 +85,7 @@ export const LessonActionsSheet = ({
           }}
           disabled={Boolean(rescheduleDisabledReason)}
         >
-          Перенести
+          Перенести урок
         </button>
         <Tooltip content={deleteDisabledReason}>
           <button
@@ -98,7 +98,7 @@ export const LessonActionsSheet = ({
             }}
             disabled={Boolean(deleteDisabledReason)}
           >
-            Удалить
+            Удалить урок
           </button>
         </Tooltip>
       </div>

@@ -19,6 +19,7 @@ export const createSessionService = ({ getSessionTokenHash }: SessionServiceDeps
       sessions: sessions.map((session) => ({
         id: session.id,
         createdAt: session.createdAt,
+        lastSeenAt: session.lastSeenAt ?? session.createdAt,
         ip: session.ip,
         userAgent: session.userAgent,
         isCurrent: tokenHash ? session.tokenHash === tokenHash : false,

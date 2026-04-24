@@ -64,13 +64,14 @@ export const MonthDayLessonCard = ({
   const startTime = format(startDate, 'HH:mm');
   const endTime = format(endDate, 'HH:mm');
   const isCanceled = lesson.status === 'CANCELED';
+  const isCompleted = lesson.status === 'COMPLETED';
   const isRecurring = isLessonInSeries(lesson);
   const { primaryAssignment, extraCount } = resolveMonthDayHomeworkSummary(homeworkAssignments);
   const rescheduleDisabledReason = resolveLessonMutationDisabledReason(lesson);
   const editDisabledReason = resolveLessonEditDisabledReason(lesson);
   const deleteDisabledReason = resolveLessonDeleteDisabledReason(lesson);
   const cancelCopy = resolveLessonCancelActionCopy(lesson);
-  const hasMetaRow = Boolean(primaryAssignment || lesson.meetingLink || isCanceled);
+  const hasMetaRow = Boolean(primaryAssignment || lesson.meetingLink || isCanceled || isCompleted);
   const lessonColorTheme = getLessonColorTheme(lesson.color);
   const styleVars = {
     ...getLessonColorVars(lesson.color),
@@ -89,7 +90,7 @@ export const MonthDayLessonCard = ({
   return (
     <div className={styles.cardWrap} style={style}>
       <div
-        className={`${styles.card} ${isCanceled ? styles.canceled : ''}`}
+        className={`${styles.card} ${isCanceled ? styles.canceled : ''} ${isCompleted ? styles.completed : ''}`}
         style={styleVars}
         role="button"
         tabIndex={0}
@@ -159,7 +160,7 @@ export const MonthDayLessonCard = ({
                             onCloseActions();
                           }}
                         >
-                          Перенести занятие
+                          Перенести урок
                         </button>
                       </Tooltip>
 
@@ -215,7 +216,7 @@ export const MonthDayLessonCard = ({
                         onCloseActions();
                       }}
                     >
-                      Удалить занятие
+                      Удалить урок
                     </button>
                   </Tooltip>
                 </div>
@@ -255,6 +256,22 @@ export const MonthDayLessonCard = ({
               ) : null}
 
               {isCanceled ? <span className={`${styles.linkBadge} ${styles.canceledBadge}`}>Отменено</span> : null}
+
+              {isCompleted ? (
+                <span className={`${styles.linkBadge} ${styles.completedBadge}`}>
+                  <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden="true">
+                    <path
+                      d="M3.5 8.5l2.8 2.8 6.2-6.2"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Проведён
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

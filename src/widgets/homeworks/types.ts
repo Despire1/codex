@@ -64,7 +64,7 @@ export type TeacherAssignmentsSummary = HomeworkAssignmentsSummary;
 export type TeacherHomeworkSort = HomeworkAssignmentsSort;
 export type TeacherHomeworkProblemFilter = HomeworkAssignmentProblemFilter;
 export type TeacherHomeworkGroupKey = `group_${number}` | 'ungrouped';
-export type TeacherHomeworkListFilter = 'all' | 'not_issued' | 'sent' | 'review' | 'closed';
+export type TeacherHomeworkListFilter = 'all' | 'not_issued' | 'sent' | 'overdue' | 'review' | 'closed';
 
 export interface TeacherHomeworksViewModel {
   assignments: HomeworkAssignment[];

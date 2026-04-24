@@ -213,6 +213,17 @@ const getPaymentStatusMeta = (event: PaymentEvent) => {
 
 const formatPaymentEventValue = (event: PaymentEvent) => {
   if (event.type === 'ADJUSTMENT' && event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
+    // TEA-25: показываем, какая сумма была списана без возврата,
+    // иначе учитель видит только «—» и не понимает, что именно отменилось.
+    const amount =
+      typeof event.moneyAmount === 'number' && event.moneyAmount > 0
+        ? event.moneyAmount
+        : typeof event.priceSnapshot === 'number' && event.priceSnapshot > 0
+          ? event.priceSnapshot
+          : null;
+    if (amount !== null) {
+      return `−${amount.toLocaleString('ru-RU')} ₽`;
+    }
     return '—';
   }
   if (typeof event.moneyAmount === 'number' && event.moneyAmount > 0) {
@@ -322,6 +333,12 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const canRemind = canRemindStudentProfileHomework(assignment);
           const statusLabel = resolveStudentProfileHomeworkStatusLabel(assignment);
 
+          const recipientName =
+            assignment.studentName ||
+            studentEntry.link?.customName ||
+            studentEntry.student.username ||
+            '';
+
           return (
             <article
               key={assignment.id}
@@ -341,6 +358,9 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <p className={styles.activitySubtitle}>
                     {resolveStudentProfileHomeworkDeadlineLabel(assignment, timeZone)}
                   </p>
+                  {recipientName ? (
+                    <p className={styles.activityRecipient}>Выдано: {recipientName}</p>
+                  ) : null}
                 </div>
                 <span className={styles.statusBadge}>{statusLabel}</span>
               </div>
@@ -400,8 +420,14 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const isPaidForStudent = lessonParticipant?.isPaid ?? lesson.isPaid;
           const statusLabel = resolveLessonStatusLabel(lesson);
           const statusTone = resolveLessonStatusTone(lesson);
-          const paymentLabel = isPaidForStudent ? 'Оплачено' : 'Не оплачено';
-          const paymentTone = isPaidForStudent ? 'paid' : 'unpaid';
+          const isFutureScheduled =
+            lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
+          const paymentLabel = isPaidForStudent
+            ? 'Оплачено'
+            : isFutureScheduled
+              ? 'Оплата после урока'
+              : 'Не оплачено';
+          const paymentTone = isPaidForStudent ? 'paid' : isFutureScheduled ? 'pending' : 'unpaid';
           const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
           const lessonKindLabel = lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок';
           const editDisabledReason = resolveLessonEditDisabledReason(lesson);
@@ -641,7 +667,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     hasUnpaidLessons ||
     (typeof studentEntry.debtRub === 'number' && studentEntry.debtRub > 0) ||
     (studentEntry.debtLessonCount ?? 0) > 0;
-  const unpaidLessonsLabel = 'Сумма неоплаченных занятий';
+  const unpaidLessonsLabel = 'Сумма неоплаченных уроков';
   const unpaidLessonsValueLabel =
     typeof unpaidLessonsTotal === 'number' && unpaidLessonsTotal > 0
       ? `${unpaidLessonsTotal.toLocaleString('ru-RU')} ₽`
@@ -868,10 +894,10 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       ) : null}
                       {showActivationBadge ? (
                         <Tooltip content={activationHint} side="bottom" align="center">
-                          <span className={styles.heroInactiveBadge}>Не активирован</span>
+                          <span className={styles.heroInactiveBadge}>Telegram не привязан</span>
                         </Tooltip>
                       ) : null}
-                      <Tooltip content="Статус ученика" side="bottom" align="center">
+                      <Tooltip content="Статус обучения" side="bottom" align="center">
                         <span
                           className={`${styles.heroStatusBadge} ${
                             statusMeta.tone === 'active'
@@ -924,7 +950,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   </button>
                 </Tooltip>
                 <button type="button" className={styles.primaryAction} onClick={onScheduleLesson}>
-                  <FontAwesomeIcon icon={faCalendarPlus} /> Назначить занятие
+                  <FontAwesomeIcon icon={faCalendarPlus} /> Назначить урок
                 </button>
                 <AdaptivePopover
                   isOpen={isActionsMenuOpen}
@@ -960,7 +986,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
             <div className={styles.heroStatsGrid}>
               <div>
                 <div className={styles.heroStatValue}>{profileStats.lessonsConducted}</div>
-                <div className={styles.heroStatLabel}>Занятий проведено</div>
+                <div className={styles.heroStatLabel}>Уроков проведено</div>
               </div>
               <Tooltip content="Изменить цену урока" side="bottom" align="start">
                 <button

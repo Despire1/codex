@@ -85,7 +85,7 @@ const resolveQuestionPoints = (question: HomeworkTestQuestion) => {
   if (typeof question.points === 'number' && Number.isFinite(question.points) && question.points > 0) {
     return roundToHalf(question.points);
   }
-  return 2;
+  return 1;
 };
 
 const resolveChoiceOptionText = (question: HomeworkTestQuestion, optionId: string) =>

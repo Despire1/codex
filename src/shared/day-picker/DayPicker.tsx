@@ -120,7 +120,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
     if (!isRangeMode && selectedDate && !isSameMonth(selectedDate, month)) {
       setMonth(startOfMonth(selectedDate));
     }
-  }, [isRangeMode, selectedDate, selectedRange?.from]);
+  }, [isRangeMode, month, selectedDate, selectedRange?.from]);
 
   const weekdays = useMemo(() => {
     const base = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];

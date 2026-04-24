@@ -99,7 +99,7 @@ export const SecuritySettings: FC = () => {
       const data = await api.listSessions();
       setSessions(data.sessions ?? []);
       setStatus('ready');
-    } catch (error) {
+    } catch (_error) {
       setStatus('error');
     }
   }, []);
@@ -119,7 +119,7 @@ export const SecuritySettings: FC = () => {
     try {
       await api.revokeSession(sessionId);
       setSessions((prev) => prev.filter((session) => session.id !== sessionId));
-    } catch (error) {
+    } catch (_error) {
       showToast({ message: 'Не удалось завершить сессию', variant: 'error' });
     } finally {
       setActionLoading(false);
@@ -131,7 +131,7 @@ export const SecuritySettings: FC = () => {
     try {
       await api.revokeOtherSessions();
       setSessions((prev) => prev.filter((session) => session.isCurrent));
-    } catch (error) {
+    } catch (_error) {
       showToast({ message: 'Не удалось завершить другие сессии', variant: 'error' });
     } finally {
       setActionLoading(false);
@@ -198,7 +198,9 @@ export const SecuritySettings: FC = () => {
                       </div>
 
                       <div className={styles.sessionMetaLine}>{session.ip ? `IP: ${session.ip}` : 'IP не определён'}</div>
-                      <div className={styles.sessionMetaSecondary}>{formatSessionActivity(session.createdAt)}</div>
+                      <div className={styles.sessionMetaSecondary}>
+                        {formatSessionActivity(session.lastSeenAt ?? session.createdAt)}
+                      </div>
                     </div>
                   </div>
 

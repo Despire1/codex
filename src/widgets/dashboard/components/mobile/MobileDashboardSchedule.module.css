@@ -194,8 +194,8 @@
 }
 
 .weekRowToday {
-  border-color: var(--color-blue-200);
-  background: var(--color-blue-50);
+  border-color: #a7f14e;
+  background: rgba(167, 241, 78, 0.18);
 }
 
 .weekLabel {

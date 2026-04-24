@@ -178,7 +178,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   const [actionsLesson, setActionsLesson] = useState<Lesson | null>(null);
   const [participantActionState, setParticipantActionState] = useState<ParticipantActionState>(null);
   const activitySeenRef = useRef<string | null>(null);
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const nowTs = now.getTime();
 
   const presentation = useMemo(
@@ -320,6 +320,34 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
     return baseName.split(' ')[0] || 'Преподаватель';
   }, [teacher.name, teacher.username]);
 
+  const upcomingTodayCount = useMemo(
+    () => presentation.dayTimeline.filter((item) => !item.isPast && item.lesson.status !== 'COMPLETED').length,
+    [presentation.dayTimeline],
+  );
+
+  const heroTitleLabel = useMemo(() => {
+    if (upcomingTodayCount > 0) return `${pluralizeLessons(upcomingTodayCount)} сегодня`;
+    if (presentation.dayTimeline.length > 0) return 'Сегодня уроки завершены';
+    return 'Сегодня уроков нет';
+  }, [presentation.dayTimeline.length, upcomingTodayCount]);
+
+  const heroSubtitleLabel = useMemo(() => {
+    if (!presentation.nextLesson) return 'Следующий урок ещё не запланирован';
+    const startAt = new Date(presentation.nextLesson.lesson.startAt);
+    const startZoned = toZonedDate(startAt, timeZone);
+    const timeLabel = formatInTimeZone(startAt, 'HH:mm', { timeZone });
+    const studentLabel = presentation.nextLesson.studentLabel;
+
+    if (isSameDay(startZoned, todayZoned)) {
+      return `Следующий в ${timeLabel} — ${studentLabel}`;
+    }
+    if (isSameDay(startZoned, tomorrowZoned)) {
+      return `Завтра в ${timeLabel} — ${studentLabel}`;
+    }
+    const dateLabel = formatInTimeZone(startAt, 'EEE, d MMM', { locale: ru, timeZone }).replace('.', '');
+    return `${capitalizeFirst(dateLabel)} в ${timeLabel} — ${studentLabel}`;
+  }, [presentation.nextLesson, timeZone, todayZoned, tomorrowZoned]);
+
   const openActivityFeed = () => {
     setIsActivityOpen(true);
     onRequestActivityFeed();
@@ -340,7 +368,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
         void onRefreshUnreadActivity();
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to mark activity feed as seen in mobile dashboard', error);
         activitySeenRef.current = null;
       });
@@ -357,14 +385,8 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
         <div className={styles.heroCard}>
           <div className={styles.heroHeader}>
             <div>
-              <h2 className={styles.heroTitle}>{pluralizeLessons(presentation.dayTimeline.length)} на сегодня</h2>
-              <p className={styles.heroSubtitle}>
-                {presentation.nextLesson
-                  ? `Следующий в ${formatInTimeZone(presentation.nextLesson.lesson.startAt, 'HH:mm', {
-                      timeZone,
-                    })} с ${presentation.nextLesson.studentLabel}`
-                  : 'На сегодня уроков больше нет'}
-              </p>
+              <h2 className={styles.heroTitle}>{heroTitleLabel}</h2>
+              <p className={styles.heroSubtitle}>{heroSubtitleLabel}</p>
             </div>
 
             <div className={styles.heroIconWrap} aria-hidden>

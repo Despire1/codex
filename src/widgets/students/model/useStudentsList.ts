@@ -120,7 +120,7 @@ export const useStudentsList = ({
           });
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load students list', error);
       } finally {
         setIsLoading(false);

@@ -29,6 +29,7 @@ export const WeekLessonCard: FC<WeekLessonCardProps> = ({
   const endDate = addMinutes(startDate, lesson.durationMinutes);
   const timeLabel = `${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`;
   const isCanceled = lesson.status === 'CANCELED';
+  const isCompleted = lesson.status === 'COMPLETED';
   const theme = getLessonColorTheme(lesson.color);
 
   const styleVars = {
@@ -40,13 +41,40 @@ export const WeekLessonCard: FC<WeekLessonCardProps> = ({
   return (
     <button
       type="button"
-      className={[styles.card, isCanceled ? styles.cardCanceled : ''].filter(Boolean).join(' ')}
+      className={[
+        styles.card,
+        isCanceled ? styles.cardCanceled : '',
+        isCompleted ? styles.cardCompleted : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={styleVars}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
+      aria-label={isCompleted ? `Проведённое занятие: ${lessonLabel}, ${timeLabel}` : undefined}
     >
-      <span className={styles.time}>{timeLabel}</span>
+      <span className={styles.time}>
+        {isCompleted ? (
+          <svg
+            className={styles.completedIcon}
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            width={12}
+            height={12}
+          >
+            <path
+              d="M3.5 8.5l2.8 2.8 6.2-6.2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : null}
+        {timeLabel}
+      </span>
       <span className={styles.name}>{lessonLabel}</span>
     </button>
   );

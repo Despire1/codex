@@ -42,6 +42,8 @@ export const LessonFiltersPopover: FC<LessonFiltersPopoverProps> = ({
       from: parseDateValue(lessonDateRange.from),
       to: parseDateValue(lessonDateRange.to),
     }),
+    // parseDateValue читает только timeZone (меняется редко); перевыполнять при её пересоздании не нужно.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [lessonDateRange.from, lessonDateRange.to],
   );
 

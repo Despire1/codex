@@ -8,7 +8,6 @@ import { Tooltip } from '../../../shared/ui/Tooltip/Tooltip';
 import {
   AddOutlinedIcon,
   CheckCircleOutlineIcon,
-  EditOutlinedIcon,
   MoreHorizIcon,
   FilterAltOutlinedIcon,
 } from '../../../icons/MaterialIcons';

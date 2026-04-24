@@ -42,6 +42,16 @@
   color: #dc2626 !important;
 }
 
+.separator {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 4px;
+}
+
+.menu {
+  min-width: 210px;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .trigger:hover {
     background: #f3f4f6;

@@ -445,8 +445,8 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
         isOpen={Boolean(activeLesson && lessonPopover)}
         anchorEl={lessonPopover?.anchorEl ?? null}
         onClose={closeLessonPopover}
-        side="right"
-        align="start"
+        side="bottom"
+        align="center"
         className={styles.lessonPopover}
       >
         {activeLesson && (

@@ -39,6 +39,10 @@ interface StudentsReferenceListViewProps {
   onAddStudent: () => void;
   onEditStudent: (studentId: number) => void;
   onDeleteStudent: (studentId: number) => void;
+  onScheduleLesson?: (studentId: number) => void;
+  onWriteStudent?: (studentId: number) => void;
+  onTopUpBalance?: (studentId: number) => void;
+  onAssignHomework?: (studentId: number) => void;
   timeZone: string;
 }
 
@@ -83,6 +87,10 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   onAddStudent,
   onEditStudent,
   onDeleteStudent,
+  onScheduleLesson,
+  onWriteStudent,
+  onTopUpBalance,
+  onAssignHomework,
   timeZone,
 }) => {
   const isMobile = useIsMobile(900);
@@ -145,6 +153,19 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
       return aNext - bNext;
     });
   }, [levelFilter, sortBy, statusFilter, students, timeZone]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (statusFilter === 'PAUSED') {
+      return 'Здесь будут ученики, которых вы поставили на паузу (временно не проводите уроки). Поставить на паузу можно из профиля ученика через меню «⋯».';
+    }
+    if (statusFilter === 'COMPLETED') {
+      return 'Здесь будут ученики, с которыми вы завершили обучение. Завершить обучение можно из профиля ученика через меню «⋯».';
+    }
+    if (statusFilter === 'ACTIVE') {
+      return 'Нет активных учеников. Добавьте ученика или измените фильтр.';
+    }
+    return 'По текущим фильтрам ученики не найдены.';
+  }, [statusFilter]);
 
   return (
     <div className={styles.screen}>
@@ -214,10 +235,10 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
               <div className={styles.compactTableHeader}>
                 <div className={styles.compactTableGrid}>
                   <div>Ученик</div>
-                  <div className={styles.compactHeaderCenter}>Занятий</div>
+                  <div className={styles.compactHeaderCenter}>Уроков</div>
                   <div className={styles.compactHeaderCenter}>Посещаемость</div>
                   <div className={styles.compactHeaderCenter}>Средний балл</div>
-                  <div>Следующее занятие</div>
+                  <div>Следующий урок</div>
                   <div className={styles.compactHeaderRight}>Статус</div>
                 </div>
               </div>
@@ -231,11 +252,15 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                     onOpenStudent={onOpenStudent}
                     onEditStudent={onEditStudent}
                     onDeleteStudent={onDeleteStudent}
+                    onScheduleLesson={onScheduleLesson}
+                    onWriteStudent={onWriteStudent}
+                    onTopUpBalance={onTopUpBalance}
+                    onAssignHomework={onAssignHomework}
                   />
                 ))}
 
                 {!isLoading && preparedStudents.length === 0 ? (
-                  <div className={styles.compactEmptyState}>По текущим фильтрам ученики не найдены</div>
+                  <div className={styles.compactEmptyState}>{emptyStateMessage}</div>
                 ) : null}
 
                 {isLoading && preparedStudents.length === 0
@@ -253,11 +278,15 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                   onOpenStudent={onOpenStudent}
                   onEditStudent={onEditStudent}
                   onDeleteStudent={onDeleteStudent}
+                  onScheduleLesson={onScheduleLesson}
+                  onWriteStudent={onWriteStudent}
+                  onTopUpBalance={onTopUpBalance}
+                  onAssignHomework={onAssignHomework}
                 />
               ))}
 
               {!isLoading && preparedStudents.length === 0 ? (
-                <div className={styles.emptyState}>По текущим фильтрам ученики не найдены</div>
+                <div className={styles.emptyState}>{emptyStateMessage}</div>
               ) : null}
 
               {isLoading && preparedStudents.length === 0

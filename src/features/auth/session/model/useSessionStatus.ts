@@ -27,7 +27,7 @@ export const useSessionStatus = () => {
         }
       }
       setState('authenticated');
-    } catch (error) {
+    } catch (_error) {
       setUser(null);
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem('userRole');

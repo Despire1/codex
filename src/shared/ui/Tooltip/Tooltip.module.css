@@ -32,16 +32,8 @@
   transform: rotate(45deg);
 }
 
-.side_bottom {
-  top: calc(100% + 8px);
-}
-
 .side_bottom::before {
   top: -5px;
-}
-
-.side_top {
-  bottom: calc(100% + 8px);
 }
 
 .side_top::before {

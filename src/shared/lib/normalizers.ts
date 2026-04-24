@@ -31,7 +31,7 @@ export const normalizeLesson = (lesson: any): Lesson => ({
             return Array.isArray(parsed)
               ? parsed.map((value: any) => Number(value)).filter((v: number) => !Number.isNaN(v))
               : null;
-          } catch (error) {
+          } catch (_error) {
             return null;
           }
         })()
@@ -62,7 +62,7 @@ export const normalizeHomework = (homework: any, timeZone?: string | null): Home
   } else if (typeof homework.attachments === 'string') {
     try {
       attachments = JSON.parse(homework.attachments) ?? [];
-    } catch (error) {
+    } catch (_error) {
       attachments = [];
     }
   }

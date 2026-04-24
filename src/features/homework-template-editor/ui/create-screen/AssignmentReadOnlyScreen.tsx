@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { ru } from 'date-fns/locale';
 import type {
   HomeworkAssignment,
   HomeworkBlock,
@@ -25,7 +26,6 @@ import {
   HomeworkLayerGroupIcon,
   HomeworkLinkIcon,
   HomeworkListCheckIcon,
-  HomeworkMicrophoneIcon,
   HomeworkPaperPlaneIcon,
   HomeworkPlayIcon,
 } from '../../../../shared/ui/icons/HomeworkFaIcons';
@@ -69,7 +69,7 @@ const QUESTION_KIND_LABELS: Record<string, string> = {
 const formatDateTime = (value: string | null | undefined, timeZone: string) => {
   if (!value) return 'Не указано';
   try {
-    return formatInTimeZone(value, 'd MMMM yyyy, HH:mm', { timeZone });
+    return formatInTimeZone(value, 'd MMMM yyyy, HH:mm', { timeZone, locale: ru });
   } catch {
     return 'Не указано';
   }
@@ -224,7 +224,11 @@ const QuestionsSection: FC<{ block: HomeworkBlockTest }> = ({ block }) => {
             <div className={styles.questionMetaBadges}>
               <span className={styles.questionKindBadge}>{resolveQuestionLabel(question)}</span>
               <span className={styles.questionPointsBadge}>
-                {Number.isFinite(question.points) ? `${question.points} б.` : 'Без баллов'}
+                {(() => {
+                  const raw = Number(question.points);
+                  const resolved = Number.isFinite(raw) && raw > 0 ? raw : 1;
+                  return `${resolved} б.`;
+                })()}
               </span>
             </div>
           </div>

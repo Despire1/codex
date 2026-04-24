@@ -24,7 +24,7 @@ interface HomeworkAssignmentsWorkspaceProps {
   students: TeacherHomeworkStudentOption[];
   loadingStudents: boolean;
   activeTab: TeacherHomeworkListFilter;
-  countsByTab: Record<'all' | 'sent' | 'review' | 'closed', number>;
+  countsByTab: Record<'all' | 'sent' | 'overdue' | 'review' | 'closed', number>;
   draftCounts: Record<HomeworkDraftScope, number>;
   onSearchChange: (value: string) => void;
   onSortChange: (value: TeacherHomeworkSort) => void;
@@ -43,6 +43,7 @@ interface HomeworkAssignmentsWorkspaceProps {
 const ASSIGNED_SCOPE_TABS: Array<{ id: TeacherHomeworkListFilter; label: string }> = [
   { id: 'all', label: 'Все' },
   { id: 'sent', label: 'Выданы' },
+  { id: 'overdue', label: 'Просрочено' },
   { id: 'review', label: 'На проверке' },
   { id: 'closed', label: 'Завершены' },
 ];
@@ -64,7 +65,16 @@ const SORT_LABELS: Array<{ id: TeacherHomeworkSort; label: string }> = [
 const filterAssignedItems = (assignments: HomeworkAssignment[], activeTab: TeacherHomeworkListFilter) => {
   const nonDraftAssignments = assignments.filter((assignment) => assignment.status !== 'DRAFT' && assignment.status !== 'SCHEDULED');
   if (activeTab === 'sent') {
-    return nonDraftAssignments.filter((assignment) => assignment.status === 'SENT' || assignment.status === 'RETURNED' || assignment.status === 'OVERDUE');
+    // «Выданы» — реально активные, без просроченных (у просроченных отдельный таб).
+    return nonDraftAssignments.filter(
+      (assignment) =>
+        (assignment.status === 'SENT' || assignment.status === 'RETURNED') && !assignment.isOverdue,
+    );
+  }
+  if (activeTab === 'overdue') {
+    return nonDraftAssignments.filter(
+      (assignment) => assignment.status === 'OVERDUE' || assignment.isOverdue,
+    );
   }
   if (activeTab === 'review') {
     return nonDraftAssignments.filter((assignment) => assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW');
@@ -167,7 +177,7 @@ export const HomeworkAssignmentsWorkspace: FC<HomeworkAssignmentsWorkspaceProps>
                   >
                     <span>{tab.label}</span>
                     <span className={`${styles.scopeCount} ${activeTab === tab.id ? styles.scopeCountActive : ''}`}>
-                      {countsByTab[tab.id as 'all' | 'sent' | 'review' | 'closed']}
+                      {countsByTab[tab.id as 'all' | 'sent' | 'overdue' | 'review' | 'closed']}
                     </span>
                   </button>
                 ))}

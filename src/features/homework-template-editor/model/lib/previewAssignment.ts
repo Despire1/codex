@@ -13,6 +13,13 @@ type BuildPreviewHomeworkAssignmentPayload = {
   groupTitle?: string | null;
 };
 
+const cloneBlocks = (blocks: HomeworkEditorDraft['blocks']): HomeworkEditorDraft['blocks'] => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(blocks);
+  }
+  return JSON.parse(JSON.stringify(blocks));
+};
+
 export const buildPreviewHomeworkAssignment = ({
   draft,
   studentName,
@@ -35,7 +42,7 @@ export const buildPreviewHomeworkAssignment = ({
     scheduledFor: draft.assignment.scheduledFor,
     deadlineAt: draft.assignment.deadlineAt,
     sentAt: nowIso,
-    contentSnapshot: draft.blocks,
+    contentSnapshot: cloneBlocks(draft.blocks),
     overdueReminderCount: 0,
     createdAt: nowIso,
     updatedAt: nowIso,

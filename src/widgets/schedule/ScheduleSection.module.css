@@ -484,8 +484,8 @@
 }
 
 .activeDay {
-  border-color: #a7f14e;
-  background: #a7f14e;
+  border-color: var(--accent-primary, #a3e635);
+  background: var(--accent-primary, #a3e635);
   border-width: 1px;
 }
 
@@ -494,14 +494,14 @@
 }
 
 .todayCell {
-  border-color: #05070b;
+  border-color: var(--accent-primary, #a3e635);
   border-width: 1px;
-  background: #05070b;
+  background: var(--accent-primary, #a3e635);
 }
 
 .activeDay.todayCell {
-  border-color: #a7f14e;
-  background: #a7f14e;
+  border-color: var(--accent-primary, #a3e635);
+  background: var(--accent-primary, #a3e635);
 }
 
 .activeDay.todayCell .monthDateNumber,
@@ -549,7 +549,7 @@
 }
 
 .todayDateNumber {
-  color: #b8fa4e;
+  color: #111827;
 }
 
 .monthCounters {

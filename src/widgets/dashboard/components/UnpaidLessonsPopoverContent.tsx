@@ -64,9 +64,10 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   const reminderDelayMs = Math.max(1, reminderDelayHours) * 60 * 60 * 1000;
 
   useEffect(() => {
+    const timeouts = successTimeouts.current;
     return () => {
-      successTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      successTimeouts.current.clear();
+      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      timeouts.clear();
     };
   }, []);
 
@@ -96,7 +97,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
           successTimeouts.current.delete(key);
         }, 1200);
         successTimeouts.current.set(key, timeoutId);
-      } catch (error) {
+      } catch (_error) {
         // keep previous reminder timestamp on failure
       } finally {
         setPendingReminderIds((prev) => {
@@ -116,12 +117,19 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
       : sortedEntries.slice(0, maxVisibleEntries);
   const canToggle = !showAll && showToggle && sortedEntries.length > maxVisibleEntries;
   const isScrollable = showAll || (isExpanded && sortedEntries.length > 4);
+  const totalUnpaidRub = useMemo(
+    () => entries.reduce((sum, entry) => sum + (typeof entry.price === 'number' && entry.price > 0 ? entry.price : 0), 0),
+    [entries],
+  );
 
   return (
       <div className={`${styles.root} ${fitContainer ? styles.rootFill : ''}`.trim()}>
         {hideHeader ? null : (
           <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
-            <div className={styles.title}>Неоплаченные ({entries.length})</div>
+            <div className={styles.title}>
+              Неоплаченные ({entries.length})
+              {totalUnpaidRub > 0 ? ` · ${new Intl.NumberFormat('ru-RU').format(totalUnpaidRub)} ₽` : ''}
+            </div>
           </div>
         )}
 

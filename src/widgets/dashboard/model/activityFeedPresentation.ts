@@ -123,12 +123,18 @@ const resolveFailureDetails = (item: ActivityFeedItem): string | null => {
 
   if (normalized.includes('chat not found')) {
     const isTeacherTarget = item.action === 'PAYMENT_REMINDER_TEACHER' || item.action === 'TEACHER_LESSON_REMINDER';
-    const target = isTeacherTarget ? 'преподавателя' : 'получателя';
-    return `Telegram вернул «chat not found»: бот не нашёл чат ${target}. Обычно это значит, что чат с ботом не открыт (не было /start), чат удалён или используется другой bot token/окружение.`;
+    if (isTeacherTarget) {
+      return 'Чат с ботом не открыт. Откройте бота в Telegram и нажмите /start, чтобы получать уведомления.';
+    }
+    return 'У получателя не открыт чат с ботом. Попросите ученика найти бота в Telegram и нажать /start.';
   }
 
   if (normalized.includes('blocked by the user')) {
-    return 'Telegram вернул «blocked by the user»: получатель заблокировал бота.';
+    const isTeacherTarget = item.action === 'PAYMENT_REMINDER_TEACHER' || item.action === 'TEACHER_LESSON_REMINDER';
+    if (isTeacherTarget) {
+      return 'Вы заблокировали бота в Telegram. Разблокируйте бота, чтобы получать уведомления.';
+    }
+    return 'Получатель заблокировал бота. Попросите ученика разблокировать бота в Telegram.';
   }
 
   if (normalized.includes('bad request')) {

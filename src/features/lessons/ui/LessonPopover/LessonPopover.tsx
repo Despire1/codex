@@ -66,7 +66,7 @@ export const LessonPopover = ({
   const paymentLabel = resolveLessonPaymentStatusLabel(lesson, participants);
   const paymentTone = resolveLessonPaymentTone(lesson, participants);
   const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
-  const title = `Занятие с ${lessonLabel}`;
+  const title = `Урок с ${lessonLabel}`;
   const lessonColorTheme = getLessonColorTheme(lesson.color);
   const studentLabel = participants.length > 1 ? `Ученики: ${lessonLabel}` : lessonLabel;
   const headerDateLabel = dateLabel ? `${dateLabel[0].toUpperCase()}${dateLabel.slice(1)}` : dateLabel;
@@ -75,13 +75,16 @@ export const LessonPopover = ({
   return (
     <div className={styles.root}>
       <div className={styles.toolbar}>
-        <div
-          className={styles.colorSwatch}
-          style={{
-            background: lessonColorTheme.hoverBackground,
-            boxShadow: `0 10px 22px ${lessonColorTheme.shadow}`,
-          }}
-        />
+        <Tooltip content="Цвет занятия">
+          <div
+            className={styles.colorSwatch}
+            aria-label="Цвет занятия"
+            style={{
+              background: lessonColorTheme.hoverBackground,
+              boxShadow: `0 10px 22px ${lessonColorTheme.shadow}`,
+            }}
+          />
+        </Tooltip>
         <div className={styles.toolbarActions}>
           <Tooltip content={editDisabledReason ?? 'Редактировать'}>
             <button

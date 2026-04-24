@@ -73,7 +73,6 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
   linkedStudents,
   timeZone,
   onCreateLesson,
-  onOpenLessonDay,
   onWeekRangeChange,
   className,
 }) => {
@@ -420,8 +419,8 @@ export const WeeklyCalendar: FC<WeeklyCalendarProps> = ({
         isOpen={Boolean(activeLesson && lessonPopover)}
         anchorEl={lessonPopover?.anchorEl ?? null}
         onClose={closeLessonPopover}
-        side="right"
-        align="start"
+        side="bottom"
+        align="center"
       >
         {activeLesson && (
           <LessonPopover

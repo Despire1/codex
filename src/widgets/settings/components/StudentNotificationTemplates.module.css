@@ -135,13 +135,13 @@
 }
 
 .variableLabel {
-  display: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .variableCode {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1f2937;
+  display: none;
 }
 
 .editorGrid {
@@ -267,9 +267,14 @@
 }
 
 .sendTestButton {
-  background: #4a7fe8;
-  color: #fff;
-  border-color: transparent;
+  background: transparent;
+  color: #111827;
+  border: 2px solid var(--accent-primary, #a3e635);
+}
+
+.sendTestButton:hover:not(:disabled) {
+  background: var(--accent-primary, #a3e635);
+  color: #111827;
 }
 
 .saveButton {

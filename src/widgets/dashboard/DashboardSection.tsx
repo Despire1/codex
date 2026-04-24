@@ -84,18 +84,18 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
     refresh: refreshUnreadActivity,
     markSeen: markActivityAsSeen,
   } = useDashboardActivityUnread(isDashboardMobile);
-  const now = new Date();
-  const todayZoned = toZonedDate(now, timeZone);
+  const todayZoned = toZonedDate(new Date(), timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const showWeeklyCalendar = !isDashboardMobile;
 
   const attentionItems: AttentionItem[] = useMemo(() => {
+    const nowMs = Date.now();
     return lessons.flatMap((lesson) => {
       const startMs = new Date(lesson.startAt).getTime();
       const endMs = startMs + lesson.durationMinutes * 60_000;
-      const isPast = endMs < now.getTime();
+      const isPast = endMs < nowMs;
       if (!isPast) return [];
 
       if (lesson.participants && lesson.participants.length > 0) {
@@ -127,7 +127,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         },
       ];
     });
-  }, [lessons, linkedStudents, now]);
+  }, [lessons, linkedStudents]);
 
   const todayLessons = useMemo(
     () =>
@@ -138,10 +138,11 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   );
 
   const todayUpcomingLesson = useMemo(() => {
+    const nowMs = Date.now();
     return todayLessons
-      .filter((lesson) => lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() >= now.getTime())
+      .filter((lesson) => lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() >= nowMs)
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
-  }, [now, todayLessons]);
+  }, [todayLessons]);
 
   const unpaidSummary = useMemo(() => {
     const studentIds = new Set(unpaidEntries.map((entry) => entry.studentId));

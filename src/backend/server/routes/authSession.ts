@@ -116,7 +116,7 @@ export const createAuthSessionHandlers = (config: AuthSessionHandlersConfig) => 
     let telegramUser: any;
     try {
       telegramUser = JSON.parse(userRaw);
-    } catch (error) {
+    } catch (_error) {
       return badRequest(res, 'invalid_init_data');
     }
     if (!telegramUser?.id) {

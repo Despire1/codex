@@ -83,7 +83,7 @@ export const useDashboardActivityFeed = (
       setItems(data.items);
       setNextCursor(data.nextCursor);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load activity feed', error);
       if (requestIdRef.current === requestId) {
         setItems([]);
@@ -111,7 +111,7 @@ export const useDashboardActivityFeed = (
       setItems((prev) => [...prev, ...data.items]);
       setNextCursor(data.nextCursor);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load more activity feed items', error);
     } finally {
       setLoadingMore(false);

@@ -5,7 +5,7 @@ const formatOffsetLabel = (timeZone: string, date: Date) => {
     if (timeZoneName) {
       return timeZoneName.replace('GMT', 'UTC');
     }
-  } catch (error) {
+  } catch (_error) {
     // ignore and fallback
   }
 
@@ -15,7 +15,7 @@ const formatOffsetLabel = (timeZone: string, date: Date) => {
     if (timeZoneName) {
       return timeZoneName.replace('GMT', 'UTC');
     }
-  } catch (error) {
+  } catch (_error) {
     // ignore and fallback
   }
 

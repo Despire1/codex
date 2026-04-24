@@ -116,6 +116,8 @@ export const Tooltip = ({
   useLayoutEffect(() => {
     if (!isOpen || !resolvedContent) return;
     updatePosition();
+    // updatePosition читает только refs/props, перевыполнять при её пересоздании не нужно.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [align, isOpen, resolvedContent, side]);
 
   useEffect(() => {
@@ -134,6 +136,8 @@ export const Tooltip = ({
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
+    // updatePosition читает только refs/props, перевыполнять при её пересоздании не нужно.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!resolvedContent) return <>{children}</>;

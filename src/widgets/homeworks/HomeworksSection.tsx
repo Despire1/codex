@@ -166,9 +166,6 @@ const emptyTeacherSummary: TeacherAssignmentsSummary = {
   },
 };
 
-const toTeacherGroupKey = (groupId: number | null): TeacherHomeworkGroupKey =>
-  groupId === null ? 'ungrouped' : (`group_${groupId}` as const);
-
 const resolveTeacherListQuery = (
   filter: TeacherHomeworkListFilter,
 ): { tab?: 'all' | 'in_progress' | 'review' | 'closed'; bucket?: HomeworkAssignmentBucket } => {
@@ -371,7 +368,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   const [reviewQueueActive, setReviewQueueActive] = useState(false);
   const [reviewInitialDraft, setReviewInitialDraft] = useState<HomeworkReviewDraft | null>(null);
   const [reviewCurrentDraft, setReviewCurrentDraft] = useState<HomeworkReviewDraft | null>(null);
-  const [reviewHasUnsavedDraft, setReviewHasUnsavedDraft] = useState(false);
+  const [, setReviewHasUnsavedDraft] = useState(false);
 
   const [homeworkActivityItems, setHomeworkActivityItems] = useState<ActivityFeedItem[]>([]);
   const [homeworkActivityLoading, setHomeworkActivityLoading] = useState(false);
@@ -522,7 +519,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         setTemplateEditorDraft(openedDraft);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load template for edit screen', error);
         if (isCancelled) return;
         setTemplateEditorTemplate(null);
@@ -628,7 +625,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         setAssignmentEditorServerAssignment(response.assignment);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load assignment for editor screen', error);
         if (isCancelled) return;
         setAssignmentEditorError('Не удалось загрузить домашнее задание');
@@ -699,7 +696,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
     void loadHomeworkDetail()
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load homework source detail', error);
         if (isCancelled) return;
         setHomeworkDetailTemplate(null);
@@ -915,7 +912,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
       setStudents(result);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework students', error);
       setStudentsError('Не удалось загрузить список учеников');
     } finally {
@@ -930,7 +927,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.listHomeworkTemplatesV2({ includeArchived: true });
       setTemplates(response.items);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework templates', error);
       setTemplatesError('Не удалось загрузить домашние задания');
     } finally {
@@ -945,7 +942,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.listHomeworkGroupsV2();
       setGroups(response.items);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework groups', error);
       setGroups([]);
       setGroupsError('Не удалось загрузить группы');
@@ -968,7 +965,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.getHomeworkAssignmentsSummaryV2({ studentId: studentId ?? undefined });
       setTeacherSummary(response);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework summary', error);
       setSummaryError('Не удалось загрузить сводку');
     } finally {
@@ -1017,7 +1014,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
       return response.items;
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework assignments', error);
       setAssignmentsError('Не удалось загрузить выданные домашки');
       if (!options.append) {
@@ -1062,7 +1059,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }));
         setGroupAssignmentsNextOffsetByKey((prev) => ({ ...prev, [groupKey]: response.nextOffset }));
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load homework assignments for group', error);
         setGroupAssignmentsErrorByKey((prev) => ({ ...prev, [groupKey]: 'Не удалось загрузить задания группы' }));
         if (!append) {
@@ -1081,7 +1078,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const unread = await api.getActivityFeedUnreadStatus();
       setHomeworkActivityHasUnread(unread.hasUnread);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework unread status', error);
       setHomeworkActivityHasUnread(false);
     }
@@ -1096,7 +1093,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       });
       setHomeworkActivityItems(response.items);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load homework activity feed', error);
       setHomeworkActivityItems([]);
     } finally {
@@ -1109,7 +1106,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const status = await api.markActivityFeedSeen(seenThrough ? { seenThrough } : undefined);
       setHomeworkActivityHasUnread(status.hasUnread);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to mark homework activity feed as seen', error);
     }
   }, []);
@@ -1138,7 +1135,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setStudentNextOffset(assignmentsData.nextOffset);
       setStudentHasMore(assignmentsData.nextOffset !== null);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load student homework list', error);
       if (!append) {
         setStudentSummary(emptySummary);
@@ -1164,7 +1161,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setStudentDetailAssignment(response.assignment);
       setStudentDetailSubmissions(response.submissions);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load student homework detail', error);
       setStudentDetailAssignment(null);
       setStudentDetailSubmissions([]);
@@ -1191,7 +1188,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setReviewCurrentDraft(initialDraft);
       setReviewHasUnsavedDraft(false);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load review data', error);
       setReviewAssignment(null);
       setReviewSubmissions([]);
@@ -1317,7 +1314,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setReviewHasUnsavedDraft(false);
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to persist homework review draft', error);
       try {
         saveReviewDraftToStorage(reviewAssignment.id, reviewCurrentDraft);
@@ -1453,7 +1450,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       requestNavigationBypass();
       navigate(`/homeworks/${copiedTemplate.id}/edit`, { replace: cancelPath !== null });
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to create editable copy of homework template', error);
       showToast({ message: 'Не удалось создать копию домашнего задания', variant: 'error' });
     } finally {
@@ -1486,7 +1483,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await loadTeacherTemplates();
       return { success: true };
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to create homework template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1517,7 +1514,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await loadTeacherTemplates();
       return { success: true };
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to update homework template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1556,7 +1553,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         blocks: payload.blocks,
       });
 
-      let assignmentResponse = await api.createHomeworkAssignmentV2({
+      const assignmentResponse = await api.createHomeworkAssignmentV2({
         studentId: templateEditorDraft.assignment.studentId,
         lessonId: templateEditorDraft.assignment.lessonId ?? undefined,
         templateId: editingTemplateId,
@@ -1602,7 +1599,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       navigate(`/homeworks/assignments/${finalAssignment.id}/edit`, { replace: true });
       return { success: true, closeOnSuccess: false };
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to update homework template and issue assignment', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1632,7 +1629,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         void loadTeacherTemplates();
         showToast({ message: 'Домашнее задание продублировано', variant: 'success' });
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to duplicate homework template', error);
         showToast({ message: 'Не удалось продублировать домашнее задание', variant: 'error' });
       } finally {
@@ -1640,26 +1637,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
     },
     [createTemplateCopy, loadTeacherTemplates, showToast],
-  );
-
-  const handleCreateHomeworkBasedOnTemplate = useCallback(
-    async (template: HomeworkTemplate) => {
-      setSubmittingTemplate(true);
-      try {
-        const copiedTemplate = await createTemplateCopy(template);
-        void loadTeacherTemplates();
-        showToast({ message: 'Создана новая домашка на основе текущей', variant: 'success' });
-        requestNavigationBypass();
-        navigate(`/homeworks/${copiedTemplate.id}/edit`);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to create homework based on template', error);
-        showToast({ message: 'Не удалось создать новую домашку на основе текущей', variant: 'error' });
-      } finally {
-        setSubmittingTemplate(false);
-      }
-    },
-    [createTemplateCopy, loadTeacherTemplates, navigate, requestNavigationBypass, showToast],
   );
 
   const handleArchiveTemplate = useCallback(
@@ -1670,7 +1647,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Домашнее задание перенесено в архив', variant: 'success' });
         await loadTeacherTemplates();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to archive homework template', error);
         showToast({ message: 'Не удалось архивировать домашнее задание', variant: 'error' });
       } finally {
@@ -1688,7 +1665,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Домашнее задание восстановлено из архива', variant: 'success' });
         await loadTeacherTemplates();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to restore homework template', error);
         showToast({ message: 'Не удалось восстановить домашнее задание', variant: 'error' });
       } finally {
@@ -1730,7 +1707,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         navigate('/homeworks', { replace: true });
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to delete homework template', error);
       showToast({
         message:
@@ -1758,7 +1735,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await api.updateHomeworkTemplateV2(template.id, { tags: nextTags });
       await loadTeacherTemplates();
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to toggle template favorite', error);
       showToast({ message: 'Не удалось обновить избранное', variant: 'error' });
     } finally {
@@ -1781,7 +1758,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Группа создана', variant: 'success' });
         return response.group;
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to create homework group', error);
         showToast({ message: 'Не удалось создать группу', variant: 'error' });
         return null;
@@ -1808,7 +1785,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         resetGroupAssignmentsState();
         showToast({ message: 'Группа обновлена', variant: 'success' });
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to update homework group', error);
         showToast({ message: 'Не удалось обновить группу', variant: 'error' });
       }
@@ -1824,7 +1801,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         resetGroupAssignmentsState();
         showToast({ message: 'Группа удалена', variant: 'success' });
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete homework group', error);
         showToast({ message: 'Не удалось удалить группу', variant: 'error' });
       }
@@ -1849,7 +1826,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         resetGroupAssignmentsState();
         showToast({ message: 'Группа для домашки обновлена', variant: 'success' });
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to rebind homework assignment group', error);
         showToast({ message: 'Не удалось обновить группу домашки', variant: 'error' });
       }
@@ -1891,7 +1868,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           variant: 'success',
         });
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to rebind homework assignment group in bulk', error);
         showToast({ message: 'Не удалось обновить группу домашних заданий', variant: 'error' });
       }
@@ -1943,7 +1920,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         });
         return true;
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to create homework assignment from side sheet', error);
         showToast({ message: 'Не удалось выдать домашнее задание', variant: 'error' });
         return false;
@@ -2113,7 +2090,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
         return { success: true, closeOnSuccess: false };
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to save homework assignment from editor', error);
         showToast({ message: 'Не удалось сохранить домашку', variant: 'error' });
         return { success: false };
@@ -2123,7 +2100,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     },
     [
       assignmentEditorDraft,
-      assignmentEditorOriginalStatus,
       editingAssignmentId,
       assignmentEditorDraftStorageKey,
       assignmentEditorReadOnly,
@@ -2169,7 +2145,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
       return { success: true, closeOnSuccess: false };
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to save assignment as template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -2194,7 +2170,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Домашка отправлена ученику', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary(), loadTeacherTemplates()]);
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to send assignment now', error);
         showToast({ message: 'Не удалось отправить домашку', variant: 'error' });
       }
@@ -2242,7 +2218,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       ]);
       resetGroupAssignmentsState();
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to cancel assignment issue', error);
       showToast({
         message:
@@ -2278,7 +2254,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherActivityUnread()]);
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to remind assignment', error);
         showToast({ message: 'Не удалось отправить напоминание', variant: 'error' });
       }
@@ -2322,7 +2298,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: deadlineAt ? 'Дедлайн обновлён' : 'Дедлайн убран', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to update assignment deadline', error);
         showToast({ message: 'Не удалось обновить дедлайн', variant: 'error' });
       }
@@ -2348,7 +2324,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         ]);
         resetGroupAssignmentsState();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete assignment', error);
         showToast({ message: 'Не удалось удалить домашку', variant: 'error' });
       }
@@ -2373,7 +2349,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Ошибка настройки исправлена', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to fix assignment config', error);
         showToast({ message: 'Не удалось исправить конфигурацию', variant: 'error' });
       }
@@ -2405,7 +2381,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         ]);
         resetGroupAssignmentsState();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to run bulk action', error);
         showToast({ message: 'Не удалось выполнить массовое действие', variant: 'error' });
       }
@@ -2501,7 +2477,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }
         return true;
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to review assignment', error);
         showToast({ message: 'Не удалось сохранить проверку', variant: 'error' });
         return false;
@@ -2566,7 +2542,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         });
         return true;
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to submit homework payload', error);
         const fallbackMessage = payload.submit ? 'Не удалось отправить домашку' : 'Не удалось сохранить черновик';
         const errorMessage = isApiRequestError(error) && error.message ? error.message : fallbackMessage;
@@ -2593,7 +2569,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       });
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to start timed homework attempt', error);
       setStudentDetailError('Не удалось запустить таймер');
       return false;
@@ -2781,6 +2757,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       loadingTemplates,
       markTeacherActivitySeen,
       navigate,
+      onOpenMobileSidebar,
       problemFilters,
       resetGroupAssignmentsState,
       reviewAssignment,

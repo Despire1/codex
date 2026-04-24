@@ -113,7 +113,7 @@ const loadStudentCardFilters = (): StudentCardFiltersState => {
     }
     return result;
   } catch (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('Failed to load student card filters', error);
     return {};
   }
@@ -124,7 +124,7 @@ const saveStudentCardFilters = (state: StudentCardFiltersState) => {
   try {
     localStorage.setItem(STUDENT_CARD_FILTERS_KEY, JSON.stringify(state));
   } catch (error) {
-    // eslint-disable-next-line no-console
+     
     console.error('Failed to save student card filters', error);
   }
 };

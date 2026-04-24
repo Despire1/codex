@@ -108,6 +108,9 @@ export const AppModals: FC<AppModalsProps> = ({
     saveLesson,
     closeLessonModal,
     requestDeleteLesson,
+    markLessonCompleted,
+    togglePaid,
+    cancelLesson,
     rescheduleModalOpen,
     rescheduleModalSubmitting,
     rescheduleDraft,
@@ -157,6 +160,30 @@ export const AppModals: FC<AppModalsProps> = ({
         onDelete={editingLessonId ? requestDeleteLesson : undefined}
         isSubmitting={lessonModalSubmitting}
         onSubmit={saveLesson}
+        onToggleCompleted={
+          editingLesson && editingLesson.status !== 'CANCELED'
+            ? () => {
+                void markLessonCompleted(editingLesson.id);
+              }
+            : undefined
+        }
+        onTogglePaid={
+          editingLesson && editingLesson.status !== 'CANCELED'
+            ? () => {
+                const primaryStudentId = editingLesson.participants?.[0]?.studentId;
+                void togglePaid(editingLesson.id, primaryStudentId, {
+                  currentIsPaid: Boolean(editingLesson.isPaid),
+                });
+              }
+            : undefined
+        }
+        onCancelLesson={
+          editingLesson && editingLesson.status !== 'CANCELED'
+            ? () => {
+                void cancelLesson(editingLesson, 'SINGLE');
+              }
+            : undefined
+        }
       />
 
       <RescheduleLessonModal

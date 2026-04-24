@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
 import { useToast } from '@/shared/lib/toast';
@@ -170,10 +170,10 @@ export const SendTestNotificationModal: FC<SendTestNotificationModalProps> = ({
     !isSending &&
     (recipientMode === 'SELF' || selectedStudentIds.length > 0);
 
-  const closeRequest = () => {
+  const closeRequest = useCallback(() => {
     if (isSending) return;
     onClose();
-  };
+  }, [isSending, onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -386,7 +386,7 @@ export const SendTestNotificationModal: FC<SendTestNotificationModalProps> = ({
         return;
       }
       showToast({ message: 'Не удалось скопировать текст', variant: 'error' });
-    } catch (error) {
+    } catch (_error) {
       showToast({ message: 'Не удалось скопировать текст', variant: 'error' });
     }
   };

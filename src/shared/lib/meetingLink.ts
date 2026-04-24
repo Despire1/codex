@@ -18,7 +18,7 @@ export const isValidMeetingLink = (value: string) => {
   try {
     const url = new URL(value);
     return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 };

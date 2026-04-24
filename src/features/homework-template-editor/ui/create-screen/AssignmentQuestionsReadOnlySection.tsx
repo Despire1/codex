@@ -33,13 +33,14 @@ const QUESTION_KIND_ICONS: Record<string, ReactNode> = {
 };
 
 const formatQuestionPoints = (value: number | null | undefined) => {
-  if (!Number.isFinite(value) || value === null || value <= 0) return 'Без баллов';
-  const points = Math.round(value);
-  const mod10 = points % 10;
-  const mod100 = points % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${points} балл`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${points} балла`;
-  return `${points} баллов`;
+  // Если баллы не заданы явно — считаем дефолтный 1 балл, как в buildTemplateCreateStats
+  // (TEA-21: без этого totalPoints в шапке и в списке показывают разные цифры).
+  const resolved = Number.isFinite(value) && value !== null && value > 0 ? Math.round(value as number) : 1;
+  const mod10 = resolved % 10;
+  const mod100 = resolved % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${resolved} балл`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${resolved} балла`;
+  return `${resolved} баллов`;
 };
 
 const formatQuestionCount = (count: number) => {
@@ -48,6 +49,14 @@ const formatQuestionCount = (count: number) => {
   if (mod10 === 1 && mod100 !== 11) return `${count} вопрос`;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} вопроса`;
   return `${count} вопросов`;
+};
+
+const formatPointsSummary = (count: number) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} балл`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} балла`;
+  return `${count} баллов`;
 };
 
 const countFillInBlanks = (value: string) => (value.match(/\[___\]/g) ?? []).length;
@@ -206,13 +215,14 @@ const renderQuestionBody = (question: HomeworkTestQuestion) => {
 export const AssignmentQuestionsReadOnlySection: FC<AssignmentQuestionsReadOnlySectionProps> = ({
   testBlock,
 }) => {
-  const questions = testBlock?.questions ?? [];
+  const questions = useMemo(() => testBlock?.questions ?? [], [testBlock?.questions]);
   const totalPoints = useMemo(
     () =>
-      questions.reduce(
-        (sum, question) => sum + (Number.isFinite(Number(question.points)) ? Number(question.points) : 0),
-        0,
-      ),
+      questions.reduce((sum, question) => {
+        const raw = Number(question.points);
+        if (!Number.isFinite(raw) || raw <= 0) return sum + 1;
+        return sum + raw;
+      }, 0),
     [questions],
   );
 
@@ -222,7 +232,7 @@ export const AssignmentQuestionsReadOnlySection: FC<AssignmentQuestionsReadOnlyS
         <div>
           <h2 className={styles.title}>{testBlock?.title?.trim() || 'Вопросы'}</h2>
           <p className={styles.subtitle}>
-            {formatQuestionCount(questions.length)} • {totalPoints} баллов
+            {formatQuestionCount(questions.length)} • {formatPointsSummary(totalPoints)}
           </p>
         </div>
       </div>

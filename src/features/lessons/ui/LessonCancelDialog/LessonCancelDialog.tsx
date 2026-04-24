@@ -41,7 +41,6 @@ export const LessonCancelDialog = ({
   const isPaid = lesson ? resolveLessonPaid(lesson, participants) : false;
   const hasPaidParticipants = lesson ? resolveLessonHasPaidParticipant(lesson) : false;
   const isCompleted = lesson?.status === 'COMPLETED';
-  const isCorrectionFlow = isCompleted || hasPaidParticipants;
   const [refundMode, setRefundMode] = useState<LessonCancelRefundMode | undefined>(undefined);
 
   useEffect(() => {

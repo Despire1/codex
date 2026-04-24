@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { type FC, type ReactNode } from 'react';
 import { BarsIcon, ChevronLeftIcon, NotificationsNoneOutlinedIcon, RobotIcon } from '@/icons/MaterialIcons';
 import styles from './MobileTopbar.module.css';
 
@@ -10,6 +10,7 @@ export interface MobileTopbarProps {
   title?: string;
   onOpenSidebar: () => void;
   onOpenNotifications: () => void;
+  renderNotificationBell?: (triggerClassName: string) => ReactNode;
   onBack?: () => void;
 }
 
@@ -23,6 +24,7 @@ export const MobileTopbar: FC<MobileTopbarProps> = ({
   title = 'Настройки',
   onOpenSidebar,
   onOpenNotifications,
+  renderNotificationBell,
   onBack,
 }) => {
   const isDefault = variant === 'default';
@@ -54,15 +56,19 @@ export const MobileTopbar: FC<MobileTopbarProps> = ({
 
       {isDefault ? (
         <div className={styles.right}>
-          <button
-            type="button"
-            className={styles.notificationButton}
-            aria-label="Открыть уведомления"
-            onClick={onOpenNotifications}
-          >
-            <NotificationsNoneOutlinedIcon width={20} height={20} />
-            {hasNotificationDot ? <span className={styles.notificationDot} aria-hidden /> : null}
-          </button>
+          {renderNotificationBell ? (
+            renderNotificationBell(styles.notificationButton)
+          ) : (
+            <button
+              type="button"
+              className={styles.notificationButton}
+              aria-label="Открыть уведомления"
+              onClick={onOpenNotifications}
+            >
+              <NotificationsNoneOutlinedIcon width={20} height={20} />
+              {hasNotificationDot ? <span className={styles.notificationDot} aria-hidden /> : null}
+            </button>
+          )}
 
           <div className={styles.avatar} aria-hidden>
             {profilePhotoUrl ? (

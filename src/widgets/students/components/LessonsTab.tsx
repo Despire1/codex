@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { format, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
@@ -20,7 +20,7 @@ import { SelectedStudent } from '../types';
 import { LessonFiltersPopover } from './LessonFiltersPopover';
 import { LessonActionsSheet } from './LessonActionsSheet';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
-import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
+import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
 
 interface LessonsTabProps {
@@ -105,39 +105,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     return () => window.clearTimeout(timer);
   }, [activeLessonActions, isLessonSheetOpen]);
 
-  const parseDateValue = (value?: string) => {
-    if (!value) return undefined;
-    const parsed = toUtcDateFromDate(value, timeZone);
-    return Number.isNaN(parsed.getTime()) ? undefined : toZonedDate(parsed, timeZone);
-  };
-
-  const selectedRange = useMemo(
-    () => ({
-      from: parseDateValue(lessonDateRange.from),
-      to: parseDateValue(lessonDateRange.to),
-    }),
-    [lessonDateRange.from, lessonDateRange.to],
-  );
 
   const sortedLessons = useMemo(() => {
     const sorted = [...studentLessons].sort((a, b) => a.startAt.localeCompare(b.startAt));
     return lessonSortOrder === 'desc' ? sorted.reverse() : sorted;
   }, [lessonSortOrder, studentLessons]);
-
-  const formatRangeLabel = () => {
-    const from = selectedRange.from;
-    const to = selectedRange.to;
-    if (from && to) {
-      return `${format(from, 'dd.MM.yyyy')} — ${format(to, 'dd.MM.yyyy')}`;
-    }
-    if (from) {
-      return `С ${format(from, 'dd.MM.yyyy')}`;
-    }
-    if (to) {
-      return `До ${format(to, 'dd.MM.yyyy')}`;
-    }
-    return 'Все';
-  };
 
   const handleCloseLessonMenu = useCallback(() => {
     setOpenLessonMenuId(null);
@@ -253,11 +225,11 @@ export const LessonsTab: FC<LessonsTabProps> = ({
               onClick: () => onTogglePaid(lesson.id, selectedStudentId ?? undefined),
             },
             {
-              label: 'Перенести',
+              label: 'Перенести урок',
               onClick: () => onEditLesson(lesson),
             },
             {
-              label: 'Удалить',
+              label: 'Удалить урок',
               onClick: () => {
                 handleCloseLessonMenu();
                 onRequestDeleteLesson(lesson);

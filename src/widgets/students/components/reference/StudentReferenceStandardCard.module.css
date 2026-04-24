@@ -83,6 +83,20 @@
   cursor: help;
 }
 
+.inactiveBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-600, #475569);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: help;
+}
+
 .metricsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

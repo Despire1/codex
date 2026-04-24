@@ -34,7 +34,7 @@ export const StudentSettingsSection: FC<StudentSettingsSectionProps> = ({ active
     try {
       await api.updateStudentPreferencesV2({ timezone: timezone.trim() || null });
       setMessage('Сохранено');
-    } catch (error) {
+    } catch (_error) {
       setMessage('Не удалось сохранить');
     } finally {
       setSaving(false);

@@ -28,6 +28,29 @@
   opacity: 0.55;
 }
 
+.cardCompleted {
+  background: var(--color-slate-50, #f8fafc);
+  border-left-color: var(--color-slate-400, #9ca3af);
+  opacity: 0.85;
+}
+
+.cardCompleted .name {
+  color: var(--color-slate-500, #64748b);
+  font-weight: 600;
+}
+
+.cardCompleted .time {
+  color: var(--color-emerald-600, #059669);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
+
+.completedIcon {
+  flex-shrink: 0;
+}
+
 .time {
   font-size: 12px;
   line-height: 1.2;

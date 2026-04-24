@@ -80,7 +80,7 @@ const formatCompletionMoment = (completedAt: string | null | undefined, timeZone
   if (!completedAt) return '';
   try {
     return formatInTimeZone(completedAt, 'd MMM, HH:mm', { locale: ru, timeZone });
-  } catch (error) {
+  } catch (_error) {
     return '';
   }
 };
@@ -242,6 +242,8 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
     } else {
       setIsDrawerVisible(false);
     }
+    // Намеренно реагируем только на смену активной домашки по id, без перезаполнения формы при каждом изменении её полей.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHomework?.id]);
 
   const handleOpenHomework = (homeworkId: number) => {
@@ -345,7 +347,7 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
       await onUpdateHomework(activeHomework.id, payload);
       setDrawerMode('view');
       return true;
-    } catch (error) {
+    } catch (_error) {
       setSaveError('Ошибка сохранения, попробуйте ещё раз');
       return false;
     } finally {
@@ -414,6 +416,8 @@ export const HomeworkPanel: FC<HomeworkPanelProps> = ({
       window.addEventListener('paste', handler);
     }
     return () => window.removeEventListener('paste', handler);
+    // handlePaste пересоздаётся каждый рендер; перевешивать слушатель при каждом рендере не нужно.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeHomeworkId, drawerMode]);
 
   const handleHomeworkReminder = (homeworkId: number) => {

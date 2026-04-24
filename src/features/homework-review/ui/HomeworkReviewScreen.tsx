@@ -223,7 +223,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
     setDecisionOverridesById({});
     setGeneralComment(initialGeneralComment);
     setError(null);
-  }, [assignment?.id, initialDraft, latestSubmission, reviewItems]);
+  }, [assignment?.id, assignment?.teacherComment, initialDraft, latestSubmission, reviewItems]);
 
   const currentDraft = useMemo<HomeworkReviewDraft | null>(() => {
     if (!latestSubmission) return null;

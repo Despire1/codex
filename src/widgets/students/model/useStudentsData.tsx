@@ -120,7 +120,6 @@ export const useStudentsDataInternal = ({
   hasAccess,
   timeZone,
   selectedStudentId,
-  studentActiveTab,
   homeworkFilter,
   lessonPaymentFilter,
   lessonStatusFilter,
@@ -242,7 +241,7 @@ export const useStudentsDataInternal = ({
               : normalizedHomeworks,
           );
         } catch (error) {
-          // eslint-disable-next-line no-console
+           
           console.error('Failed to load student homeworks', error);
         } finally {
           if (homeworkLoadRequestId.current === requestId) {
@@ -333,7 +332,7 @@ export const useStudentsDataInternal = ({
           setStudentLessonsHasMore(data.nextOffset !== null);
           setStudentLessonsNextOffset(data.nextOffset);
         } catch (error) {
-          // eslint-disable-next-line no-console
+           
           console.error('Failed to load student lessons', error);
         } finally {
           if (lessonLoadRequestId.current === requestId) {
@@ -404,7 +403,7 @@ export const useStudentsDataInternal = ({
           if (lessonSummaryLoadRequestId.current !== requestId) return;
           setStudentLessonsSummary(data.items.map(normalizeLesson).filter(isVisibleLesson));
         } catch (error) {
-          // eslint-disable-next-line no-console
+           
           console.error('Failed to load student lessons summary', error);
           if (lessonSummaryLoadRequestId.current === requestId) {
             setStudentLessonsSummary([]);
@@ -436,7 +435,7 @@ export const useStudentsDataInternal = ({
         setStudentUnpaidTotalByStudent((prev) => ({ ...prev, [targetStudentId]: data.total }));
         setStudentUnpaidLoadedByStudent((prev) => ({ ...prev, [targetStudentId]: true }));
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load student unpaid lessons', error);
       }
     },
@@ -477,7 +476,7 @@ export const useStudentsDataInternal = ({
         const data = await api.getPaymentEvents(studentId, { filter, date: date || undefined });
         setPaymentEventsByStudent((prev) => ({ ...prev, [studentId]: data.events }));
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load payment events', error);
       } finally {
         setPaymentEventsLoadingByStudent((prev) => ({ ...prev, [studentId]: false }));
@@ -504,7 +503,7 @@ export const useStudentsDataInternal = ({
         }));
         setPaymentRemindersNextOffsetByStudent((prev) => ({ ...prev, [studentId]: data.nextOffset }));
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to load payment reminders', error);
       } finally {
         if (append) {
@@ -524,8 +523,14 @@ export const useStudentsDataInternal = ({
     [fetchPaymentRemindersPage],
   );
 
-  const payments = selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : [];
-  const studentDebtItems = selectedStudentId ? studentUnpaidLessonsByStudent[selectedStudentId] ?? [] : [];
+  const payments = useMemo(
+    () => (selectedStudentId ? paymentEventsByStudent[selectedStudentId] ?? [] : []),
+    [paymentEventsByStudent, selectedStudentId],
+  );
+  const studentDebtItems = useMemo(
+    () => (selectedStudentId ? studentUnpaidLessonsByStudent[selectedStudentId] ?? [] : []),
+    [selectedStudentId, studentUnpaidLessonsByStudent],
+  );
   const studentDebtTotal = selectedStudentId ? studentUnpaidTotalByStudent[selectedStudentId] ?? 0 : 0;
   const paymentsLoading = selectedStudentId ? paymentEventsLoadingByStudent[selectedStudentId] ?? false : false;
   const paymentRemindersLoading = selectedStudentId
@@ -537,7 +542,10 @@ export const useStudentsDataInternal = ({
   const paymentRemindersHasMore = selectedStudentId
     ? paymentRemindersNextOffsetByStudent[selectedStudentId] != null
     : false;
-  const paymentReminders = selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : [];
+  const paymentReminders = useMemo(
+    () => (selectedStudentId ? paymentRemindersByStudent[selectedStudentId] ?? [] : []),
+    [paymentRemindersByStudent, selectedStudentId],
+  );
 
   const openPaymentReminders = useCallback(() => {
     if (!selectedStudentId) return;

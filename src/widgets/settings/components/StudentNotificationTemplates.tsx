@@ -287,6 +287,7 @@ const TemplateEditor: FC<{
               if (isMobile) return;
               event.dataTransfer.setData('text/plain', variableLabels[variable]?.code ?? `{{${variable}}}`);
             }}
+            title={`Вставит ${variableLabels[variable]?.code ?? `{{${variable}}}`} в позицию курсора`}
             data-testid={`student-notification-${config.id}-badge-${variable}`}
           >
             <span className={styles.variableLabel}>{variableLabels[variable]?.label ?? variable}</span>

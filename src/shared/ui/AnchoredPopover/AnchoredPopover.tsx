@@ -160,6 +160,8 @@ export const AnchoredPopover = ({
   useLayoutEffect(() => {
     if (!shouldRender || !isOpen) return;
     updatePosition();
+    // updatePosition пересоздаётся каждый рендер, но читает только refs/props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldRender, isOpen, anchorEl, activeAnchorEl, side, align, offset, onClose]);
 
   useEffect(() => {
@@ -227,6 +229,8 @@ export const AnchoredPopover = ({
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
+    // updatePosition пересоздаётся каждый рендер, но читает только refs/props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anchorEl, isOpen, onClose, preventCloseOnOtherPopoverClick, activeAnchorEl]);
 
   if (!shouldRender || !activeAnchorEl) return null;

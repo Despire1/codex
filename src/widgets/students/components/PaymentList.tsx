@@ -1,9 +1,8 @@
 import { FC, useMemo } from 'react';
 import { addDays, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Box, Chip, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Stack } from '@mui/material';
+import { Box, Chip, List, ListItem, ListItemText, Stack } from '@mui/material';
 
-import { AddOutlinedIcon, HistoryOutlinedIcon, RemoveOutlinedIcon } from '../../../icons/MaterialIcons';
 import { Lesson, PaymentEvent } from '../../../entities/types';
 import styles from '../StudentsSection.module.css';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
@@ -109,12 +108,6 @@ const getEventChipClass = (event: PaymentEvent) => {
   return styles.paymentChipFallback;
 };
 
-const getEventIcon = (event: PaymentEvent) => {
-  if (event.type === 'TOP_UP' || event.type === 'SUBSCRIPTION' || event.type === 'OTHER') return AddOutlinedIcon;
-  if (event.type === 'AUTO_CHARGE') return RemoveOutlinedIcon;
-  return HistoryOutlinedIcon;
-};
-
 const formatLessonLabel = (lesson: Lesson | null | undefined, timeZone: string) =>
   lesson?.startAt
     ? `Занятие ${formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone })}`
@@ -152,6 +145,8 @@ export const PaymentList: FC<PaymentListProps> = ({
       acc[key] = acc[key] ? [...acc[key], event] : [event];
       return acc;
     }, {});
+    // getDateLabel читает только timeZone/todayZoned (уже в deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payments, timeZone, todayZoned]);
 
   const groupEntries = Object.entries(groupedEvents);
@@ -174,7 +169,6 @@ export const PaymentList: FC<PaymentListProps> = ({
                     {groupLabel}
                   </div>
                   {events.map((event) => {
-                    const IconComponent = getEventIcon(event);
                     const timestamp = formatInTimeZone(event.createdAt, 'd MMM yyyy, HH:mm', {
                       locale: ru,
                       timeZone,

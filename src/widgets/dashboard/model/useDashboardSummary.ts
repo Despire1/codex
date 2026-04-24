@@ -24,7 +24,7 @@ export const useDashboardSummaryInternal = ({ hasAccess, isActive }: DashboardSu
       const data = await api.getDashboardSummary();
       setSummary(data);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load dashboard summary', error);
     } finally {
       setIsLoading(false);

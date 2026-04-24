@@ -11,6 +11,11 @@ import {
 } from './notificationLogService';
 import { resolveStudentTelegramId } from './studentContacts';
 import {
+  buildDashboardDeepLink,
+  buildLessonDeepLink,
+  buildStudentProfileDeepLink,
+} from './server/lib/deepLinks';
+import {
   buildWebPushTextNotificationPayload,
   hasWebPushSubscriptionsForStudent,
   hasWebPushSubscriptionsForTeacher,
@@ -69,23 +74,32 @@ const callTelegram = async <T>(method: string, payload?: Record<string, unknown>
   return data.result;
 };
 
-export const sendTelegramMessage = async (chatId: bigint | number, text: string) => {
-  await callTelegram('sendMessage', {
+type TelegramWebAppButton = { label: string; url: string };
+
+export const sendTelegramMessage = async (
+  chatId: bigint | number,
+  text: string,
+  options?: { webAppButton?: TelegramWebAppButton | null },
+) => {
+  const payload: Record<string, unknown> = {
     chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
     text,
-  });
+  };
+  const button = options?.webAppButton;
+  if (button?.url) {
+    payload.reply_markup = {
+      inline_keyboard: [[{ text: button.label, web_app: { url: button.url } }]],
+    };
+  }
+  await callTelegram('sendMessage', payload);
 };
 
 const sendTelegramWebAppMessage = async (chatId: bigint | number, text: string) => {
   if (!TELEGRAM_WEBAPP_URL) {
     throw new Error('TELEGRAM_WEBAPP_URL is required');
   }
-  await callTelegram('sendMessage', {
-    chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
-    text,
-    reply_markup: {
-      inline_keyboard: [[{ text: 'Открыть приложение', web_app: { url: TELEGRAM_WEBAPP_URL } }]],
-    },
+  await sendTelegramMessage(chatId, text, {
+    webAppButton: { label: 'Открыть приложение', url: TELEGRAM_WEBAPP_URL },
   });
 };
 
@@ -341,10 +355,11 @@ export const sendTeacherLessonReminder = async ({
     target: 'teacher',
     minutesBefore,
   });
+  const lessonLink = buildLessonDeepLink(lessonId);
   const pwaPayload = buildWebPushTextNotificationPayload({
     text,
     defaultTitle: 'Напоминание о занятии',
-    path: '/schedule',
+    path: lessonLink?.path ?? '/schedule',
     tag: `teacher-lesson-reminder-${lessonId}`,
   });
   const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
@@ -359,7 +374,10 @@ export const sendTeacherLessonReminder = async ({
       type: 'TEACHER_LESSON_REMINDER',
       scheduledFor,
       dedupeKey,
-      send: () => sendTelegramMessage(teacher.chatId, text),
+      send: () =>
+        sendTelegramMessage(teacher.chatId, text, {
+          webAppButton: lessonLink ? { label: lessonLink.label, url: lessonLink.fullUrl } : null,
+        }),
     }),
     deliverNotificationChannel({
       channel: 'PWA_PUSH',
@@ -387,7 +405,6 @@ export const sendStudentLessonReminder = async ({
   lessonId,
   scheduledFor,
   dedupeKey,
-  minutesBefore,
 }: {
   studentId: number;
   lessonId: number;
@@ -426,10 +443,11 @@ export const sendStudentLessonReminder = async ({
     STUDENT_LESSON_TEMPLATE_VARIABLES,
   );
   const normalizedText = normalizeNotificationText(text);
+  const lessonLink = buildLessonDeepLink(lessonId);
   const pwaPayload = buildWebPushTextNotificationPayload({
     text: normalizedText,
     defaultTitle: 'Скоро занятие',
-    path: '/schedule',
+    path: lessonLink?.path ?? '/schedule',
     tag: `student-lesson-reminder-${lessonId}`,
   });
   const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
@@ -446,7 +464,10 @@ export const sendStudentLessonReminder = async ({
       type: 'STUDENT_LESSON_REMINDER',
       scheduledFor,
       dedupeKey,
-      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      send: () =>
+        sendTelegramMessage(telegramId as bigint, normalizedText, {
+          webAppButton: lessonLink ? { label: lessonLink.label, url: lessonLink.fullUrl } : null,
+        }),
       onFailure: async (message) => {
         if (isTelegramUnreachableError(message)) {
           await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
@@ -502,10 +523,11 @@ export const sendStudentLessonReminderManual = async ({
     return { status: 'skipped' as const, reason: 'empty_text' as const };
   }
 
+  const manualLessonLink = buildLessonDeepLink(lessonId);
   const pwaPayload = buildWebPushTextNotificationPayload({
     text: normalizedText,
     defaultTitle: 'Напоминание о занятии',
-    path: '/schedule',
+    path: manualLessonLink?.path ?? '/schedule',
     tag: `student-lesson-manual-${lessonId}`,
   });
   const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
@@ -524,7 +546,12 @@ export const sendStudentLessonReminderManual = async ({
       source: 'MANUAL',
       scheduledFor,
       dedupeKey,
-      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      send: () =>
+        sendTelegramMessage(telegramId as bigint, normalizedText, {
+          webAppButton: manualLessonLink
+            ? { label: manualLessonLink.label, url: manualLessonLink.fullUrl }
+            : null,
+        }),
       onFailure: async (message) => {
         if (isTelegramUnreachableError(message)) {
           await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
@@ -627,10 +654,11 @@ export const sendTeacherDailySummary = async ({
     unpaidLessons,
     timeZone: teacher.timezone,
   });
+  const summaryLink = buildDashboardDeepLink();
   const pwaPayload = buildWebPushTextNotificationPayload({
     text,
     defaultTitle: type === 'TEACHER_DAILY_SUMMARY' ? 'Сводка на сегодня' : 'Сводка на завтра',
-    path: '/dashboard',
+    path: summaryLink?.path ?? '/dashboard',
     tag: `${type.toLowerCase()}-${formatInTimeZone(summaryDate, 'yyyy-MM-dd', {
       timeZone: resolveTimeZone(teacher.timezone),
     })}`,
@@ -644,7 +672,10 @@ export const sendTeacherDailySummary = async ({
       type,
       scheduledFor,
       dedupeKey,
-      send: () => sendTelegramMessage(teacher.chatId, text),
+      send: () =>
+        sendTelegramMessage(teacher.chatId, text, {
+          webAppButton: summaryLink ? { label: summaryLink.label, url: summaryLink.fullUrl } : null,
+        }),
     }),
     deliverNotificationChannel({
       channel: 'PWA_PUSH',
@@ -715,10 +746,11 @@ export const sendStudentPaymentReminder = async ({
     STUDENT_PAYMENT_TEMPLATE_VARIABLES,
   );
   const normalizedText = normalizeNotificationText(text);
+  const paymentStudentLink = buildLessonDeepLink(lessonId);
   const pwaPayload = buildWebPushTextNotificationPayload({
     text: normalizedText,
     defaultTitle: 'Напоминание об оплате',
-    path: '/schedule',
+    path: paymentStudentLink?.path ?? '/schedule',
     tag: `payment-reminder-${lessonId}-${studentId}`,
   });
   const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForStudent(studentId));
@@ -733,7 +765,12 @@ export const sendStudentPaymentReminder = async ({
       lessonId,
       type: 'PAYMENT_REMINDER_STUDENT',
       source,
-      send: () => sendTelegramMessage(telegramId as bigint, normalizedText),
+      send: () =>
+        sendTelegramMessage(telegramId as bigint, normalizedText, {
+          webAppButton: paymentStudentLink
+            ? { label: 'Открыть занятие', url: paymentStudentLink.fullUrl }
+            : null,
+        }),
       onFailure: async (message) => {
         if (isTelegramUnreachableError(message)) {
           await prisma.student.update({ where: { id: studentId }, data: { isActivated: false } });
@@ -786,10 +823,11 @@ export const sendTeacherPaymentReminderNotice = async ({
     timeZone: teacher.timezone,
     source,
   });
+  const paymentTeacherLink = buildStudentProfileDeepLink(studentId);
   const pwaPayload = buildWebPushTextNotificationPayload({
     text,
     defaultTitle: 'Напоминание отправлено',
-    path: '/schedule',
+    path: paymentTeacherLink?.path ?? '/schedule',
     tag: `teacher-payment-reminder-${lessonId}-${studentId}`,
   });
   const pwaEnabled = isWebPushConfigured() && (await hasWebPushSubscriptionsForTeacher(teacherId));
@@ -802,7 +840,12 @@ export const sendTeacherPaymentReminderNotice = async ({
       lessonId,
       type: 'PAYMENT_REMINDER_TEACHER',
       source,
-      send: () => sendTelegramMessage(teacher.chatId, text),
+      send: () =>
+        sendTelegramMessage(teacher.chatId, text, {
+          webAppButton: paymentTeacherLink
+            ? { label: paymentTeacherLink.label, url: paymentTeacherLink.fullUrl }
+            : null,
+        }),
     }),
     deliverNotificationChannel({
       channel: 'PWA_PUSH',

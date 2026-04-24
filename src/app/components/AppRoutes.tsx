@@ -10,6 +10,7 @@ import { StudentDashboardSection } from '../../widgets/student-dashboard/Student
 import { StudentSettingsSection } from '../../widgets/student-settings/StudentSettingsSection';
 import { StudentsSection } from '../../widgets/students/StudentsSection';
 import { type StudentTabId } from '../../widgets/students/types';
+import { NotFoundSection } from '../../widgets/notFound/NotFoundSection';
 import { tabPathById } from '../tabs';
 import type { DashboardSummary } from '../../shared/api/client';
 
@@ -38,6 +39,7 @@ interface AppRoutesProps {
     teacher: Teacher;
     lessons: Lesson[];
     onActiveTabChange?: (tab: StudentTabId) => void;
+    onOpenHomeworkAssign?: (studentId?: number | null, lessonId?: number | null) => void;
     studentListReloadKey: number;
   };
   schedule: {
@@ -91,7 +93,7 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
         <Route path={`${tabPathById.homeworks}/:assignmentId`} element={<HomeworksSection {...homeworks} />} />
         <Route path={tabPathById.settings} element={<StudentSettingsSection {...studentSettings} />} />
         <Route path={`${tabPathById.settings}/*`} element={<StudentSettingsSection {...studentSettings} />} />
-        <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
+        <Route path="*" element={<NotFoundSection homePath={tabPathById.dashboard} />} />
       </Routes>
     );
   }
@@ -117,7 +119,7 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
       <Route path={tabPathById.homeworks} element={<HomeworksSection {...homeworks} />} />
       <Route path={tabPathById.analytics} element={<AnalyticsSection />} />
       <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />
-      <Route path="*" element={<Navigate to={resolveLastVisitedPath()} replace />} />
+      <Route path="*" element={<NotFoundSection homePath={tabPathById.dashboard} />} />
     </Routes>
   );
 };

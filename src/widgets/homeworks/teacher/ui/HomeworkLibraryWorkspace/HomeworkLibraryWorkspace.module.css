@@ -34,7 +34,7 @@
 }
 
 .searchFieldCompact {
-  flex: 0 1 clamp(220px, 25vw, 320px);
+  flex: 0 1 clamp(260px, 28vw, 380px);
 }
 
 .searchField:focus-within {

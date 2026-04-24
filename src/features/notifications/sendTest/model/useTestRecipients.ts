@@ -26,7 +26,7 @@ export const useTestRecipients = (params: { open: boolean; type: 'LESSON_REMINDE
       lastFetchedAt.current = Date.now();
       lastType.current = type;
       setState({ status: 'ready', students: data.students });
-    } catch (error) {
+    } catch (_error) {
       setState((prev) => ({ ...prev, status: 'error', students: [] }));
     }
   }, [type]);

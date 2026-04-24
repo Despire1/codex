@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// WIP: часть логики вынесена в HomeworkLibraryWorkspace / HomeworkAssignmentsWorkspace,
+// старые импорты/хелперы/константы оставлены для поэтапного допереноса.
 import { ChangeEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -713,10 +716,19 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     () => ({
       all: Math.max(summary.totalCount - summary.draftCount - summary.scheduledCount, 0),
       sent: summary.inProgressCount,
+      overdue: summary.overdueCount,
       review: summary.reviewCount,
       closed: summary.closedCount,
     }),
-    [summary.closedCount, summary.draftCount, summary.inProgressCount, summary.reviewCount, summary.scheduledCount, summary.totalCount],
+    [
+      summary.closedCount,
+      summary.draftCount,
+      summary.inProgressCount,
+      summary.overdueCount,
+      summary.reviewCount,
+      summary.scheduledCount,
+      summary.totalCount,
+    ],
   );
   const draftCounts = useMemo(
     () => ({
@@ -920,7 +932,9 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     navigate(`${location.pathname}${nextSearchParams.toString() ? `?${nextSearchParams.toString()}` : ''}`, {
       replace: true,
     });
-  }, [location.pathname, location.search, navigate, openCreateGroupEditor, workspaceSearchParams]);
+    // openCreateGroupEditor — локальная функция, читает только setters; перевыполнять при её пересоздании не нужно.
+     
+  }, [location.pathname, location.search, navigate, workspaceSearchParams]);
 
   return (
     <section className={`${styles.page} ${isMobile ? styles.pageMobile : ''}`}>

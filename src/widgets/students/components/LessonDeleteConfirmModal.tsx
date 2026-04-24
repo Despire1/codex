@@ -15,10 +15,10 @@ export const LessonDeleteConfirmModal = ({
   onClose,
   onConfirm,
 }: LessonDeleteConfirmModalProps) => (
-  <Modal open={open} onClose={onClose} title="Удалить занятие?">
+  <Modal open={open} onClose={onClose} title="Удалить урок?">
     <p>
-      {lessonId ? `Занятие #${lessonId}` : 'Занятие'} будет удалено навсегда. Это действие необратимо, вернуть
-      занятие будет невозможно.
+      {lessonId ? `Урок #${lessonId}` : 'Урок'} будет удалён навсегда. Это действие необратимо, вернуть
+      урок будет невозможно.
     </p>
     <p>Если вы уверены, подтвердите удаление.</p>
     <div className={styles.modalFooter}>
@@ -26,7 +26,7 @@ export const LessonDeleteConfirmModal = ({
         Отмена
       </button>
       <button type="button" className={controls.dangerButton} onClick={onConfirm}>
-        Удалить занятие
+        Удалить урок
       </button>
     </div>
   </Modal>

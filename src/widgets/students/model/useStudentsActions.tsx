@@ -141,7 +141,6 @@ export const useStudentsActionsInternal = ({
   showToast,
   showInfoDialog,
   openConfirmDialog,
-  navigateToStudents,
   navigateToStudentProfile,
   triggerStudentsListReload,
   refreshPayments,
@@ -290,7 +289,7 @@ export const useStudentsActionsInternal = ({
       }
       onStudentCreated?.({ student, link, source: studentModalSource });
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to add student', error);
       onStudentCreateError?.(error, studentModalSource);
     } finally {
@@ -368,7 +367,7 @@ export const useStudentsActionsInternal = ({
       closeStudentModal();
       triggerStudentsListReload();
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to update student', error);
     } finally {
       setIsStudentSubmitting(false);
@@ -415,7 +414,7 @@ export const useStudentsActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить ученика';
         showInfoDialog('Ошибка', message);
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to delete student', error);
       }
     },
@@ -465,7 +464,7 @@ export const useStudentsActionsInternal = ({
       setPriceEditState({ id: null, value: '' });
       triggerStudentsListReload();
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to update price', error);
     }
   }, [priceEditState.id, priceEditState.value, setLinks, triggerStudentsListReload]);
@@ -486,7 +485,7 @@ export const useStudentsActionsInternal = ({
             : 'Авто-напоминания об оплате выключены',
           variant: 'success',
         });
-      } catch (error) {
+      } catch (_error) {
         showToast({
           message: 'Не удалось обновить настройки напоминаний',
           variant: 'error',
@@ -504,7 +503,7 @@ export const useStudentsActionsInternal = ({
         await refreshPayments(studentId);
         triggerStudentsListReload();
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to adjust balance', error);
       }
     },
@@ -573,6 +572,7 @@ export const useStudentsActionsInternal = ({
       savePrice,
       setPriceValue,
       setStudentDraft,
+      startEditPrice,
       studentEmailSuggestions,
       studentModalFocusField,
       studentModalOpen,

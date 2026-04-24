@@ -71,6 +71,9 @@ interface LessonModalProps {
   onClose: () => void;
   onDelete?: () => void;
   onSubmit: () => void;
+  onToggleCompleted?: () => void;
+  onTogglePaid?: () => void;
+  onCancelLesson?: () => void;
   variant?: 'modal' | 'sheet';
   focusTarget?: LessonModalFocus;
 }
@@ -89,6 +92,9 @@ export const LessonModal: FC<LessonModalProps> = ({
   onClose,
   onDelete,
   onSubmit,
+  onToggleCompleted,
+  onTogglePaid,
+  onCancelLesson,
   variant = 'modal',
   focusTarget = 'full',
 }) => {
@@ -284,6 +290,44 @@ export const LessonModal: FC<LessonModalProps> = ({
             {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
           </div>
           {limitedEditNotice && <div className={sheetStyles.lockNotice}>{limitedEditNotice}</div>}
+          {isEditing && editingLesson && (onToggleCompleted || onTogglePaid || onCancelLesson) ? (
+            <div className={sheetStyles.quickActionsRow}>
+              {onToggleCompleted ? (
+                <button
+                  type="button"
+                  className={`${sheetStyles.quickAction} ${
+                    editingLesson.status === 'COMPLETED' ? sheetStyles.quickActionActive : ''
+                  }`}
+                  onClick={onToggleCompleted}
+                  disabled={isSubmitting || editingLesson.status === 'CANCELED'}
+                >
+                  {editingLesson.status === 'COMPLETED' ? '✓ Проведён' : 'Отметить проведённым'}
+                </button>
+              ) : null}
+              {onTogglePaid ? (
+                <button
+                  type="button"
+                  className={`${sheetStyles.quickAction} ${
+                    editingLesson.isPaid ? sheetStyles.quickActionActive : ''
+                  }`}
+                  onClick={onTogglePaid}
+                  disabled={isSubmitting || editingLesson.status === 'CANCELED'}
+                >
+                  {editingLesson.isPaid ? '✓ Оплачен' : 'Отметить оплату'}
+                </button>
+              ) : null}
+              {onCancelLesson ? (
+                <button
+                  type="button"
+                  className={`${sheetStyles.quickAction} ${sheetStyles.quickActionDanger}`}
+                  onClick={onCancelLesson}
+                  disabled={isSubmitting || editingLesson.status === 'CANCELED'}
+                >
+                  Отменить урок
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <button
           className={`${modalStyles.closeButton} ${sheetStyles.closeButtonTop}`}

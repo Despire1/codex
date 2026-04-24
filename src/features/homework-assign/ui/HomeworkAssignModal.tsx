@@ -28,7 +28,6 @@ import {
   createEndOfWeekDeadlineValue,
   createQuickDateTimeValue,
   createQuickDeadlineValue,
-  resolveNextUpcomingLesson,
   toLocalDateTimeValue,
   toUtcIsoFromLocal,
 } from '../model/lib/assignmentStarter';

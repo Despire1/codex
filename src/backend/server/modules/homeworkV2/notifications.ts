@@ -15,6 +15,7 @@ import {
   sendWebPushToStudent,
 } from '../../../webPushService';
 import { formatInTimeZone, resolveTimeZone } from '../../../../shared/lib/timezoneDates';
+import { buildHomeworkAssignmentDeepLink } from '../../lib/deepLinks';
 
 export type HomeworkV2NotificationKind =
   | 'ASSIGNED'
@@ -94,6 +95,7 @@ export const sendHomeworkNotificationToStudent = async (payload: {
   type: string;
   dedupeKey?: string;
   text: string;
+  assignmentId?: number;
 }) => {
   const student = await prisma.student.findUnique({ where: { id: payload.studentId } });
   if (!student) return { status: 'skipped' as const };
@@ -102,10 +104,11 @@ export const sendHomeworkNotificationToStudent = async (payload: {
   const telegramEnabled = Boolean((process.env.TELEGRAM_BOT_TOKEN ?? '') && telegramId);
   if (!telegramEnabled && !pwaEnabled) return { status: 'skipped' as const };
 
+  const assignmentLink = payload.assignmentId ? buildHomeworkAssignmentDeepLink(payload.assignmentId) : null;
   const pwaPayload = buildWebPushTextNotificationPayload({
     text: payload.text,
     defaultTitle: 'TeacherBot',
-    path: '/homeworks',
+    path: assignmentLink?.path ?? '/homeworks',
     tag: `homework-${payload.type.toLowerCase()}-${payload.studentId}`,
   });
 
@@ -117,7 +120,12 @@ export const sendHomeworkNotificationToStudent = async (payload: {
       studentId: payload.studentId,
       type: payload.type,
       dedupeKey: payload.dedupeKey ?? null,
-      send: () => sendNotificationTelegramMessage(telegramId as bigint, payload.text),
+      send: () =>
+        sendNotificationTelegramMessage(telegramId as bigint, payload.text, {
+          webAppButton: assignmentLink
+            ? { label: assignmentLink.label, url: assignmentLink.fullUrl }
+            : null,
+        }),
     }),
     deliverHomeworkNotificationChannel({
       channel: 'PWA_PUSH',

@@ -221,9 +221,8 @@ export const createOverviewService = ({
       where: {
         teacherId: teacher.chatId,
         isSuppressed: false,
-        status: { not: 'CANCELED' },
-        OR: [{ status: 'COMPLETED' }, { startAt: { lt: now } }],
-        AND: [{ OR: [{ isPaid: false }, { participants: { some: { isPaid: false } } }] }],
+        status: 'COMPLETED',
+        OR: [{ isPaid: false }, { participants: { some: { isPaid: false } } }],
       },
       include: {
         participants: {

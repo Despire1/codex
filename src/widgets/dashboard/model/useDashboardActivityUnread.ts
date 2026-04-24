@@ -26,7 +26,7 @@ export const useDashboardActivityUnread = (enabled: boolean) => {
       if (requestIdRef.current !== requestId) return;
       setStatus(nextStatus);
     } catch (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to load activity feed unread status', error);
       if (requestIdRef.current === requestId) {
         setStatus(defaultStatus);
@@ -51,7 +51,7 @@ export const useDashboardActivityUnread = (enabled: boolean) => {
         );
         setStatus(nextStatus);
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to mark activity feed as seen', error);
       }
     },
