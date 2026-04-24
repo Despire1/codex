@@ -33,6 +33,8 @@ type StudentHomeworkTableSectionProps = {
   loading: boolean;
   onRefresh: () => void;
   onOpenAssignment: (assignment: HomeworkAssignment) => void;
+  filter?: 'all' | 'new' | 'in_progress' | 'submitted' | 'reviewed';
+  onResetFilter?: () => void;
 };
 
 type HomeworkTaskIconTone = 'danger' | 'green' | 'amber' | 'blue' | 'purple' | 'slate';
@@ -72,9 +74,29 @@ export const StudentHomeworkTableSection: FC<StudentHomeworkTableSectionProps> =
   loading,
   onRefresh,
   onOpenAssignment,
+  filter = 'all',
+  onResetFilter,
 }) => {
+  const isEmpty = !loading && assignments.length === 0;
+  const hasFilterApplied = filter !== 'all';
+  const emptyTitle = hasFilterApplied
+    ? 'По текущему фильтру ничего не найдено'
+    : 'Вам пока не назначено ни одного задания';
+  const emptyActionLabel = hasFilterApplied ? 'Сбросить фильтр' : 'Обновить список';
+  const onEmptyAction = hasFilterApplied && onResetFilter ? onResetFilter : onRefresh;
+
   return (
     <section className={styles.section} aria-label="Список домашних заданий">
+      {isEmpty ? (
+        <div className={styles.emptyState}>
+          <p>{emptyTitle}</p>
+          <button type="button" onClick={onEmptyAction}>
+            {emptyActionLabel}
+          </button>
+        </div>
+      ) : null}
+
+      {!isEmpty ? (
       <div className={styles.tableWrap}>
         <div className={styles.scrollArea}>
           <table className={styles.table}>
@@ -93,19 +115,6 @@ export const StudentHomeworkTableSection: FC<StudentHomeworkTableSectionProps> =
                 <tr>
                   <td colSpan={6}>
                     <div className={styles.emptyState}>Загрузка заданий…</div>
-                  </td>
-                </tr>
-              ) : null}
-
-              {!loading && assignments.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <div className={styles.emptyState}>
-                      <p>По выбранным фильтрам ничего не найдено.</p>
-                      <button type="button" onClick={onRefresh}>
-                        Обновить список
-                      </button>
-                    </div>
                   </td>
                 </tr>
               ) : null}
@@ -203,6 +212,7 @@ export const StudentHomeworkTableSection: FC<StudentHomeworkTableSectionProps> =
           </table>
         </div>
       </div>
+      ) : null}
 
       <div className={styles.mobileList}>
         {loading
@@ -223,11 +233,11 @@ export const StudentHomeworkTableSection: FC<StudentHomeworkTableSectionProps> =
             ))
           : null}
 
-        {!loading && assignments.length === 0 ? (
+        {isEmpty ? (
           <div className={styles.mobileEmptyState}>
-            <p>По выбранным фильтрам ничего не найдено.</p>
-            <button type="button" onClick={onRefresh}>
-              Обновить список
+            <p>{emptyTitle}</p>
+            <button type="button" onClick={onEmptyAction}>
+              {emptyActionLabel}
             </button>
           </div>
         ) : null}

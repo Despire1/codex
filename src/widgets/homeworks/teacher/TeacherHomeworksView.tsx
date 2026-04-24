@@ -743,7 +743,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   const createMenuItems = [
     {
       id: 'create_homework',
-      label: 'Создать домашнее задание',
+      label: 'Создать задание',
       description: 'Создать новое задание в библиотеке, чтобы потом выдать его ученику.',
       onSelect: onOpenCreateTemplateScreen,
       icon: <HomeworkFileLinesIcon size={12} />,

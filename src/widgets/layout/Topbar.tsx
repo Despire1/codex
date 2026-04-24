@@ -63,7 +63,7 @@ export const Topbar: FC<TopbarProps> = ({
   subtitle,
   variant = 'default',
   showCreateLesson,
-  createButtonLabel = 'Новый урок',
+  createButtonLabel = 'Создать урок',
   createButtonIconAccent = false,
   reserveCreateButtonSpace = true,
   createMenuItems,

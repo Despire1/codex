@@ -915,6 +915,8 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  padding-bottom: 24px;
+  scroll-padding-bottom: 40px;
 }
 
 .weekHeaderRow {
@@ -1065,6 +1067,8 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  padding-bottom: 24px;
+  scroll-padding-bottom: 40px;
 }
 
 .dayColumn {
@@ -1471,4 +1475,36 @@
   .monthWeekday {
     font-size: 11px;
   }
+}
+
+.mobileCreateFab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-primary, #a3e635);
+  color: #111827;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobileCreateFab:hover {
+  background: #94d82d;
+}
+
+.mobileCreateFab:active {
+  transform: scale(0.96);
+}
+
+.mobileCreateFabIcon {
+  width: 26px;
+  height: 26px;
 }

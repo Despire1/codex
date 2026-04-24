@@ -31,6 +31,7 @@ import {
   resolveHomeworkLibraryIssuedCount,
   resolveHomeworkLibraryMetrics,
   resolveHomeworkLibraryUpdatedLabel,
+  resolveHomeworkLibraryUpdatedTooltip,
 } from '../../model/lib/homeworkLibraryPresentation';
 import styles from './HomeworkLibraryCard.module.css';
 
@@ -96,6 +97,7 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
   const metrics = resolveHomeworkLibraryMetrics(template);
   const issuedCount = resolveHomeworkLibraryIssuedCount(template);
   const updatedLabel = resolveHomeworkLibraryUpdatedLabel(template.updatedAt);
+  const updatedTooltip = resolveHomeworkLibraryUpdatedTooltip(template.updatedAt);
 
   const actionLabel = template.isArchived ? 'Вернуть' : 'Выдать';
   const actionAriaLabel = template.isArchived ? 'Вернуть задание в библиотеку' : 'Выдать домашнее задание';
@@ -255,7 +257,7 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
         </div>
 
         <div className={styles.footer}>
-          <span className={styles.updatedLabel}>{updatedLabel}</span>
+          <span className={styles.updatedLabel} title={updatedTooltip}>{updatedLabel}</span>
           <span className={styles.issuedMeta}>
             <UserGroupIcon width={12} height={12} />
             <span>{issuedCount}</span>

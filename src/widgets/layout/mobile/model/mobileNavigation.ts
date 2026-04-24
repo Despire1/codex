@@ -58,8 +58,8 @@ const studentDrawerOrder: Record<TabId, number> = {
 const teacherTabbarOrder: Partial<Record<TabId, number>> = {
   dashboard: 10,
   schedule: 20,
-  homeworks: 30,
-  students: 40,
+  students: 30,
+  homeworks: 40,
 };
 
 const studentTabbarOrder: Partial<Record<TabId, number>> = {

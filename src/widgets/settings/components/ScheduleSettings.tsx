@@ -4,7 +4,6 @@ import {
   CalendarIcon,
   CalendarWeekReferenceIcon,
   CheckCircleOutlineIcon,
-  CoffeeIcon,
   ExpandLessOutlinedIcon,
   ExpandMoreOutlinedIcon,
 } from '../../../icons/MaterialIcons';
@@ -18,14 +17,19 @@ import styles from '../SettingsSection.module.css';
 interface ScheduleSettingsProps {
   teacher: Teacher;
   onChange: (patch: Partial<Teacher>) => void;
+  onSaveNow: (patch: Partial<Teacher>) => Promise<{ ok: boolean; error?: string }>;
   onSaveWeekendWeekdays: (weekendWeekdays: number[]) => Promise<boolean>;
   isWeekendSaving: boolean;
   onComingSoonClick: () => void;
 }
 
+const MIN_LESSON_DURATION = 15;
+const MAX_LESSON_DURATION = 240;
+
 export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   teacher,
   onChange,
+  onSaveNow,
   onSaveWeekendWeekdays,
   isWeekendSaving,
   onComingSoonClick,
@@ -34,6 +38,8 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   const { showToast } = useToast();
   const [weekendsExpanded, setWeekendsExpanded] = useState(Boolean(teacher.weekendWeekdays.length));
   const [weekendDraft, setWeekendDraft] = useState(() => normalizeWeekdayList(teacher.weekendWeekdays));
+  const [durationDraft, setDurationDraft] = useState(() => String(teacher.defaultLessonDuration));
+  const [isDurationSaving, setIsDurationSaving] = useState(false);
   const isWeekendDirty = useMemo(() => {
     const saved = normalizeWeekdayList(teacher.weekendWeekdays);
     return saved.length !== weekendDraft.length || saved.some((weekday, index) => weekday !== weekendDraft[index]);
@@ -54,6 +60,38 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   }, [teacher.weekendWeekdays]);
 
   useEffect(() => {
+    setDurationDraft(String(teacher.defaultLessonDuration));
+  }, [teacher.defaultLessonDuration]);
+
+  const parsedDurationDraft = useMemo(() => {
+    const trimmed = durationDraft.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric)) return null;
+    return Math.round(numeric);
+  }, [durationDraft]);
+
+  const isDurationDirty = durationDraft.trim() !== String(teacher.defaultLessonDuration);
+  const isDurationValid =
+    parsedDurationDraft !== null &&
+    parsedDurationDraft >= MIN_LESSON_DURATION &&
+    parsedDurationDraft <= MAX_LESSON_DURATION;
+
+  const saveDuration = async () => {
+    if (!isDurationDirty || !isDurationValid || parsedDurationDraft === null) return;
+    setIsDurationSaving(true);
+    const result = await onSaveNow({ defaultLessonDuration: parsedDurationDraft });
+    setIsDurationSaving(false);
+    if (result.ok) {
+      showToast({ message: 'Длительность урока сохранена', variant: 'success' });
+    }
+  };
+
+  const resetDuration = () => {
+    setDurationDraft(String(teacher.defaultLessonDuration));
+  };
+
+  useEffect(() => {
     const discardWeekendChanges = () => {
       setWeekendDraft(normalizeWeekdayList(teacher.weekendWeekdays));
     };
@@ -68,6 +106,22 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
 
     return () => clearEntry('settings-schedule-weekends');
   }, [clearEntry, isWeekendDirty, onSaveWeekendWeekdays, setEntry, teacher.weekendWeekdays, weekendDraft]);
+
+  useEffect(() => {
+    setEntry('settings-schedule-duration', {
+      isDirty: isDurationDirty,
+      onSave: async () => {
+        if (!isDurationValid || parsedDurationDraft === null) return false;
+        const result = await onSaveNow({ defaultLessonDuration: parsedDurationDraft });
+        return result.ok;
+      },
+      onDiscard: resetDuration,
+      message: 'Вы изменили длительность урока. Сохранить перед выходом?',
+      cancelText: 'Выйти без сохранения',
+    });
+
+    return () => clearEntry('settings-schedule-duration');
+  }, [clearEntry, isDurationDirty, isDurationValid, onSaveNow, parsedDurationDraft, setEntry]);
 
   return (
     <div className={styles.moduleStack}>
@@ -89,30 +143,49 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
               className={`${controls.input} ${styles.fieldInput}`}
               type="number"
               inputMode="numeric"
-              min={15}
-              max={240}
+              min={MIN_LESSON_DURATION}
+              max={MAX_LESSON_DURATION}
               step={5}
-              value={teacher.defaultLessonDuration}
+              value={durationDraft}
               onKeyDown={(event) => {
                 if (event.key === '-' || event.key === 'e' || event.key === 'E') {
                   event.preventDefault();
+                  return;
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void saveDuration();
                 }
               }}
               onChange={(event) => {
-                const numeric = Number(event.target.value);
-                if (!Number.isFinite(numeric)) return;
-                const rounded = Math.round(numeric);
-                const clamped = Math.min(Math.max(rounded, 15), 240);
-                onChange({ defaultLessonDuration: clamped });
-                if (rounded !== clamped) {
-                  const hint = rounded > 240
-                    ? 'Установлено максимальное значение 240 минут'
-                    : 'Установлено минимальное значение 15 минут';
-                  showToast({ message: hint, variant: 'success' });
-                }
+                setDurationDraft(event.target.value);
               }}
             />
-            <p className={styles.fieldHint}>Допустимо 15–240 минут.</p>
+            <p className={styles.fieldHint}>
+              Допустимо {MIN_LESSON_DURATION}–{MAX_LESSON_DURATION} минут.
+              {isDurationDirty && !isDurationValid ? ' Введите значение в этом диапазоне.' : ''}
+            </p>
+            {isDurationDirty ? (
+              <div className={styles.fieldActionsRow}>
+                <button
+                  type="button"
+                  className={`${controls.primaryButton} ${styles.darkActionButton}`}
+                  disabled={isDurationSaving || !isDurationValid}
+                  onClick={() => void saveDuration()}
+                >
+                  <CheckCircleOutlineIcon width={16} height={16} />
+                  <span>{isDurationSaving ? 'Сохраняем…' : 'Сохранить длительность'}</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.fieldSecondaryButton}
+                  disabled={isDurationSaving}
+                  onClick={resetDuration}
+                >
+                  Отменить
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.infoRow}>
@@ -184,28 +257,6 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
         ) : null}
       </section>
 
-      <section className={styles.comingSoonCard}>
-        <div className={styles.sectionHeader}>
-          <div className={`${styles.sectionIcon} ${styles.sectionIconDark}`}>
-            <CoffeeIcon width={20} height={20} />
-          </div>
-          <div className={styles.sectionHeaderCopy}>
-            <h2 className={styles.sectionHeadingOnDark}>Дополнительные настройки</h2>
-            <p className={styles.sectionDescriptionOnDark}>Скоро появятся новые возможности</p>
-          </div>
-        </div>
-
-        <div className={styles.comingSoonStack}>
-          <button type="button" className={styles.comingSoonFeature} onClick={onComingSoonClick}>
-            <span className={styles.comingSoonFeatureTitle}>Перерыв между уроками</span>
-            <span className={styles.comingSoonBadgeAccent}>Скоро</span>
-          </button>
-          <button type="button" className={styles.comingSoonFeature} onClick={onComingSoonClick}>
-            <span className={styles.comingSoonFeatureTitle}>Рабочие часы</span>
-            <span className={styles.comingSoonBadgeAccent}>Скоро</span>
-          </button>
-        </div>
-      </section>
     </div>
   );
 };

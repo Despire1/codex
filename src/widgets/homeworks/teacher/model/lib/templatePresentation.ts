@@ -90,11 +90,11 @@ export const resolveHomeworkTemplateCategoryTone = (template: HomeworkTemplate) 
   return 'blue' as const;
 };
 
-export const resolveHomeworkTemplatePreview = (template: HomeworkTemplate) => {
+export const resolveHomeworkTemplatePreview = (template: HomeworkTemplate): string | null => {
   const textBlock = template.blocks.find((block) => block.type === 'TEXT');
-  if (!textBlock || textBlock.type !== 'TEXT') return 'Описание не заполнено';
+  if (!textBlock || textBlock.type !== 'TEXT') return null;
   const normalized = textBlock.content.replace(/\s+/g, ' ').trim();
-  if (!normalized) return 'Описание не заполнено';
+  if (!normalized) return null;
   if (normalized.length <= 120) return normalized;
   return `${normalized.slice(0, 117)}...`;
 };

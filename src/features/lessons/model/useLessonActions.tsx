@@ -203,6 +203,7 @@ export type LessonActionsContextValue = {
   markLessonCompleted: (lessonId: number) => Promise<void>;
   updateLessonStatus: (lessonId: number, status: Lesson['status']) => Promise<void>;
   togglePaid: (lessonId: number, studentId?: number, options?: { currentIsPaid?: boolean }) => Promise<void>;
+  undoMarkPaid: (lessonId: number, studentId?: number) => Promise<void>;
   remindLessonPayment: (
     lessonId: number,
     studentId?: number,
@@ -1626,9 +1627,11 @@ export const useLessonActionsInternal = ({
       studentId?: number,
       cancelBehavior?: PaymentCancelBehavior,
       writeOffBalance?: boolean,
+      options?: { silent?: boolean },
     ) => {
       try {
         const payload = cancelBehavior || writeOffBalance ? { cancelBehavior, writeOffBalance } : undefined;
+        let resolvedStudentId: number | undefined;
         if (studentId !== undefined) {
           const data = await api.toggleParticipantPaid(lessonId, studentId, payload);
           const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
@@ -1650,10 +1653,7 @@ export const useLessonActionsInternal = ({
 
           await refreshPayments(studentId);
           await loadStudentUnpaidLessons({ studentIdOverride: studentId, force: true });
-          showToast({
-            message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
-            variant: 'success',
-          });
+          resolvedStudentId = studentId;
         } else {
           const data = await api.togglePaid(lessonId, payload);
           const baseLesson = lessons.find((lesson) => lesson.id === lessonId);
@@ -1673,14 +1673,29 @@ export const useLessonActionsInternal = ({
             triggerStudentsListReload();
           }
 
-          const targetStudent = data.lesson.studentId;
-          await refreshPayments(targetStudent);
-          if (targetStudent) {
-            await loadStudentUnpaidLessons({ studentIdOverride: targetStudent, force: true });
+          resolvedStudentId = data.lesson.studentId;
+          await refreshPayments(resolvedStudentId);
+          if (resolvedStudentId) {
+            await loadStudentUnpaidLessons({ studentIdOverride: resolvedStudentId, force: true });
           }
+        }
+
+        if (!options?.silent) {
+          const canOfferUndo = !cancelBehavior;
           showToast({
             message: cancelBehavior ? 'Оплата отменена' : 'Оплата отмечена',
             variant: 'success',
+            ...(canOfferUndo
+              ? {
+                  actionLabel: 'Отменить',
+                  durationMs: 5000,
+                  onAction: () => {
+                    void applyTogglePaid(lessonId, studentId ?? resolvedStudentId, 'refund', undefined, {
+                      silent: true,
+                    });
+                  },
+                }
+              : {}),
           });
         }
 
@@ -1768,6 +1783,13 @@ export const useLessonActionsInternal = ({
       await markPaidWithBalance(lessonId, studentId, false);
     },
     [applyTogglePaid, lessons, markPaidWithBalance, openPaymentBalanceDialog, openPaymentCancelDialog, resolvePaymentTarget],
+  );
+
+  const undoMarkPaid = useCallback(
+    async (lessonId: number, studentId?: number) => {
+      await applyTogglePaid(lessonId, studentId, 'refund');
+    },
+    [applyTogglePaid],
   );
 
   const remindLessonPayment = useCallback(
@@ -1870,6 +1892,7 @@ export const useLessonActionsInternal = ({
       markLessonCompleted,
       updateLessonStatus,
       togglePaid,
+      undoMarkPaid,
       remindLessonPayment,
       shiftLessonTime,
       cancelLesson,
@@ -1905,6 +1928,7 @@ export const useLessonActionsInternal = ({
       markLessonCompleted,
       remindLessonPayment,
       togglePaid,
+      undoMarkPaid,
       updateLessonStatus,
       shiftLessonTime,
       cancelLesson,

@@ -95,7 +95,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
             return next;
           });
           successTimeouts.current.delete(key);
-        }, 1200);
+        }, 3000);
         successTimeouts.current.set(key, timeoutId);
       } catch (_error) {
         // keep previous reminder timestamp on failure
@@ -224,7 +224,7 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
                                 type="button"
                                 className={styles.remindButton}
                                 onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
-                                disabled={Boolean(reminderDisabledReason) || isPending}
+                                disabled={Boolean(reminderDisabledReason) || isPending || isSuccess}
                             >
                               {isPending ? (
                                   <span className={styles.iconSpinner} aria-hidden />

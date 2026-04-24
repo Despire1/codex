@@ -287,7 +287,10 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworkAssignments, studentDebtItems);
 
   const homeworkAssignmentsOrdered = useMemo(
-    () => [...studentHomeworkAssignments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    () =>
+      [...studentHomeworkAssignments]
+        .filter((assignment) => assignment.status !== 'DRAFT')
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [studentHomeworkAssignments],
   );
   const lessonsOrdered = studentLessons;
@@ -976,6 +979,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <button type="button" onClick={openReminderSettings}>
                     Настройки уведомлений
                   </button>
+                  <div className={styles.menuSeparator} aria-hidden />
                   <button type="button" className={styles.dangerButton} onClick={() => handleMenuAction(onRequestDeleteStudent)}>
                     Удалить ученика
                   </button>

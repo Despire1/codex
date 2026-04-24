@@ -80,6 +80,16 @@ type ValidateHomeworkTemplatePayload = (payload: { title: string; blocks: Homewo
   errorIssues: any[];
 };
 
+const sanitizeTemplateTitleForAssignment = (title: string): string => {
+  const trimmed = title.trim();
+  if (!trimmed) return trimmed;
+  const withoutRecipient = trimmed
+    .replace(/\s+для\s+[A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'\-]*(?:\s+[A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'\-]*)?/giu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return withoutRecipient || trimmed;
+};
+
 type CreateHomeworkV2ServiceDeps = {
   defaultPageSize: number;
   maxPageSize: number;
@@ -836,7 +846,7 @@ export const createHomeworkV2Service = ({
 
     const resolvedTitle =
       (typeof body.title === 'string' && body.title.trim()) ||
-      (template?.title ? String(template.title) : '') ||
+      (template?.title ? sanitizeTemplateTitleForAssignment(String(template.title)) : '') ||
       'Домашнее задание';
     const snapshot = normalizeHomeworkBlocks(body.contentSnapshot ?? template?.blocks ?? []);
     const sendMode = normalizeAssignmentSendModeInput(body.sendMode);

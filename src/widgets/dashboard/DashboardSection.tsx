@@ -34,6 +34,7 @@ interface DashboardSectionProps {
   onOpenLessonDay: (lesson: Lesson) => void;
   onOpenStudent: (studentId: number) => void;
   onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
+  onCreateHomeworkTemplate: () => void;
   dashboardSummary: DashboardSummary | null;
 }
 
@@ -51,6 +52,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   onOpenLessonDay,
   onOpenStudent,
   onOpenHomeworkAssign,
+  onCreateHomeworkTemplate,
   dashboardSummary,
 }) => {
   const timeZone = useTimeZone();
@@ -231,6 +233,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         onOpenLesson={onOpenLesson}
         onOpenStudent={onOpenStudent}
         onOpenHomeworkAssign={onOpenHomeworkAssign}
+        onCreateHomeworkTemplate={onCreateHomeworkTemplate}
         onTogglePaid={togglePaid}
         onCompleteLesson={markLessonCompleted}
         onRemindLessonPayment={handleRemindLessonPayment}
@@ -310,7 +313,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
 
       <DashboardQuickActionsReferenceCard
         className={styles.quickActionsArea}
-        onCreateHomework={() => onOpenHomeworkAssign()}
+        onCreateHomework={onCreateHomeworkTemplate}
         onCreateLesson={() => onCreateLesson()}
         onAddStudent={onAddStudent}
       />

@@ -1182,7 +1182,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 disabled={selectedDayIsWeekend}
               >
                 <AddOutlinedIcon className={styles.dayPanelAddButtonIcon} />
-                {selectedDayIsWeekend ? 'Выходной день' : 'Добавить урок'}
+                {selectedDayIsWeekend ? 'Выходной день' : 'Создать урок'}
               </button>
             </div>
           </div>
@@ -1487,6 +1487,26 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       {scheduleView === 'week' && (isMobileWeekView ? renderMobileWeekView() : renderWeekGrid())}
       {scheduleView === 'month' && renderMonthView()}
       {scheduleView === 'day' && renderDayView()}
+
+      {isMobileViewport ? (
+        <button
+          type="button"
+          className={styles.mobileCreateFab}
+          aria-label="Создать урок"
+          onClick={() => {
+            const defaultDayIso =
+              scheduleView === 'month'
+                ? effectiveSelectedMonthDay ?? format(todayZoned, 'yyyy-MM-dd')
+                : format(dayViewDate, 'yyyy-MM-dd');
+            openLessonModal(defaultDayIso, undefined, undefined, {
+              skipNavigation: true,
+              variant: 'sheet',
+            });
+          }}
+        >
+          <AddOutlinedIcon className={styles.mobileCreateFabIcon} />
+        </button>
+      ) : null}
 
       <LessonCancelDialog
         open={Boolean(cancelDialogLesson)}

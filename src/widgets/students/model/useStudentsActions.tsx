@@ -232,10 +232,6 @@ export const useStudentsActionsInternal = ({
       showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
       return;
     }
-    if (!newStudentDraft.username.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите Telegram username ученика.');
-      return;
-    }
     const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
     if (pricePerLesson === null) {
       showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
@@ -325,10 +321,6 @@ export const useStudentsActionsInternal = ({
     if (!editingStudentId) return;
     if (!newStudentDraft.customName.trim()) {
       showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
-      return;
-    }
-    if (!newStudentDraft.username.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите Telegram username ученика.');
       return;
     }
     const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);

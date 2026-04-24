@@ -162,6 +162,18 @@ export const resolveHomeworkLibraryUpdatedLabel = (value: string) => {
   return `Изм. ${formatDistanceToNow(date, { addSuffix: true, locale: ru })}`;
 };
 
+export const resolveHomeworkLibraryUpdatedTooltip = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 export const resolveHomeworkLibraryIssuedCount = (template: HomeworkTemplate) => template.issuedAssignmentsCount ?? 0;
 
 export const resolveHomeworkLibraryCollections = (templates: HomeworkTemplate[]) => {

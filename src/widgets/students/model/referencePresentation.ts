@@ -287,8 +287,7 @@ export const buildCompactStudentTablePresentation = (
           ? 'Завершил'
           : presentation.nextLessonShortLabel;
 
-  const statusMeta = getStatusUiMeta(presentation.status);
-  const activationLabel = item.student.isActivated === false ? 'Telegram не привязан' : null;
+  const statusMeta = getCombinedStudentStatusMeta(presentation.status, item.student.isActivated);
 
   return {
     levelLabel: presentation.levelLabel,
@@ -301,7 +300,7 @@ export const buildCompactStudentTablePresentation = (
     nextLessonTone: presentation.nextLessonTone,
     statusLabel: statusMeta.label,
     statusTone: statusMeta.tone,
-    activationLabel,
+    activationLabel: null,
     uiColor: presentation.uiColor,
   };
 };
@@ -314,6 +313,18 @@ export const getStatusUiMeta = (status: StudentLifecycleStatus) => {
     return { label: 'Ученик на паузе', tone: 'paused' as const };
   }
   return { label: 'Обучение завершено', tone: 'completed' as const };
+};
+
+export const getCombinedStudentStatusMeta = (status: StudentLifecycleStatus, isActivated: boolean) => {
+  if (status === 'PAUSED') {
+    return { label: 'На паузе', tone: 'paused' as const };
+  }
+  if (status === 'COMPLETED') {
+    return { label: 'Завершил', tone: 'completed' as const };
+  }
+  return isActivated
+    ? { label: 'Telegram ✓', tone: 'active' as const }
+    : { label: 'Telegram ✗', tone: 'inactive' as const };
 };
 
 export const buildProfileStats = (

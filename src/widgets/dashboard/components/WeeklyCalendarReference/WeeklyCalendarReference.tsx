@@ -74,7 +74,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
   const [weekOffset, setWeekOffset] = useState(0);
   const [pendingWeekStartKey, setPendingWeekStartKey] = useState<string | null>(null);
   const [pendingWeekLoadStarted, setPendingWeekLoadStarted] = useState(false);
-  const [lessonPopover, setLessonPopover] = useState<{ lessonId: number; anchorEl: HTMLElement } | null>(null);
+  const [lessonPopover, setLessonPopover] = useState<{ lesson: Lesson; anchorEl: HTMLElement } | null>(null);
   const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
   const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
   const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
@@ -128,7 +128,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
 
   useEffect(() => {
     if (!lessonPopover) return;
-    const exists = lessons.some((lesson) => lesson.id === lessonPopover.lessonId);
+    const exists = lessons.some((lesson) => lesson.id === lessonPopover.lesson.id);
     if (!exists) setLessonPopover(null);
   }, [lessons, lessonPopover]);
 
@@ -163,7 +163,11 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
 
   const activeLesson = useMemo(() => {
     if (!lessonPopover) return null;
-    return lessons.find((lesson) => lesson.id === lessonPopover.lessonId) ?? null;
+    const stored = lessonPopover.lesson;
+    const refreshed = lessons.find(
+      (lesson) => lesson.id === stored.id && lesson.startAt === stored.startAt,
+    );
+    return refreshed ?? stored;
   }, [lessonPopover, lessons]);
 
   const handleDayKeyDown = (date: Date, disabled = false) => (event: KeyboardEvent<HTMLDivElement>) => {
@@ -182,7 +186,7 @@ export const WeeklyCalendarReference: FC<WeeklyCalendarReferenceProps> = ({
   };
 
   const openLessonPopoverForLesson = (lesson: Lesson, anchorEl: HTMLElement) => {
-    setLessonPopover({ lessonId: lesson.id, anchorEl });
+    setLessonPopover({ lesson, anchorEl });
   };
 
   const closeLessonPopover = () => setLessonPopover(null);

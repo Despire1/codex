@@ -861,16 +861,16 @@ export const createStudentsService = ({
     if (!customName || typeof customName !== 'string' || !customName.trim()) {
       throw new Error('Имя ученика обязательно');
     }
-    if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
-      throw new Error('Telegram username обязателен');
-    }
     if (!Number.isFinite(Number(pricePerLesson)) || Number(pricePerLesson) < 0) {
       throw new Error('Цена занятия обязательна и должна быть неотрицательной');
     }
 
     const teacher = await ensureTeacher(user);
-    const normalizedUsername = typeof username === 'string' ? normalizeTelegramUsername(username) : null;
-    if (!normalizedUsername) throw new Error('Telegram username обязателен');
+    const normalizedUsername =
+      typeof username === 'string' && username.trim() ? normalizeTelegramUsername(username) : null;
+    if (typeof username === 'string' && username.trim() && !normalizedUsername) {
+      throw new Error('Некорректный Telegram username');
+    }
     const normalizedCustomName = customName.trim();
     const profileFields = parseStudentProfileFields(body as Record<string, unknown>, 'create');
     const existingStudent = normalizedUsername
@@ -977,9 +977,6 @@ export const createStudentsService = ({
     if (!customName || typeof customName !== 'string' || !customName.trim()) {
       throw new Error('Имя ученика обязательно');
     }
-    if (!username || typeof username !== 'string' || !normalizeTelegramUsername(username)) {
-      throw new Error('Telegram username обязателен');
-    }
     const numericPrice = Number(pricePerLesson);
     if (!Number.isFinite(numericPrice) || numericPrice < 0) {
       throw new Error('Цена занятия обязательна и должна быть неотрицательной');
@@ -993,9 +990,12 @@ export const createStudentsService = ({
     });
     if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
-    const normalizedUsername = normalizeTelegramUsername(typeof username === 'string' ? username : null);
-    if (!normalizedUsername) throw new Error('Telegram username обязателен');
-    const matchedUser = await findUserByTelegramUsername(normalizedUsername);
+    const usernameProvided = typeof username === 'string' && username.trim().length > 0;
+    const normalizedUsername = usernameProvided ? normalizeTelegramUsername(username) : null;
+    if (usernameProvided && !normalizedUsername) {
+      throw new Error('Некорректный Telegram username');
+    }
+    const matchedUser = normalizedUsername ? await findUserByTelegramUsername(normalizedUsername) : null;
 
     const [student, updatedLink] = await prisma.$transaction([
       prisma.student.update({

@@ -1,4 +1,5 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, ReactNode, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AddOutlinedIcon, ExpandMoreOutlinedIcon } from '../../../../icons/MaterialIcons';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import styles from './TopbarCreateMenu.module.css';
@@ -30,6 +31,11 @@ export const TopbarCreateMenu: FC<TopbarCreateMenuProps> = ({
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname, location.search]);
 
   const handleSelect = (action: () => void) => {
     setOpen(false);

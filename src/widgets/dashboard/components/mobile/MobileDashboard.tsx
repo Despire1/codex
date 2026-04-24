@@ -1,6 +1,6 @@
 import { addDays, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCalendarCheck,
@@ -16,12 +16,14 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { ActivityFeedItem, Lesson, LinkedStudent, Teacher, UnpaidLessonEntry } from '@/entities/types';
 import {
+  isVisibleLesson,
   resolveLessonDeleteDisabledReason,
   resolveLessonEditDisabledReason,
   resolveLessonLimitedEditNotice,
   resolveLessonMutationDisabledReason,
 } from '@/entities/lesson/lib/lessonMutationGuards';
-import type { DashboardSummary } from '@/shared/api/client';
+import { normalizeLesson } from '@/shared/lib/normalizers';
+import { api, type DashboardSummary } from '@/shared/api/client';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import { useTimeZone } from '@/shared/lib/timezoneContext';
@@ -52,6 +54,7 @@ interface MobileDashboardProps {
   onOpenLesson: (lesson: Lesson) => void;
   onOpenStudent: (studentId: number) => void;
   onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
+  onCreateHomeworkTemplate: () => void;
   onTogglePaid: (lessonId: number, studentId?: number) => Promise<void>;
   onCompleteLesson: (lessonId: number) => Promise<void>;
   onRemindLessonPayment: (
@@ -151,6 +154,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   onOpenLesson,
   onOpenStudent,
   onOpenHomeworkAssign,
+  onCreateHomeworkTemplate,
   onTogglePaid,
   onCompleteLesson,
   onRemindLessonPayment,
@@ -181,16 +185,53 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   const now = useMemo(() => new Date(), []);
   const nowTs = now.getTime();
 
+  const [upcomingLessonsData, setUpcomingLessonsData] = useState<Lesson[]>([]);
+
+  const loadUpcomingLessons = useCallback(async () => {
+    const start = new Date();
+    const end = addDays(start, 28);
+    try {
+      const data = await api.listLessonsForRange({ start: start.toISOString(), end: end.toISOString() });
+      const normalized = (data.lessons ?? []).map(normalizeLesson).filter(isVisibleLesson);
+      setUpcomingLessonsData(normalized);
+    } catch (error) {
+      console.error('Failed to load upcoming lessons for mobile dashboard', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUpcomingLessons();
+  }, [loadUpcomingLessons]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void loadUpcomingLessons();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [loadUpcomingLessons]);
+
+  const lessonsForPresentation = useMemo(() => {
+    const byId = new Map<number, Lesson>();
+    lessons.forEach((lesson) => byId.set(lesson.id, lesson));
+    upcomingLessonsData.forEach((lesson) => {
+      if (!byId.has(lesson.id)) byId.set(lesson.id, lesson);
+    });
+    return Array.from(byId.values());
+  }, [lessons, upcomingLessonsData]);
+
   const presentation = useMemo(
     () =>
       buildMobileDashboardPresentation({
-        lessons,
+        lessons: lessonsForPresentation,
         linkedStudents,
         unpaidEntries,
         summary,
         timeZone,
       }),
-    [lessons, linkedStudents, summary, timeZone, unpaidEntries],
+    [lessonsForPresentation, linkedStudents, summary, timeZone, unpaidEntries],
   );
 
   const actionLessonPresentation = resolveCloseLessonForActions(presentation.closeLesson, actionsLesson);
@@ -305,11 +346,11 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
 
   const upcomingLessons = useMemo(
     () =>
-      lessons
+      lessonsForPresentation
         .filter((lesson) => lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() >= nowTs)
         .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
         .slice(0, 3),
-    [lessons, nowTs],
+    [lessonsForPresentation, nowTs],
   );
 
   const todayZoned = useMemo(() => toZonedDate(now, timeZone), [now, timeZone]);
@@ -440,29 +481,29 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
           <button
             type="button"
             className={styles.quickAction}
-            onClick={() => onOpenHomeworkAssign(quickHomeworkPrefill.studentId, quickHomeworkPrefill.lessonId)}
+            onClick={onCreateHomeworkTemplate}
           >
             <span className={`${styles.quickActionIcon} ${styles.quickActionPrimary}`} aria-hidden>
               <FontAwesomeIcon icon={faFileInvoice} />
             </span>
-            <span className={styles.quickActionTitle}>Создать ДЗ</span>
-            <span className={styles.quickActionSubtitle}>Новое задание</span>
+            <span className={styles.quickActionTitle}>Создать задание</span>
+            <span className={styles.quickActionSubtitle}>Новое ДЗ</span>
           </button>
 
           <button type="button" className={styles.quickAction} onClick={onAddStudent}>
             <span className={`${styles.quickActionIcon} ${styles.quickActionBlue}`} aria-hidden>
               <FontAwesomeIcon icon={faUserPlus} />
             </span>
-            <span className={styles.quickActionTitle}>Добавить</span>
-            <span className={styles.quickActionSubtitle}>Нового ученика</span>
+            <span className={styles.quickActionTitle}>Добавить ученика</span>
+            <span className={styles.quickActionSubtitle}>Новый ученик</span>
           </button>
 
           <button type="button" className={styles.quickAction} onClick={() => onCreateLesson()}>
             <span className={`${styles.quickActionIcon} ${styles.quickActionPurple}`} aria-hidden>
               <FontAwesomeIcon icon={faCalendarPlus} />
             </span>
-            <span className={styles.quickActionTitle}>Урок</span>
-            <span className={styles.quickActionSubtitle}>Запланировать</span>
+            <span className={styles.quickActionTitle}>Создать урок</span>
+            <span className={styles.quickActionSubtitle}>Новый урок</span>
           </button>
 
           <button type="button" className={styles.quickAction} onClick={() => setIsUnpaidOpen(true)}>

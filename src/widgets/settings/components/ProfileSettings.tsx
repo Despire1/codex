@@ -16,11 +16,22 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOpt
   const usernameLabel = teacher.username ? `@${teacher.username}` : 'не указан';
   const [emailValue, setEmailValue] = useState(teacher.receiptEmail ?? '');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [nameValue, setNameValue] = useState(teacher.name ?? '');
 
   useEffect(() => {
     setEmailValue(teacher.receiptEmail ?? '');
     setEmailError(null);
   }, [teacher.receiptEmail]);
+
+  useEffect(() => {
+    setNameValue(teacher.name ?? '');
+  }, [teacher.name]);
+
+  const handleNameBlur = () => {
+    const trimmed = nameValue.trim();
+    if (trimmed === (teacher.name ?? '').trim()) return;
+    onChange({ name: trimmed || null });
+  };
 
   const handleEmailChange = (value: string) => {
     setEmailValue(value);
@@ -60,10 +71,21 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOpt
           </div>
 
           <div className={styles.profileReadOnlyGrid}>
-            <div className={styles.readonlyFieldBlock}>
-              <label className={styles.fieldLabel}>Имя</label>
-              <div className={styles.readonlyField}>{teacher.name ?? '—'}</div>
-              <p className={styles.readonlyHint}>Только для чтения</p>
+            <div className={styles.fieldBlock}>
+              <label className={styles.fieldLabel} htmlFor="profile-display-name">
+                Имя
+              </label>
+              <input
+                id="profile-display-name"
+                className={`${controls.input} ${styles.fieldInput}`}
+                value={nameValue}
+                type="text"
+                maxLength={60}
+                placeholder="Как к вам обращаться"
+                onChange={(event) => setNameValue(event.target.value)}
+                onBlur={handleNameBlur}
+              />
+              <p className={styles.fieldHint}>Видят ваши ученики в уведомлениях.</p>
             </div>
 
             <div className={styles.readonlyFieldBlock}>

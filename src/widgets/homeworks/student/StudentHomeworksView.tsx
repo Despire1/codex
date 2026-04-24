@@ -97,6 +97,8 @@ export const StudentHomeworksView: FC<StudentHomeworksViewModel> = ({
         loading={loading}
         onRefresh={onRefresh}
         onOpenAssignment={onOpenAssignment}
+        filter={filter}
+        onResetFilter={() => onFilterChange('all')}
       />
 
       {hasMore ? (

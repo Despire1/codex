@@ -68,9 +68,13 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
                   side="bottom"
                   align="start"
                 >
-                  <span className={styles.inactiveBadge}>Telegram не привязан</span>
+                  <span className={styles.inactiveBadge}>Telegram ✗</span>
                 </Tooltip>
-              ) : null}
+              ) : (
+                <Tooltip content="Telegram привязан — можно отправлять напоминания" side="bottom" align="start">
+                  <span className={styles.activeBadge}>Telegram ✓</span>
+                </Tooltip>
+              )}
             </div>
             {presentation.levelLabel ? <p className={styles.level}>{presentation.levelLabel}</p> : null}
           </div>

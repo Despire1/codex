@@ -125,10 +125,22 @@ export const StudentDashboardSection: FC<StudentDashboardSectionProps> = ({ acti
         </article>
       ) : !loading ? (
         <article className={styles.emptyHero}>
-          <h3 className={styles.emptyHeroTitle}>Активных заданий нет</h3>
+          <h3 className={styles.emptyHeroTitle}>Добро пожаловать! 👋</h3>
           <p className={styles.emptyHeroSubtitle}>
-            Когда преподаватель выдаст новую домашку, она появится здесь.
+            {activeTeacherName
+              ? `Преподаватель ${activeTeacherName} ещё не выдал домашнее задание. Когда появится — оно будет здесь.`
+              : 'Здесь будут появляться задания от преподавателя.'}
           </p>
+          <ul className={styles.emptyHeroChecklist}>
+            <li>💬 Проверьте Telegram — скоро придёт первое задание.</li>
+            <li>🔔 Включите push-уведомления, чтобы не пропустить дедлайны.</li>
+            <li>⚙️ Загляните в «Настройки» — укажите часовой пояс и язык.</li>
+          </ul>
+          <div className={styles.emptyHeroActions}>
+            <button type="button" className={styles.heroSecondaryAction} onClick={() => navigate('/settings')}>
+              Открыть настройки
+            </button>
+          </div>
         </article>
       ) : null}
 

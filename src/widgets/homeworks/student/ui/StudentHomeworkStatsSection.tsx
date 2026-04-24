@@ -76,13 +76,19 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
           </div>
 
           <div className={styles.cardAside}>
-            <div className={`${styles.metricBox} ${styles.metricBlue}`}>
+            <div
+              className={`${styles.metricBox} ${styles.metricBlue}`}
+              title="Средний балл по проверенным заданиям"
+            >
               <div className={styles.metricBlueValue}>{loading ? '—' : stats.averageScore?.toFixed(1) ?? '—'}</div>
-              <div className={styles.metricBlueLabel}>Средний</div>
+              <div className={styles.metricBlueLabel}>Средний балл</div>
             </div>
-            <div className={`${styles.metricBox} ${styles.metricPurple}`}>
+            <div
+              className={`${styles.metricBox} ${styles.metricPurple}`}
+              title="Дней подряд без пропусков"
+            >
               <div className={styles.metricPurpleValue}>{loading ? '—' : stats.streakDays}</div>
-              <div className={styles.metricPurpleLabel}>Дней</div>
+              <div className={styles.metricPurpleLabel}>Дней подряд</div>
             </div>
           </div>
         </div>

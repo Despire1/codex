@@ -475,7 +475,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
   const sendTestDisabled = channelStatus.status !== 'ready' || !channelStatus.configured;
   const sendTestHint = sendTestDisabled
     ? 'Выберите и подключите канал отправки, чтобы отправлять тест.'
-    : 'Отправит тестовое сообщение по текущему шаблону для проверки.';
+    : 'Откроется окно выбора получателя: отправить тест себе или одному из учеников.';
 
   useEffect(() => {
     setValues(resolvedValues);

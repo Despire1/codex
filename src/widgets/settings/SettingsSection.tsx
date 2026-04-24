@@ -33,6 +33,7 @@ interface SettingsSectionProps {
 type SettingsPatch = Partial<
   Pick<
     Teacher,
+    | 'name'
     | 'timezone'
     | 'receiptEmail'
     | 'defaultLessonDuration'
@@ -401,6 +402,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
           <ScheduleSettings
             teacher={teacher}
             onChange={handleSettingsChange}
+            onSaveNow={saveSettingsNow}
             onSaveWeekendWeekdays={saveWeekendWeekdays}
             isWeekendSaving={saveStatus === 'saving'}
             onComingSoonClick={() => showToast({ message: 'Скоро, в следующих обновлениях', variant: 'success' })}

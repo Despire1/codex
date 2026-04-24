@@ -34,7 +34,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
             <div className={`${styles.actionIconWrap} ${styles.actionIconPrimary}`}>
               <FontAwesomeIcon icon={faCalendarPlus} />
             </div>
-            <span className={`${styles.actionLabel} ${styles.actionLabelPrimary}`}>Добавить урок</span>
+            <span className={`${styles.actionLabel} ${styles.actionLabelPrimary}`}>Создать урок</span>
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={`${styles.actionArrow} ${styles.actionArrowPrimary}`} />
         </button>
@@ -44,7 +44,7 @@ export const DashboardQuickActionsReferenceCard: FC<DashboardQuickActionsReferen
             <div className={`${styles.actionIconWrap} ${styles.actionIconBlue}`}>
               <FontAwesomeIcon icon={faPlus} />
             </div>
-            <span className={styles.actionLabel}>Создать домашнее задание</span>
+            <span className={styles.actionLabel}>Создать задание</span>
           </div>
           <FontAwesomeIcon icon={faArrowRight} className={styles.actionArrow} />
         </button>

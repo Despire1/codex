@@ -24,7 +24,7 @@ import {
 } from '../../../entities/lesson/lib/lessonMutationGuards';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
-import { ClearIcon, MeetingLinkIcon } from '../../../icons/MaterialIcons';
+import { ClearIcon, DeleteOutlineIcon, MeetingLinkIcon } from '../../../icons/MaterialIcons';
 import {
   isValidMeetingLink,
   MEETING_LINK_MAX_LENGTH,
@@ -285,23 +285,40 @@ export const LessonModal: FC<LessonModalProps> = ({
         className={`${modalStyles.modalHeader} ${isSheet ? sheetStyles.sheetHeader : ''} ${sheetStyles.headerTopAligned}`}
       >
         <div className={sheetStyles.headerContent}>
-          <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
+          <div className={sheetStyles.titleRow}>
+            <div className={modalStyles.modalTitle}>{editingLessonId ? 'Редактирование урока' : 'Новый урок'}</div>
+            {isEditing && editingLesson ? (
+              <span
+                className={`${sheetStyles.statusBadge} ${
+                  editingLesson.status === 'COMPLETED'
+                    ? sheetStyles.statusBadgeCompleted
+                    : editingLesson.status === 'CANCELED'
+                      ? sheetStyles.statusBadgeCanceled
+                      : sheetStyles.statusBadgeScheduled
+                }`}
+              >
+                {editingLesson.status === 'COMPLETED'
+                  ? '✓ Проведён'
+                  : editingLesson.status === 'CANCELED'
+                    ? 'Отменён'
+                    : 'Запланирован'}
+              </span>
+            ) : null}
+          </div>
           <div className={modalStyles.modalSubtitle}>
             {editingLessonId ? 'Обновите данные о занятии' : 'Заполните данные о занятии'}
           </div>
           {limitedEditNotice && <div className={sheetStyles.lockNotice}>{limitedEditNotice}</div>}
           {isEditing && editingLesson && (onToggleCompleted || onTogglePaid || onCancelLesson) ? (
             <div className={sheetStyles.quickActionsRow}>
-              {onToggleCompleted ? (
+              {onToggleCompleted && editingLesson.status !== 'COMPLETED' ? (
                 <button
                   type="button"
-                  className={`${sheetStyles.quickAction} ${
-                    editingLesson.status === 'COMPLETED' ? sheetStyles.quickActionActive : ''
-                  }`}
+                  className={sheetStyles.quickAction}
                   onClick={onToggleCompleted}
                   disabled={isSubmitting || editingLesson.status === 'CANCELED'}
                 >
-                  {editingLesson.status === 'COMPLETED' ? '✓ Проведён' : 'Отметить проведённым'}
+                  Отметить проведённым
                 </button>
               ) : null}
               {onTogglePaid ? (
@@ -546,8 +563,14 @@ export const LessonModal: FC<LessonModalProps> = ({
         </div>
         <div className={`${modalStyles.modalActions} ${isSheet ? sheetStyles.sheetActions : ''}`}>
           {isEditing && onDelete && !deleteDisabledReason && (
-            <button className={controls.dangerButton} onClick={onDelete} disabled={isSubmitting}>
-              Удалить урок
+            <button
+              type="button"
+              className={`${controls.dangerButton} ${sheetStyles.deleteButton}`}
+              onClick={onDelete}
+              disabled={isSubmitting}
+            >
+              <DeleteOutlineIcon width={16} height={16} aria-hidden />
+              <span>Удалить урок</span>
             </button>
           )}
           <button className={controls.secondaryButton} onClick={onClose} disabled={isSubmitting}>

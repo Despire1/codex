@@ -1064,6 +1064,12 @@
   color: #b91c1c !important;
 }
 
+.menuSeparator {
+  height: 1px;
+  margin: 6px 4px;
+  background: #e5e7eb;
+}
+
 .sideCardHeader {
   display: flex;
   align-items: center;

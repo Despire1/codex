@@ -1385,7 +1385,7 @@ const AppPageContent = () => {
     () => [
       {
         id: 'create_homework',
-        label: 'Создать домашнее задание',
+        label: 'Создать задание',
         description: 'Открыть экран создания и сразу настроить выдачу домашнего задания ученику.',
         onSelect: () => guardedNavigate(`${tabPathById.homeworks}/new`),
         icon: <HomeworkFileLinesIcon size={12} />,
@@ -1411,6 +1411,10 @@ const AppPageContent = () => {
     [guardedNavigate, openDashboardHomeworkAssignModal],
   );
 
+  const onDashboardCreateHomeworkTemplate = useCallback(() => {
+    guardedNavigate(`${tabPathById.homeworks}/new`);
+  }, [guardedNavigate]);
+
   const dashboardRouteProps = useMemo(
     () => ({
       teacher,
@@ -1423,6 +1427,7 @@ const AppPageContent = () => {
       onOpenLessonDay: onDashboardOpenLessonDay,
       onOpenStudent: onDashboardOpenStudent,
       onOpenHomeworkAssign: onDashboardOpenHomeworkAssign,
+      onCreateHomeworkTemplate: onDashboardCreateHomeworkTemplate,
     }),
     [
       linkedStudents,
@@ -1431,6 +1436,7 @@ const AppPageContent = () => {
       onDashboardOpenLesson,
       onDashboardOpenLessonDay,
       onDashboardOpenHomeworkAssign,
+      onDashboardCreateHomeworkTemplate,
       onDashboardOpenSchedule,
       onDashboardOpenStudent,
       openCreateLesson,
@@ -1658,7 +1664,6 @@ const AppPageContent = () => {
                               !hasDesktopHomeworkDetailChrome &&
                               !isTeacherAnyHomeworkEditorRoute &&
                               (
-                                activeTab === 'dashboard' ||
                                 activeTab === 'homeworks' ||
                                 activeTab === 'students' ||
                                 activeTab === 'schedule'
@@ -1669,7 +1674,7 @@ const AppPageContent = () => {
                                 ? 'Добавить'
                                 : activeTab === 'students'
                                   ? 'Добавить ученика'
-                                  : 'Новый урок'
+                                  : 'Создать урок'
                             }
                             createButtonIconAccent={
                               activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'

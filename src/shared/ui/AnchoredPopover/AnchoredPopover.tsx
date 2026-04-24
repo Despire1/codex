@@ -51,7 +51,11 @@ export const AnchoredPopover = ({
   preventCloseOnOtherPopoverClick = false,
 }: AnchoredPopoverProps) => {
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState<{ top: number; left: number; maxHeight: number | null }>({
+    top: 0,
+    left: 0,
+    maxHeight: null,
+  });
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(isOpen);
   const [activeAnchorEl, setActiveAnchorEl] = useState<HTMLElement | null>(anchorEl);
@@ -119,6 +123,20 @@ export const AnchoredPopover = ({
     );
   };
 
+  const getAvailableSpaceForSide = (direction: PopoverSide, anchorRect: DOMRect) => {
+    switch (direction) {
+      case 'top':
+        return Math.max(anchorRect.top - offset - VIEWPORT_PADDING, 0);
+      case 'bottom':
+        return Math.max(window.innerHeight - anchorRect.bottom - offset - VIEWPORT_PADDING, 0);
+      case 'left':
+        return Math.max(anchorRect.left - offset - VIEWPORT_PADDING, 0);
+      case 'right':
+      default:
+        return Math.max(window.innerWidth - anchorRect.right - offset - VIEWPORT_PADDING, 0);
+    }
+  };
+
   const updatePosition = () => {
     const resolvedAnchorEl = anchorEl ?? activeAnchorEl;
     if (!resolvedAnchorEl || !popoverRef.current) return;
@@ -133,28 +151,44 @@ export const AnchoredPopover = ({
 
     let nextPosition = getPosition(side, anchorRect, popoverRect);
     let resolvedSide = side;
+    let foundFit = false;
 
     for (const candidate of candidates) {
       const candidatePosition = getPosition(candidate, anchorRect, popoverRect);
       if (isWithinViewport(candidatePosition, popoverRect)) {
         nextPosition = candidatePosition;
         resolvedSide = candidate;
+        foundFit = true;
         break;
       }
     }
 
-    if (!isWithinViewport(nextPosition, popoverRect)) {
-      const maxLeft = window.innerWidth - popoverRect.width - VIEWPORT_PADDING;
-      const maxTop = window.innerHeight - popoverRect.height - VIEWPORT_PADDING;
-      nextPosition = {
-        top: clampPosition(nextPosition.top, VIEWPORT_PADDING, maxTop),
-        left: clampPosition(nextPosition.left, VIEWPORT_PADDING, maxLeft),
-      };
+    let maxHeight: number | null = null;
+    if (!foundFit) {
+      const isVerticalPrimary = side === 'top' || side === 'bottom';
+      if (isVerticalPrimary) {
+        const topSpace = getAvailableSpaceForSide('top', anchorRect);
+        const bottomSpace = getAvailableSpaceForSide('bottom', anchorRect);
+        resolvedSide = bottomSpace >= topSpace ? 'bottom' : 'top';
+        maxHeight = Math.max(resolvedSide === 'bottom' ? bottomSpace : topSpace, 120);
+      } else {
+        const leftSpace = getAvailableSpaceForSide('left', anchorRect);
+        const rightSpace = getAvailableSpaceForSide('right', anchorRect);
+        resolvedSide = rightSpace >= leftSpace ? 'right' : 'left';
+      }
+      nextPosition = getPosition(resolvedSide, anchorRect, popoverRect);
     }
+
+    const maxLeft = window.innerWidth - popoverRect.width - VIEWPORT_PADDING;
+    const maxTop = window.innerHeight - popoverRect.height - VIEWPORT_PADDING;
+    const clamped = {
+      top: clampPosition(nextPosition.top, VIEWPORT_PADDING, Math.max(maxTop, VIEWPORT_PADDING)),
+      left: clampPosition(nextPosition.left, VIEWPORT_PADDING, Math.max(maxLeft, VIEWPORT_PADDING)),
+    };
 
     popoverRef.current.dataset.side = resolvedSide;
 
-    setPosition(nextPosition);
+    setPosition({ ...clamped, maxHeight });
   };
 
   useLayoutEffect(() => {
@@ -241,7 +275,13 @@ export const AnchoredPopover = ({
       data-anchored-popover-root="true"
       data-visibility={isVisible ? 'open' : 'closing'}
       className={`${styles.popover} ${isVisible ? styles.popoverOpen : styles.popoverClosing} ${className}`.trim()}
-      style={{ top: `${position.top}px`, left: `${position.left}px` }}
+      style={{
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        ...(position.maxHeight !== null
+          ? { maxHeight: `${position.maxHeight}px`, overflowY: 'auto' as const }
+          : null),
+      }}
     >
       {children}
     </div>,

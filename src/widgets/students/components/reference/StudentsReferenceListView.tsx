@@ -237,7 +237,6 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                   <div>Ученик</div>
                   <div className={styles.compactHeaderCenter}>Уроков</div>
                   <div className={styles.compactHeaderCenter}>Посещаемость</div>
-                  <div className={styles.compactHeaderCenter}>Средний балл</div>
                   <div>Следующий урок</div>
                   <div className={styles.compactHeaderRight}>Статус</div>
                 </div>

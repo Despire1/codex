@@ -173,7 +173,7 @@ export const StudentModal: FC<StudentModalProps> = ({
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="student-telegram-username">
-              Telegram username <span className={styles.requiredMark}>*</span>
+              Telegram username
             </label>
             <div className={styles.inputWithIcon}>
               <span className={styles.leadingIcon} aria-hidden>
@@ -186,10 +186,9 @@ export const StudentModal: FC<StudentModalProps> = ({
                 id="student-telegram-username"
                 className={`${styles.input} ${styles.inputWithLeadingIcon} ${styles.telegramInput}`}
                 type="text"
-                required
                 autoComplete="off"
                 inputMode="text"
-                placeholder="username"
+                placeholder="username (необязательно)"
                 value={draft.username}
                 disabled={isSubmitting}
                 onChange={(event) =>
@@ -200,6 +199,9 @@ export const StudentModal: FC<StudentModalProps> = ({
                 }
               />
             </div>
+            <p className={styles.fieldHint}>
+              Нужно для Telegram-уведомлений. Без username ученик получит ссылку на WebApp другим способом.
+            </p>
           </div>
 
           <div

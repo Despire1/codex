@@ -627,8 +627,8 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
             title="Просмотр домашнего задания"
             subtitle={
               isTemplateReadOnlyView
-                ? 'Тот же поток, что в создании и редактировании, но без изменений'
-                : 'Просмотр выданного задания в новом формате'
+                ? 'Задание в режиме просмотра — как его увидит ученик'
+                : 'Просмотр выданного задания'
             }
             primaryActionLabel=""
             primarySubmittingLabel=""

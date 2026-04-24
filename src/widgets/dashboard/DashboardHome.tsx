@@ -17,6 +17,7 @@ interface DashboardHomeProps {
   onOpenLessonDay: (lesson: Lesson) => void;
   onOpenStudent: (studentId: number) => void;
   onOpenHomeworkAssign: (studentId?: number | null, lessonId?: number | null) => void;
+  onCreateHomeworkTemplate: () => void;
   dashboardSummary: {
     summary: DashboardSummary | null;
     isLoading: boolean;

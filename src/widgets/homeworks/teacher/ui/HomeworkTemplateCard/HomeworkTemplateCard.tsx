@@ -81,7 +81,7 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
       </div>
 
       <h3 className={styles.title}>{template.title}</h3>
-      <p className={styles.preview}>{preview}</p>
+      {preview ? <p className={styles.preview}>{preview}</p> : null}
 
       <div className={styles.footer}>
         <span className={styles.meta}>

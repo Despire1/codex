@@ -489,6 +489,12 @@ export const createSettingsService = ({
     } else if (body.timezone === null) {
       data.timezone = null;
     }
+    if (typeof body.name === 'string') {
+      const trimmedName = body.name.trim().slice(0, 60);
+      data.name = trimmedName ? trimmedName : null;
+    } else if (body.name === null) {
+      data.name = null;
+    }
     if (body.defaultLessonDuration !== undefined) {
       const numeric = Number(body.defaultLessonDuration);
       if (Number.isFinite(numeric)) {

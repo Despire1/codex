@@ -409,7 +409,7 @@
 
 .compactTableGrid {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(84px, 1fr) minmax(112px, 1fr) minmax(112px, 1fr) minmax(0, 2fr) minmax(92px, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(84px, 1fr) minmax(112px, 1fr) minmax(0, 2fr) minmax(92px, 1fr);
   gap: 16px;
   align-items: center;
   font-size: 11px;

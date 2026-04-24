@@ -52,8 +52,31 @@ const getSessionPresentation = (session: SessionSummary): SessionPresentation =>
     };
   }
 
+  if (
+    value.includes('curl') ||
+    value.includes('python') ||
+    value.includes('postman') ||
+    value.includes('node') ||
+    value.includes('wget') ||
+    value.includes('httpie')
+  ) {
+    return {
+      title: 'Скрипт или API-клиент',
+      icon: SettingsIcon,
+      iconClassName: styles.sessionGlyphDefault,
+    };
+  }
+
+  if (value.includes('firefox')) {
+    return {
+      title: value.includes('windows') ? 'Firefox на Windows' : 'Firefox',
+      icon: SettingsIcon,
+      iconClassName: styles.sessionGlyphDefault,
+    };
+  }
+
   return {
-    title: session.userAgent?.trim() || (session.ip ? `Сессия · ${session.ip}` : 'Сессия'),
+    title: 'Неизвестное устройство',
     icon: SettingsIcon,
     iconClassName: styles.sessionGlyphDefault,
   };
@@ -115,6 +138,9 @@ export const SecuritySettings: FC = () => {
   );
 
   const handleRevoke = async (sessionId: number) => {
+    if (!window.confirm('Эта сессия будет закрыта. Пользователь потеряет доступ, пока не войдёт снова.')) {
+      return;
+    }
     setActionLoading(true);
     try {
       await api.revokeSession(sessionId);
@@ -127,6 +153,16 @@ export const SecuritySettings: FC = () => {
   };
 
   const handleRevokeOthers = async () => {
+    const otherCount = sessions.filter((session) => !session.isCurrent).length;
+    const message =
+      otherCount > 0
+        ? `Все сессии кроме текущей будут закрыты. ${otherCount} ${
+            otherCount === 1 ? 'устройство потеряет' : 'устройств потеряют'
+          } доступ.`
+        : 'Закрыть все другие сессии?';
+    if (!window.confirm(message)) {
+      return;
+    }
     setActionLoading(true);
     try {
       await api.revokeOtherSessions();
@@ -200,6 +236,15 @@ export const SecuritySettings: FC = () => {
                       <div className={styles.sessionMetaLine}>{session.ip ? `IP: ${session.ip}` : 'IP не определён'}</div>
                       <div className={styles.sessionMetaSecondary}>
                         {formatSessionActivity(session.lastSeenAt ?? session.createdAt)}
+                      </div>
+                      <div className={styles.sessionMetaSecondary}>
+                        Вход: {new Date(session.createdAt).toLocaleString('ru-RU', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </div>
                     </div>
                   </div>

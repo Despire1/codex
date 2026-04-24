@@ -72,7 +72,7 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
               <div className={styles.infoRow}>
                 <div>
                   <div className={styles.infoRowTitle}>Напоминания о предстоящем уроке</div>
-                  <div className={styles.infoRowDescription}>Telegram-уведомление перед началом.</div>
+                  <div className={styles.infoRowDescription}>Telegram-уведомление или PWA Push перед началом.</div>
                 </div>
                 <label className={`${controls.switch} ${styles.switchControl}`}>
                   <input

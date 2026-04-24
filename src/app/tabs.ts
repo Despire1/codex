@@ -9,8 +9,8 @@ import {
 
 export const teacherTabs = [
   { id: 'dashboard', label: 'Главная', icon: DashboardIcon, path: '/dashboard' },
-  { id: 'students', label: 'Ученики', icon: PeopleIcon, path: '/students' },
   { id: 'schedule', label: 'Расписание', icon: EventNoteIcon, path: '/schedule' },
+  { id: 'students', label: 'Ученики', icon: PeopleIcon, path: '/students' },
   { id: 'homeworks', label: 'Домашки', icon: TaskAltIcon, path: '/homeworks' },
   { id: 'analytics', label: 'Аналитика', icon: AnalyticsIcon, path: '/analytics', hidden: true },
   { id: 'settings', label: 'Настройки', icon: SettingsIcon, path: '/settings' },

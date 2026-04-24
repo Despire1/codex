@@ -64,14 +64,6 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
           </span>
         </div>
 
-        <div className={styles.centerCell}>
-          <span
-            className={`${styles.scoreValue} ${presentation.averageScoreValue === null ? styles.scoreValueMuted : ''}`}
-          >
-            {presentation.averageScoreLabel}
-          </span>
-        </div>
-
         <div className={styles.lessonCell}>
           <div className={styles.lessonMeta}>
             <span
