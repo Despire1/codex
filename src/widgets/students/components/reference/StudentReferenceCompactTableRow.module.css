@@ -1,13 +1,13 @@
 .row {
   position: relative;
   padding: 16px 32px;
-  background: #ffffff;
+  background: var(--surface-card);
   cursor: pointer;
   transition: background-color 0.16s ease;
 }
 
 .row:hover {
-  background: #fafbfc;
+  background: var(--surface-card-strong);
 }
 
 .row:focus-visible {
@@ -17,9 +17,19 @@
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(84px, 1fr) minmax(112px, 1fr) minmax(112px, 1fr) minmax(0, 2fr) minmax(92px, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(84px, 1fr) minmax(112px, 1fr) minmax(0, 2fr) minmax(92px, 1fr);
   gap: 16px;
   align-items: center;
+}
+
+.cellLabel {
+  display: none;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .studentCell {
@@ -54,7 +64,7 @@
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -64,7 +74,7 @@
   margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.25;
-  color: #6b7280;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -81,7 +91,7 @@
   font-size: 14px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .attendanceBadge {
@@ -112,8 +122,8 @@
 }
 
 .attendanceNeutral {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
 }
 
 .scoreValue {
@@ -124,7 +134,7 @@
 }
 
 .scoreValueMuted {
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .lessonCell {
@@ -162,7 +172,7 @@
   min-width: 0;
   font-size: 12px;
   line-height: 1.3;
-  color: #4b5563;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,7 +200,7 @@
 }
 
 .statusPaused {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .statusCompleted {
@@ -199,4 +209,50 @@
 
 .statusInactive {
   color: #5b6475;
+}
+
+@media (max-width: 768px) {
+  .row {
+    padding: 14px 16px;
+  }
+
+  .grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .cellLabel {
+    display: inline-flex;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  .studentName,
+  .studentLevel {
+    white-space: normal;
+  }
+
+  .centerCell,
+  .lessonCell,
+  .statusCell {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 4px 8px;
+    min-width: 0;
+  }
+
+  .lessonText {
+    white-space: normal;
+  }
+
+  .statusText {
+    text-align: left;
+    white-space: normal;
+  }
 }

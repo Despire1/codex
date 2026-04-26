@@ -77,7 +77,14 @@ export const ScheduleNoteModal: FC<ScheduleNoteModalProps> = ({
     setIsSubmitting(false);
   }, [dateKey, initialNoteType, initialValue, mode, open]);
 
-  const title = mode === 'edit' ? 'Редактировать заметку' : 'Добавить заметку';
+  const dateLabel = (() => {
+    if (!dateKey) return '';
+    const parsed = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  })();
+  const baseTitle = mode === 'edit' ? 'Редактировать заметку' : 'Добавить заметку';
+  const title = dateLabel ? `${baseTitle} · ${dateLabel}` : baseTitle;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -176,7 +183,13 @@ export const ScheduleNoteModal: FC<ScheduleNoteModalProps> = ({
           <button type="submit" className={styles.submitButton} disabled={isSubmitting || !draft.trim()}>
             <span className={styles.submitButtonContent}>
               {isSubmitting ? <span className={styles.submitSpinner} aria-hidden /> : null}
-              {isSubmitting ? (mode === 'edit' ? 'Сохраняем...' : 'Добавляем...') : mode === 'edit' ? 'Сохранить заметку' : 'Добавить заметку'}
+              {isSubmitting
+                ? mode === 'edit'
+                  ? 'Сохраняем...'
+                  : 'Добавляем...'
+                : mode === 'edit'
+                  ? 'Сохранить заметку'
+                  : 'Добавить заметку'}
             </span>
           </button>
         </div>

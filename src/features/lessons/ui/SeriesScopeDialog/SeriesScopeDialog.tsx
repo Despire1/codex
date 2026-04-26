@@ -5,6 +5,8 @@ import { useFocusTrap } from '../../../../shared/lib/useFocusTrap';
 import type { LessonMutationPreview, LessonSeriesScope } from '../../model/types';
 import styles from './SeriesScopeDialog.module.css';
 
+// SERIES намеренно скрыт: backend normalizeLessonScope (src/backend/server.ts) мапит SERIES → FOLLOWING,
+// поэтому отдельная кнопка «Вся серия» сейчас не отличается от «Этот и следующие».
 type VisibleLessonSeriesScope = Exclude<LessonSeriesScope, 'SERIES'>;
 
 const VISIBLE_LESSON_SERIES_SCOPES: VisibleLessonSeriesScope[] = ['SINGLE', 'FOLLOWING'];
@@ -70,7 +72,7 @@ export const SeriesScopeDialog = ({
     ? 'Этот вариант сейчас недоступен.'
     : effectiveDateLabel && (preview?.skippedProtectedCount ?? 0) > 0
       ? `Изменения начнутся с ${effectiveDateLabel}.`
-    : resolveScopeHint(scope);
+      : resolveScopeHint(scope);
 
   return (
     <Modal open={open} title={title} onClose={onClose}>
@@ -106,7 +108,12 @@ export const SeriesScopeDialog = ({
           <button type="button" className={controls.secondaryButton} onClick={onClose}>
             Назад
           </button>
-          <button type="button" className={controls.primaryButton} disabled={isConfirmDisabled} onClick={() => onConfirm(scope)}>
+          <button
+            type="button"
+            className={controls.primaryButton}
+            disabled={isConfirmDisabled}
+            onClick={() => onConfirm(scope)}
+          >
             {confirmText}
           </button>
         </div>

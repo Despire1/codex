@@ -40,6 +40,26 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
   const [weekendDraft, setWeekendDraft] = useState(() => normalizeWeekdayList(teacher.weekendWeekdays));
   const [durationDraft, setDurationDraft] = useState(() => String(teacher.defaultLessonDuration));
   const [isDurationSaving, setIsDurationSaving] = useState(false);
+  const [defaultPriceDraft, setDefaultPriceDraft] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem('tb_default_student_price') ?? '';
+  });
+  const handleSaveDefaultPrice = () => {
+    if (typeof window === 'undefined') return;
+    const trimmed = defaultPriceDraft.trim();
+    if (!trimmed) {
+      window.localStorage.removeItem('tb_default_student_price');
+      showToast({ message: 'Цена по умолчанию очищена', variant: 'success' });
+      return;
+    }
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      showToast({ message: 'Введите неотрицательное число', variant: 'error' });
+      return;
+    }
+    window.localStorage.setItem('tb_default_student_price', String(Math.round(numeric)));
+    showToast({ message: 'Цена по умолчанию сохранена', variant: 'success' });
+  };
   const isWeekendDirty = useMemo(() => {
     const saved = normalizeWeekdayList(teacher.weekendWeekdays);
     return saved.length !== weekendDraft.length || saved.some((weekday, index) => weekday !== weekendDraft[index]);
@@ -188,12 +208,47 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
             ) : null}
           </div>
 
+          <div className={styles.fieldBlock}>
+            <label className={styles.fieldLabel}>Цена за урок по умолчанию (₽)</label>
+            <input
+              className={`${controls.input} ${styles.fieldInput}`}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={50}
+              value={defaultPriceDraft}
+              placeholder="Например, 1500"
+              onKeyDown={(event) => {
+                if (event.key === '-' || event.key === 'e' || event.key === 'E') {
+                  event.preventDefault();
+                  return;
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleSaveDefaultPrice();
+                }
+              }}
+              onChange={(event) => setDefaultPriceDraft(event.target.value)}
+            />
+            <p className={styles.fieldHint}>
+              Будет автоматически подставляться в форму нового ученика. Хранится локально в браузере.
+            </p>
+            <div className={styles.fieldActionsRow}>
+              <button
+                type="button"
+                className={`${controls.primaryButton} ${styles.darkActionButton}`}
+                onClick={handleSaveDefaultPrice}
+              >
+                <CheckCircleOutlineIcon width={16} height={16} />
+                <span>Сохранить цену</span>
+              </button>
+            </div>
+          </div>
+
           <div className={styles.infoRow}>
             <div>
               <div className={styles.infoRowTitle}>Автоматически отмечать уроки как проведённые</div>
-              <div className={styles.infoRowDescription}>
-                Если выключено, уроки нужно подтверждать вручную.
-              </div>
+              <div className={styles.infoRowDescription}>Если выключено, уроки нужно подтверждать вручную.</div>
             </div>
             <label className={`${controls.switch} ${styles.switchControl}`}>
               <input
@@ -225,7 +280,11 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
             onClick={() => setWeekendsExpanded((current) => !current)}
             aria-expanded={weekendsExpanded}
           >
-            {weekendsExpanded ? <ExpandLessOutlinedIcon width={18} height={18} /> : <ExpandMoreOutlinedIcon width={18} height={18} />}
+            {weekendsExpanded ? (
+              <ExpandLessOutlinedIcon width={18} height={18} />
+            ) : (
+              <ExpandMoreOutlinedIcon width={18} height={18} />
+            )}
           </button>
         </div>
 
@@ -240,8 +299,11 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
 
             {weekendDraft.length >= 7 ? (
               <p className={styles.sectionDescription}>
-                Все 7 дней отмечены как выходные — должен остаться хотя бы один рабочий день, иначе планировать уроки не получится.
+                Все 7 дней отмечены как выходные — должен остаться хотя бы один рабочий день, иначе планировать уроки не
+                получится.
               </p>
+            ) : !isWeekendDirty ? (
+              <p className={styles.fieldHint}>Измените выбор дней, чтобы сохранить новые выходные.</p>
             ) : null}
 
             <button
@@ -256,7 +318,6 @@ export const ScheduleSettings: FC<ScheduleSettingsProps> = ({
           </div>
         ) : null}
       </section>
-
     </div>
   );
 };

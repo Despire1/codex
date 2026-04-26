@@ -16,6 +16,7 @@ import {
   readHomeworkTemplateQuizSettingsFromBlocks,
   sanitizeHomeworkTemplateQuizSettingsForSave,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
+import { resolveHomeworkDurationMinutes } from '../../../../entities/homework-template/model/lib/duration';
 import { HomeworkEditorTaskType, HomeworkTemplateEditorDraft } from '../types';
 import {
   createMediaBlock,
@@ -30,7 +31,8 @@ import { createAttachmentFromUrl as createAttachmentFromUrlInternal } from './te
 export type CreateTemplateType = HomeworkEditorTaskType;
 
 export type CreateQuestionKind =
-  | 'CHOICE'
+  | 'SINGLE_CHOICE'
+  | 'MULTIPLE_CHOICE'
   | 'SHORT_TEXT'
   | 'LONG_TEXT'
   | 'AUDIO'
@@ -53,7 +55,8 @@ const QUESTION_KIND_KEY = 'uiQuestionKind';
 const QUESTION_REQUIRED_KEY = 'uiRequired';
 
 const QUESTION_KIND_VALUES: CreateQuestionKind[] = [
-  'CHOICE',
+  'SINGLE_CHOICE',
+  'MULTIPLE_CHOICE',
   'SHORT_TEXT',
   'LONG_TEXT',
   'AUDIO',
@@ -66,7 +69,7 @@ const QUESTION_KIND_VALUES: CreateQuestionKind[] = [
 
 export const DEFAULT_TEMPLATE_QUIZ_SETTINGS: TemplateQuizSettings = DEFAULT_HOMEWORK_TEMPLATE_QUIZ_SETTINGS;
 
-const toRecord = (value: unknown): Record<string, unknown> => (value as unknown as Record<string, unknown>);
+const toRecord = (value: unknown): Record<string, unknown> => value as unknown as Record<string, unknown>;
 
 const isCreateQuestionKind = (value: unknown): value is CreateQuestionKind =>
   typeof value === 'string' && QUESTION_KIND_VALUES.includes(value as CreateQuestionKind);
@@ -85,7 +88,9 @@ const createTableRow = (answerColumnCount: number): HomeworkTestTableRow => ({
 const createOrderingItems = (count = 4): HomeworkTestOption[] =>
   Array.from({ length: count }, () => createQuestionOption(''));
 
-const createShortQuestionByKind = (kind: Exclude<CreateQuestionKind, 'CHOICE' | 'MATCHING'>): HomeworkTestQuestion => {
+const createShortQuestionByKind = (
+  kind: Exclude<CreateQuestionKind, 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'MATCHING'>,
+): HomeworkTestQuestion => {
   const base = withQuestionKind(createTestQuestion('SHORT_ANSWER'), kind);
 
   if (kind === 'FILL_WORD') {
@@ -161,14 +166,11 @@ const withPreservedQuestionRequired = (
   target: HomeworkTestQuestion,
 ): HomeworkTestQuestion => withQuestionMeta(target, QUESTION_REQUIRED_KEY, toRecord(source)[QUESTION_REQUIRED_KEY]);
 
-const withQuestionMeta = (
-  question: HomeworkTestQuestion,
-  key: string,
-  value: unknown,
-): HomeworkTestQuestion => ({
-  ...toRecord(question),
-  [key]: value,
-}) as unknown as HomeworkTestQuestion;
+const withQuestionMeta = (question: HomeworkTestQuestion, key: string, value: unknown): HomeworkTestQuestion =>
+  ({
+    ...toRecord(question),
+    [key]: value,
+  }) as unknown as HomeworkTestQuestion;
 
 const normalizeResponseBlock = (
   base: HomeworkBlockStudentResponse,
@@ -285,10 +287,8 @@ export const ensurePrimaryMediaBlock = (blocks: HomeworkBlock[]) => {
 const buildTemplateTypeBlocks = (blocks: HomeworkBlock[], type: CreateTemplateType): HomeworkBlock[] => {
   const textBlock =
     blocks.find((block): block is HomeworkBlock & { type: 'TEXT' } => block.type === 'TEXT') ?? createTextBlock();
-  const testBlock =
-    blocks.find((block): block is HomeworkBlockTest => block.type === 'TEST') ?? createTestBlock();
-  const mediaBlock =
-    blocks.find((block): block is HomeworkBlockMedia => block.type === 'MEDIA') ?? createMediaBlock();
+  const testBlock = blocks.find((block): block is HomeworkBlockTest => block.type === 'TEST') ?? createTestBlock();
+  const mediaBlock = blocks.find((block): block is HomeworkBlockMedia => block.type === 'MEDIA') ?? createMediaBlock();
   const responseBase =
     blocks.find((block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE') ??
     createStudentResponseBlock();
@@ -416,10 +416,7 @@ export const readTemplateQuizSettings = (blocks: HomeworkBlock[]): TemplateQuizS
   return readHomeworkTemplateQuizSettingsFromBlocks(blocks);
 };
 
-export const writeTemplateQuizSettings = (
-  blocks: HomeworkBlock[],
-  settings: TemplateQuizSettings,
-): HomeworkBlock[] => {
+export const writeTemplateQuizSettings = (blocks: HomeworkBlock[], settings: TemplateQuizSettings): HomeworkBlock[] => {
   const testEntry = getPrimaryTestBlockEntry(blocks);
   if (!testEntry) return blocks;
 
@@ -432,16 +429,18 @@ export const writeTemplateQuizSettings = (
 };
 
 export const getQuestionKind = (question: HomeworkTestQuestion): CreateQuestionKind => {
-  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return 'CHOICE';
+  if (question.type === 'SINGLE_CHOICE') return 'SINGLE_CHOICE';
+  if (question.type === 'MULTIPLE_CHOICE') return 'MULTIPLE_CHOICE';
   if (question.type === 'MATCHING') return 'MATCHING';
 
   const raw = toRecord(question)[QUESTION_KIND_KEY];
-  if (isCreateQuestionKind(raw) && raw !== 'CHOICE') return raw;
+  if (isCreateQuestionKind(raw)) return raw;
   return 'SHORT_TEXT';
 };
 
 export const createQuestionByKind = (kind: CreateQuestionKind): HomeworkTestQuestion => {
-  if (kind === 'CHOICE') return createTestQuestion('SINGLE_CHOICE');
+  if (kind === 'SINGLE_CHOICE') return createTestQuestion('SINGLE_CHOICE');
+  if (kind === 'MULTIPLE_CHOICE') return createTestQuestion('MULTIPLE_CHOICE');
   if (kind === 'MATCHING') return withQuestionKind(createTestQuestion('MATCHING'), 'MATCHING');
   return createShortQuestionByKind(kind);
 };
@@ -449,14 +448,28 @@ export const createQuestionByKind = (kind: CreateQuestionKind): HomeworkTestQues
 export const setQuestionKind = (question: HomeworkTestQuestion, kind: CreateQuestionKind): HomeworkTestQuestion => {
   const questionRecord = toRecord(question);
 
-  if (kind === 'CHOICE') {
-    const targetType =
-      question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE'
-        ? normalizeQuestionType(question.type)
-        : 'SINGLE_CHOICE';
+  if (kind === 'SINGLE_CHOICE' || kind === 'MULTIPLE_CHOICE') {
+    const targetType: HomeworkTestQuestionType = kind;
     const replaced = replaceQuestionTypePreservingContent(question, targetType);
+
+    const previousOptions =
+      question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE'
+        ? (question.options ?? replaced.options)
+        : replaced.options;
+    const previousCorrect =
+      question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE' ? (question.correctOptionIds ?? []) : [];
+    const nextCorrect = kind === 'SINGLE_CHOICE' ? previousCorrect.slice(0, 1) : previousCorrect;
+
     return clearQuestionKind(
-      withQuestionMeta(replaced, QUESTION_REQUIRED_KEY, questionRecord[QUESTION_REQUIRED_KEY]),
+      withQuestionMeta(
+        {
+          ...replaced,
+          options: previousOptions,
+          correctOptionIds: nextCorrect,
+        },
+        QUESTION_REQUIRED_KEY,
+        questionRecord[QUESTION_REQUIRED_KEY],
+      ),
     );
   }
 
@@ -486,10 +499,7 @@ export const setQuestionRequired = (question: HomeworkTestQuestion, value: boole
 export const isQuestionMultipleChoice = (question: HomeworkTestQuestion): boolean =>
   question.type === 'MULTIPLE_CHOICE';
 
-export const toggleQuestionMultipleChoice = (
-  question: HomeworkTestQuestion,
-  value: boolean,
-): HomeworkTestQuestion => {
+export const toggleQuestionMultipleChoice = (question: HomeworkTestQuestion, value: boolean): HomeworkTestQuestion => {
   if (question.type !== 'SINGLE_CHOICE' && question.type !== 'MULTIPLE_CHOICE') return question;
 
   const targetType: HomeworkTestQuestionType = value ? 'MULTIPLE_CHOICE' : 'SINGLE_CHOICE';
@@ -554,12 +564,11 @@ export const buildTemplateCreateStats = (
     }, 0);
 
   const explicitMinutes = extractEstimatedMinutes(draft.level);
-  const derivedMinutes = questionCount > 0 ? Math.max(10, questionCount * 3) : 15;
 
   return {
     questionCount,
     totalPoints,
-    estimatedMinutes: explicitMinutes ?? derivedMinutes,
+    estimatedMinutes: resolveHomeworkDurationMinutes(draft.blocks, explicitMinutes),
     autoCheckEnabled: settings.autoCheckEnabled && questionCount > 0,
   };
 };

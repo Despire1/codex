@@ -5,6 +5,7 @@ import {
   CalendarIcon,
   CheckCircleOutlineIcon,
   NotificationsNoneOutlinedIcon,
+  PaletteIcon,
   PersonOutlineIcon,
   SettingsIcon,
 } from '../../icons/MaterialIcons';
@@ -15,7 +16,8 @@ import { useToast } from '../../shared/lib/toast';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
 import controls from '../../shared/styles/controls.module.css';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
-import { SETTINGS_TABS, SettingsTabId } from './constants';
+import { SETTINGS_TABS, SettingsTabId, VISIBLE_SETTINGS_TABS } from './constants';
+import { AppearanceSettings } from './components/AppearanceSettings';
 import { NotificationsSettings } from './components/NotificationsSettings';
 import { ProfileSettings } from './components/ProfileSettings';
 import { ScheduleSettings } from './components/ScheduleSettings';
@@ -79,6 +81,9 @@ const SETTINGS_TAB_META: Record<SettingsTabId, TabMeta> = {
   },
   notifications: {
     icon: NotificationsNoneOutlinedIcon,
+  },
+  appearance: {
+    icon: PaletteIcon,
   },
   security: {
     icon: SettingsIcon,
@@ -166,7 +171,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   const isMobile = useIsMobile(720);
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const teacherRef = useRef(teacher);
   const pendingPatchRef = useRef<SettingsPatch>({});
   const saveTimerRef = useRef<number | null>(null);
@@ -205,7 +209,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       setWeekendConflict(null);
       setPendingWeekendWeekdays(null);
       setSaveStatus('idle');
-      setLastSavedAt(Date.now());
       showToast({ message: successMessage, variant: 'success' });
     },
     [applyTeacherPatch, onLessonsRemoved, onLinksPatched, showToast],
@@ -380,7 +383,11 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       return (
         <div className={styles.errorState}>
           Не удалось загрузить настройки.
-          <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSettings}>
+          <button
+            className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`}
+            type="button"
+            onClick={loadSettings}
+          >
             Повторить
           </button>
         </div>
@@ -395,6 +402,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
             onChange={handleSettingsChange}
             timeZoneOptions={timeZoneOptions}
             initials={getTeacherInitials(teacher)}
+            saveStatus={saveStatus}
           />
         );
       case 'schedule':
@@ -410,6 +418,8 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         );
       case 'notifications':
         return <NotificationsSettings teacher={teacher} onChange={handleSettingsChange} onSaveNow={saveSettingsNow} />;
+      case 'appearance':
+        return <AppearanceSettings />;
       case 'security':
         return <SecuritySettings />;
       default:
@@ -420,7 +430,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   const sidebarNav = (
     <>
       <div className={styles.sidebarNav}>
-        {SETTINGS_TABS.map((tab) => {
+        {VISIBLE_SETTINGS_TABS.map((tab) => {
           const meta = SETTINGS_TAB_META[tab.id];
           const Icon = meta.icon;
           const isActive = activeTab === tab.id;
@@ -454,6 +464,14 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         <p className={styles.sidebarFooterText}>
           Настройте автоматические напоминания, чтобы не забывать о важных событиях.
         </p>
+        <a
+          className={styles.sidebarFooterLink}
+          href="https://t.me/teacherbot_help"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Сообщить о проблеме →
+        </a>
       </div>
     </>
   );
@@ -463,11 +481,32 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       {showMobileList ? (
         <div className={styles.mobileOverview}>
           <div className={styles.mobileSidebarCard}>{sidebarNav}</div>
+          <a
+            className={styles.mobileHelpCard}
+            href="https://t.me/teacherbot_help"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span className={styles.mobileHelpIcon} aria-hidden>
+              ?
+            </span>
+            <span className={styles.mobileHelpCopy}>
+              <strong>Помощь и поддержка</strong>
+              <span>Связаться с нами в Telegram</span>
+            </span>
+            <span className={styles.mobileHelpArrow} aria-hidden>
+              →
+            </span>
+          </a>
           {loadStatus === 'loading' && <div className={styles.loadingState}>Загрузка…</div>}
           {loadStatus === 'error' && (
             <div className={styles.errorState}>
               Не удалось загрузить настройки.
-              <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSettings}>
+              <button
+                className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`}
+                type="button"
+                onClick={loadSettings}
+              >
                 Повторить
               </button>
             </div>
@@ -478,17 +517,10 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
           {!isMobile && <aside className={styles.sidebar}>{sidebarNav}</aside>}
 
           <div className={styles.moduleShell}>
-            <div className={styles.autosaveBar} aria-live="polite">
-              {saveStatus === 'saving'
-                ? 'Сохраняем изменения…'
-                : saveStatus === 'error'
-                  ? 'Не удалось сохранить — проверьте подключение'
-                  : lastSavedAt
-                    ? `Автосохранение: ${new Date(lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Изменения сохраняются автоматически'}
-            </div>
             {renderModule()}
-            {saveStatus === 'error' && <div className={styles.saveErrorNote}>Ошибка сохранения. Попробуйте ещё раз.</div>}
+            {saveStatus === 'error' && (
+              <div className={styles.saveErrorNote}>Ошибка сохранения. Попробуйте ещё раз.</div>
+            )}
           </div>
         </div>
       )}

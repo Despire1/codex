@@ -1,7 +1,7 @@
 .wrapper {
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--color-white);
+  background: var(--surface-card);
   overflow: hidden;
 }
 
@@ -31,7 +31,7 @@
   min-height: 140px;
   border: 1px solid var(--border);
   padding: 10px;
-  background: var(--color-white);
+  background: var(--surface-card);
   display: flex;
   flex-direction: column;
   gap: 8px;

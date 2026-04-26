@@ -10,7 +10,7 @@
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: var(--color-white);
+  background: var(--surface-card);
   overflow: hidden;
 }
 

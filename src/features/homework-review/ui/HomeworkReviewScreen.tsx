@@ -23,6 +23,7 @@ import {
 import { getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
 import { readHomeworkTemplateQuizSettingsFromBlocks } from '../../../entities/homework-template/model/lib/quizSettings';
 import { resolveHomeworkStorageUrl } from '../../homework-submit/model/upload';
+import { getPluralForm } from '../../../shared/lib/pluralizeRu';
 import { buildHomeworkReviewItems, normalizeReviewPoints } from '../model/lib/questionReview';
 import styles from './HomeworkReviewScreen.module.css';
 
@@ -175,7 +176,9 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
 
   const [scoresById, setScoresById] = useState<Record<string, number>>({});
   const [commentsById, setCommentsById] = useState<Record<string, string>>({});
-  const [decisionOverridesById, setDecisionOverridesById] = useState<Record<string, 'ACCEPTED' | 'REWORK_REQUIRED'>>({});
+  const [decisionOverridesById, setDecisionOverridesById] = useState<Record<string, 'ACCEPTED' | 'REWORK_REQUIRED'>>(
+    {},
+  );
   const [baselineDraft, setBaselineDraft] = useState<HomeworkReviewDraft | null>(null);
   const [generalComment, setGeneralComment] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -205,7 +208,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
     const initialGeneralComment =
       typeof draftForCurrentSubmission?.generalComment === 'string'
         ? draftForCurrentSubmission.generalComment
-        : assignment?.teacherComment ?? latestSubmission?.teacherComment ?? '';
+        : (assignment?.teacherComment ?? latestSubmission?.teacherComment ?? '');
 
     const nextBaselineDraft =
       latestSubmission === null
@@ -257,10 +260,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
     });
   }, [currentDraft, draftIsDirty, latestSubmission?.id, onDraftChange]);
 
-  const maxPoints = useMemo(
-    () => reviewItems.reduce((sum, item) => sum + item.maxPoints, 0),
-    [reviewItems],
-  );
+  const maxPoints = useMemo(() => reviewItems.reduce((sum, item) => sum + item.maxPoints, 0), [reviewItems]);
   const earnedPoints = useMemo(
     () =>
       reviewItems.reduce((sum, item) => {
@@ -293,7 +293,8 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
       const score = Number(scoresById[item.id]);
       const normalizedScore = Number.isFinite(score) ? normalizeReviewPoints(score, item.maxPoints) : 0;
       acc[item.id] = {
-        decision: decisionOverridesById[item.id] ?? (normalizedScore >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED'),
+        decision:
+          decisionOverridesById[item.id] ?? (normalizedScore >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED'),
         score: normalizedScore,
         comment: commentsById[item.id]?.trim() || null,
       };
@@ -455,7 +456,10 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
                   <div className={styles.questionMetaWrap}>
                     <div className={styles.questionTopMeta}>
                       <span className={styles.typeBadge}>{item.typeLabel}</span>
-                      <span className={styles.typePoints}>• {formatScore(item.maxPoints)} балла</span>
+                      <span className={styles.typePoints}>
+                        • {formatScore(item.maxPoints)}{' '}
+                        {getPluralForm(item.maxPoints, { one: 'балл', few: 'балла', many: 'баллов' })}
+                      </span>
                     </div>
                     <h3 className={styles.questionPrompt}>{item.prompt}</h3>
                     <p className={styles.questionHint}>{item.hint}</p>
@@ -658,7 +662,11 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
               {reviewItems.map((item, index) => {
                 const value = scoresById[item.id] ?? 0;
                 const itemClass =
-                  value >= item.maxPoints ? styles.summaryItemSuccess : value <= 0 ? styles.summaryItemDanger : styles.summaryItemWarning;
+                  value >= item.maxPoints
+                    ? styles.summaryItemSuccess
+                    : value <= 0
+                      ? styles.summaryItemDanger
+                      : styles.summaryItemWarning;
                 return (
                   <div key={`summary_${item.id}`} className={`${styles.summaryItem} ${itemClass}`}>
                     <div className={styles.summaryItemLeft}>

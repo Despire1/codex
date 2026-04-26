@@ -13,7 +13,7 @@
 .input {
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 10px;
   font-size: 14px;
   color: var(--text);
@@ -21,6 +21,6 @@
 }
 
 .input:focus {
-  outline: 2px solid var(--primary-weak);
-  border-color: var(--primary);
+  outline: none;
+  border-color: var(--accent-primary);
 }

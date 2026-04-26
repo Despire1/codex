@@ -306,13 +306,16 @@ export const AdaptivePopover = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, children, side, align, offset, onClose]);
 
+  const isMeasured = position.maxWidth > 0 && position.maxHeight > 0;
   const popoverStyle = {
     top: `${position.top}px`,
     left: `${position.left}px`,
-    width: matchTriggerWidth ? `${Math.min(position.width, position.maxWidth)}px` : undefined,
+    width: matchTriggerWidth && isMeasured ? `${Math.min(position.width, position.maxWidth)}px` : undefined,
     maxWidth: position.maxWidth ? `${position.maxWidth}px` : undefined,
     maxHeight: position.maxHeight ? `${position.maxHeight}px` : undefined,
-  } as CSSProperties & Record<'--adaptive-popover-available-width' | '--adaptive-popover-available-height', string | undefined>;
+    visibility: isMeasured ? undefined : ('hidden' as const),
+  } as CSSProperties &
+    Record<'--adaptive-popover-available-width' | '--adaptive-popover-available-height', string | undefined>;
 
   popoverStyle['--adaptive-popover-available-width'] = position.maxWidth ? `${position.maxWidth}px` : undefined;
   popoverStyle['--adaptive-popover-available-height'] = position.maxHeight ? `${position.maxHeight}px` : undefined;

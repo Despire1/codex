@@ -31,13 +31,24 @@ import {
   HomeworkTestQuestion,
   HomeworkTestQuestionKind,
 } from '../../../entities/types';
-import { readHomeworkTemplateQuizSettingsFromBlocks, resolveHomeworkAttemptTimerConfig } from '../../../entities/homework-template/model/lib/quizSettings';
+import {
+  readHomeworkTemplateQuizSettingsFromBlocks,
+  resolveHomeworkAttemptTimerConfig,
+} from '../../../entities/homework-template/model/lib/quizSettings';
+import { estimateHomeworkBlocksDurationMinutes } from '../../../entities/homework-template/model/lib/duration';
+import { pluralizeRu } from '../../../shared/lib/pluralizeRu';
 import { resolveHomeworkQuizAttemptState } from '../../../entities/homework-template/model/lib/quizProgress';
 import styles from './StudentHomeworkDetailView.module.css';
 import { ASSIGNMENT_STATUS_LABELS } from '../../../entities/homework-assignment/model/lib/assignmentBuckets';
 import { resolveAssignmentResponseConfig } from '../../../entities/homework-assignment/model/lib/assignmentResponse';
-import { canStudentEditSubmission, getLatestSubmission } from '../../../entities/homework-submission/model/lib/submissionState';
-import { getSubmissionReviewResult, isReviewItemAccepted } from '../../../entities/homework-submission/model/lib/reviewResult';
+import {
+  canStudentEditSubmission,
+  getLatestSubmission,
+} from '../../../entities/homework-submission/model/lib/submissionState';
+import {
+  getSubmissionReviewResult,
+  isReviewItemAccepted,
+} from '../../../entities/homework-submission/model/lib/reviewResult';
 import { resolveHomeworkStorageUrl, uploadFileToHomeworkStorage } from '../model/upload';
 import {
   clearStoredStudentHomeworkSubmissionDraft,
@@ -296,12 +307,13 @@ const isTestQuestionAnswered = (question: HomeworkTestQuestion, value: unknown) 
     });
   }
 
-  const selectedMap = value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  const selectedMap =
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
   const pairs = question.matchingPairs ?? [];
   if (!pairs.length || !selectedMap) return false;
-  return pairs.every((pair) => typeof selectedMap[pair.left] === 'string' && String(selectedMap[pair.left]).trim().length > 0);
+  return pairs.every(
+    (pair) => typeof selectedMap[pair.left] === 'string' && String(selectedMap[pair.left]).trim().length > 0,
+  );
 };
 
 const isPdfAttachment = (attachment: HomeworkAttachment) => {
@@ -345,10 +357,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     [submissions],
   );
   const canEdit = assignment ? (isPreview ? true : canStudentEditSubmission(assignment)) : false;
-  const responseConfig = useMemo(
-    () => (assignment ? resolveAssignmentResponseConfig(assignment) : null),
-    [assignment],
-  );
+  const responseConfig = useMemo(() => (assignment ? resolveAssignmentResponseConfig(assignment) : null), [assignment]);
   const quizSettings = useMemo(
     () => readHomeworkTemplateQuizSettingsFromBlocks(assignment?.contentSnapshot ?? []),
     [assignment?.contentSnapshot],
@@ -366,8 +375,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     timerConfig.enabled && timedAttemptStartedAtTs !== null && timerConfig.durationMs !== null
       ? timedAttemptStartedAtTs + timerConfig.durationMs
       : null;
-  const timedAttemptRemainingMs =
-    timedAttemptDeadlineTs === null ? null : Math.max(0, timedAttemptDeadlineTs - nowTs);
+  const timedAttemptRemainingMs = timedAttemptDeadlineTs === null ? null : Math.max(0, timedAttemptDeadlineTs - nowTs);
   const requiresTimedAttemptStart = timerConfig.enabled && canEdit && timedAttemptStartedAtTs === null;
   const canStartFreshAttempt = canEdit && !timerConfig.enabled && !latestDraftSubmission && quizAttemptState.canRetry;
   const requiresAttemptStart = requiresTimedAttemptStart || canStartFreshAttempt;
@@ -395,7 +403,8 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     [activeReviewSubmission],
   );
   const reviewItemsById = useMemo(() => {
-    if (!assignment || !activeReviewSubmission) return new Map<string, ReturnType<typeof buildHomeworkReviewItems>[number]>();
+    if (!assignment || !activeReviewSubmission)
+      return new Map<string, ReturnType<typeof buildHomeworkReviewItems>[number]>();
     return new Map(
       buildHomeworkReviewItems(assignment, activeReviewSubmission).map((item) => [item.id, item] as const),
     );
@@ -460,7 +469,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     setAttachments(storedDraft?.attachments ?? latestEditableSubmission?.attachments ?? []);
     setVoice(storedDraft?.voice ?? latestEditableSubmission?.voice ?? []);
     setTestAnswers(
-      storedDraft?.testAnswers ?? ((latestEditableSubmission?.testAnswers as Record<string, unknown>) ?? {}),
+      storedDraft?.testAnswers ?? (latestEditableSubmission?.testAnswers as Record<string, unknown>) ?? {},
     );
   }, [
     assignment,
@@ -522,9 +531,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const objectUrl = URL.createObjectURL(file);
     registerPreviewObjectUrl(objectUrl);
     return {
-      id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      id:
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}_${Math.random().toString(16).slice(2)}`,
       fileName: file.name,
       size: file.size,
       url: objectUrl,
@@ -779,7 +789,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const success = await onStartAttempt();
     if (!success) {
       setLocalError(
-        requiresTimedAttemptStart ? 'Не удалось запустить таймер. Попробуйте еще раз.' : 'Не удалось начать новую попытку.',
+        requiresTimedAttemptStart
+          ? 'Не удалось запустить таймер. Попробуйте еще раз.'
+          : 'Не удалось начать новую попытку.',
       );
     }
     setStartingAttempt(false);
@@ -809,9 +821,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const normalizedAttachments = canUploadAttachments ? attachments : [];
     const normalizedVoice = canUploadVoice
       ? Array.from(
-          new Map(
-            voice.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const),
-          ).values(),
+          new Map(voice.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const)).values(),
         )
       : [];
     const normalizedTestAnswers = responseConfig.hasTest && Object.keys(testAnswers).length ? testAnswers : null;
@@ -916,7 +926,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const assignmentDescription = useMemo(() => {
     if (!assignment) return 'Выполните задание внимательно и ответьте на все вопросы.';
     const textBlocks = assignment.contentSnapshot
-      .filter((block): block is Extract<HomeworkAssignment['contentSnapshot'][number], { type: 'TEXT' }> => block.type === 'TEXT')
+      .filter(
+        (block): block is Extract<HomeworkAssignment['contentSnapshot'][number], { type: 'TEXT' }> =>
+          block.type === 'TEXT',
+      )
       .map((block) => block.content.trim())
       .filter(Boolean);
 
@@ -929,7 +942,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const materialAttachments = useMemo(() => {
     if (!assignment) return [] as HomeworkAttachment[];
-    return assignment.contentSnapshot.flatMap((block) => (block.type === 'MEDIA' ? block.attachments ?? [] : []));
+    return assignment.contentSnapshot.flatMap((block) => (block.type === 'MEDIA' ? (block.attachments ?? []) : []));
   }, [assignment]);
 
   const completedCount = useMemo(
@@ -945,7 +958,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const latestScore = quizAttemptState.latestResolvedScore;
 
-  const estimatedMinutes = Math.max(10, totalQuestions * 3);
+  const estimatedMinutes = useMemo(
+    () => estimateHomeworkBlocksDurationMinutes(assignment?.contentSnapshot ?? []),
+    [assignment?.contentSnapshot],
+  );
   const essayWordCount = countWords(answerText);
 
   const deadlineTs = parseTimestamp(assignment?.deadlineAt);
@@ -963,9 +979,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       : 'до конца попытки'
     : canStartFreshAttempt
       ? 'для новой попытки сначала нажмите «Начать»'
-    : deadlineRemainingMs === null
-      ? 'без ограничения по времени'
-      : 'до дедлайна';
+      : deadlineRemainingMs === null
+        ? 'без ограничения по времени'
+        : 'до дедлайна';
 
   const timeProgressPercent = useMemo(() => {
     if (timerConfig.enabled) {
@@ -1002,7 +1018,8 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const passingScorePercent = quizSettings.passingScorePercent;
   const attemptsLabel = quizSettings.attemptsLimit === null ? '∞' : String(quizSettings.attemptsLimit);
-  const currentAttemptLabel = latestDraftSubmission?.attemptNo ?? (quizAttemptState.latestResolvedSubmission?.attemptNo ?? 1);
+  const currentAttemptLabel =
+    latestDraftSubmission?.attemptNo ?? quizAttemptState.latestResolvedSubmission?.attemptNo ?? 1;
 
   const submitButtonLabel = isPreview
     ? 'Завершить предпросмотр'
@@ -1174,7 +1191,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       const normalizedText = fillText.trim();
       const segments = normalizedText ? normalizedText.split('[___]') : [];
       const blanksCount = normalizedText ? countFillInBlanks(normalizedText) : 0;
-      const answers = Array.isArray(currentValue) ? currentValue.filter((value): value is string => typeof value === 'string') : [];
+      const answers = Array.isArray(currentValue)
+        ? currentValue.filter((value): value is string => typeof value === 'string')
+        : [];
       const answerCount = Math.max(1, blanksCount || answers.length || 1);
       const normalizedAnswers = Array.from({ length: answerCount }, (_, index) => answers[index] ?? '');
 
@@ -1235,9 +1254,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       const isValidSelectedOrder =
         selectedOrderRaw.length === itemIds.length && selectedOrderRaw.every((itemId) => itemIds.includes(itemId));
 
-      const initialOrder = (question.shuffleOptions ?? true)
-        ? deterministicShuffle(baseItems, `${question.id}_ordering`).map((item) => item.id)
-        : itemIds;
+      const initialOrder =
+        (question.shuffleOptions ?? true)
+          ? deterministicShuffle(baseItems, `${question.id}_ordering`).map((item) => item.id)
+          : itemIds;
       const selectedOrder = isValidSelectedOrder ? selectedOrderRaw : initialOrder;
 
       return (
@@ -1257,9 +1277,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       }
 
       const answerColumns = table.answerHeaders ?? [];
-      const answerMap = currentValue && typeof currentValue === 'object' && !Array.isArray(currentValue)
-        ? (currentValue as Record<string, unknown>)
-        : {};
+      const answerMap =
+        currentValue && typeof currentValue === 'object' && !Array.isArray(currentValue)
+          ? (currentValue as Record<string, unknown>)
+          : {};
 
       return (
         <div className={styles.answerTableWrap}>
@@ -1288,7 +1309,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           value={rowValues[cellIndex] ?? ''}
                           disabled={!canEditCurrentQuestion}
                           onChange={(event) => {
-                            const nextRowValues = Array.from({ length: answerColumns.length }, (_, index) => rowValues[index] ?? '');
+                            const nextRowValues = Array.from(
+                              { length: answerColumns.length },
+                              (_, index) => rowValues[index] ?? '',
+                            );
                             nextRowValues[cellIndex] = event.target.value;
                             setQuestionAnswer(question.id, {
                               ...answerMap,
@@ -1387,17 +1411,20 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             <div className={styles.titleBlock}>
               <h1 className={styles.pageTitle}>{isPreview ? `Предпросмотр: ${assignment.title}` : assignment.title}</h1>
               <p className={styles.pageSubtitle}>
-                {isPreview ? 'Предпросмотр для учителя' : ASSIGNMENT_STATUS_LABELS[assignment.status]} • ~{estimatedMinutes} минут
+                {isPreview ? 'Предпросмотр для учителя' : ASSIGNMENT_STATUS_LABELS[assignment.status]} • ~
+                {estimatedMinutes} минут
               </p>
             </div>
           </div>
         </div>
 
         <div className={styles.topbarActions}>
-          <div className={styles.timerPill}>
-            <FontAwesomeIcon icon={faClock} className={styles.timerPillIcon} />
-            <span className={styles.timerPillValue}>{timeLabel}</span>
-          </div>
+          {timerConfig.enabled || deadlineTs !== null ? (
+            <div className={styles.timerPill}>
+              <FontAwesomeIcon icon={faClock} className={styles.timerPillIcon} />
+              <span className={styles.timerPillValue}>{timeLabel}</span>
+            </div>
+          ) : null}
 
           {canEdit ? (
             requiresAttemptStart ? (
@@ -1494,7 +1521,8 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
           {latestScore !== null ? (
             <div className={`${styles.notice} ${styles.noticeSuccess}`}>
-              Последний результат: {latestScore}%{quizAttemptState.latestAttemptPassed ? ' • проходной балл достигнут' : ''}
+              Последний результат: {latestScore}%
+              {quizAttemptState.latestAttemptPassed ? ' • проходной балл достигнут' : ''}
             </div>
           ) : null}
 
@@ -1534,13 +1562,15 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                 <p className={styles.heroStatValue}>{displayMaxPoints}</p>
               </div>
 
-              <div className={styles.heroStatCard}>
-                <div className={styles.heroStatLabelRow}>
-                  <FontAwesomeIcon icon={faCircleCheck} className={styles.heroStatGreenIcon} />
-                  <span className={styles.heroStatLabel}>Проходной балл</span>
+              {responseConfig?.hasTest && quizSettings.autoCheckEnabled ? (
+                <div className={styles.heroStatCard}>
+                  <div className={styles.heroStatLabelRow}>
+                    <FontAwesomeIcon icon={faCircleCheck} className={styles.heroStatGreenIcon} />
+                    <span className={styles.heroStatLabel}>Проходной балл</span>
+                  </div>
+                  <p className={styles.heroStatValue}>{passingScorePercent}%</p>
                 </div>
-                <p className={styles.heroStatValue}>{passingScorePercent}%</p>
-              </div>
+              ) : null}
 
               <div className={styles.heroStatCard}>
                 <div className={styles.heroStatLabelRow}>
@@ -1588,7 +1618,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                                 ? styles.badgeTable
                                 : card.tone === 'manual'
                                   ? styles.badgeInfo
-                          : styles.badgeEssay;
+                                  : styles.badgeEssay;
 
                 const promptText = card.kind === 'essay' ? card.prompt : card.question.prompt || 'Вопрос без текста';
                 const reviewItem = reviewItemsById.get(card.id);
@@ -1607,7 +1637,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                       <div className={styles.questionMeta}>
                         <div className={styles.questionTopRow}>
                           <span className={`${styles.questionTypeBadge} ${badgeClassName}`}>{card.typeLabel}</span>
-                          <span className={styles.questionPoints}>• {card.points} балла</span>
+                          <span className={styles.questionPoints}>
+                            • {pluralizeRu(card.points, { one: 'балл', few: 'балла', many: 'баллов' })}
+                          </span>
                         </div>
                         <h3 className={styles.questionPrompt}>{promptText}</h3>
                         <p className={styles.questionHint}>{card.hint}</p>
@@ -1626,20 +1658,28 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           />
                           <div className={styles.essayMeta}>
                             <span>Минимум {ESSAY_MIN_WORDS} слов</span>
-                            <span>{essayWordCount} / {ESSAY_MIN_WORDS} слов</span>
+                            <span>
+                              {essayWordCount} / {ESSAY_MIN_WORDS} слов
+                            </span>
                           </div>
                         </>
                       ) : (
                         renderTestQuestionControls(card.id, card.question)
                       )}
                       {reviewFeedback?.comment ? (
-                        <div className={styles.manualAnswerStub}>Комментарий преподавателя: {reviewFeedback.comment}</div>
+                        <div className={styles.manualAnswerStub}>
+                          Комментарий преподавателя: {reviewFeedback.comment}
+                        </div>
                       ) : null}
                       {showCorrectAnswers && reviewItem?.correctAnswerSummary ? (
-                        <div className={styles.manualAnswerStub}>Правильный ответ: {reviewItem.correctAnswerSummary}</div>
+                        <div className={styles.manualAnswerStub}>
+                          Правильный ответ: {reviewItem.correctAnswerSummary}
+                        </div>
                       ) : null}
                       {isLockedByReview ? (
-                        <div className={styles.manualAnswerStub}>Этот элемент принят и больше не требует изменений.</div>
+                        <div className={styles.manualAnswerStub}>
+                          Этот элемент принят и больше не требует изменений.
+                        </div>
                       ) : null}
                     </div>
                   </section>
@@ -1667,7 +1707,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                     <div className={styles.uploadControls}>
                       <label
                         className={`${styles.uploadButton} ${
-                          !canEditReviewItem('response_attachments') || uploading || !canUploadAttachments ? styles.uploadButtonDisabled : ''
+                          !canEditReviewItem('response_attachments') || uploading || !canUploadAttachments
+                            ? styles.uploadButtonDisabled
+                            : ''
                         }`}
                       >
                         <FontAwesomeIcon icon={faPaperclip} />
@@ -1709,7 +1751,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           ) : null}
                         </div>
                       ))}
-                      {attachments.length === 0 ? <div className={styles.emptyLine}>Файлы пока не добавлены</div> : null}
+                      {attachments.length === 0 ? (
+                        <div className={styles.emptyLine}>Файлы пока не добавлены</div>
+                      ) : null}
                     </div>
                   </div>
                 </section>
@@ -1723,7 +1767,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                         <span className={`${styles.questionTypeBadge} ${styles.badgeInfo}`}>Голосовой ответ</span>
                       </div>
                       <h3 className={styles.questionPrompt}>Запишите голосовое сообщение</h3>
-                      <p className={styles.questionHint}>Голосовые добавляются в ответ сразу после сохранения записи.</p>
+                      <p className={styles.questionHint}>
+                        Голосовые добавляются в ответ сразу после сохранения записи.
+                      </p>
                     </div>
                   </div>
 
@@ -1762,7 +1808,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                         <div className={styles.waveShell}>
                           <span className={styles.waveGlow} aria-hidden />
                           <div className={styles.waveTrack} aria-live="polite">
-                            {recordingSamples.length === 0 ? <span className={styles.waveBar} style={{ height: '16%' }} /> : null}
+                            {recordingSamples.length === 0 ? (
+                              <span className={styles.waveBar} style={{ height: '16%' }} />
+                            ) : null}
                             {recordingSamples.map((sample, sampleIndex) => (
                               <span
                                 key={`recording_sample_${sampleIndex}`}
@@ -1775,7 +1823,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
                         <div className={styles.recordingMetaRow}>
                           <span className={styles.recordingHint}>Говорите, затем нажмите «Сохранить голосовое»</span>
-                          <span className={styles.recordingLevel}>Громкость: {Math.round(Math.min(1, recordingLevel) * 100)}%</span>
+                          <span className={styles.recordingLevel}>
+                            Громкость: {Math.round(Math.min(1, recordingLevel) * 100)}%
+                          </span>
                         </div>
 
                         <div className={styles.recordingActions}>
@@ -1833,7 +1883,13 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                         }}
                       >
                         <FontAwesomeIcon icon={faPlay} />
-                        <span>{startingAttempt ? 'Запускаем...' : canStartFreshAttempt ? 'Начать новую попытку' : 'Начать попытку'}</span>
+                        <span>
+                          {startingAttempt
+                            ? 'Запускаем...'
+                            : canStartFreshAttempt
+                              ? 'Начать новую попытку'
+                              : 'Начать попытку'}
+                        </span>
                       </button>
                       {isPreview ? (
                         <button type="button" className={styles.bottomPreviewButton} onClick={preview?.onFinish}>
@@ -1886,7 +1942,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                   {questionCards.map((card, index) => {
                     const isDone = Boolean(answeredMap[card.id]);
                     return (
-                      <div key={`progress_${card.id}`} className={`${styles.progressItem} ${isDone ? styles.progressItemDone : ''}`}>
+                      <div
+                        key={`progress_${card.id}`}
+                        className={`${styles.progressItem} ${isDone ? styles.progressItemDone : ''}`}
+                      >
                         <button
                           type="button"
                           className={styles.progressMainButton}
@@ -1913,33 +1972,37 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                 </div>
               </section>
 
-              <section className={styles.timerCard}>
-                <div className={styles.sidebarTitleRow}>
-                  <div className={styles.timerIconWrap}>
-                    <FontAwesomeIcon icon={faClock} />
-                  </div>
-                  <h3 className={styles.sidebarTitle}>Оставшееся время</h3>
-                </div>
-
-                <div className={styles.timerBody}>
-                  <p className={styles.timerValue}>{timeLabel}</p>
-                  <p className={styles.timerNote}>{timeHint}</p>
-                  <div className={styles.attemptMetaList}>
-                    <div className={styles.attemptMetaRow}>
-                      <span>Текущая попытка</span>
-                      <strong>№{currentAttemptLabel}</strong>
+              {timerConfig.enabled || deadlineTs !== null ? (
+                <section className={styles.timerCard}>
+                  <div className={styles.sidebarTitleRow}>
+                    <div className={styles.timerIconWrap}>
+                      <FontAwesomeIcon icon={faClock} />
                     </div>
-                    <div className={styles.attemptMetaRow}>
-                      <span>Осталось</span>
-                      <strong>{quizAttemptState.attemptsRemaining === null ? '∞' : quizAttemptState.attemptsRemaining}</strong>
+                    <h3 className={styles.sidebarTitle}>Оставшееся время</h3>
+                  </div>
+
+                  <div className={styles.timerBody}>
+                    <p className={styles.timerValue}>{timeLabel}</p>
+                    <p className={styles.timerNote}>{timeHint}</p>
+                    <div className={styles.attemptMetaList}>
+                      <div className={styles.attemptMetaRow}>
+                        <span>Текущая попытка</span>
+                        <strong>№{currentAttemptLabel}</strong>
+                      </div>
+                      <div className={styles.attemptMetaRow}>
+                        <span>Осталось</span>
+                        <strong>
+                          {quizAttemptState.attemptsRemaining === null ? '∞' : quizAttemptState.attemptsRemaining}
+                        </strong>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className={styles.timerTrack}>
-                  <div className={styles.timerFill} style={{ width: `${timeProgressPercent}%` }} />
-                </div>
-              </section>
+                  <div className={styles.timerTrack}>
+                    <div className={styles.timerFill} style={{ width: `${timeProgressPercent}%` }} />
+                  </div>
+                </section>
+              ) : null}
 
               {showHelpCard ? (
                 <section className={styles.helpCard}>
@@ -1981,7 +2044,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <span className={`${styles.materialIcon} ${isPdf ? styles.materialPdfIcon : styles.materialLinkIcon}`}>
+                          <span
+                            className={`${styles.materialIcon} ${isPdf ? styles.materialPdfIcon : styles.materialLinkIcon}`}
+                          >
                             <FontAwesomeIcon icon={isPdf ? faFilePdf : faLink} />
                           </span>
                           <span className={styles.materialContent}>

@@ -13,7 +13,7 @@
   border-radius: 32px;
   background: linear-gradient(160deg, #111827 0%, #1f2937 100%);
   color: #fff;
-  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 26px 60px -20px rgba(15, 23, 42, 0.18);
 }
 
 .heroHeader {
@@ -127,7 +127,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(160deg, #e5e7eb 0%, #d1d5db 100%);
-  color: #111827;
+  color: var(--text-primary);
   font-size: 15px;
   font-weight: 900;
 }
@@ -149,12 +149,12 @@
   min-height: 52px;
   border-radius: 18px;
   background: #ffe45a;
-  color: #111827;
+  color: var(--text-primary);
   --primary-button-bg: #ffe45a;
   --primary-button-hover-bg: #ffd93a;
   --primary-button-text: #111827;
   font-weight: 900;
-  box-shadow: 0 18px 32px rgba(255, 212, 59, 0.22);
+  box-shadow: 0 18px 32px -10px rgba(255, 212, 59, 0.22);
 }
 
 .message {
@@ -168,9 +168,9 @@
   gap: 20px;
   padding: 32px;
   border-radius: 32px;
-  border: 1px solid #edf0f4;
-  background: #fff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.06);
 }
 
 .infoHeader {
@@ -198,13 +198,13 @@
   font-size: 24px;
   line-height: 1.15;
   font-weight: 900;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .infoSubtitle {
   margin: 4px 0 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .infoStack {
@@ -223,7 +223,7 @@
 
 .noteCardBlue {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .noteCardPurple {
@@ -233,20 +233,20 @@
 
 .noteCardGreen {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .noteTitle {
   font-size: 14px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .noteText {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.5;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 720px) {

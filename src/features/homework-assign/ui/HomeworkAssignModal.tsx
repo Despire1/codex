@@ -72,14 +72,12 @@ const isFavoriteTemplate = (template: HomeworkTemplate) =>
   template.tags.some((tag) => tag.trim().toLowerCase() === FAVORITE_TAG);
 
 const sortTemplatesForModal = (templates: HomeworkTemplate[]) =>
-  templates
-    .slice()
-    .sort((left, right) => {
-      const leftFavorite = isFavoriteTemplate(left) ? 1 : 0;
-      const rightFavorite = isFavoriteTemplate(right) ? 1 : 0;
-      if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
-      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-    });
+  templates.slice().sort((left, right) => {
+    const leftFavorite = isFavoriteTemplate(left) ? 1 : 0;
+    const rightFavorite = isFavoriteTemplate(right) ? 1 : 0;
+    if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  });
 
 const resolveTemplateCategory = (template: HomeworkTemplate) => {
   const subject = template.subject?.trim();
@@ -118,7 +116,13 @@ const estimateStudentResponseMinutes = (block: HomeworkTemplate['blocks'][number
 
 const estimateTemplateDuration = (template: HomeworkTemplate) => {
   const estimated = template.blocks.reduce((total, block) => {
-    return total + estimateQuestionMinutes(block) + estimateTextMinutes(block) + estimateMediaMinutes(block) + estimateStudentResponseMinutes(block);
+    return (
+      total +
+      estimateQuestionMinutes(block) +
+      estimateTextMinutes(block) +
+      estimateMediaMinutes(block) +
+      estimateStudentResponseMinutes(block)
+    );
   }, 0);
   return Math.max(estimated, 5);
 };
@@ -249,7 +253,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     [selectedStudentAvatarColor],
   );
   const selectedTemplate = useMemo(
-    () => (draft.templateId ? templatesById.get(draft.templateId) ?? null : null),
+    () => (draft.templateId ? (templatesById.get(draft.templateId) ?? null) : null),
     [draft.templateId, templatesById],
   );
   const selectedLesson = useMemo(
@@ -305,7 +309,12 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   const hasValidSchedule = draft.sendMode !== 'SCHEDULED' || Boolean(scheduledFor);
   const isFormDisabled = submitting || loading;
   const canSubmit =
-    hasStudents && Boolean(draft.studentId) && hasValidTemplate && hasValidLesson && hasValidSchedule && !isFormDisabled;
+    hasStudents &&
+    Boolean(draft.studentId) &&
+    hasValidTemplate &&
+    hasValidLesson &&
+    hasValidSchedule &&
+    !isFormDisabled;
 
   const resolveFutureLessons = useCallback(async (studentId: number) => {
     const requestId = lessonsRequestIdRef.current + 1;
@@ -389,7 +398,16 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     setTemplateVisibleCount(INITIAL_TEMPLATE_PAGE_SIZE);
     setFutureLessons([]);
     setNextLessonError(null);
-  }, [assignmentGroups, defaultGroupId, defaultLessonId, defaultStudentId, defaultTemplateId, open, sortedTemplates, students]);
+  }, [
+    assignmentGroups,
+    defaultGroupId,
+    defaultLessonId,
+    defaultStudentId,
+    defaultTemplateId,
+    open,
+    sortedTemplates,
+    students,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -600,7 +618,7 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                   </span>
                   <span className={styles.studentMeta}>
                     <strong>{selectedStudent?.name ?? 'Выберите ученика'}</strong>
-                    <span>{selectedStudent?.level?.trim() || 'Без уровня'}</span>
+                    {selectedStudent ? <span>{selectedStudent.level?.trim() || 'Уровень не указан'}</span> : null}
                   </span>
                   <HomeworkChevronDownIcon
                     size={12}
@@ -633,12 +651,17 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                         setFutureLessons([]);
                       }}
                     >
-                      <span className={styles.studentOptionAvatar} style={{ background: avatarColor, color: avatarTextColor }}>
+                      <span
+                        className={styles.studentOptionAvatar}
+                        style={{ background: avatarColor, color: avatarTextColor }}
+                      >
                         {buildStudentInitials(student.name)}
                       </span>
                       <span className={styles.studentOptionMeta}>
                         <span className={styles.studentOptionLabel}>{student.name}</span>
-                        <span className={styles.studentOptionDescription}>{student.level?.trim() || 'Без уровня'}</span>
+                        <span className={styles.studentOptionDescription}>
+                          {student.level?.trim() || 'Уровень не указан'}
+                        </span>
                       </span>
                       <HomeworkCheckIcon
                         size={11}
@@ -712,7 +735,12 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                 <span>{availableTemplates.length}</span>
               </div>
 
-              <div className={styles.templatePicker} role="listbox" aria-label="Выбор домашнего задания" onScroll={handleTemplateListScroll}>
+              <div
+                className={styles.templatePicker}
+                role="listbox"
+                aria-label="Выбор домашнего задания"
+                onScroll={handleTemplateListScroll}
+              >
                 {visibleTemplates.map((template) => {
                   const active = template.id === draft.templateId;
                   return (
@@ -727,22 +755,23 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                     >
                       <span className={styles.templatePickerOptionTitle}>{template.title}</span>
                       <span className={styles.templatePickerOptionMeta}>
-                        {resolveTemplateCategory(template)} • {formatTemplateDuration(estimateTemplateDuration(template))}
+                        {resolveTemplateCategory(template)} •{' '}
+                        {formatTemplateDuration(estimateTemplateDuration(template))}
                       </span>
                     </button>
                   );
                 })}
 
-                {isTemplateSearchLoading ? <div className={styles.templatePickerState}>Ищем домашние задания…</div> : null}
+                {isTemplateSearchLoading ? (
+                  <div className={styles.templatePickerState}>Ищем домашние задания…</div>
+                ) : null}
                 {!isTemplateSearchLoading && availableTemplates.length === 0 ? (
                   <div className={styles.templatePickerState}>Ничего не найдено.</div>
                 ) : null}
               </div>
             </AdaptivePopover>
 
-            {!hasValidTemplate ? (
-              <p className={styles.validationError}>Выберите домашнее задание для выдачи.</p>
-            ) : null}
+            {!hasValidTemplate ? <p className={styles.validationError}>Выберите домашнее задание для выдачи.</p> : null}
           </section>
 
           <div className={styles.divider} />
@@ -799,7 +828,9 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                   }
                 />
                 {selectedLesson?.linkedAssignmentTitle ? (
-                  <p className={styles.inlineInfo}>На этот урок уже привязано: {selectedLesson.linkedAssignmentTitle}</p>
+                  <p className={styles.inlineInfo}>
+                    На этот урок уже привязано: {selectedLesson.linkedAssignmentTitle}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -878,27 +909,6 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
                 Конец недели
               </button>
             </div>
-          </section>
-
-          <section className={styles.section}>
-            <button
-              type="button"
-              className={`${styles.additionalToggle} ${isAdditionalOpen ? styles.additionalToggleOpen : ''}`}
-              onClick={() => setIsAdditionalOpen((prev) => !prev)}
-            >
-              <span>Дополнительные настройки</span>
-              <HomeworkChevronDownIcon
-                size={12}
-                className={`${styles.additionalToggleIcon} ${isAdditionalOpen ? styles.additionalToggleIconOpen : ''}`}
-              />
-            </button>
-            {isAdditionalOpen ? (
-              <div className={styles.additionalPanel}>
-                <p className={styles.additionalText}>
-                  Здесь оставил место под дополнительные параметры выдачи. Основной сценарий выдачи теперь выполняется прямо из этого side-sheet.
-                </p>
-              </div>
-            ) : null}
           </section>
         </div>
 

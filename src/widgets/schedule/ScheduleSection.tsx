@@ -1,6 +1,6 @@
-import { addDays, addMinutes, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addDays, addMinutes, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek, ru } from 'date-fns';
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -21,7 +21,7 @@ import {
 } from '../../icons/MaterialIcons';
 import { DayPicker } from 'react-day-picker';
 import { HomeworkAssignment, Lesson, LinkedStudent } from '../../entities/types';
-import { getLessonColorVars } from '../../shared/lib/lessonColors';
+import { LESSON_COLOR_OPTIONS, getLessonColorVars } from '../../shared/lib/lessonColors';
 import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
 import { Badge } from '../../shared/ui/Badge/Badge';
@@ -41,8 +41,10 @@ import type {
   LessonSeriesScope,
 } from '../../features/lessons/model/types';
 import { LessonCancelDialog } from '../../features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import { LessonPopover } from '../../features/lessons/ui/LessonPopover/LessonPopover';
 import { LessonRestoreDialog } from '../../features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
 import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { AnchoredPopover } from '../../shared/ui/AnchoredPopover/AnchoredPopover';
 import { useScheduleState } from './model/useScheduleState';
 import { MonthDayLessonCard } from './components/MonthDayLessonCard';
 import { useScheduleNotesRangeInternal } from './model/useScheduleNotesRange';
@@ -154,11 +156,32 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     goToToday,
   } = useScheduleState();
   const todayZoned = useMemo(() => toZonedDate(new Date(), timeZone), [timeZone]);
+  const [nowMinutes, setNowMinutes] = useState<number>(() => {
+    const now = toZonedDate(new Date(), timeZone);
+    return now.getHours() * 60 + now.getMinutes();
+  });
+  useEffect(() => {
+    const tick = () => {
+      const now = toZonedDate(new Date(), timeZone);
+      setNowMinutes(now.getHours() * 60 + now.getMinutes());
+    };
+    tick();
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [timeZone]);
   const [hoverIndicator, setHoverIndicator] = useState<{ dayIso: string; minutes: number } | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const [dayPanelActionsLessonId, setDayPanelActionsLessonId] = useState<number | null>(null);
   const [cancelDialogLesson, setCancelDialogLesson] = useState<Lesson | null>(null);
   const [restoreDialogLesson, setRestoreDialogLesson] = useState<Lesson | null>(null);
+  const [lessonPopover, setLessonPopover] = useState<{ lesson: Lesson; anchorEl: HTMLElement } | null>(null);
+  const closeLessonPopover = useCallback(() => setLessonPopover(null), []);
+  const popoverActiveLesson = useMemo(() => {
+    if (!lessonPopover) return null;
+    const stored = lessonPopover.lesson;
+    const refreshed = lessons.find((lesson) => lesson.id === stored.id && lesson.startAt === stored.startAt);
+    return refreshed ?? stored;
+  }, [lessonPopover, lessons]);
   const [scopeDialog, setScopeDialog] = useState<PendingScopeAction | null>(null);
   const dayPickerRef = useRef<HTMLDivElement>(null);
   const weekScrollRef = useRef<HTMLDivElement>(null);
@@ -268,18 +291,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
   const monthWeekdays = useMemo(() => ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], []);
   const weekDayShortLabels = useMemo(() => ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'], []);
 
-  const capitalizedDayLabel = useMemo(
-    () => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
-    [dayLabel],
-  );
+  const capitalizedDayLabel = useMemo(() => dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1), [dayLabel]);
   const daySwitchLabel = useMemo(() => {
     if (!isMobileViewport) {
       return capitalizedDayLabel;
     }
 
     const weekdayIndex = Number(format(dayViewDate, 'i')) - 1;
-    const shortWeekday =
-      weekDayShortLabels[weekdayIndex] ?? format(dayViewDate, 'EE', { locale: ru }).toUpperCase();
+    const shortWeekday = weekDayShortLabels[weekdayIndex] ?? format(dayViewDate, 'EE', { locale: ru }).toUpperCase();
 
     return `${shortWeekday}, ${format(dayViewDate, 'd MMMM', { locale: ru })}`;
   }, [capitalizedDayLabel, dayViewDate, isMobileViewport, weekDayShortLabels]);
@@ -512,8 +531,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     };
   };
 
-  const buildLessonColorStyle = (lesson: Lesson): CSSProperties =>
-    getLessonColorVars(lesson.color) as CSSProperties;
+  const buildLessonColorStyle = (lesson: Lesson): CSSProperties => getLessonColorVars(lesson.color) as CSSProperties;
 
   const formatMinutesToTime = (minutes: number) => {
     const hoursValue = Math.floor(minutes / 60)
@@ -549,8 +567,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     const paidCount = participants.filter((participant: any) => participant.isPaid).length;
     const unpaidCount = participants.length - paidCount;
     // Для будущих запланированных уроков оплата ещё не ожидается — скрываем плашку «Не оплачено».
-    const isFutureScheduled =
-      lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
+    const isFutureScheduled = lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
 
     if (isGroupLesson) {
       const badges = [] as Array<{ label: string; variant: 'groupPaid' | 'groupUnpaid' }>;
@@ -581,9 +598,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           }}
         >
           <span className={styles.paymentBadgeIcon} aria-hidden="true" />
-          <span
-              className={`${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaidText}`}
-          >
+          <span className={`${isPaid ? styles.paymentBadgePaid : styles.paymentBadgeUnpaidText}`}>
             {isPaid ? 'Оплачено' : 'Не оплачено'}
           </span>
         </button>
@@ -691,11 +706,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     );
   };
 
-  const renderLessonContent = (
-    lesson: Lesson,
-    layoutStyle: CSSProperties,
-    className?: string,
-  ) => {
+  const renderLessonContent = (lesson: Lesson, layoutStyle: CSSProperties, className?: string) => {
     const participants = buildParticipants(lesson, linkedStudentsById);
     const isGroupLesson = participants.length > 1;
     const awaitingConfirmation = isAwaitingConfirmation(lesson);
@@ -712,7 +723,15 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           lesson.status === 'CANCELED' ? styles.canceledLesson : ''
         }`}
         style={{ ...layoutStyle, ...buildLessonColorStyle(lesson) }}
-        onClick={() => startEditLesson(lesson)}
+        onClick={(event) => {
+          event.stopPropagation();
+          setLessonPopover({ lesson, anchorEl: event.currentTarget });
+        }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          closeLessonPopover();
+          startEditLesson(lesson);
+        }}
         onMouseEnter={() => setHoverIndicator(null)}
       >
         {lesson.isRecurring && <span className={styles.recurringBadge}>↻</span>}
@@ -806,11 +825,12 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                 .filter((lesson) => formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone }) === day.iso)
                 .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
               const dayLessonLayouts = buildLessonLayout(dayLessons);
+              const isTodayColumn = isSameDay(day.date, todayZoned);
 
               return (
                 <div
                   key={day.iso}
-                  className={styles.weekDayColumn}
+                  className={`${styles.weekDayColumn} ${isTodayColumn ? styles.todayColumn : ''}`}
                   onMouseLeave={() => setHoverIndicator(null)}
                 >
                   <div
@@ -820,6 +840,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                     onMouseMove={(event) => handleTimeHover(event, day.iso)}
                   >
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
+                    {isTodayColumn && (
+                      <div
+                        className={styles.nowLine}
+                        style={{ top: ((nowMinutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT }}
+                        aria-hidden
+                      />
+                    )}
                     {dayLessonLayouts.map((layout) =>
                       renderLessonContent(layout.lesson, buildLessonStyle(layout, WEEK_LESSON_INSET)),
                     )}
@@ -831,14 +858,11 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
         </div>
       </div>
     </div>
-
   );
 
   const renderMobileWeekView = () => {
     const selectedIso = format(dayViewDate, 'yyyy-MM-dd');
-    const selectedDate = selectedIso
-      ? toZonedDate(toUtcDateFromDate(selectedIso, timeZone), timeZone)
-      : dayViewDate;
+    const selectedDate = selectedIso ? toZonedDate(toUtcDateFromDate(selectedIso, timeZone), timeZone) : dayViewDate;
     const selectedLessons = selectedIso
       ? (lessonsByDay[selectedIso] ?? [])
           .slice()
@@ -866,6 +890,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === selectedDayIso && renderHoverIndicator(hoverIndicator.minutes)}
+              {isSameDay(selectedDate, todayZoned) && (
+                <div
+                  className={styles.nowLine}
+                  style={{ top: ((nowMinutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT }}
+                  aria-hidden
+                />
+              )}
               {selectedLessonLayouts.map((layout) =>
                 renderLessonContent(layout.lesson, buildLessonStyle(layout, DAY_LESSON_INSET), styles.dayLesson),
               )}
@@ -883,11 +914,17 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
     const dayLessonLayouts = buildLessonLayout(dayLessons);
 
+    const totalDayMinutes = dayLessons.reduce((sum, lesson) => sum + (lesson.durationMinutes || 0), 0);
+    const nowMs = Date.now();
+    const upcomingLesson = dayLessons.find((lesson) => new Date(lesson.startAt).getTime() >= nowMs) ?? null;
+    const upcomingLabel = upcomingLesson ? formatInTimeZone(upcomingLesson.startAt, 'HH:mm', { timeZone }) : null;
+    const completedCount = dayLessons.filter((lesson) => lesson.status === 'COMPLETED').length;
+
     return (
-        <div className={styles.dayView}>
-          <div key={dayLabelKey} className={styles.dayHeading}>
-            <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM yyyy', { locale: ru })}</div>
-          </div>
+      <div className={styles.dayView}>
+        <div key={dayLabelKey} className={styles.dayHeading}>
+          <div className={styles.dayTitle}>{format(dayViewDate, 'EEEE, d MMMM yyyy', { locale: ru })}</div>
+        </div>
         <div className={styles.dayGridScroll} ref={dayScrollRef}>
           <div className={styles.dayGrid}>
             <div className={styles.timeColumn}>
@@ -905,10 +942,47 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               onMouseLeave={() => setHoverIndicator(null)}
             >
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
+              {isSameDay(dayViewDate, todayZoned) && (
+                <div
+                  className={styles.nowLine}
+                  style={{ top: ((nowMinutes - DAY_START_MINUTE) / 60) * HOUR_BLOCK_HEIGHT }}
+                  aria-hidden
+                />
+              )}
               {dayLessonLayouts.map((layout) =>
                 renderLessonContent(layout.lesson, buildLessonStyle(layout, DAY_LESSON_INSET), styles.dayLesson),
               )}
             </div>
+            <aside className={styles.daySidePanel}>
+              <div className={styles.daySidePanelTitle}>Сводка дня</div>
+              <div className={styles.daySidePanelMetric}>
+                <span className={styles.daySidePanelMetricValue}>{dayLessons.length}</span>
+                <span className={styles.daySidePanelMetricLabel}>уроков</span>
+              </div>
+              <div className={styles.daySidePanelMetric}>
+                <span className={styles.daySidePanelMetricValue}>{Math.round((totalDayMinutes / 60) * 10) / 10} ч</span>
+                <span className={styles.daySidePanelMetricLabel}>занятий</span>
+              </div>
+              {upcomingLabel ? (
+                <div className={styles.daySidePanelMetric}>
+                  <span className={styles.daySidePanelMetricValue}>{upcomingLabel}</span>
+                  <span className={styles.daySidePanelMetricLabel}>следующий</span>
+                </div>
+              ) : null}
+              {completedCount > 0 ? (
+                <div className={styles.daySidePanelMetric}>
+                  <span className={styles.daySidePanelMetricValue}>{completedCount}</span>
+                  <span className={styles.daySidePanelMetricLabel}>проведено</span>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className={styles.daySidePanelCta}
+                onClick={() => openLessonModal(dayIso, undefined, undefined, { skipNavigation: true })}
+              >
+                + Создать урок
+              </button>
+            </aside>
           </div>
         </div>
       </div>
@@ -937,9 +1011,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
   const selectedDayDate = useMemo(
     () =>
-      effectiveSelectedMonthDay
-        ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone)
-        : null,
+      effectiveSelectedMonthDay ? toZonedDate(toUtcDateFromDate(effectiveSelectedMonthDay, timeZone), timeZone) : null,
     [effectiveSelectedMonthDay, timeZone],
   );
 
@@ -973,7 +1045,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
 
         return { lessonId, items };
       } catch (error) {
-         
         console.error('Failed to load homework assignments for lesson', error);
         return { lessonId, items: [] as HomeworkAssignment[] };
       }
@@ -991,7 +1062,6 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
       isCancelled = true;
     };
   }, [activeDayPanelTab, scheduleView, selectedDayLessonIdsKey, selectedDayLessons]);
-
 
   const renderMonthView = () => {
     const days = buildMonthDays(selectedMonth);
@@ -1139,7 +1209,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                         timeZone={timeZone}
                         isActionsOpen={dayPanelActionsLessonId === lesson.id}
                         onOpenActions={() => setDayPanelActionsLessonId(lesson.id)}
-                        onCloseActions={() => setDayPanelActionsLessonId((current) => (current === lesson.id ? null : current))}
+                        onCloseActions={() =>
+                          setDayPanelActionsLessonId((current) => (current === lesson.id ? null : current))
+                        }
                         onOpenHomeworkAssignment={(assignment) => {
                           setDayPanelActionsLessonId(null);
                           navigate(`/homeworks/assignments/${assignment.id}/edit`);
@@ -1279,56 +1351,105 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               </div>
               <div className={styles.monthDaysScroller}>
                 <div className={styles.monthDaysGrid}>
-                {days.map((day) => {
-                  const dayLessons = lessonsByDay[day.iso] ?? [];
-                  const dayNotesCount = notesCountByDay[day.iso] ?? 0;
-                  const isWeekendCell = isWeekendDate(day.date);
-                  const handleDayClick = () => {
-                    setInternalSelectedMonthDay(day.iso);
-                    setSelectedMonthDay(day.iso);
-                    setDayViewDate(day.date);
+                  {days.map((day) => {
+                    const dayLessons = lessonsByDay[day.iso] ?? [];
+                    const dayNotesCount = notesCountByDay[day.iso] ?? 0;
+                    const isPastDay = day.date.getTime() < todayZoned.getTime();
+                    const isWeekendCell = isWeekendDate(day.date) && !isPastDay;
+                    const handleDayClick = () => {
+                      setInternalSelectedMonthDay(day.iso);
+                      setSelectedMonthDay(day.iso);
+                      setDayViewDate(day.date);
 
-                    if (isMobileMonthView) {
-                      setDrawerMode('expanded');
-                      setDrawerDragOffset(0);
-                    }
-                  };
-                  const isTodayCell = isSameDay(day.date, todayZoned);
+                      if (isMobileMonthView) {
+                        setDrawerMode('expanded');
+                        setDrawerDragOffset(0);
+                      }
+                    };
+                    const isTodayCell = isSameDay(day.date, todayZoned);
 
-                  return (
-                    <div
-                      key={`${monthLabel}-${day.iso}`}
-                      className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
-                        isTodayCell ? styles.todayCell : ''
-                      } ${effectiveSelectedMonthDay === day.iso ? styles.activeDay : ''}`}
-                      onClick={handleDayClick}
-                    >
-                      <div className={styles.monthDateRow}>
-                        <span
-                          className={`${styles.monthDateNumber} ${isTodayCell ? styles.todayDateNumber : ''}`}
-                        >
-                          {day.date.getDate()}
-                        </span>
-                        {isWeekendCell && (
-                          <Tooltip content="Выходной день" align="center">
-                            <span className={styles.monthWeekendBadge} aria-label="Выходной день">
-                              <CoffeeIcon />
-                            </span>
-                          </Tooltip>
-                        )}
+                    return (
+                      <div
+                        key={`${monthLabel}-${day.iso}`}
+                        className={`${styles.monthCell} ${day.inMonth ? '' : styles.mutedDay} ${
+                          isTodayCell ? styles.todayCell : ''
+                        } ${effectiveSelectedMonthDay === day.iso ? styles.activeDay : ''}`}
+                        onClick={handleDayClick}
+                      >
+                        <div className={styles.monthDateRow}>
+                          <span className={`${styles.monthDateNumber} ${isTodayCell ? styles.todayDateNumber : ''}`}>
+                            {day.date.getDate()}
+                          </span>
+                          {isWeekendCell && (
+                            <Tooltip content="Выходной день" align="center">
+                              <span className={styles.monthWeekendBadge} aria-label="Выходной день">
+                                <CoffeeIcon />
+                              </span>
+                            </Tooltip>
+                          )}
+                        </div>
+                        <div className={styles.monthCounters}>
+                          {dayLessons.length > 0 && (
+                            <Tooltip
+                              content={`${dayLessons.length} ${
+                                dayLessons.length === 1 ? 'занятие' : dayLessons.length < 5 ? 'занятия' : 'занятий'
+                              }`}
+                              align="center"
+                            >
+                              <span
+                                className={`${styles.dayCounter} ${styles.lessonCounter}`}
+                                aria-label={`${dayLessons.length} занятий`}
+                              >
+                                {dayLessons.length}
+                              </span>
+                            </Tooltip>
+                          )}
+                          {dayNotesCount > 0 && (
+                            <Tooltip
+                              content={`${dayNotesCount} ${
+                                dayNotesCount === 1 ? 'заметка' : dayNotesCount < 5 ? 'заметки' : 'заметок'
+                              }`}
+                              align="center"
+                            >
+                              <span
+                                className={`${styles.dayCounter} ${styles.noteCounter}`}
+                                aria-label={`${dayNotesCount} заметок`}
+                              >
+                                {dayNotesCount}
+                              </span>
+                            </Tooltip>
+                          )}
+                        </div>
                       </div>
-                      <div className={styles.monthCounters}>
-                        {dayLessons.length > 0 && (
-                          <span className={`${styles.dayCounter} ${styles.lessonCounter}`}>{dayLessons.length}</span>
-                        )}
-                        {dayNotesCount > 0 && (
-                          <span className={`${styles.dayCounter} ${styles.noteCounter}`}>{dayNotesCount}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 </div>
+              </div>
+              <div className={styles.monthLegend} aria-label="Легенда календаря">
+                <span className={styles.monthLegendItem}>
+                  <span className={`${styles.monthLegendDot} ${styles.monthLegendDotLessons}`} aria-hidden />
+                  Занятия
+                </span>
+                <span className={styles.monthLegendItem}>
+                  <span className={`${styles.monthLegendDot} ${styles.monthLegendDotNotes}`} aria-hidden />
+                  Заметки
+                </span>
+                <span className={styles.monthLegendDivider} aria-hidden>
+                  ·
+                </span>
+                <span className={styles.monthLegendCaption}>Цвета:</span>
+                {LESSON_COLOR_OPTIONS.map((option) => (
+                  <Tooltip key={option.id} content={option.label} align="center">
+                    <span className={styles.monthLegendItem} aria-label={`Цвет ${option.label}`}>
+                      <span
+                        className={styles.monthLegendDot}
+                        style={{ background: option.background, border: `1px solid ${option.border}` }}
+                        aria-hidden
+                      />
+                      {option.label}
+                    </span>
+                  </Tooltip>
+                ))}
               </div>
             </div>
           </section>
@@ -1496,7 +1617,7 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           onClick={() => {
             const defaultDayIso =
               scheduleView === 'month'
-                ? effectiveSelectedMonthDay ?? format(todayZoned, 'yyyy-MM-dd')
+                ? (effectiveSelectedMonthDay ?? format(todayZoned, 'yyyy-MM-dd'))
                 : format(dayViewDate, 'yyyy-MM-dd');
             openLessonModal(defaultDayIso, undefined, undefined, {
               skipNavigation: true,
@@ -1507,6 +1628,42 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           <AddOutlinedIcon className={styles.mobileCreateFabIcon} />
         </button>
       ) : null}
+
+      <AnchoredPopover
+        isOpen={Boolean(popoverActiveLesson && lessonPopover)}
+        anchorEl={lessonPopover?.anchorEl ?? null}
+        onClose={closeLessonPopover}
+        side="bottom"
+        align="center"
+      >
+        {popoverActiveLesson && (
+          <LessonPopover
+            lesson={popoverActiveLesson}
+            linkedStudentsById={linkedStudentsById}
+            timeZone={timeZone}
+            onEditFull={() => {
+              closeLessonPopover();
+              startEditLesson(popoverActiveLesson);
+            }}
+            onDelete={() => {
+              closeLessonPopover();
+              requestDeleteLessonFromList(popoverActiveLesson);
+            }}
+            onCancel={() => {
+              closeLessonPopover();
+              handleCancelLesson(popoverActiveLesson);
+            }}
+            onRestore={() => {
+              closeLessonPopover();
+              handleRestoreLesson(popoverActiveLesson);
+            }}
+            onTogglePaid={(studentId) => {
+              void togglePaid(popoverActiveLesson.id, studentId);
+            }}
+            onClose={closeLessonPopover}
+          />
+        )}
+      </AnchoredPopover>
 
       <LessonCancelDialog
         open={Boolean(cancelDialogLesson)}

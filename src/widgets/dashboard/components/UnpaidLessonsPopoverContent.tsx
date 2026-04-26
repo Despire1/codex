@@ -1,6 +1,5 @@
-import { formatDistanceToNowStrict } from 'date-fns';
+import { formatDistanceToNowStrict, ru } from 'date-fns';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
-import { ru } from 'date-fns/locale';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import controls from '../../../shared/styles/controls.module.css';
 import { Badge } from '../../../shared/ui/Badge/Badge';
@@ -51,8 +50,22 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   const [optimisticReminders, setOptimisticReminders] = useState<Record<string, string>>({});
   const successTimeouts = useRef<Map<string, number>>(new Map());
   const [isExpanded, setIsExpanded] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState<'all' | 'month' | 'overdue7'>('all');
 
-  const sortedEntries = [...entries].sort(
+  const filteredEntries = useMemo(() => {
+    if (periodFilter === 'all') return entries;
+    const nowTs = Date.now();
+    if (periodFilter === 'month') {
+      const startMonth = new Date();
+      startMonth.setDate(1);
+      startMonth.setHours(0, 0, 0, 0);
+      return entries.filter((entry) => new Date(entry.startAt).getTime() >= startMonth.getTime());
+    }
+    const sevenDaysAgo = nowTs - 7 * 24 * 60 * 60 * 1000;
+    return entries.filter((entry) => new Date(entry.startAt).getTime() <= sevenDaysAgo);
+  }, [entries, periodFilter]);
+
+  const sortedEntries = [...filteredEntries].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
   );
 
@@ -118,151 +131,176 @@ export const UnpaidLessonsPopoverContent: FC<UnpaidLessonsPopoverContentProps> =
   const canToggle = !showAll && showToggle && sortedEntries.length > maxVisibleEntries;
   const isScrollable = showAll || (isExpanded && sortedEntries.length > 4);
   const totalUnpaidRub = useMemo(
-    () => entries.reduce((sum, entry) => sum + (typeof entry.price === 'number' && entry.price > 0 ? entry.price : 0), 0),
-    [entries],
+    () =>
+      filteredEntries.reduce(
+        (sum, entry) => sum + (typeof entry.price === 'number' && entry.price > 0 ? entry.price : 0),
+        0,
+      ),
+    [filteredEntries],
   );
 
   return (
-      <div className={`${styles.root} ${fitContainer ? styles.rootFill : ''}`.trim()}>
-        {hideHeader ? null : (
-          <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
-            <div className={styles.title}>
-              Неоплаченные ({entries.length})
-              {totalUnpaidRub > 0 ? ` · ${new Intl.NumberFormat('ru-RU').format(totalUnpaidRub)} ₽` : ''}
-            </div>
+    <div className={`${styles.root} ${fitContainer ? styles.rootFill : ''}`.trim()}>
+      {hideHeader ? null : (
+        <div className={`${styles.header} ${stickyHeader ? styles.headerSticky : ''}`}>
+          <div className={styles.title}>
+            Неоплаченные ({filteredEntries.length})
+            {totalUnpaidRub > 0 ? ` · ${new Intl.NumberFormat('ru-RU').format(totalUnpaidRub)} ₽` : ''}
           </div>
-        )}
-
-        {entries.length === 0 ? (
-            <div className={styles.empty}>Нет неоплаченных занятий</div>
-        ) : (
-            <>
-              <div
-                className={`${styles.list} ${isScrollable ? styles.listScrollable : ''} ${
-                  fitContainer ? styles.listFill : ''
-                }`.trim()}
+          <div className={styles.periodChips} role="tablist" aria-label="Период неоплаченных">
+            {(
+              [
+                { id: 'all', label: 'Все' },
+                { id: 'month', label: 'Этот месяц' },
+                { id: 'overdue7', label: 'Просрочено 7+ дней' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={periodFilter === tab.id}
+                className={`${styles.periodChip} ${periodFilter === tab.id ? styles.periodChipActive : ''}`}
+                onClick={() => setPeriodFilter(tab.id)}
               >
-                {visibleEntries.map((entry) => {
-                  const entryKey = `${entry.lessonId}-${entry.studentId}`;
-                  const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-                  const lessonDate = capitalizeFirst(
-                      formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
-                  );
+      {filteredEntries.length === 0 ? (
+        <div className={styles.empty}>
+          {entries.length === 0 ? 'Нет неоплаченных занятий' : 'Нет неоплаченных за выбранный период'}
+        </div>
+      ) : (
+        <>
+          <div
+            className={`${styles.list} ${isScrollable ? styles.listScrollable : ''} ${
+              fitContainer ? styles.listFill : ''
+            }`.trim()}
+          >
+            {visibleEntries.map((entry) => {
+              const entryKey = `${entry.lessonId}-${entry.studentId}`;
+              const reminderTimestamp = optimisticReminders[entryKey] ?? entry.lastPaymentReminderAt;
 
-                  const priceLabel = `${entry.price} ₽`;
+              const lessonDate = capitalizeFirst(
+                formatInTimeZone(entry.startAt, 'd MMM', { locale: ru, timeZone }).replace('.', ''),
+              );
 
-                  const reminderLabel = entry.isActivated
-                      ? reminderTimestamp
-                          ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(reminderTimestamp), {
-                            addSuffix: true,
-                            locale: ru,
-                          })}.`
-                          : 'Напоминание не отправлялось.'
-                      : 'Ученик не активировал бота — отправка напоминаний невозможна.';
+              const priceLabel = `${entry.price} ₽`;
 
-                  const showProgress =
-                      entry.isActivated &&
-                      !reminderTimestamp &&
-                      globalPaymentRemindersEnabled &&
-                      entry.paymentRemindersEnabled &&
-                      entry.completedAt;
+              const reminderLabel = entry.isActivated
+                ? reminderTimestamp
+                  ? `Напоминание отправлено ${formatDistanceToNowStrict(new Date(reminderTimestamp), {
+                      addSuffix: true,
+                      locale: ru,
+                    })}.`
+                  : 'Напоминание не отправлялось.'
+                : 'Ученик не активировал бота — отправка напоминаний невозможна.';
 
-                  const progressValue = showProgress
-                      ? Math.min(
-                          (now.getTime() - new Date(entry.completedAt ?? entry.startAt).getTime()) / reminderDelayMs,
-                          1,
-                      )
-                      : 0;
+              const showProgress =
+                entry.isActivated &&
+                !reminderTimestamp &&
+                globalPaymentRemindersEnabled &&
+                entry.paymentRemindersEnabled &&
+                entry.completedAt;
 
-                  const waitLabel = `Ждём ${Math.max(1, reminderDelayHours)}ч`;
+              const progressValue = showProgress
+                ? Math.min(
+                    (now.getTime() - new Date(entry.completedAt ?? entry.startAt).getTime()) / reminderDelayMs,
+                    1,
+                  )
+                : 0;
 
-                  const avatarLetter = entry.studentName.trim().charAt(0).toUpperCase() || 'У';
+              const waitLabel = `Ждём ${Math.max(1, reminderDelayHours)}ч`;
 
-                  const reminderDisabledReason = entry.isActivated
-                      ? null
-                      : 'Ученик не активировал бота — отправка напоминаний невозможна';
+              const avatarLetter = entry.studentName.trim().charAt(0).toUpperCase() || 'У';
 
-                  const isPending = pendingReminderIds.has(entryKey);
-                  const isSuccess = successReminderIds.has(entryKey);
+              const reminderDisabledReason = entry.isActivated
+                ? null
+                : 'Ученик не активировал бота — отправка напоминаний невозможна';
 
-                  return (
-                      <div key={entryKey} className={styles.item}>
-                        <div className={styles.itemHeader}>
-                          <div className={styles.avatar}>{avatarLetter}</div>
-                          <div className={styles.itemHeaderInfo}>
-                            <button
-                                type="button"
-                                className={styles.studentName}
-                                onClick={() => onOpenStudent(entry.studentId)}
-                            >
-                              {entry.studentName}
-                            </button>
-                            <div className={styles.lessonMeta}>
-                              Урок {lessonDate} • {priceLabel}
-                            </div>
-                          </div>
-                          <Badge className={styles.debtBadge} label="долг" variant="unpaid" />
-                        </div>
+              const isPending = pendingReminderIds.has(entryKey);
+              const isSuccess = successReminderIds.has(entryKey);
 
-                        <div className={styles.reminderRow}>
-                          <NotificationsNoneOutlinedIcon width={16} height={16} />
-                          <span>{reminderLabel}</span>
-                        </div>
-
-                        <div className={styles.actionsRow}>
-                          <button
-                              type="button"
-                              className={`${controls.primaryButton} ${styles.payButton}`}
-                              onClick={() => onTogglePaid(entry.lessonId, entry.studentId)}
-                          >
-                            Отметить оплату
-                          </button>
-
-                          <Tooltip content={reminderDisabledReason ?? 'Отправить напоминание'}>
-                            <button
-                                type="button"
-                                className={styles.remindButton}
-                                onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
-                                disabled={Boolean(reminderDisabledReason) || isPending || isSuccess}
-                            >
-                              {isPending ? (
-                                  <span className={styles.iconSpinner} aria-hidden />
-                              ) : isSuccess ? (
-                                  <span className={styles.iconCheck} aria-hidden />
-                              ) : (
-                                  <NotificationsNoneOutlinedIcon width={18} height={18} />
-                              )}
-                            </button>
-                          </Tooltip>
-                        </div>
-
-                        {showProgress && (
-                            <div className={styles.progressRow}>
-                              <div className={styles.progressTrack}>
-                                <span className={styles.progressFill} style={{ width: `${progressValue * 100}%` }} />
-                              </div>
-                              <div className={styles.progressLabel}>{waitLabel}</div>
-                            </div>
-                        )}
-                      </div>
-                  );
-                })}
-              </div>
-
-              {canToggle && (
-                  <div className={styles.toggleWrapper}>
-                    <button
+              return (
+                <div key={entryKey} className={styles.item}>
+                  <div className={styles.itemHeader}>
+                    <div className={styles.avatar}>{avatarLetter}</div>
+                    <div className={styles.itemHeaderInfo}>
+                      <button
                         type="button"
-                        className={styles.toggleButton}
-                        onClick={() => setIsExpanded((prev) => !prev)}
-                    >
-                      {isExpanded ? 'Свернуть' : 'Показать все'}
-                    </button>
+                        className={styles.studentName}
+                        onClick={() => onOpenStudent(entry.studentId)}
+                      >
+                        {entry.studentName}
+                      </button>
+                      <div className={styles.lessonMeta}>
+                        Урок {lessonDate} • {priceLabel}
+                      </div>
+                    </div>
+                    <Badge className={styles.debtBadge} label="долг" variant="unpaid" />
                   </div>
-              )}
-            </>
-        )}
-      </div>
+
+                  <div className={styles.reminderRow}>
+                    <NotificationsNoneOutlinedIcon width={16} height={16} />
+                    <span>{reminderLabel}</span>
+                  </div>
+
+                  <div className={styles.actionsRow}>
+                    <button
+                      type="button"
+                      className={`${controls.primaryButton} ${styles.payButton}`}
+                      onClick={() => onTogglePaid(entry.lessonId, entry.studentId)}
+                      aria-label={`Отметить оплату урока ${lessonDate}`}
+                    >
+                      Оплачен урок {lessonDate}
+                    </button>
+
+                    <Tooltip content={reminderDisabledReason ?? 'Отправить напоминание в Telegram'}>
+                      <button
+                        type="button"
+                        className={styles.remindButton}
+                        onClick={() => handleReminderSend(entry.lessonId, entry.studentId)}
+                        disabled={Boolean(reminderDisabledReason) || isPending || isSuccess}
+                        aria-label={reminderDisabledReason ?? 'Отправить напоминание в Telegram'}
+                        title={reminderDisabledReason ?? 'Отправить напоминание в Telegram'}
+                      >
+                        {isPending ? (
+                          <span className={styles.iconSpinner} aria-hidden />
+                        ) : isSuccess ? (
+                          <span className={styles.iconCheck} aria-hidden />
+                        ) : (
+                          <NotificationsNoneOutlinedIcon width={18} height={18} />
+                        )}
+                      </button>
+                    </Tooltip>
+                  </div>
+
+                  {showProgress && (
+                    <div className={styles.progressRow}>
+                      <div className={styles.progressTrack}>
+                        <span className={styles.progressFill} style={{ width: `${progressValue * 100}%` }} />
+                      </div>
+                      <div className={styles.progressLabel}>{waitLabel}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {canToggle && (
+            <div className={styles.toggleWrapper}>
+              <button type="button" className={styles.toggleButton} onClick={() => setIsExpanded((prev) => !prev)}>
+                {isExpanded ? 'Свернуть' : 'Показать все'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 };

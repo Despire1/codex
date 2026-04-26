@@ -2,7 +2,7 @@
   padding: 32px;
   border: 1px solid #edf0f6;
   border-radius: 32px;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .header {
@@ -18,13 +18,13 @@
   font-size: 26px;
   line-height: 1.1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .materialsList {
@@ -39,16 +39,19 @@
   padding: 16px;
   border: 1px solid #e6eaf1;
   border-radius: 22px;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
   color: inherit;
   text-decoration: none;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .materialCard:hover {
   transform: translateY(-1px);
   border-color: #d6deea;
-  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 28px -9px rgba(15, 23, 42, 0.08);
 }
 
 .materialIcon,
@@ -70,8 +73,8 @@
   height: 32px;
   margin-left: auto;
   border-radius: 999px;
-  background: #ffffff;
-  color: #475569;
+  background: var(--surface-card);
+  color: var(--text-secondary);
 }
 
 .materialMeta {
@@ -81,14 +84,14 @@
 }
 
 .materialMeta strong {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.45;
 }
 
 .materialMeta span {
   margin-top: 4px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
   word-break: break-word;
@@ -96,12 +99,12 @@
 
 .iconTonePdf {
   background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  color: var(--status-red-text);
 }
 
 .iconToneWord {
   background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .iconToneImage {
@@ -116,7 +119,7 @@
 
 .iconToneVideo {
   background: rgba(234, 88, 12, 0.12);
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .iconToneLink {
@@ -126,19 +129,19 @@
 
 .iconToneFile {
   background: rgba(100, 116, 139, 0.12);
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .emptyState {
   padding: 18px;
   border-radius: 20px;
-  background: #f8fafc;
-  color: #6b7280;
+  background: var(--surface-card-strong);
+  color: var(--text-muted);
 }
 
 .emptyState strong {
   display: block;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
 }
 

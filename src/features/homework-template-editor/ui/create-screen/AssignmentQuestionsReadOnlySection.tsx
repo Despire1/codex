@@ -18,6 +18,8 @@ import styles from './AssignmentQuestionsReadOnlySection.module.css';
 
 interface AssignmentQuestionsReadOnlySectionProps {
   testBlock: HomeworkBlockTest | null;
+  showCorrectAnswers?: boolean;
+  onToggleCorrectAnswers?: (next: boolean) => void;
 }
 
 const QUESTION_KIND_ICONS: Record<string, ReactNode> = {
@@ -82,21 +84,26 @@ const renderFillWordPrompt = (value: string) => {
   );
 };
 
-const renderQuestionBody = (question: HomeworkTestQuestion) => {
+const renderQuestionBody = (question: HomeworkTestQuestion, showCorrectAnswers: boolean) => {
   const kind = getQuestionKind(question);
 
   if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') {
     const markerClassName =
       question.type === 'MULTIPLE_CHOICE' ? styles.choiceMarkerCheckbox : styles.choiceMarkerRadio;
+    const correctIds = new Set(question.correctOptionIds ?? []);
 
     return (
       <div className={styles.choiceList}>
-        {(question.options ?? []).map((option) => (
-          <div key={option.id} className={styles.choiceRow}>
-            <span className={`${styles.choiceMarker} ${markerClassName}`} aria-hidden />
-            <span>{option.text.trim() || 'Вариант без текста'}</span>
-          </div>
-        ))}
+        {(question.options ?? []).map((option) => {
+          const isCorrect = showCorrectAnswers && correctIds.has(option.id);
+          return (
+            <div key={option.id} className={`${styles.choiceRow} ${isCorrect ? styles.choiceRowCorrect : ''}`}>
+              <span className={`${styles.choiceMarker} ${markerClassName}`} aria-hidden />
+              <span>{option.text.trim() || 'Вариант без текста'}</span>
+              {isCorrect ? <span className={styles.choiceCorrectBadge}>Правильно</span> : null}
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -114,9 +121,7 @@ const renderQuestionBody = (question: HomeworkTestQuestion) => {
     return (
       <div className={styles.answerShell}>
         <span className={styles.answerShellLabel}>Ответ ученика</span>
-        <div className={`${styles.answerShellInput} ${styles.answerShellTextarea}`}>
-          Развернутый письменный ответ
-        </div>
+        <div className={`${styles.answerShellInput} ${styles.answerShellTextarea}`}>Развернутый письменный ответ</div>
       </div>
     );
   }
@@ -214,6 +219,8 @@ const renderQuestionBody = (question: HomeworkTestQuestion) => {
 
 export const AssignmentQuestionsReadOnlySection: FC<AssignmentQuestionsReadOnlySectionProps> = ({
   testBlock,
+  showCorrectAnswers = true,
+  onToggleCorrectAnswers,
 }) => {
   const questions = useMemo(() => testBlock?.questions ?? [], [testBlock?.questions]);
   const totalPoints = useMemo(
@@ -235,6 +242,16 @@ export const AssignmentQuestionsReadOnlySection: FC<AssignmentQuestionsReadOnlyS
             {formatQuestionCount(questions.length)} • {formatPointsSummary(totalPoints)}
           </p>
         </div>
+        {onToggleCorrectAnswers ? (
+          <label className={styles.correctAnswersToggle}>
+            <input
+              type="checkbox"
+              checked={showCorrectAnswers}
+              onChange={(event) => onToggleCorrectAnswers(event.target.checked)}
+            />
+            <span>Показать правильные ответы</span>
+          </label>
+        ) : null}
       </div>
 
       {questions.length === 0 ? (
@@ -268,7 +285,7 @@ export const AssignmentQuestionsReadOnlySection: FC<AssignmentQuestionsReadOnlyS
                 </div>
 
                 <h3 className={styles.questionPrompt}>{question.prompt.trim() || 'Вопрос без текста'}</h3>
-                {renderQuestionBody(question)}
+                {renderQuestionBody(question, showCorrectAnswers)}
               </article>
             );
           })}

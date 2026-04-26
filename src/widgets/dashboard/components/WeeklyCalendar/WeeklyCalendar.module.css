@@ -1,6 +1,6 @@
 .root {
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   padding: 24px;
   box-shadow: none;
@@ -17,14 +17,14 @@
 .title {
   font-size: 22px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .subtitle {
   margin: 0;
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .controls {
@@ -41,9 +41,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .controlButton svg {
@@ -52,8 +54,8 @@
 }
 
 .controlButton:hover {
-  background: var(--color-slate-100);
-  color: var(--color-slate-700);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .grid {
@@ -78,7 +80,7 @@
 }
 
 .dayCard {
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   border-radius: 14px;
   padding: 12px 10px;
   min-height: 140px;
@@ -88,7 +90,9 @@
 
 .dayCardInteractive {
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .dayCardInteractive:hover {
@@ -122,19 +126,19 @@
 
 .moreButton {
   border: 1px dashed var(--color-slate-300);
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
   cursor: pointer;
   justify-self: center;
 }
 
 .moreButton:hover {
   border-color: var(--color-slate-400);
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
 }
 
 .emptyState {

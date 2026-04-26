@@ -1,5 +1,6 @@
 import { HomeworkAssignment, HomeworkBlock } from '../../../../../entities/types';
 import { resolveHomeworkAssignmentWorkflow } from '../../../../../entities/homework-assignment/model/lib/workflow';
+import { estimateHomeworkBlocksDurationMinutes } from '../../../../../entities/homework-template/model/lib/duration';
 import { formatHumanizedRelativeDurationRu } from '../../../../../shared/lib/humanizeDurationRu';
 import { pluralizeRu } from '../../../../../shared/lib/pluralizeRu';
 
@@ -200,9 +201,7 @@ export const resolveStudentHomeworkScoreValue = (assignment: HomeworkAssignment)
 export const formatStudentHomeworkScore = (score: number) =>
   Number.isInteger(score) ? `${score}/10` : `${score.toFixed(1)}/10`;
 
-export const resolveStudentHomeworkResponseTraits = (
-  assignment: HomeworkAssignment,
-): StudentHomeworkResponseTraits => {
+export const resolveStudentHomeworkResponseTraits = (assignment: HomeworkAssignment): StudentHomeworkResponseTraits => {
   const traits: StudentHomeworkResponseTraits = {
     hasTest: false,
     hasVoice: false,
@@ -237,28 +236,8 @@ export const resolveStudentHomeworkResponseTraits = (
   return traits;
 };
 
-export const resolveStudentHomeworkDurationMinutes = (assignment: HomeworkAssignment) => {
-  let minutes = 0;
-
-  assignment.contentSnapshot.forEach((block) => {
-    if (block.type === 'TEXT') {
-      const words = normalizeText(block.content).split(' ').filter(Boolean).length;
-      minutes += Math.max(4, Math.ceil(words / 16));
-    }
-    if (block.type === 'TEST') {
-      minutes += Math.max(8, block.questions.length * 2);
-    }
-    if (block.type === 'MEDIA') {
-      minutes += Math.max(3, block.attachments.length * 2);
-    }
-    if (block.type === 'STUDENT_RESPONSE') {
-      minutes += 6;
-    }
-  });
-
-  if (minutes <= 0) return 20;
-  return Math.max(5, Math.min(120, minutes));
-};
+export const resolveStudentHomeworkDurationMinutes = (assignment: HomeworkAssignment) =>
+  estimateHomeworkBlocksDurationMinutes(assignment.contentSnapshot);
 
 export const resolveStudentHomeworkDurationLabel = (assignment: HomeworkAssignment) =>
   `~${resolveStudentHomeworkDurationMinutes(assignment)} мин`;

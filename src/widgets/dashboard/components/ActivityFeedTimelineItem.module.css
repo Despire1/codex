@@ -18,7 +18,7 @@
   height: 14px;
   border-radius: 999px;
   border: 3px solid var(--color-slate-400, #94a3b8);
-  background: var(--color-white);
+  background: var(--surface-card);
   margin-top: 4px;
 }
 
@@ -32,6 +32,30 @@
 
 .dotInfo {
   border-color: var(--color-blue-600, #2563eb);
+}
+
+.dotLesson {
+  border-color: var(--accent-primary, #a3e635);
+}
+
+.dotPayment {
+  border-color: var(--color-emerald-600, #059669);
+}
+
+.dotHomework {
+  border-color: var(--color-blue-600, #2563eb);
+}
+
+.dotNotification {
+  border-color: var(--color-orange-500, #f97316);
+}
+
+.dotSettings {
+  border-color: var(--color-slate-400, #94a3b8);
+}
+
+.dotDefault {
+  border-color: var(--color-slate-400, #94a3b8);
 }
 
 .line {
@@ -60,18 +84,18 @@
 }
 
 .message {
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.35;
 }
 
 .message strong {
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .details {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.35;
 }
@@ -84,7 +108,7 @@
   padding: 6px 12px;
   border-radius: 12px;
   background: var(--accent-primary, #a3e635);
-  color: #111827;
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;

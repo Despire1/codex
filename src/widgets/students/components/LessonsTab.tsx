@@ -1,6 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { startOfDay } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { startOfDay, ru } from 'date-fns';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import {
@@ -105,7 +104,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     return () => window.clearTimeout(timer);
   }, [activeLessonActions, isLessonSheetOpen]);
 
-
   const sortedLessons = useMemo(() => {
     const sorted = [...studentLessons].sort((a, b) => a.startAt.localeCompare(b.startAt));
     return lessonSortOrder === 'desc' ? sorted.reverse() : sorted;
@@ -138,8 +136,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
     [activeLessonActions, getLessonDerivedData],
   );
 
-  const formatPriceLabel = (price?: number | null) =>
-    price === undefined || price === null ? '—' : `${price} ₽`;
+  const formatPriceLabel = (price?: number | null) => (price === undefined || price === null ? '—' : `${price} ₽`);
 
   const getRecurrenceLabel = (lesson: Lesson) =>
     lesson.isRecurring || lesson.recurrenceGroupId ? 'Повторяющееся' : 'Одиночное';
@@ -248,19 +245,16 @@ export const LessonsTab: FC<LessonsTabProps> = ({
         <div className={styles.lessonsActions}>
           <div className={styles.priceLabel}>Занятия</div>
           <LessonFiltersPopover
-              lessonPaymentFilter={lessonPaymentFilter}
-              lessonStatusFilter={lessonStatusFilter}
-              lessonDateRange={lessonDateRange}
-              onLessonPaymentFilterChange={onLessonPaymentFilterChange}
-              onLessonStatusFilterChange={onLessonStatusFilterChange}
-              onLessonDateRangeChange={onLessonDateRangeChange}
+            lessonPaymentFilter={lessonPaymentFilter}
+            lessonStatusFilter={lessonStatusFilter}
+            lessonDateRange={lessonDateRange}
+            onLessonPaymentFilterChange={onLessonPaymentFilterChange}
+            onLessonStatusFilterChange={onLessonStatusFilterChange}
+            onLessonDateRangeChange={onLessonDateRangeChange}
           />
         </div>
         <div className={styles.lessonHeaderActions}>
-          <button
-            className={controls.primaryButton}
-            onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-          >
+          <button className={controls.primaryButton} onClick={() => onCreateLesson(selectedStudentId ?? undefined)}>
             + Урок
           </button>
         </div>
@@ -296,9 +290,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                           className={styles.lessonStatusSelectMobile}
                           value={lesson.status}
                           autoFocus
-                          onChange={(event) =>
-                            onLessonStatusChange(lesson.id, event.target.value as Lesson['status'])
-                          }
+                          onChange={(event) => onLessonStatusChange(lesson.id, event.target.value as Lesson['status'])}
                           onBlur={onStopEditLessonStatus}
                         >
                           {!isPastLesson && <option value="SCHEDULED">Запланирован</option>}
@@ -315,19 +307,20 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                         </button>
                       )}
                       {awaitingConfirmation && (
-                        <Badge
-                          label="Ожидает подтверждения"
-                          variant="pending"
-                          className={styles.lessonPendingBadge}
-                        />
+                        <Badge label="Ожидает подтверждения" variant="pending" className={styles.lessonPendingBadge} />
                       )}
                       <Badge
                         label={isPaid ? 'Оплачено' : 'Не оплачено'}
                         variant={isPaid ? 'paid' : 'unpaid'}
                         className={styles.lessonPaymentChip}
-                        onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
-                        title="Отметить оплату"
                       />
+                      <button
+                        type="button"
+                        className={styles.lessonPaymentActionChip}
+                        onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
+                      >
+                        {isPaid ? 'Отменить оплату' : 'Отметить оплату'}
+                      </button>
                       <span className={styles.lessonRecurrenceTag}>{getRecurrenceLabel(lesson)}</span>
                     </div>
                     <div className={styles.lessonCardMeta}>
@@ -350,9 +343,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
             </div>
           ) : (
             <TableContainer className={styles.lessonTableContainer}>
-              {lessonListLoading && (
-                <div className={styles.loadingRow}>Обновляем список...</div>
-              )}
+              {lessonListLoading && <div className={styles.loadingRow}>Обновляем список...</div>}
               <Table size="small" aria-label="Список занятий ученика">
                 <TableHead>
                   <TableRow>
@@ -438,8 +429,6 @@ export const LessonsTab: FC<LessonsTabProps> = ({
                             label={isPaid ? 'Оплачено' : 'Не оплачено'}
                             variant={isPaid ? 'paid' : 'unpaid'}
                             className={styles.paymentBadge}
-                            onClick={() => onTogglePaid(lesson.id, selectedStudentId ?? undefined)}
-                            title="Отметить оплату"
                           />
                         </TableCell>
                         <TableCell align="right" className={styles.monoCell}>
@@ -458,10 +447,7 @@ export const LessonsTab: FC<LessonsTabProps> = ({
         ) : (
           <div className={styles.emptyState}>
             <p>Пока нет занятий. Добавьте урок.</p>
-            <button
-              className={controls.secondaryButton}
-              onClick={() => onCreateLesson(selectedStudentId ?? undefined)}
-            >
+            <button className={controls.secondaryButton} onClick={() => onCreateLesson(selectedStudentId ?? undefined)}>
               + Урок
             </button>
           </div>

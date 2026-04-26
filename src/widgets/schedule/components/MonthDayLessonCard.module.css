@@ -39,7 +39,7 @@
 }
 
 .completed .title {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .completed .timeBadge {
@@ -69,20 +69,22 @@
 }
 
 .timeBadge {
-  min-width: 74px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
   justify-content: center;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 8px 14px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--lesson-bg, #dbeafe) 78%, #ffffff);
   border: 1px solid color-mix(in srgb, var(--lesson-border, #93c5fd) 68%, #ffffff);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.timeStart {
-  font-size: 21px;
+.timeStart,
+.timeEnd {
+  font-size: 17px;
   line-height: 1;
   font-weight: 700;
   color: var(--lesson-text, #2563eb);
@@ -90,18 +92,10 @@
 }
 
 .timeDivider {
-  width: 100%;
-  height: 1px;
-  margin: 6px 0 5px;
-  background: color-mix(in srgb, var(--lesson-border, #bfdbfe) 74%, #ffffff);
-}
-
-.timeEnd {
-  font-size: 11px;
+  color: color-mix(in srgb, var(--lesson-text, #2563eb) 60%, #ffffff);
+  font-size: 15px;
   line-height: 1;
   font-weight: 600;
-  color: color-mix(in srgb, var(--lesson-text, #2563eb) 62%, #ffffff);
-  letter-spacing: 0.04em;
 }
 
 .identity {
@@ -115,7 +109,7 @@
   font-size: 18px;
   line-height: 1.2;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
@@ -123,7 +117,7 @@
   font-size: 12px;
   line-height: 1.35;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .headerControls {
@@ -204,8 +198,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #f9fafb;
-  color: #4b5563;
+  background: var(--surface-card-strong);
+  color: var(--text-secondary);
   cursor: pointer;
   transition:
     background-color 0.18s ease,
@@ -213,8 +207,8 @@
 }
 
 .homeworkBadge:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--surface-card-muted);
+  color: var(--text-primary);
 }
 
 .homeworkIcon {
@@ -237,8 +231,8 @@
 .homeworkCountBadge {
   padding: 8px 10px;
   border-radius: 10px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1;
   font-weight: 700;
@@ -251,7 +245,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1;
   font-weight: 500;
@@ -259,7 +253,7 @@
 }
 
 .linkBadge:hover {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .linkIcon {
@@ -272,8 +266,8 @@
 .canceledBadge {
   padding: 8px 10px;
   border-radius: 10px;
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1;
   font-weight: 700;
@@ -281,7 +275,7 @@
 }
 
 .canceledBadge:hover {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .completedBadge {
@@ -308,8 +302,8 @@
   flex-direction: column;
   gap: 4px;
   min-width: 180px;
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   box-shadow: 0 12px 24px var(--shadow-slate-900-16);
 }
@@ -321,12 +315,23 @@
   border-radius: 10px;
   font-size: 14px;
   text-align: left;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.actionItemHint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.3;
 }
 
 .actionItem:hover:not(:disabled) {
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
 }
 
 .actionItem:disabled {

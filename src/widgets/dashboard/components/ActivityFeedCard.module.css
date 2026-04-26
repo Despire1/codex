@@ -36,7 +36,7 @@
   border-radius: 999px;
   border: 1px solid var(--color-blue-200);
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -50,7 +50,7 @@
 }
 
 .state {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 14px;
   padding: 8px 0;
 }

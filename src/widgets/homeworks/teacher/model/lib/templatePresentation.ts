@@ -1,4 +1,5 @@
-import { HomeworkBlock, HomeworkTemplate } from '../../../../../entities/types';
+import { HomeworkTemplate } from '../../../../../entities/types';
+import { estimateHomeworkBlocksDurationMinutes } from '../../../../../entities/homework-template/model/lib/duration';
 
 export const HOMEWORK_TEMPLATE_FAVORITE_TAG = '__favorite';
 const CATEGORY_PURPLE_KEYWORDS = ['speaking', 'устн', 'говор', 'audio', 'voice'];
@@ -26,39 +27,8 @@ export const resolveHomeworkTemplateCategory = (template: HomeworkTemplate) => {
   return firstTag ?? 'Общее';
 };
 
-const estimateQuestionMinutes = (block: HomeworkBlock) => {
-  if (block.type !== 'TEST') return 0;
-  const questionsCount = Array.isArray(block.questions) ? block.questions.length : 0;
-  return Math.max(questionsCount * 2, questionsCount > 0 ? 3 : 0);
-};
-
-const estimateTextMinutes = (block: HomeworkBlock) => {
-  if (block.type !== 'TEXT') return 0;
-  const words = block.content.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.ceil(words / 120));
-};
-
-const estimateMediaMinutes = (block: HomeworkBlock) => {
-  if (block.type !== 'MEDIA') return 0;
-  const attachmentsCount = Array.isArray(block.attachments) ? block.attachments.length : 0;
-  return attachmentsCount > 0 ? attachmentsCount * 3 : 0;
-};
-
-const estimateStudentResponseMinutes = (block: HomeworkBlock) => {
-  if (block.type !== 'STUDENT_RESPONSE') return 0;
-  let score = 0;
-  if (block.allowText) score += 5;
-  if (block.allowVoice) score += 4;
-  if (block.allowFiles || block.allowDocuments || block.allowPhotos || block.allowAudio || block.allowVideo) score += 3;
-  return score;
-};
-
-export const estimateHomeworkTemplateDurationMinutes = (template: HomeworkTemplate) => {
-  const estimated = template.blocks.reduce((total, block) => {
-    return total + estimateQuestionMinutes(block) + estimateTextMinutes(block) + estimateMediaMinutes(block) + estimateStudentResponseMinutes(block);
-  }, 0);
-  return Math.max(estimated, 5);
-};
+export const estimateHomeworkTemplateDurationMinutes = (template: HomeworkTemplate) =>
+  estimateHomeworkBlocksDurationMinutes(template.blocks);
 
 export const formatHomeworkTemplateDuration = (minutes: number) => {
   if (minutes < 60) return `${minutes} мин`;
@@ -69,9 +39,7 @@ export const formatHomeworkTemplateDuration = (minutes: number) => {
 };
 
 const hasAudioAnswerInTemplate = (template: HomeworkTemplate) =>
-  template.blocks.some(
-    (block) => block.type === 'STUDENT_RESPONSE' && (block.allowVoice || block.allowAudio),
-  );
+  template.blocks.some((block) => block.type === 'STUDENT_RESPONSE' && (block.allowVoice || block.allowAudio));
 
 export const resolveHomeworkTemplateCardMeta = (template: HomeworkTemplate) => {
   if (hasAudioAnswerInTemplate(template)) {

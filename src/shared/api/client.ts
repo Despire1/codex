@@ -222,7 +222,10 @@ const parseValidationIssues = (value: unknown): FormValidationIssue[] => {
         : [];
       if (path.length === 0) return null;
       const code = typeof issue.code === 'string' && issue.code.trim().length > 0 ? issue.code : 'validation_error';
-      const message = typeof issue.message === 'string' && issue.message.trim().length > 0 ? issue.message : 'Некорректное значение поля';
+      const message =
+        typeof issue.message === 'string' && issue.message.trim().length > 0
+          ? issue.message
+          : 'Некорректное значение поля';
       const severity = issue.severity === 'warning' ? 'warning' : 'error';
       return { path, code, message, severity };
     })
@@ -246,11 +249,11 @@ export class ApiRequestError extends Error {
 export const isApiRequestError = (error: unknown): error is ApiRequestError => error instanceof ApiRequestError;
 
 const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
-  const roleHeader = typeof window !== 'undefined' ? window.localStorage.getItem('userRole') ?? undefined : undefined;
+  const roleHeader = typeof window !== 'undefined' ? (window.localStorage.getItem('userRole') ?? undefined) : undefined;
   const activeTeacherHeader =
-    typeof window !== 'undefined' ? window.localStorage.getItem('student_active_teacher_id') ?? undefined : undefined;
+    typeof window !== 'undefined' ? (window.localStorage.getItem('student_active_teacher_id') ?? undefined) : undefined;
   const activeStudentHeader =
-    typeof window !== 'undefined' ? window.localStorage.getItem('student_active_student_id') ?? undefined : undefined;
+    typeof window !== 'undefined' ? (window.localStorage.getItem('student_active_student_id') ?? undefined) : undefined;
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -316,6 +319,7 @@ export const api = {
     apiFetch<{ status: string }>('/auth/logout', {
       method: 'POST',
     }),
+  exportAccount: () => apiFetch<Record<string, unknown>>('/api/account/export'),
   bootstrap: (params?: {
     lessonsStart?: string;
     lessonsEnd?: string;
@@ -479,10 +483,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ value }),
     }),
-  adjustBalance: (
-    studentId: number,
-    payload: { delta: number; type?: string; comment?: string; createdAt?: string },
-  ) =>
+  adjustBalance: (studentId: number, payload: { delta: number; type?: string; comment?: string; createdAt?: string }) =>
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/balance`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -499,8 +500,7 @@ export const api = {
     durationMinutes: number;
     color?: LessonColor;
     meetingLink?: string | null;
-  }) =>
-    apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
+  }) => apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
   createRecurringLessons: (payload: {
     studentId?: number;
     studentIds?: number[];
@@ -522,7 +522,11 @@ export const api = {
       repeatWeekdays?: number[];
       repeatUntil?: string | null;
     },
-  ) => apiFetch<{ preview: LessonMutationPreview }>(`/api/lessons/${id}/preview`, { method: 'POST', body: JSON.stringify(payload) }),
+  ) =>
+    apiFetch<{ preview: LessonMutationPreview }>(`/api/lessons/${id}/preview`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   updateLesson: (
     id: number,
     payload: {
@@ -538,10 +542,11 @@ export const api = {
       acknowledgeRisk?: boolean;
       paymentHandling?: LessonPaymentHandling;
     },
-  ) => apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  }),
+  ) =>
+    apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
   updateLessonStatus: (id: number, status: Lesson['status']) =>
     apiFetch<{ lesson: Lesson; links?: TeacherStudent[] }>(`/api/lessons/${id}/status`, {
       method: 'PATCH',
@@ -602,9 +607,7 @@ export const api = {
     if (params?.filter) query.set('filter', params.filter);
     if (params?.date) query.set('date', params.date);
     const suffix = query.toString();
-    return apiFetch<{ events: PaymentEvent[] }>(
-      `/api/students/${studentId}/payments${suffix ? `?${suffix}` : ''}`,
-    );
+    return apiFetch<{ events: PaymentEvent[] }>(`/api/students/${studentId}/payments${suffix ? `?${suffix}` : ''}`);
   },
   getPaymentReminders: (studentId: number, params?: { limit?: number; offset?: number }) => {
     const query = new URLSearchParams();
@@ -622,13 +625,16 @@ export const api = {
     status?: HomeworkStatus;
     attachments?: HomeworkAttachment[];
     timeSpentMinutes?: number | null;
-  }) =>
-    apiFetch<{ homework: Homework }>('/api/homeworks', { method: 'POST', body: JSON.stringify(payload) }),
+  }) => apiFetch<{ homework: Homework }>('/api/homeworks', { method: 'POST', body: JSON.stringify(payload) }),
   toggleHomework: (homeworkId: number) =>
     apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}/toggle`, { method: 'PATCH' }),
   updateHomework: (homeworkId: number, payload: Partial<Homework>) =>
-    apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
-  deleteHomework: (homeworkId: number) => apiFetch<{ id: number }>(`/api/homeworks/${homeworkId}`, { method: 'DELETE' }),
+    apiFetch<{ homework: Homework }>(`/api/homeworks/${homeworkId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  deleteHomework: (homeworkId: number) =>
+    apiFetch<{ id: number }>(`/api/homeworks/${homeworkId}`, { method: 'DELETE' }),
   sendHomework: (homeworkId: number) =>
     apiFetch<{ status: string; homework: Homework }>(`/api/homeworks/${homeworkId}/send`, { method: 'POST' }),
   remindHomeworkById: (homeworkId: number) =>
@@ -845,9 +851,7 @@ export const api = {
     if (typeof params?.studentId === 'number') search.set('studentId', String(params.studentId));
     if (typeof params?.lessonId === 'number') search.set('lessonId', String(params.lessonId));
     const suffix = search.toString();
-    return apiFetch<HomeworkAssignmentsSummary>(
-      `/api/v2/homework/assignments/summary${suffix ? `?${suffix}` : ''}`,
-    );
+    return apiFetch<HomeworkAssignmentsSummary>(`/api/v2/homework/assignments/summary${suffix ? `?${suffix}` : ''}`);
   },
   createHomeworkAssignmentV2: (payload: {
     studentId: number;
@@ -905,10 +909,7 @@ export const api = {
     apiFetch<{ deletedId: number }>(`/api/v2/homework/assignments/${assignmentId}`, {
       method: 'DELETE',
     }),
-  bulkHomeworkAssignmentsV2: (payload: {
-    ids: number[];
-    action: 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
-  }) =>
+  bulkHomeworkAssignmentsV2: (payload: { ids: number[]; action: 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE' }) =>
     apiFetch<{
       action: 'SEND_NOW' | 'REMIND' | 'CANCEL_ISSUE' | 'DELETE';
       total: number;

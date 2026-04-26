@@ -217,7 +217,9 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
               <div className={styles.infoRow}>
                 <div>
                   <div className={styles.infoRowTitle}>Автоматические напоминания ученику об оплате</div>
-                  <div className={styles.infoRowDescription}>Учитываются только завершённые и неоплаченные занятия.</div>
+                  <div className={styles.infoRowDescription}>
+                    Учитываются только завершённые и неоплаченные занятия.
+                  </div>
                 </div>
                 <label className={`${controls.switch} ${styles.switchControl}`}>
                   <input
@@ -283,7 +285,10 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
                   </div>
 
                   <div className={styles.fieldGridTwo}>
-                    <div className={styles.infoRowCompact}>
+                    <div
+                      className={styles.infoRowCompact}
+                      title="Когда бот автоматически напоминает ученику об оплате — вам тоже приходит копия"
+                    >
                       <span className={styles.infoRowCompactTitle}>Уведомлять меня об авто-напоминаниях</span>
                       <label className={`${controls.switch} ${styles.switchControl}`}>
                         <input
@@ -296,7 +301,10 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
                       </label>
                     </div>
 
-                    <div className={styles.infoRowCompact}>
+                    <div
+                      className={styles.infoRowCompact}
+                      title="Когда вы сами шлёте ученику напоминание кнопкой — вам приходит копия себе"
+                    >
                       <span className={styles.infoRowCompactTitle}>Уведомлять меня о ручных напоминаниях</span>
                       <label className={`${controls.switch} ${styles.switchControl}`}>
                         <input
@@ -424,7 +432,9 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
                         <select
                           className={`${controls.input} ${styles.fieldInput}`}
                           value={teacher.homeworkOverdueReminderMaxCount}
-                          onChange={(event) => onChange({ homeworkOverdueReminderMaxCount: Number(event.target.value) })}
+                          onChange={(event) =>
+                            onChange({ homeworkOverdueReminderMaxCount: Number(event.target.value) })
+                          }
                           disabled={studentSectionDisabled}
                         >
                           {homeworkOverdueMaxOptions.map((count) => (

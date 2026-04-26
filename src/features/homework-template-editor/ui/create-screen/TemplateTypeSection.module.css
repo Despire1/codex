@@ -1,7 +1,7 @@
 .section {
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 32px;
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   box-shadow: 0 14px 32px var(--shadow-slate-900-06);
   padding: 30px;
 }
@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 24px;
   line-height: 1;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .grid {
@@ -41,13 +41,15 @@
   border: 2px solid var(--color-gray-200);
   border-radius: 18px;
   padding: 16px;
-  background: var(--color-white);
+  background: var(--surface-card);
   cursor: pointer;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: border-color 0.2s ease, transform 0.15s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.15s ease;
 }
 
 .card:hover {
@@ -95,19 +97,19 @@
 }
 
 .cardGray .cardIcon {
-  background: var(--color-gray-100);
-  color: var(--color-slate-600);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .cardTitle {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .cardDescription {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   line-height: 1.35;
 }
 

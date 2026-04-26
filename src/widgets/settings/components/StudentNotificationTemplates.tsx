@@ -44,13 +44,13 @@ type EmojiMartSelection = {
   native?: string;
 };
 
-const variableLabels: Record<string, { label: string; code: string }> = {
-  student_name: { label: 'Имя ученика', code: '{{student_name}}' },
-  lesson_date: { label: 'Дата', code: '{{lesson_date}}' },
-  lesson_time: { label: 'Время', code: '{{lesson_time}}' },
-  lesson_datetime: { label: 'Дата и время', code: '{{lesson_datetime}}' },
-  lesson_price: { label: 'Цена занятия', code: '{{lesson_price}}' },
-  lesson_link: { label: 'Ссылка на занятие', code: '{{lesson_link}}' },
+const variableLabels: Record<string, { label: string; code: string; example: string }> = {
+  student_name: { label: 'Имя ученика', code: '{{student_name}}', example: 'Ирина' },
+  lesson_date: { label: 'Дата', code: '{{lesson_date}}', example: '5 сентября' },
+  lesson_time: { label: 'Время', code: '{{lesson_time}}', example: '18:00' },
+  lesson_datetime: { label: 'Дата и время', code: '{{lesson_datetime}}', example: '5 сентября, 18:00' },
+  lesson_price: { label: 'Цена занятия', code: '{{lesson_price}}', example: '1500 ₽' },
+  lesson_link: { label: 'Ссылка на занятие', code: '{{lesson_link}}', example: 'https://meet.google.com/...' },
 };
 
 const resolveTemplateValue = (value: string | null, fallback: string) => (value?.trim() ? value : fallback);
@@ -112,9 +112,7 @@ const renderPreview = (value: string, example: Record<string, string>, allowedVa
   if (nodes.length === 0) {
     return value;
   }
-  return nodes.map((node, index) =>
-    typeof node === 'string' ? <span key={`text-${index}`}>{node}</span> : node,
-  );
+  return nodes.map((node, index) => (typeof node === 'string' ? <span key={`text-${index}`}>{node}</span> : node));
 };
 
 const templateConfigs: TemplateConfig[] = [
@@ -287,7 +285,11 @@ const TemplateEditor: FC<{
               if (isMobile) return;
               event.dataTransfer.setData('text/plain', variableLabels[variable]?.code ?? `{{${variable}}}`);
             }}
-            title={`Вставит ${variableLabels[variable]?.code ?? `{{${variable}}}`} в позицию курсора`}
+            title={
+              variableLabels[variable]?.example
+                ? `Пример: ${variableLabels[variable].example}`
+                : `Вставит ${variableLabels[variable]?.code ?? `{{${variable}}}`} в позицию курсора`
+            }
             data-testid={`student-notification-${config.id}-badge-${variable}`}
           >
             <span className={styles.variableLabel}>{variableLabels[variable]?.label ?? variable}</span>
@@ -372,9 +374,7 @@ const TemplateEditor: FC<{
             </div>
           </div>
           <div className={styles.previewBox} data-testid={`student-notification-${config.id}-preview`}>
-            <div className={styles.previewText}>
-              {renderPreview(value, previewExample, config.allowedVariables)}
-            </div>
+            <div className={styles.previewText}>{renderPreview(value, previewExample, config.allowedVariables)}</div>
           </div>
         </div>
       </div>
@@ -608,9 +608,7 @@ export const StudentNotificationTemplates: FC<StudentNotificationTemplatesProps>
               onExampleChange={(value) => setExamples((prev) => ({ ...prev, [config.id]: value }))}
               onSaveNow={onSaveNow}
               saveField={config.field}
-              examples={
-                config.id === 'lesson' ? STUDENT_LESSON_TEMPLATE_EXAMPLES : STUDENT_PAYMENT_TEMPLATE_EXAMPLES
-              }
+              examples={config.id === 'lesson' ? STUDENT_LESSON_TEMPLATE_EXAMPLES : STUDENT_PAYMENT_TEMPLATE_EXAMPLES}
             />
           </div>
         ))}

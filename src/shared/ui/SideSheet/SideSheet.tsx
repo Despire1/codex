@@ -18,20 +18,19 @@ export const SideSheet = ({ isOpen, onClose, children, className = '' }: SideShe
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const frameId = window.requestAnimationFrame(() => {
+      const timer = window.setTimeout(() => {
         setIsPresented(true);
-      });
-      return () => window.cancelAnimationFrame(frameId);
+      }, 16);
+      return () => window.clearTimeout(timer);
     }
 
     setIsPresented(false);
-    if (!isMounted) return undefined;
     const timerId = window.setTimeout(() => {
       setIsMounted(false);
     }, ANIMATION_DURATION);
 
     return () => window.clearTimeout(timerId);
-  }, [isMounted, isOpen]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

@@ -3,7 +3,7 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   overflow: hidden;
 }
 
@@ -33,9 +33,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #4b5563;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -44,20 +44,20 @@
 
 .backButton:hover {
   border-color: #dbe2ea;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
 }
 
 .backTitle {
   margin: 0;
   font-size: 20px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .heroCard {
   border: 1px solid #edf1f7;
   border-radius: 28px;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 20px;
   margin-bottom: 16px;
 }
@@ -100,7 +100,7 @@
   font-size: 32px;
   line-height: 1.05;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .heroTitleRow {
@@ -123,16 +123,16 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
 .heroUsernameLabel {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .heroUsernameValue {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .heroUsernameButton {
@@ -150,7 +150,7 @@
 
 .heroUsernameButton:hover,
 .heroUsernameButton:focus-visible {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
   border-color: #bfdbfe;
 }
 
@@ -172,13 +172,34 @@
 }
 
 .heroStatusBadge {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
 }
 
 .heroInactiveBadge {
-  background: #eef2f7;
-  color: #475569;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
+}
+
+.heroInviteButton {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 999px;
+  background: var(--color-white, #ffffff);
+  color: var(--color-slate-700, #334155);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.heroInviteButton:hover {
+  background: var(--color-slate-50, #f8fafc);
+  border-color: var(--color-slate-300, #cbd5e1);
 }
 
 .heroDebtBadge {
@@ -193,13 +214,13 @@
 }
 
 .heroStatusPaused {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
 }
 
 .heroStatusCompleted {
   background: #fff7ed;
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .heroContactsRow {
@@ -208,7 +229,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 18px;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .contactItem {
@@ -223,7 +244,7 @@
 .contactItemStrong {
   font-size: 15px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .contactItemInteractive {
@@ -239,7 +260,7 @@
 }
 
 .contactItemInteractive:hover {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .heroActions {
@@ -270,33 +291,33 @@
 }
 
 .secondaryAction {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  color: #4b5563;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
 }
 
 .secondaryAction:hover {
-  background: #f8fafc;
+  background: var(--surface-card-strong);
   border-color: #d8dee7;
 }
 
 .primaryAction {
   border: none;
-  background: #111111;
-  color: #ffffff;
+  background: var(--accent-primary, #a3e635);
+  color: var(--text-primary);
 }
 
 .primaryAction:hover {
-  background: #1f2937;
+  background: var(--accent-primary-hover, #94d82d);
 }
 
 .menuAction {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #4b5563;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -304,14 +325,14 @@
 }
 
 .menuAction:hover {
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
   border-color: #d8dee7;
 }
 
 .heroStatsGrid {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--border-subtle);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
@@ -335,29 +356,46 @@
   transform: scale(1.02);
 }
 
+.heroStatInput {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+  color: #2563eb;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 10px;
+  padding: 4px 8px;
+  width: 140px;
+  outline: none;
+}
+
+.heroStatInput:focus {
+  border-color: var(--accent-primary, #a3e635);
+  box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.35);
+}
+
 .heroStatValue {
   font-size: 30px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .heroStatLabel {
   margin-top: 6px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .heroStatGreen {
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .heroStatBlue {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .heroStatViolet {
-  color: #6d4cf8;
+  color: var(--status-violet-text);
 }
 
 .heroStatOrange {
@@ -369,12 +407,12 @@
 }
 
 .heroStatDangerButton:hover .heroStatDanger {
-  color: #b91c1c;
+  color: var(--status-red-text);
 }
 
 .debtPopover {
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   box-shadow: 0 18px 40px var(--shadow-slate-900-16);
   padding: 14px;
@@ -408,7 +446,7 @@
 .sideCard {
   border: 1px solid #edf1f7;
   border-radius: 28px;
-  background: #ffffff;
+  background: var(--surface-card);
 }
 
 .tabsCard {
@@ -440,7 +478,7 @@
   border-radius: 12px;
   padding: 10px 14px;
   background: transparent;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 800;
   display: inline-flex;
@@ -453,8 +491,8 @@
 }
 
 .tabButton:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--surface-card-muted);
+  color: var(--text-primary);
 }
 
 .tabButtonActive {
@@ -464,7 +502,7 @@
 
 .tabButtonActive:hover {
   background: #e5e7eb;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .viewAllButton {
@@ -518,6 +556,78 @@
   scrollbar-gutter: stable;
 }
 
+.paymentsSummary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'tabs add'
+    'totals totals';
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--surface-card-strong, #f9fafb);
+}
+
+.paymentsPeriodTabs {
+  grid-area: tabs;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-card, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+}
+
+.paymentsPeriodTab {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.paymentsPeriodTabActive {
+  background: #111;
+  color: #fff;
+}
+
+.paymentsAddButton {
+  grid-area: add;
+  border: none;
+  background: var(--accent-primary, #a3e635);
+  color: #111;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.paymentsAddButton:hover {
+  background: #94d82d;
+}
+
+.paymentsTotalRow {
+  grid-area: totals;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary, #4b5563);
+}
+
+.paymentsTotalRow strong {
+  color: var(--text-primary, #111);
+}
+
 .paymentsListStack::-webkit-scrollbar {
   width: 8px;
 }
@@ -538,7 +648,7 @@
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
@@ -567,9 +677,9 @@
 }
 
 .activityCard {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   border-radius: 16px;
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   padding: 14px;
 }
 
@@ -589,8 +699,8 @@
 }
 
 .activityMuted {
-  background: #f9fafb;
-  border-color: #e5e7eb;
+  background: var(--surface-card-strong);
+  border-color: var(--border-default);
 }
 
 .activityHeader,
@@ -605,13 +715,13 @@
   margin: 0;
   font-size: 14px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .activitySubtitle {
   margin: 3px 0 0;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .activityRecipient {
@@ -632,27 +742,27 @@
   font-size: 11px;
   font-weight: 800;
   background: #e5e7eb;
-  color: #374151;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .statusPaid {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statusCharge {
   background: #fff7ed;
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .statusPending {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .paymentEventCard {
-  background: #ffffff;
+  background: var(--surface-card);
 }
 
 .paymentEventMain {
@@ -685,7 +795,7 @@
   font-size: 18px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -696,18 +806,18 @@
   gap: 6px;
   font-size: 12px;
   line-height: 1.45;
-  color: #6b7280;
+  color: var(--text-muted);
   min-width: 0;
   flex: 1;
 }
 
 .paymentMetaLabel {
   font-weight: 800;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .paymentComment {
-  color: #475569;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -728,19 +838,19 @@
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .activityActionButton {
   border: none;
   background: transparent;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
   font-size: 12px;
   font-weight: 800;
 }
 
 .lessonCard {
-  background: #ffffff;
+  background: var(--surface-card);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -750,7 +860,7 @@
 .lessonCard:hover {
   transform: translateY(-1px);
   border-color: #dbe2ea;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 28px -9px rgba(15, 23, 42, 0.08);
 }
 
 .lessonIconWrap {
@@ -770,12 +880,12 @@
 
 .lessonIconCompleted {
   background: rgba(34, 197, 94, 0.14);
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .lessonIconCanceled {
   background: rgba(148, 163, 184, 0.16);
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .lessonHeaderMain {
@@ -792,19 +902,26 @@
   align-self: flex-start;
   gap: 6px;
   margin-left: 12px;
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  opacity: 0.55;
+  pointer-events: auto;
+  transition: opacity 0.18s ease;
 }
 
-.lessonCard:hover .lessonQuickActions,
-.lessonCard:focus-within .lessonQuickActions {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+@media (hover: hover) and (pointer: fine) {
+  .lessonQuickActions {
+    opacity: 0.4;
+  }
+
+  .lessonCard:hover .lessonQuickActions,
+  .lessonCard:focus-within .lessonQuickActions {
+    opacity: 1;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .lessonQuickActions {
+    opacity: 1;
+  }
 }
 
 .lessonActionButton {
@@ -816,7 +933,7 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-muted);
   cursor: pointer;
   transition:
     transform 0.18s ease,
@@ -826,8 +943,8 @@
 
 .lessonActionButton:hover {
   transform: translateY(-1px);
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--surface-card-muted);
+  color: var(--text-primary);
 }
 
 .lessonActionButton:disabled {
@@ -838,7 +955,7 @@
 
 .lessonActionButtonDanger:hover {
   background: rgba(255, 241, 242, 0.92);
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .lessonActionButtonNeutral:hover {
@@ -885,6 +1002,77 @@
     opacity 0.18s ease;
 }
 
+.lessonActionButtonPay {
+  color: #4d7c0f;
+}
+
+.lessonActionButtonPay:hover:not(:disabled) {
+  background: rgba(163, 230, 53, 0.18);
+  border-color: var(--accent-primary, #a3e635);
+  color: #365314;
+}
+
+.lessonActionButtonPayRevert {
+  color: #b91c1c;
+}
+
+.lessonActionButtonPayRevert:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.lessonPaymentAction {
+  border: 1px solid var(--accent-primary, #a3e635);
+  background: rgba(163, 230, 53, 0.16);
+  color: #365314;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.lessonPaymentAction::before {
+  content: '✓';
+  margin-right: 4px;
+  font-weight: 800;
+}
+
+.lessonPaymentAction:hover {
+  transform: translateY(-1px);
+  background: rgba(163, 230, 53, 0.32);
+  border-color: #84cc16;
+}
+
+.lessonPaymentActionRevert {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.lessonPaymentActionRevert::before {
+  content: '×';
+  font-size: 14px;
+  line-height: 1;
+}
+
+.lessonPaymentActionRevert:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+.lessonPaymentAction:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.lessonPaymentAction:focus-visible {
+  outline: 2px solid var(--accent-primary, #a3e635);
+  outline-offset: 2px;
+}
+
 .lessonPaymentButton:hover {
   transform: translateY(-1px);
   filter: saturate(1.06);
@@ -902,22 +1090,22 @@
 
 .lessonStatusBadge_scheduled {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .lessonStatusBadge_completed {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .lessonStatusBadge_canceled {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .lessonPaymentBadge_unpaid {
   background: #fff7ed;
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .lessonPaymentBadge_partial {
@@ -932,12 +1120,12 @@
 
 .lessonPaymentBadge_paid {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .lessonMetaBadge {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
   max-width: 100%;
   white-space: normal;
   line-height: 1.25;
@@ -975,7 +1163,7 @@
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .tabEmpty {
@@ -983,8 +1171,61 @@
   border-radius: 16px;
   padding: 20px;
   text-align: center;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 13px;
+}
+
+.homeworkEmptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+  border: 1px dashed #cfd8e6;
+  border-radius: 20px;
+  text-align: center;
+}
+
+.homeworkEmptyTitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-secondary, #4b5563);
+}
+
+.homeworkEmptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.homeworkEmptyPrimary,
+.homeworkEmptySecondary {
+  border: none;
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.homeworkEmptyPrimary {
+  background: var(--accent-primary, #a3e635);
+  color: #111;
+}
+
+.homeworkEmptyPrimary:hover {
+  background: #94d82d;
+}
+
+.homeworkEmptySecondary {
+  background: transparent;
+  color: var(--text-primary, #111);
+  border: 1px solid var(--border-default, #e5e7eb);
+}
+
+.homeworkEmptySecondary:hover {
+  background: var(--surface-card-strong, #f8fafc);
 }
 
 .sideCard {
@@ -1020,24 +1261,24 @@
 .reminderLabel {
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .reminderHelper {
   margin-top: 4px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .reminderHint {
   margin: 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .actionsMenu {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -1053,15 +1294,15 @@
   text-align: left;
   cursor: pointer;
   font-size: 13px;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .actionsMenu button:hover {
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
 }
 
 .dangerButton {
-  color: #b91c1c !important;
+  color: var(--status-red-text) !important;
 }
 
 .menuSeparator {
@@ -1092,19 +1333,19 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .sideSubtitle {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .chartWrap {
   border-radius: 14px;
-  border: 1px solid #eef2f7;
-  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
   padding: 8px 8px 2px;
 }
 
@@ -1119,7 +1360,7 @@
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -1129,7 +1370,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .quickStatsList {
@@ -1144,11 +1385,11 @@
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .quickStatsList strong {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 13px;
 }
 
@@ -1186,19 +1427,19 @@
 
 .noteCard {
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   padding: 10px;
 }
 
 .noteCard p {
   margin: 0 0 6px;
   font-size: 12px;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .noteCard span {
   font-size: 10px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .noteWarning {

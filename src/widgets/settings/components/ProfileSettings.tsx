@@ -10,9 +10,16 @@ interface ProfileSettingsProps {
   timeZoneOptions: { value: string; label: string }[];
   onChange: (patch: Partial<Teacher>) => void;
   initials: string;
+  saveStatus?: 'idle' | 'saving' | 'error';
 }
 
-export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOptions, onChange, initials }) => {
+export const ProfileSettings: FC<ProfileSettingsProps> = ({
+  teacher,
+  timeZoneOptions,
+  onChange,
+  initials,
+  saveStatus = 'idle',
+}) => {
   const usernameLabel = teacher.username ? `@${teacher.username}` : 'не указан';
   const [emailValue, setEmailValue] = useState(teacher.receiptEmail ?? '');
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -58,7 +65,14 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOpt
           </div>
           <div className={styles.sectionHeaderCopy}>
             <h2 className={styles.sectionHeading}>Основная информация</h2>
-            <p className={styles.sectionDescription}>Данные вашего профиля</p>
+            <p className={styles.sectionDescription}>
+              Данные вашего профиля.{' '}
+              {saveStatus === 'saving'
+                ? 'Сохраняем…'
+                : saveStatus === 'error'
+                  ? 'Не удалось сохранить — проверьте подключение.'
+                  : 'Изменения применяются автоматически.'}
+            </p>
           </div>
         </div>
 
@@ -91,7 +105,9 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOpt
             <div className={styles.readonlyFieldBlock}>
               <label className={styles.fieldLabel}>Telegram username</label>
               <div className={`${styles.readonlyField} ${styles.readonlyFieldAccent}`}>{usernameLabel}</div>
-              <p className={styles.readonlyHint}>Только для чтения</p>
+              <p className={styles.readonlyHint}>
+                Только для чтения. Имя приходит из Telegram и обновляется автоматически при следующем входе.
+              </p>
             </div>
           </div>
         </div>
@@ -115,7 +131,9 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({ teacher, timeZoneOpt
             {emailError ? (
               <div className={styles.errorText}>{emailError}</div>
             ) : (
-              <div className={styles.fieldHint}>Будет использоваться для отправки чеков.</div>
+              <div className={styles.fieldHint}>
+                Сюда придут чеки YooKassa за оплату подписки TeacherBot. Не используется для уведомлений ученикам.
+              </div>
             )}
           </div>
 

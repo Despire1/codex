@@ -33,6 +33,25 @@ const sanitizeTelegramUsername = (value: string) => {
   return withoutAt.replace(/[^a-zA-Z0-9_]/g, '');
 };
 
+const formatPhoneInput = (value: string) => {
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('8') && digits.length <= 11) {
+    digits = '7' + digits.slice(1);
+  }
+  if (!digits) return '';
+  if (!digits.startsWith('7')) {
+    digits = '7' + digits;
+  }
+  digits = digits.slice(0, 11);
+  const parts = ['+7'];
+  if (digits.length > 1) parts.push(' (' + digits.slice(1, Math.min(4, digits.length)));
+  if (digits.length >= 4) parts[parts.length - 1] += ')';
+  if (digits.length > 4) parts.push(' ' + digits.slice(4, Math.min(7, digits.length)));
+  if (digits.length > 7) parts.push('-' + digits.slice(7, Math.min(9, digits.length)));
+  if (digits.length > 9) parts.push('-' + digits.slice(9, 11));
+  return parts.join('');
+};
+
 const UserPlusIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 640 512" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M96 128a128 128 0 1 1 256 0A128 128 0 1 1 96 128zM0 482.3C0 383.8 79.8 304 178.3 304h91.4C368.2 304 448 383.8 448 482.3c0 16.4-13.3 29.7-29.7 29.7H29.7C13.3 512 0 498.7 0 482.3zM504 312V248H440c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V136c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H552v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z" />
@@ -199,14 +218,10 @@ export const StudentModal: FC<StudentModalProps> = ({
                 }
               />
             </div>
-            <p className={styles.fieldHint}>
-              Нужно для Telegram-уведомлений. Без username ученик получит ссылку на WebApp другим способом.
-            </p>
+            <p className={styles.fieldHint}>Необязательно. Используется для Telegram-уведомлений.</p>
           </div>
 
-          <div
-            className={`${styles.field} ${highlightedField === 'price' ? styles.fieldHighlighted : ''}`}
-          >
+          <div className={`${styles.field} ${highlightedField === 'price' ? styles.fieldHighlighted : ''}`}>
             <label className={styles.label} htmlFor="student-price">
               Цена занятия <span className={styles.requiredMark}>*</span>
             </label>
@@ -221,7 +236,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 type="number"
                 min={0}
                 required
-                placeholder="1500"
+                placeholder="например, 1500"
                 value={draft.pricePerLesson}
                 disabled={isSubmitting}
                 onChange={(event) => onDraftChange({ ...draft, pricePerLesson: event.target.value })}
@@ -281,7 +296,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                   placeholder="+7 (999) 123-45-67"
                   value={draft.phone}
                   disabled={isSubmitting}
-                  onChange={(event) => onDraftChange({ ...draft, phone: event.target.value })}
+                  onChange={(event) => onDraftChange({ ...draft, phone: formatPhoneInput(event.target.value) })}
                 />
               </div>
             </div>
@@ -339,8 +354,18 @@ export const StudentModal: FC<StudentModalProps> = ({
           </button>
           <button type="submit" className={styles.submitButton} disabled={isSubmitting}>
             <span className={styles.submitButtonContent}>
-              {isSubmitting ? <span className={styles.submitSpinner} aria-hidden /> : <CheckIcon className={styles.submitButtonIcon} />}
-              {isSubmitting ? (isEditing ? 'Сохраняем...' : 'Добавляем...') : isEditing ? 'Сохранить изменения' : 'Добавить ученика'}
+              {isSubmitting ? (
+                <span className={styles.submitSpinner} aria-hidden />
+              ) : (
+                <CheckIcon className={styles.submitButtonIcon} />
+              )}
+              {isSubmitting
+                ? isEditing
+                  ? 'Сохраняем...'
+                  : 'Добавляем...'
+                : isEditing
+                  ? 'Сохранить изменения'
+                  : 'Добавить ученика'}
             </span>
           </button>
         </div>
@@ -350,10 +375,13 @@ export const StudentModal: FC<StudentModalProps> = ({
 
   if (variant === 'sheet') {
     return (
-      <BottomSheet isOpen={open} onClose={() => {
-        if (isSubmitting) return;
-        onClose();
-      }}>
+      <BottomSheet
+        isOpen={open}
+        onClose={() => {
+          if (isSubmitting) return;
+          onClose();
+        }}
+      >
         {modalContent}
       </BottomSheet>
     );
@@ -362,10 +390,13 @@ export const StudentModal: FC<StudentModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className={modalStyles.modalOverlay} onClick={() => {
-      if (isSubmitting) return;
-      onClose();
-    }}>
+    <div
+      className={modalStyles.modalOverlay}
+      onClick={() => {
+        if (isSubmitting) return;
+        onClose();
+      }}
+    >
       {modalContent}
     </div>
   );

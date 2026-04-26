@@ -21,7 +21,11 @@ type StudentHomeworkStatsSectionProps = {
   loading: boolean;
 };
 
-export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> = ({ assignments, summary, loading }) => {
+export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> = ({
+  assignments,
+  summary,
+  loading,
+}) => {
   const stats = useMemo(
     () => buildStudentHomeworkReferenceDashboardStats(assignments, summary),
     [assignments, summary],
@@ -38,24 +42,32 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
             </div>
             <h3 className={styles.value}>{loading ? '—' : stats.activeCount}</h3>
             <p className={styles.label}>Активных заданий</p>
-            <div className={styles.metaRow}>
-              <span className={styles.urgentBadge}>
-                <FontAwesomeIcon icon={faCircle} />
-                {loading ? '—' : `${stats.overdueCount} срочное`}
-              </span>
-            </div>
+            {!loading && stats.overdueCount > 0 ? (
+              <div className={styles.metaRow}>
+                <span className={styles.urgentBadge}>
+                  <FontAwesomeIcon icon={faCircle} />
+                  {stats.overdueCount} срочное
+                </span>
+              </div>
+            ) : null}
           </div>
 
-          <div className={styles.cardAside}>
-            <div className={styles.metricBox}>
-              <div className={styles.metricValue}>{loading ? '—' : stats.newCount}</div>
-              <div className={styles.metricLabel}>Новых</div>
+          {!loading && (stats.newCount > 0 || stats.inProgressCount > 0) ? (
+            <div className={styles.cardAside}>
+              {stats.newCount > 0 ? (
+                <div className={styles.metricBox}>
+                  <div className={styles.metricValue}>{stats.newCount}</div>
+                  <div className={styles.metricLabel}>Новых</div>
+                </div>
+              ) : null}
+              {stats.inProgressCount > 0 ? (
+                <div className={styles.metricBox}>
+                  <div className={styles.metricValueAccent}>{stats.inProgressCount}</div>
+                  <div className={styles.metricLabel}>В работе</div>
+                </div>
+              ) : null}
             </div>
-            <div className={styles.metricBox}>
-              <div className={styles.metricValueAccent}>{loading ? '—' : stats.inProgressCount}</div>
-              <div className={styles.metricLabel}>В работе</div>
-            </div>
-          </div>
+          ) : null}
         </div>
       </article>
 
@@ -76,17 +88,11 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
           </div>
 
           <div className={styles.cardAside}>
-            <div
-              className={`${styles.metricBox} ${styles.metricBlue}`}
-              title="Средний балл по проверенным заданиям"
-            >
-              <div className={styles.metricBlueValue}>{loading ? '—' : stats.averageScore?.toFixed(1) ?? '—'}</div>
+            <div className={`${styles.metricBox} ${styles.metricBlue}`} title="Средний балл по проверенным заданиям">
+              <div className={styles.metricBlueValue}>{loading ? '—' : (stats.averageScore?.toFixed(1) ?? '—')}</div>
               <div className={styles.metricBlueLabel}>Средний балл</div>
             </div>
-            <div
-              className={`${styles.metricBox} ${styles.metricPurple}`}
-              title="Дней подряд без пропусков"
-            >
+            <div className={`${styles.metricBox} ${styles.metricPurple}`} title="Дней подряд без пропусков">
               <div className={styles.metricPurpleValue}>{loading ? '—' : stats.streakDays}</div>
               <div className={styles.metricPurpleLabel}>Дней подряд</div>
             </div>
@@ -94,46 +100,52 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
         </div>
       </article>
 
-      <article className={`${styles.card} ${styles.cardPerformance}`}>
-        <div className={styles.cardContent}>
-          <div className={styles.cardMain}>
-            <div className={`${styles.iconWrap} ${styles.iconWrapDark}`}>
-              <FontAwesomeIcon icon={faTrophy} />
-            </div>
-            <h3 className={styles.valueDark}>{loading ? '—' : `${stats.performancePercent}%`}</h3>
-            <p className={styles.labelBlack}>Успеваемость</p>
-            <div className={styles.awardsRow}>
-              <div className={styles.awardsIcons}>
-                <span className={styles.awardsIcon}>
-                  <FontAwesomeIcon icon={faStar} />
-                </span>
-                <span className={styles.awardsIcon}>
-                  <FontAwesomeIcon icon={faMedal} />
-                </span>
-                <span className={styles.awardsIcon}>
-                  <FontAwesomeIcon icon={faFire} />
-                </span>
+      {stats.hasGamificationData ? (
+        <article className={`${styles.card} ${styles.cardPerformance}`}>
+          <div className={styles.cardContent}>
+            <div className={styles.cardMain}>
+              <div className={`${styles.iconWrap} ${styles.iconWrapDark}`}>
+                <FontAwesomeIcon icon={faTrophy} />
               </div>
-              <span className={styles.awardsText}>{loading ? '—' : `${stats.awardsCount} награды`}</span>
+              <h3 className={styles.valueDark}>
+                {loading ? '—' : stats.performancePercent > 0 ? `${stats.performancePercent}%` : '—'}
+              </h3>
+              <p className={styles.labelBlack}>Успеваемость</p>
+              {stats.awardsCount > 0 ? (
+                <div className={styles.awardsRow}>
+                  <div className={styles.awardsIcons}>
+                    <span className={styles.awardsIcon}>
+                      <FontAwesomeIcon icon={faStar} />
+                    </span>
+                    <span className={styles.awardsIcon}>
+                      <FontAwesomeIcon icon={faMedal} />
+                    </span>
+                    <span className={styles.awardsIcon}>
+                      <FontAwesomeIcon icon={faFire} />
+                    </span>
+                  </div>
+                  <span className={styles.awardsText}>{loading ? '—' : `${stats.awardsCount} награды`}</span>
+                </div>
+              ) : null}
             </div>
-          </div>
 
-          <div className={styles.cardAsideCompact}>
-            <div className={styles.metricDarkBox}>
-              <div className={styles.metricDarkValue}>{loading ? '—' : stats.groupRankLabel}</div>
-              <div className={styles.metricDarkLabel}>В группе</div>
-            </div>
-            <div className={styles.metricDarkBox}>
-              <div className={styles.metricDarkValue}>{loading ? '—' : stats.levelLabel}</div>
-              <div className={styles.metricDarkLabel}>Уровень</div>
-            </div>
-            <div className={styles.metricDarkBox}>
-              <div className={styles.metricDarkValue}>{loading ? '—' : stats.xp}</div>
-              <div className={styles.metricDarkLabel}>XP</div>
+            <div className={styles.cardAsideCompact}>
+              <div className={styles.metricDarkBox}>
+                <div className={styles.metricDarkValue}>{loading ? '—' : stats.groupRankLabel}</div>
+                <div className={styles.metricDarkLabel}>В группе</div>
+              </div>
+              <div className={styles.metricDarkBox}>
+                <div className={styles.metricDarkValue}>{loading ? '—' : stats.levelLabel}</div>
+                <div className={styles.metricDarkLabel}>Уровень</div>
+              </div>
+              <div className={styles.metricDarkBox}>
+                <div className={styles.metricDarkValue}>{loading ? '—' : stats.xp}</div>
+                <div className={styles.metricDarkLabel}>XP</div>
+              </div>
             </div>
           </div>
-        </div>
-      </article>
+        </article>
+      ) : null}
     </section>
   );
 };

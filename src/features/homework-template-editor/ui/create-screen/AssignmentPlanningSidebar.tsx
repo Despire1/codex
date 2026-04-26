@@ -6,7 +6,6 @@ import { useTimeZone } from '../../../../shared/lib/timezoneContext';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { AdaptivePopover } from '../../../../shared/ui/AdaptivePopover/AdaptivePopover';
 import {
-  HomeworkBookOpenIcon,
   HomeworkCheckIcon,
   HomeworkChevronDownIcon,
   HomeworkRobotIcon,
@@ -25,7 +24,11 @@ import {
   normalizeHomeworkTimerDurationMinutes,
 } from '../../../../entities/homework-template/model/lib/quizSettings';
 import { HomeworkQuizCapabilities } from '../../../../entities/homework-template/model/lib/quizProgress';
-import { createQuickDeadlineValue, toLocalDateTimeValue, toUtcIsoFromLocal } from '../../../homework-assign/model/lib/assignmentStarter';
+import {
+  createQuickDeadlineValue,
+  toLocalDateTimeValue,
+  toUtcIsoFromLocal,
+} from '../../../homework-assign/model/lib/assignmentStarter';
 import controls from '../../../../shared/styles/controls.module.css';
 import {
   AssignmentStudentOption,
@@ -40,6 +43,7 @@ type FutureLessonRef = Pick<Lesson, 'id' | 'startAt' | 'durationMinutes'>;
 interface AssignmentPlanningSidebarProps {
   surface?: 'card' | 'plain';
   assignment: HomeworkEditorAssignmentContext;
+  assignmentTitle?: string;
   students: AssignmentStudentOption[];
   quizSettings: HomeworkTemplateQuizSettings;
   quizCapabilities: HomeworkQuizCapabilities;
@@ -52,12 +56,36 @@ interface AssignmentPlanningSidebarProps {
   cancelIssueSubmitting?: boolean;
   onChange: (next: HomeworkEditorAssignmentContext) => void;
   onQuizSettingsChange: (next: HomeworkTemplateQuizSettings) => void;
+  onAlignTitle?: () => void;
   onCancelIssue?: () => void;
 }
+
+const findMismatchedStudentInTitle = (
+  title: string,
+  currentStudentId: number | null,
+  students: AssignmentStudentOption[],
+): AssignmentStudentOption | null => {
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+  const haystack = trimmed.toLocaleLowerCase('ru-RU');
+  for (const student of students) {
+    if (currentStudentId !== null && student.id === currentStudentId) continue;
+    const firstName = (student.name ?? '').trim().split(/\s+/)[0] ?? '';
+    if (firstName.length < 3) continue;
+    const stem = firstName.toLocaleLowerCase('ru-RU').slice(0, Math.max(3, firstName.length - 2));
+    const stemPattern = new RegExp(
+      `(^|[^a-zа-яё])${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[a-zа-яё]{0,3}([^a-zа-яё]|$)`,
+      'iu',
+    );
+    if (stemPattern.test(haystack)) return student;
+  }
+  return null;
+};
 
 export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
   surface = 'card',
   assignment,
+  assignmentTitle = '',
   students,
   quizSettings,
   quizCapabilities,
@@ -70,6 +98,7 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
   cancelIssueSubmitting = false,
   onChange,
   onQuizSettingsChange,
+  onAlignTitle,
   onCancelIssue,
 }) => {
   const timeZone = useTimeZone();
@@ -83,6 +112,15 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
     () => students.find((student) => student.id === assignment.studentId) ?? null,
     [assignment.studentId, students],
   );
+  const titleMismatchedStudent = useMemo(
+    () => findMismatchedStudentInTitle(assignmentTitle, assignment.studentId, students),
+    [assignment.studentId, assignmentTitle, students],
+  );
+  const isDeadlineInPast = useMemo(() => {
+    if (!assignment.deadlineAt) return false;
+    const ts = new Date(assignment.deadlineAt).getTime();
+    return Number.isFinite(ts) && ts < Date.now();
+  }, [assignment.deadlineAt]);
   const selectedStudentAvatarColor = useMemo(
     () => resolveAssignmentStudentOptionAvatarColor(selectedStudent?.uiColor),
     [selectedStudent?.uiColor],
@@ -262,7 +300,7 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
               </div>
               <div className={styles.studentMeta}>
                 <strong>{selectedStudent?.name ?? 'Выберите ученика'}</strong>
-                <span>{selectedStudent?.level?.trim() || 'Без уровня'}</span>
+                {selectedStudent ? <span>{selectedStudent.level?.trim() || 'Уровень не указан'}</span> : null}
               </div>
               <HomeworkChevronDownIcon
                 size={12}
@@ -308,7 +346,9 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
                   </span>
                   <span className={styles.studentOptionMeta}>
                     <span className={styles.studentOptionLabel}>{student.name}</span>
-                    <span className={styles.studentOptionDescription}>{student.level?.trim() || 'Без уровня'}</span>
+                    <span className={styles.studentOptionDescription}>
+                      {student.level?.trim() || 'Уровень не указан'}
+                    </span>
                   </span>
                   <HomeworkCheckIcon
                     size={11}
@@ -321,13 +361,33 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
         </AdaptivePopover>
         {studentError ? <p className={styles.error}>{studentError}</p> : null}
 
+        {titleMismatchedStudent ? (
+          <div className={styles.titleMismatch}>
+            <span>
+              Имя задания упоминает <strong>{titleMismatchedStudent.name}</strong>, но получатель —{' '}
+              <strong>{selectedStudent?.name ?? 'не выбран'}</strong>. Имя задания и адресат не совпадают.
+            </span>
+            {onAlignTitle ? (
+              <button type="button" className={styles.titleMismatchAction} onClick={onAlignTitle}>
+                Убрать имя из названия
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!hasSelectedStudent && !studentRequired ? (
+          <p className={styles.helperText}>Без ученика задание сохранится как шаблон в библиотеке.</p>
+        ) : null}
+
         {hasSelectedStudent ? <div className={styles.divider} /> : null}
 
         {hasSelectedStudent ? (
           <>
             <label className={styles.label}>Когда отправить</label>
             <div className={styles.optionList}>
-              <label className={`${styles.optionCard} ${assignment.sendMode === 'MANUAL' ? styles.optionCardActive : ''}`}>
+              <label
+                className={`${styles.optionCard} ${assignment.sendMode === 'MANUAL' ? styles.optionCardActive : ''}`}
+              >
                 <input
                   type="radio"
                   name="assignment-send-mode"
@@ -379,7 +439,9 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
                       }
                     >
                       {loadingLessons ? <option value="">Загружаем уроки…</option> : null}
-                      {!loadingLessons && futureLessons.length === 0 ? <option value="">Нет ближайших уроков</option> : null}
+                      {!loadingLessons && futureLessons.length === 0 ? (
+                        <option value="">Нет ближайших уроков</option>
+                      ) : null}
                       {futureLessons.map((lesson) => (
                         <option key={lesson.id} value={lesson.id}>
                           {formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', { timeZone, locale: ru })}
@@ -390,7 +452,9 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
                 </div>
               </label>
 
-              <label className={`${styles.optionCard} ${assignment.sendMode === 'SCHEDULED' ? styles.optionCardActive : ''}`}>
+              <label
+                className={`${styles.optionCard} ${assignment.sendMode === 'SCHEDULED' ? styles.optionCardActive : ''}`}
+              >
                 <input
                   type="radio"
                   name="assignment-send-mode"
@@ -400,7 +464,8 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
                       ...assignment,
                       sendMode: 'SCHEDULED',
                       lessonId: null,
-                      scheduledFor: assignment.scheduledFor ?? toUtcIsoFromLocal(createQuickDeadlineValue(1, timeZone), timeZone),
+                      scheduledFor:
+                        assignment.scheduledFor ?? toUtcIsoFromLocal(createQuickDeadlineValue(1, timeZone), timeZone),
                     })
                   }
                 />
@@ -432,17 +497,24 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
             <div className={styles.dateTimeGrid}>
               <input
                 type="date"
-                className={styles.dateInput}
+                className={`${styles.dateInput} ${isDeadlineInPast ? styles.invalidField : ''}`}
                 value={deadlineLocalValue.split('T')[0] ?? ''}
+                aria-invalid={isDeadlineInPast}
                 onChange={(event) => updateDeadlinePart('date', event.target.value)}
               />
               <input
                 type="time"
-                className={styles.dateInput}
+                className={`${styles.dateInput} ${isDeadlineInPast ? styles.invalidField : ''}`}
                 value={deadlineLocalValue.split('T')[1] ?? ''}
+                aria-invalid={isDeadlineInPast}
                 onChange={(event) => updateDeadlinePart('time', event.target.value)}
               />
             </div>
+            {isDeadlineInPast ? (
+              <p className={styles.deadlineWarning}>
+                Дедлайн уже прошёл. Установите дату в будущем — иначе ученик увидит просроченное задание.
+              </p>
+            ) : null}
             <div className={styles.quickActions}>
               <button
                 type="button"
@@ -486,7 +558,10 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
         <div className={styles.gradingSection}>
           <label className={styles.label}>Режим оценки</label>
           <div className={styles.optionList}>
-            <label className={`${styles.gradeCard} ${quizSettings.autoCheckEnabled ? styles.optionCardActive : ''}`}>
+            <label
+              className={`${styles.gradeCard} ${quizSettings.autoCheckEnabled ? styles.optionCardActive : ''}`}
+              title="Система сама сверит ответы с правильными. Подходит для choice / fill-in / matching. Открытые ответы и аудио всё равно потребуют ручной проверки."
+            >
               <div className={`${styles.gradeIcon} ${styles.gradeIconAuto}`}>
                 <HomeworkRobotIcon size={14} />
               </div>
@@ -501,7 +576,10 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
               />
             </label>
 
-            <label className={`${styles.gradeCard} ${!quizSettings.autoCheckEnabled ? styles.optionCardActive : ''}`}>
+            <label
+              className={`${styles.gradeCard} ${!quizSettings.autoCheckEnabled ? styles.optionCardActive : ''}`}
+              title="Вы сами читаете каждый ответ и ставите оценку."
+            >
               <div className={`${styles.gradeIcon} ${styles.gradeIconManual}`}>
                 <HomeworkUserCheckIcon size={14} />
               </div>
@@ -536,8 +614,8 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
                     ...quizSettings,
                     timerEnabled: event.target.checked,
                     timerDurationMinutes: event.target.checked
-                      ? quizSettings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES
-                    : quizSettings.timerDurationMinutes,
+                      ? (quizSettings.timerDurationMinutes ?? HOMEWORK_TIMER_DEFAULT_MINUTES)
+                      : quizSettings.timerDurationMinutes,
                   })
                 }
               />
@@ -631,19 +709,6 @@ export const AssignmentPlanningSidebar: FC<AssignmentPlanningSidebarProps> = ({
           </>
         ) : null}
       </section>
-
-      {!hasSelectedStudent && !studentRequired ? (
-        <section className={styles.hintCard}>
-          <div className={styles.hintIcon}>
-            <HomeworkBookOpenIcon size={14} />
-          </div>
-          <div>
-            <strong>Без ученика это библиотека</strong>
-            <p>Если не выбирать ученика, задание сохранится во вкладке «Библиотека». Чтобы сразу создать назначение, сначала выберите ученика.</p>
-          </div>
-        </section>
-      ) : null}
-
     </aside>
   );
 };

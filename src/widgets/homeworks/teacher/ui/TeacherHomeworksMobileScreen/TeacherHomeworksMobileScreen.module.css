@@ -1,6 +1,6 @@
 .screen {
   min-height: 100%;
-  background: #f6f7fb;
+  background: var(--surface-card-strong);
   color: #171c2b;
 }
 
@@ -8,13 +8,13 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #f6f7fb;
+  background: var(--surface-card-strong);
 }
 
 .topbar {
   min-height: 56px;
   padding: 0 16px;
-  background: #ffffff;
+  background: var(--surface-card);
   border-bottom: 1px solid #e7ecf4;
   display: flex;
   align-items: center;
@@ -123,7 +123,7 @@
 .segmentButtonActive {
   background: #0d1526;
   color: #ffffff;
-  box-shadow: 0 6px 14px rgba(13, 21, 38, 0.14);
+  box-shadow: 0 6px 14px -4px rgba(13, 21, 38, 0.14);
 }
 
 .body {
@@ -152,12 +152,12 @@
   height: 44px;
   border-radius: 16px;
   border: 1px solid #e7ecf4;
-  background: #ffffff;
+  background: var(--surface-card);
   display: inline-flex;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: 0 1px 2px -0px rgba(16, 24, 40, 0.04);
   animation: revealSearch 200ms ease-out;
 }
 
@@ -199,9 +199,11 @@
   flex: 1;
   min-width: 0;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chipsRow::-webkit-scrollbar {
@@ -210,29 +212,31 @@
 
 .scopeChip,
 .urgencyChip {
-  min-height: 36px;
-  border-radius: 18px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  min-height: 32px;
+  border-radius: 16px;
   border: 1px solid #e7ecf4;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #485162;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  font-size: 13px;
-  line-height: 20px;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  box-shadow: 0 1px 2px -0px rgba(16, 24, 40, 0.03);
 }
 
 .scopeChipActive,
 .urgencyChipActive {
   border-color: #d2d9e4;
   color: #171c2b;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 1px 2px -0px rgba(16, 24, 40, 0.06);
 }
 
 .scopeCount,
@@ -278,7 +282,7 @@
 .chipToneSuccess {
   background: #ecfdf3;
   border-color: #cfe9da;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .chipToneSuccess .scopeCount,
@@ -335,13 +339,13 @@
   height: 40px;
   border: 1px solid #e7ecf4;
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #5e6778;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  box-shadow: 0 1px 2px -0px rgba(16, 24, 40, 0.03);
   cursor: pointer;
   transition: background 120ms ease-out;
 }
@@ -424,9 +428,9 @@
 .stateCard {
   border: 1px solid #e7ecf4;
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #6d7486;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: 0 1px 2px -0px rgba(16, 24, 40, 0.04);
   padding: 20px 16px;
   font-size: 14px;
   line-height: 20px;
@@ -456,7 +460,7 @@
   min-height: 44px;
   border: 1px solid #e7ecf4;
   border-radius: 22px;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #0d1526;
   padding: 0 16px;
   font-size: 14px;
@@ -528,7 +532,7 @@
   min-height: 48px;
   border: 1px solid #e7ecf4;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #171c2b;
   display: flex;
   align-items: center;
@@ -586,7 +590,7 @@
 
 .sheetSecondaryButton {
   border: 1px solid #e7ecf4;
-  background: #ffffff;
+  background: var(--surface-card);
   color: #485162;
 }
 

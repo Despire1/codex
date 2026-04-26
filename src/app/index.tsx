@@ -1,4 +1,3 @@
-import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { App } from './App';
@@ -6,6 +5,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { applyDisplayModeAttributes, registerServiceWorker } from './pwa/registerServiceWorker';
 import { AppProviders } from './providers';
 import { store } from './providers/StoreProvider/config/store';
+import { applyTheme } from '@/entities/theme/lib/applyTheme';
+import { readStoredThemeMode } from '@/entities/theme/lib/initialTheme';
+import { resolveSystemTheme } from '@/entities/theme/lib/resolveSystemTheme';
 import './styles/global.css';
 import './styles/safe-area.css';
 
@@ -24,8 +26,15 @@ const applyAppTitle = () => {
   updateMeta('meta[name="apple-mobile-web-app-title"]');
 };
 
+const applyInitialTheme = () => {
+  const mode = readStoredThemeMode() ?? 'system';
+  const resolved = mode === 'system' ? resolveSystemTheme() : mode;
+  applyTheme(resolved);
+};
+
 const container = document.getElementById('root');
 
+applyInitialTheme();
 applyDisplayModeAttributes();
 registerServiceWorker();
 applyAppTitle();

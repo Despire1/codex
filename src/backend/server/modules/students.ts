@@ -117,17 +117,12 @@ const findUserByTelegramUsername = async (normalizedUsername: string) => {
   return candidates.find((user) => normalizeTelegramUsername(user.username) === normalizedUsername) ?? null;
 };
 
-const resolveNextTeacherStudentUiColor = async (
-  teacherId: bigint,
-  options?: { excludeStudentId?: number },
-) => {
+const resolveNextTeacherStudentUiColor = async (teacherId: bigint, options?: { excludeStudentId?: number }) => {
   const links = await prisma.teacherStudent.findMany({
     where: {
       teacherId,
       isArchived: false,
-      ...(typeof options?.excludeStudentId === 'number'
-        ? { studentId: { not: options.excludeStudentId } }
-        : {}),
+      ...(typeof options?.excludeStudentId === 'number' ? { studentId: { not: options.excludeStudentId } } : {}),
     },
     select: { uiColor: true },
   });
@@ -150,7 +145,18 @@ export const createStudentsService = ({
     return { limit, offset };
   };
 
-  const isHomeworkDone = (homework: any) => normalizeTeacherStatus(homework.status) === 'DONE' || homework.isDone;
+  const SUBMITTED_ASSIGNMENT_STATUSES = new Set(['SUBMITTED', 'IN_REVIEW', 'REVIEWED']);
+
+  const isHomeworkDone = (homework: any) => {
+    if (normalizeTeacherStatus(homework.status) === 'DONE' || homework.isDone) return true;
+    if (
+      homework.assignmentStatus &&
+      SUBMITTED_ASSIGNMENT_STATUSES.has(String(homework.assignmentStatus).toUpperCase())
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   const isHomeworkOverdue = (homework: any, todayStart: Date) => {
     if (!homework.deadline) return false;
@@ -158,11 +164,14 @@ export const createStudentsService = ({
     return new Date(homework.deadline).getTime() < todayStart.getTime();
   };
 
-  const buildHomeworkStats = (homeworks: any[], todayStart: Date) => {
+  const buildHomeworkStats = (
+    homeworks: any[],
+    extraAssignments: Array<{ status: string; deadlineAt: Date | null }>,
+    todayStart: Date,
+  ) => {
     let pendingHomeworkCount = 0;
     let overdueHomeworkCount = 0;
     let doneHomeworkCount = 0;
-    const totalHomeworkCount = homeworks.length;
 
     homeworks.forEach((homework) => {
       const homeworkDone = isHomeworkDone(homework);
@@ -175,6 +184,20 @@ export const createStudentsService = ({
         overdueHomeworkCount += 1;
       }
     });
+
+    extraAssignments.forEach((assignment) => {
+      const status = String(assignment.status ?? '').toUpperCase();
+      if (SUBMITTED_ASSIGNMENT_STATUSES.has(status)) {
+        doneHomeworkCount += 1;
+      } else if (status !== 'DRAFT' && status !== 'CANCELED') {
+        pendingHomeworkCount += 1;
+        if (assignment.deadlineAt && assignment.deadlineAt.getTime() < todayStart.getTime()) {
+          overdueHomeworkCount += 1;
+        }
+      }
+    });
+
+    const totalHomeworkCount = doneHomeworkCount + pendingHomeworkCount;
 
     const homeworkCompletionRate =
       totalHomeworkCount > 0 ? Math.round((doneHomeworkCount / totalHomeworkCount) * 100) : 0;
@@ -207,9 +230,7 @@ export const createStudentsService = ({
       },
     });
     const hiddenIds = new Set(
-      hidden
-        .map((item) => item.lessonId)
-        .filter((lessonId): lessonId is number => typeof lessonId === 'number'),
+      hidden.map((item) => item.lessonId).filter((lessonId): lessonId is number => typeof lessonId === 'number'),
     );
     return visibleLessons.filter((lesson) => !hiddenIds.has(lesson.id));
   };
@@ -401,10 +422,37 @@ export const createStudentsService = ({
       : [];
     const visibleLessons = await filterSuppressedLessons(lessons);
 
+    const assignments = studentIds.length
+      ? await prisma.homeworkAssignment.findMany({
+          where: { teacherId: teacher.chatId, studentId: { in: studentIds } },
+          select: {
+            id: true,
+            studentId: true,
+            legacyHomeworkId: true,
+            status: true,
+            deadlineAt: true,
+          },
+        })
+      : [];
+
+    const assignmentStatusByLegacyId = new Map<number, string>();
+    const assignmentsByStudent = new Map<number, typeof assignments>();
+    assignments.forEach((assignment) => {
+      if (assignment.legacyHomeworkId) {
+        assignmentStatusByLegacyId.set(assignment.legacyHomeworkId, assignment.status);
+      }
+      const existing = assignmentsByStudent.get(assignment.studentId) ?? [];
+      existing.push(assignment);
+      assignmentsByStudent.set(assignment.studentId, existing);
+    });
+
     const homeworksByStudent = new Map<number, any[]>();
     homeworks.forEach((homework) => {
       const existing = homeworksByStudent.get(homework.studentId) ?? [];
-      existing.push(homework);
+      existing.push({
+        ...homework,
+        assignmentStatus: assignmentStatusByLegacyId.get(homework.id) ?? null,
+      });
       homeworksByStudent.set(homework.studentId, existing);
     });
 
@@ -504,7 +552,13 @@ export const createStudentsService = ({
 
     const statsByStudent = new Map<number, StudentListStats>();
     links.forEach((link) => {
-      const homeworkStats = buildHomeworkStats(homeworksByStudent.get(link.studentId) ?? [], todayStart);
+      const studentAssignments = assignmentsByStudent.get(link.studentId) ?? [];
+      const extraAssignments = studentAssignments.filter((assignment) => !assignment.legacyHomeworkId);
+      const homeworkStats = buildHomeworkStats(
+        homeworksByStudent.get(link.studentId) ?? [],
+        extraAssignments,
+        todayStart,
+      );
       const lessonStats = lessonStatsByStudent.get(link.studentId) ?? createEmptyLessonStats();
       const attendanceRate =
         lessonStats.attendanceTrackedLessons > 0
@@ -594,10 +648,7 @@ export const createStudentsService = ({
 
       reminderCounts.forEach((reminder) => {
         if (!reminder.studentId) return;
-        reminderCountsByStudent.set(
-          reminder.studentId,
-          (reminderCountsByStudent.get(reminder.studentId) ?? 0) + 1,
-        );
+        reminderCountsByStudent.set(reminder.studentId, (reminderCountsByStudent.get(reminder.studentId) ?? 0) + 1);
       });
     }
 
@@ -630,8 +681,10 @@ export const createStudentsService = ({
         : null;
     const averageScore = Number(
       (
-        links.reduce((sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).averageScore ?? 0), 0) /
-        summaryStudents
+        links.reduce(
+          (sum, link) => sum + ((statsByStudent.get(link.studentId) ?? emptyStudentStats).averageScore ?? 0),
+          0,
+        ) / summaryStudents
       ).toFixed(1),
     );
     const lessonsThisWeek = links.reduce(
@@ -1186,19 +1239,13 @@ export const createStudentsService = ({
     const filter = options?.filter ?? 'all';
     const where: Record<string, any> = {
       studentId,
-      OR: [
-        { teacherId: teacher.chatId },
-        { teacherId: null, lesson: { teacherId: teacher.chatId } },
-      ],
+      OR: [{ teacherId: teacher.chatId }, { teacherId: null, lesson: { teacherId: teacher.chatId } }],
     };
 
     if (filter === 'topup') {
       where.AND = [
         {
-          OR: [
-            { type: { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] } },
-            { type: 'ADJUSTMENT', lessonsDelta: { gt: 0 } },
-          ],
+          OR: [{ type: { in: ['TOP_UP', 'SUBSCRIPTION', 'OTHER'] } }, { type: 'ADJUSTMENT', lessonsDelta: { gt: 0 } }],
         },
       ];
     } else if (filter === 'manual') {

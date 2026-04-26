@@ -14,7 +14,7 @@
   border-radius: 24px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.08);
   text-align: center;
 }
 

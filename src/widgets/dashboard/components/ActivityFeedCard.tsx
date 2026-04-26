@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActivityFeedItem } from '../../../entities/types';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import controls from '../../../shared/styles/controls.module.css';
@@ -15,13 +15,34 @@ interface ActivityFeedCardProps {
   onOpen: () => void;
 }
 
+const summarizeFailedNotifications = (items: ActivityFeedItem[]): ActivityFeedItem[] => {
+  const failed: ActivityFeedItem[] = [];
+  const rest: ActivityFeedItem[] = [];
+  for (const item of items) {
+    if (item.category === 'NOTIFICATION' && item.status === 'FAILED') {
+      failed.push(item);
+    } else {
+      rest.push(item);
+    }
+  }
+  if (failed.length === 0) return rest;
+  const summary = failed[0];
+  const grouped: ActivityFeedItem = {
+    ...summary,
+    title: failed.length === 1 ? summary.title : `Не удалось отправить уведомления (${failed.length})`,
+    details: failed.length === 1 ? summary.details : 'Открывайте «Всю историю», чтобы увидеть подробности.',
+  };
+  return [grouped, ...rest];
+};
+
 export const ActivityFeedCard: FC<ActivityFeedCardProps> = ({
-  items,
+  items: rawItems,
   loading,
   activeFiltersCount,
   onResetFilters,
   onOpen,
 }) => {
+  const items = useMemo(() => summarizeFailedNotifications(rawItems), [rawItems]);
   const timeZone = useTimeZone();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -69,9 +90,7 @@ export const ActivityFeedCard: FC<ActivityFeedCardProps> = ({
       <div className={styles.header}>
         <div className={styles.titleRow}>
           <div className={styles.title}>Лента активности</div>
-          {activeFiltersCount > 0 && (
-            <span className={styles.filtersBadge}>Фильтры: {activeFiltersCount}</span>
-          )}
+          {activeFiltersCount > 0 && <span className={styles.filtersBadge}>Фильтры: {activeFiltersCount}</span>}
         </div>
         <div className={styles.actions}>
           {activeFiltersCount > 0 && (
@@ -108,11 +127,7 @@ export const ActivityFeedCard: FC<ActivityFeedCardProps> = ({
             <div className={styles.list} ref={measureListRef}>
               {items.map((item, index) => (
                 <div key={`measure-${item.id}-${index}`} data-feed-measure-row="true">
-                  <ActivityFeedTimelineItem
-                    item={item}
-                    timeZone={timeZone}
-                    isLast={index === items.length - 1}
-                  />
+                  <ActivityFeedTimelineItem item={item} timeZone={timeZone} isLast={index === items.length - 1} />
                 </div>
               ))}
             </div>

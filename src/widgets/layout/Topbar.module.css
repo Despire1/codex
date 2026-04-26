@@ -5,10 +5,10 @@
   gap: 16px;
   padding: 10px 16px;
   min-height: 64px;
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
-  box-shadow: 0 12px 28px var(--shadow-slate-900-06);
+  box-shadow: var(--shadow-card-strong);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -48,9 +48,9 @@
   width: 38px;
   height: 38px;
   border-radius: 999px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,7 +59,7 @@
 }
 
 .backButton:hover {
-  background: var(--color-slate-50);
+  background: var(--surface-card-strong);
 }
 
 .actionsCreateVisible {
@@ -93,6 +93,7 @@
   letter-spacing: -0.02em;
   line-height: 1;
   white-space: nowrap;
+  color: var(--text-primary);
 }
 
 .titleHomeworks {
@@ -110,7 +111,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -119,7 +120,7 @@
 .subtitleHomeworks {
   font-size: 14px;
   font-weight: 600;
-  color: #8a93a4;
+  color: var(--text-muted);
 }
 
 .actions {
@@ -135,17 +136,17 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   border-radius: 999px;
   padding: 3px;
-  box-shadow: 0 8px 16px var(--shadow-slate-900-06);
+  box-shadow: var(--shadow-card-strong);
 }
 
 .viewToggleButton {
   border: none;
   background: transparent;
-  color: #4b5563;
+  color: var(--text-secondary);
   height: 36px;
   border-radius: 999px;
   display: inline-flex;
@@ -158,44 +159,46 @@
 }
 
 .viewToggleButton:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--surface-card-muted);
+  color: var(--text-primary);
 }
 
 .toggleActive {
-  background: #05070b;
-  color: #b8fa4e;
+  background: var(--color-slate-900);
+  color: var(--accent-primary);
 }
 
 .toggleActive:hover {
-  background: #05070b;
-  color: #b8fa4e;
+  background: var(--color-slate-900);
+  color: var(--accent-primary);
 }
 
 .iconButton {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   position: relative;
   transform: translate3d(var(--bell-shift, 0px), 0, 0);
-  transition: transform 0.22s ease, background-color 0.2s ease;
+  transition:
+    transform 0.22s ease,
+    background-color 0.2s ease;
   will-change: transform;
 }
 
 .topbarHomeworks .iconButton {
   border-radius: 999px;
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.06);
 }
 
 .iconButton:hover {
-  background: var(--color-slate-50);
+  background: var(--surface-card-strong);
 }
 
 .statusBadge {
@@ -220,17 +223,17 @@
 
 .statusBadgeActive {
   background: #ecfdf3;
-  color: #1f8f49;
+  color: var(--status-green-text);
 }
 
 .statusBadgeDraft {
   background: #edf2ff;
-  color: #4760d1;
+  color: var(--status-blue-text);
 }
 
 .statusBadgeArchived {
-  background: #eef1f5;
-  color: #5b667a;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
 }
 
 .notificationDot {
@@ -248,8 +251,8 @@
   white-space: nowrap;
   border: none;
   border-radius: 10px;
-  background: var(--color-slate-900);
-  color: var(--color-white);
+  background: var(--button-strong-bg);
+  color: var(--button-strong-text);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -258,23 +261,26 @@
   cursor: pointer;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: right center;
-  transition: transform 0.22s ease, opacity 0.22s ease, background-color 0.2s ease;
+  transition:
+    transform 0.22s ease,
+    opacity 0.22s ease,
+    background-color 0.2s ease;
   will-change: transform, opacity;
 }
 
 .topbarHomeworks .createButton {
   border-radius: 999px;
   padding: 0 18px;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 14px 28px -9px rgba(15, 23, 42, 0.14);
 }
 
 .printButton {
   min-height: 40px;
   white-space: nowrap;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: #f1f3f6;
-  color: var(--color-slate-700);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -284,12 +290,12 @@
 }
 
 .printButton:hover {
-  background: #e8ebf0;
+  background: var(--surface-card-strong);
 }
 
 .topbar .createButton {
-  color: var(--color-white) !important;
-  -webkit-text-fill-color: var(--color-white);
+  color: var(--button-strong-text) !important;
+  -webkit-text-fill-color: var(--button-strong-text);
 }
 
 .topbar .createButton svg {
@@ -297,32 +303,32 @@
 }
 
 .createButton:hover {
-  background: var(--color-slate-800);
+  background: var(--button-strong-bg-hover);
 }
 
 .createButtonIconAccent {
-  color: #a3e635;
+  color: var(--button-strong-accent, var(--accent-primary));
 }
 
 .templateSecondaryButton {
   min-height: 40px;
   white-space: nowrap;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 0 14px;
   cursor: pointer;
-  box-shadow: 0 8px 16px var(--shadow-slate-900-06);
+  box-shadow: var(--shadow-card-strong);
 }
 
 .templateSecondaryButton:hover {
-  background: var(--color-slate-50);
-  border-color: var(--color-slate-300);
+  background: var(--surface-card-strong);
+  border-color: var(--border-strong);
 }
 
 .templateSecondaryButton:disabled {
@@ -335,8 +341,8 @@
   white-space: nowrap;
   border: none;
   border-radius: 10px;
-  background: var(--color-slate-900);
-  color: var(--color-white);
+  background: var(--button-strong-bg);
+  color: var(--button-strong-text);
   font-size: 14px;
   font-weight: 700;
   display: inline-flex;
@@ -347,11 +353,11 @@
 }
 
 .templatePrimaryButton:hover {
-  background: var(--color-slate-800);
+  background: var(--button-strong-bg-hover);
 }
 
 .templatePrimaryIcon {
-  color: #a3e635;
+  color: var(--accent-primary);
 }
 
 .templatePrimaryButton:disabled {
@@ -397,7 +403,7 @@
 .teacherName {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 

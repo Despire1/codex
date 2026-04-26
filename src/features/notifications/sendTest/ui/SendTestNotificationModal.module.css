@@ -18,7 +18,7 @@
 
 .sectionTitle {
   font-weight: 600;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .radioGroup {
@@ -32,7 +32,7 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
   position: relative;
 }
@@ -50,13 +50,15 @@
   width: 18px;
   height: 18px;
   border: 1.5px solid var(--color-slate-300);
-  background: var(--color-white);
+  background: var(--surface-card);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
   flex-shrink: 0;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
 .radioIndicator {
@@ -93,13 +95,13 @@
 
 .optionInput:focus-visible + .radioIndicator,
 .optionInput:focus-visible + .checkboxIndicator {
-  box-shadow: 0 0 0 2px var(--shadow-blue-600-12);
-  border-color: var(--color-blue-600);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+  border-color: var(--accent-primary);
 }
 
 .optionInput:checked + .radioIndicator {
   border-color: var(--color-blue-600);
-  background: var(--color-white);
+  background: var(--surface-card);
 }
 
 .optionInput:checked + .checkboxIndicator {
@@ -118,10 +120,10 @@
   gap: 6px;
   max-height: 180px;
   overflow-y: auto;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 8px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
 }
 
 .studentRow {
@@ -129,21 +131,21 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
   position: relative;
 }
 
 .helperText {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .emptyState {
   border: 1px dashed var(--color-slate-200);
   border-radius: 12px;
   padding: 12px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -151,12 +153,12 @@
 
 .emptyTitle {
   font-weight: 600;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .emptyText {
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .helpButton {
@@ -172,8 +174,8 @@
 .helpPopover {
   padding: 10px 12px;
   border-radius: 12px;
-  background: var(--color-white);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  background: var(--surface-card);
+  box-shadow: 0 10px 24px -8px rgba(15, 23, 42, 0.12);
 }
 
 .helpContent {
@@ -181,7 +183,7 @@
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .segmented {
@@ -191,38 +193,38 @@
 }
 
 .segmentButton {
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   border-radius: 10px;
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .segmentButtonActive {
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   border-color: transparent;
 }
 
 .previewCard {
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   padding: 12px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
 }
 
 .previewTitle {
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
 .previewText {
   white-space: pre-wrap;
   font-size: 14px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .warningBlock {
@@ -231,7 +233,7 @@
   border-radius: 12px;
   background: var(--color-orange-200);
   border: 1px solid var(--color-orange-200);
-  color: var(--color-orange-700);
+  color: var(--status-orange-text);
   font-size: 13px;
 }
 
@@ -248,7 +250,7 @@
 .retryButton {
   margin-top: 8px;
   border: none;
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 10px;
   padding: 6px 10px;
   cursor: pointer;
@@ -278,22 +280,22 @@
 
 .resultMeta {
   font-size: 13px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .partialResults {
   margin-top: 6px;
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   padding: 10px 12px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
 }
 
 .resultSubTitle {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 8px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .resultList {
@@ -307,7 +309,7 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .resultOk {
@@ -321,7 +323,7 @@
 .sheetActions {
   position: sticky;
   bottom: 0;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding-top: 10px;
 }
 

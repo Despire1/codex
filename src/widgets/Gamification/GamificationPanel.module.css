@@ -34,7 +34,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px 10px;
-  background: var(--color-white);
+  background: var(--surface-card);
   color: var(--primary-strong);
   font-weight: 800;
   border-radius: 12px;
@@ -76,11 +76,11 @@
 
 .reward,
 .completion {
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  box-shadow: 0 6px 16px rgba(91, 141, 239, 0.1);
+  box-shadow: 0 6px 16px -5px rgba(91, 141, 239, 0.1);
 }
 
 .rewardLabel,

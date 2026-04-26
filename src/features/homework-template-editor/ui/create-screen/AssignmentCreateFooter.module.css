@@ -8,7 +8,7 @@
   gap: 20px;
   padding: 16px 32px;
   border-top: 1px solid #edf0f6;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface-card);
   backdrop-filter: blur(18px);
 }
 
@@ -17,7 +17,7 @@
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -50,18 +50,18 @@
 .cancelButton {
   padding: 0 18px;
   background: transparent;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .cancelButton:hover {
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
 }
 
 .primaryButton {
   padding: 0 22px;
   background: #111111;
   color: #fff;
-  box-shadow: 0 18px 32px rgba(17, 17, 17, 0.16);
+  box-shadow: 0 18px 32px -10px rgba(17, 17, 17, 0.16);
 }
 
 .primaryButton:disabled {

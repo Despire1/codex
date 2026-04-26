@@ -1,4 +1,4 @@
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { ru } from 'date-fns/locale';
 import type {
   HomeworkAssignment,
@@ -89,17 +89,22 @@ const resolveResponseFormats = (block: HomeworkBlockStudentResponse) =>
     block.allowVoice ? 'Голос' : null,
   ].filter(Boolean) as string[];
 
-const renderQuestionBody = (question: HomeworkTestQuestion) => {
+const renderQuestionBody = (question: HomeworkTestQuestion, showCorrectAnswers: boolean) => {
   const kind = getQuestionKind(question);
 
   if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') {
+    const correctIds = new Set(question.correctOptionIds ?? []);
     return (
       <ul className={styles.answerList}>
-        {(question.options ?? []).map((option) => (
-          <li key={option.id} className={styles.answerListItem}>
-            {option.text || 'Вариант без текста'}
-          </li>
-        ))}
+        {(question.options ?? []).map((option) => {
+          const isCorrect = showCorrectAnswers && correctIds.has(option.id);
+          return (
+            <li key={option.id} className={`${styles.answerListItem} ${isCorrect ? styles.answerListItemCorrect : ''}`}>
+              <span>{option.text || 'Вариант без текста'}</span>
+              {isCorrect ? <span className={styles.answerCorrectBadge}>Правильно</span> : null}
+            </li>
+          );
+        })}
       </ul>
     );
   }
@@ -186,13 +191,7 @@ const MaterialsSection: FC<{ block: HomeworkBlockMedia }> = ({ block }) => {
       {attachments.map((attachment) => {
         const href = resolveHomeworkStorageUrl(attachment.url);
         return (
-          <a
-            key={attachment.id}
-            className={styles.materialCard}
-            href={href}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a key={attachment.id} className={styles.materialCard} href={href} target="_blank" rel="noreferrer">
             <div className={styles.materialCardIcon}>
               <HomeworkLinkIcon size={14} />
             </div>
@@ -207,7 +206,10 @@ const MaterialsSection: FC<{ block: HomeworkBlockMedia }> = ({ block }) => {
   );
 };
 
-const QuestionsSection: FC<{ block: HomeworkBlockTest }> = ({ block }) => {
+const QuestionsSection: FC<{ block: HomeworkBlockTest; showCorrectAnswers: boolean }> = ({
+  block,
+  showCorrectAnswers,
+}) => {
   if (!block.questions.length) {
     return <p className={styles.emptyState}>Вопросы пока не добавлены.</p>;
   }
@@ -232,7 +234,7 @@ const QuestionsSection: FC<{ block: HomeworkBlockTest }> = ({ block }) => {
               </span>
             </div>
           </div>
-          {renderQuestionBody(question)}
+          {renderQuestionBody(question, showCorrectAnswers)}
           {question.explanation ? <p className={styles.questionExplanation}>{question.explanation}</p> : null}
         </article>
       ))}
@@ -272,16 +274,23 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
   onBack,
 }) => {
   const timeZone = useTimeZone();
-  const studentName = assignment?.studentName ?? students.find((item) => item.id === draft.assignment.studentId)?.name ?? 'Не выбран';
-  const groupTitle = assignment?.groupTitle ?? groups.find((item) => item.id === draft.assignment.groupId)?.title ?? 'Без группы';
+  const [showCorrectAnswers, setShowCorrectAnswers] = useState(true);
+  const studentName =
+    assignment?.studentName ?? students.find((item) => item.id === draft.assignment.studentId)?.name ?? 'Не выбран';
+  const groupTitle =
+    assignment?.groupTitle ?? groups.find((item) => item.id === draft.assignment.groupId)?.title ?? 'Без группы';
   const templateTitle =
-    assignment?.templateTitle ?? templates.find((item) => item.id === draft.assignment.sourceTemplateId)?.title ?? 'Без базовой домашки';
+    assignment?.templateTitle ??
+    templates.find((item) => item.id === draft.assignment.sourceTemplateId)?.title ??
+    'Без базовой домашки';
   const estimatedMinutes = extractEstimatedMinutes(draft.template.level);
   const blocks = draft.blocks;
   const testBlock = blocks.find((block): block is HomeworkBlockTest => block.type === 'TEST') ?? null;
   const mediaBlock = blocks.find((block): block is HomeworkBlockMedia => block.type === 'MEDIA') ?? null;
-  const responseBlock = blocks.find((block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE') ?? null;
-  const descriptionBlock = blocks.find((block): block is HomeworkBlock & { type: 'TEXT'; content: string } => block.type === 'TEXT') ?? null;
+  const responseBlock =
+    blocks.find((block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE') ?? null;
+  const descriptionBlock =
+    blocks.find((block): block is HomeworkBlock & { type: 'TEXT'; content: string } => block.type === 'TEXT') ?? null;
   const summaryCards = useMemo(
     () => [
       {
@@ -304,7 +313,7 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
             ? `Автоматически после урока${assignment?.lessonStartAt ? ` · ${formatDateTime(assignment.lessonStartAt, timeZone)}` : ''}`
             : draft.assignment.sendMode === 'SCHEDULED'
               ? `По расписанию${draft.assignment.scheduledFor ? ` · ${formatDateTime(draft.assignment.scheduledFor, timeZone)}` : ''}`
-            : 'Вручную',
+              : 'Вручную',
         icon: <HomeworkPaperPlaneIcon size={14} />,
       },
       {
@@ -349,7 +358,8 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
           </div>
           <h1 className={styles.title}>{draft.title || 'Домашнее задание без названия'}</h1>
           <p className={styles.subtitle}>
-            Домашка открыта в режиме просмотра. Пока она выдана ученику или находится в работе, её содержимое нельзя менять.
+            Домашка открыта в режиме просмотра. Пока она выдана ученику или находится в работе, её содержимое нельзя
+            менять.
           </p>
           <div className={styles.heroMeta}>
             <span className={styles.typeBadge}>{TYPE_LABELS[draft.template.selectedType] ?? 'Домашнее задание'}</span>
@@ -411,12 +421,20 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
                 <span className={styles.sectionIcon}>
                   <HomeworkListCheckIcon size={15} />
                 </span>
-                <div>
+                <div className={styles.sectionHeaderText}>
                   <h2>{testBlock.title || 'Вопросы'}</h2>
                   <p>{testBlock.questions.length} вопрос(ов) в задании.</p>
                 </div>
+                <label className={styles.correctAnswersToggle}>
+                  <input
+                    type="checkbox"
+                    checked={showCorrectAnswers}
+                    onChange={(event) => setShowCorrectAnswers(event.target.checked)}
+                  />
+                  <span>Показать правильные ответы</span>
+                </label>
               </div>
-              <QuestionsSection block={testBlock} />
+              <QuestionsSection block={testBlock} showCorrectAnswers={showCorrectAnswers} />
             </section>
           ) : null}
 

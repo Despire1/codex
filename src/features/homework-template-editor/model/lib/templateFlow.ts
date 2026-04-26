@@ -1,10 +1,5 @@
 import { HomeworkBlock, HomeworkBlockStudentResponse, HomeworkTestQuestion } from '../../../../entities/types';
-import {
-  createMediaBlock,
-  createStudentResponseBlock,
-  createTestBlock,
-  createTextBlock,
-} from './blocks';
+import { createMediaBlock, createStudentResponseBlock, createTestBlock, createTextBlock } from './blocks';
 
 export type HomeworkTemplatePresetId = 'TEST_ONLY' | 'OPEN_ANSWER' | 'MEDIA_VOICE' | 'MIXED';
 
@@ -60,7 +55,8 @@ const createOpenAnswerResponseBlock = (): HomeworkBlockStudentResponse => ({
 });
 
 const getQuestionKind = (question: HomeworkTestQuestion) => {
-  if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') return 'CHOICE';
+  if (question.type === 'SINGLE_CHOICE') return 'SINGLE_CHOICE';
+  if (question.type === 'MULTIPLE_CHOICE') return 'MULTIPLE_CHOICE';
   if (question.type === 'MATCHING') return 'MATCHING';
   return question.uiQuestionKind ?? 'SHORT_TEXT';
 };
@@ -82,7 +78,7 @@ const isQuestionConfigured = (question: HomeworkTestQuestion) => {
   if (!question.prompt.trim()) return false;
   const kind = getQuestionKind(question);
 
-  if (kind === 'CHOICE') {
+  if (kind === 'SINGLE_CHOICE' || kind === 'MULTIPLE_CHOICE') {
     const options = question.options ?? [];
     const filledOptions = options.filter((option) => option.text.trim().length > 0);
     return filledOptions.length >= 2;
@@ -124,7 +120,9 @@ const isQuestionConfigured = (question: HomeworkTestQuestion) => {
 };
 
 export const summarizeTemplateBlocks = (blocks: HomeworkBlock[]) => {
-  const responseBlocks = blocks.filter((block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE');
+  const responseBlocks = blocks.filter(
+    (block): block is HomeworkBlockStudentResponse => block.type === 'STUDENT_RESPONSE',
+  );
   const testBlocks = blocks.filter((block) => block.type === 'TEST');
   const questionCount = testBlocks.reduce((sum, block) => sum + (block.questions?.length ?? 0), 0);
   const configuredQuestionCount = testBlocks.reduce(

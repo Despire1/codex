@@ -1,5 +1,6 @@
 import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, RobotIcon } from '../../icons/MaterialIcons';
+import { HomeworkCircleInfoIcon } from '../../shared/ui/icons/HomeworkFaIcons';
 import { sidebarNavItems, type SidebarNavItem } from './model/navigation';
 import styles from './Sidebar.module.css';
 
@@ -155,6 +156,8 @@ export const Sidebar: FC<SidebarProps> = ({
         className={navLinkClassName}
         onClick={(event) => onItemClick(event, item)}
         aria-current={active ? 'page' : undefined}
+        aria-label={isCollapsed ? item.label : undefined}
+        title={isCollapsed ? item.label : undefined}
       >
         <span className={styles.navIcon} aria-hidden>
           <item.icon width={20} height={20} />
@@ -203,6 +206,23 @@ export const Sidebar: FC<SidebarProps> = ({
               </nav>
             </>
           ) : null}
+
+          <div className={styles.sectionDivider} />
+          <nav className={styles.navSection} aria-label="Поддержка">
+            <a
+              href="https://t.me/teacherbot_help"
+              target="_blank"
+              rel="noreferrer noopener"
+              className={styles.navLink}
+              aria-label={isCollapsed ? 'Помощь и поддержка' : undefined}
+              title={isCollapsed ? 'Помощь и поддержка' : undefined}
+            >
+              <span className={styles.navIcon} aria-hidden>
+                <HomeworkCircleInfoIcon size={18} />
+              </span>
+              <span className={styles.navLabel}>Помощь</span>
+            </a>
+          </nav>
         </div>
 
         <div className={styles.footer}>

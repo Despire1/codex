@@ -1,5 +1,5 @@
-import { FC, useEffect, useState } from 'react';
-import { LinkedStudent } from '../../entities/types';
+import { FC, useEffect, useMemo, useState } from 'react';
+import { Lesson, LinkedStudent } from '../../entities/types';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { Modal } from '../../shared/ui/Modal/Modal';
 import modalStyles from '../../shared/ui/Modal/Modal.module.css';
@@ -11,8 +11,11 @@ import { PaymentCancelModal } from '../../features/modals/PaymentCancelModal/Pay
 import { PaymentBalanceModal } from '../../features/modals/PaymentBalanceModal/PaymentBalanceModal';
 import { LessonEditPaymentResetModal } from '../../features/modals/LessonEditPaymentResetModal/LessonEditPaymentResetModal';
 import { SeriesScopeDialog } from '../../features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
+import { LessonCancelDialog } from '../../features/lessons/ui/LessonCancelDialog/LessonCancelDialog';
+import type { LessonCancelRefundMode } from '../../features/lessons/model/types';
 import { useStudentsActions } from '../../widgets/students/model/useStudentsActions';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
+import { useTimeZone } from '../../shared/lib/timezoneContext';
 
 export type DialogState =
   | {
@@ -82,6 +85,12 @@ export const AppModals: FC<AppModalsProps> = ({
   onDialogStateChange,
 }) => {
   const [recurringDeleteSubmitting, setRecurringDeleteSubmitting] = useState(false);
+  const [lessonCancelDialogLesson, setLessonCancelDialogLesson] = useState<Lesson | null>(null);
+  const timeZone = useTimeZone();
+  const linkedStudentsById = useMemo(
+    () => new Map(linkedStudents.map((student) => [student.id, student])),
+    [linkedStudents],
+  );
   const {
     studentModalOpen,
     studentModalVariant,
@@ -180,7 +189,7 @@ export const AppModals: FC<AppModalsProps> = ({
         onCancelLesson={
           editingLesson && editingLesson.status !== 'CANCELED'
             ? () => {
-                void cancelLesson(editingLesson, 'SINGLE');
+                setLessonCancelDialogLesson(editingLesson);
               }
             : undefined
         }
@@ -202,23 +211,23 @@ export const AppModals: FC<AppModalsProps> = ({
         dialogState.type !== 'payment-cancel' &&
         dialogState.type !== 'payment-balance' &&
         dialogState.type !== 'lesson-edit-payment-reset' && (
-        <DialogModal
-          open
-          title={dialogState.title}
-          description={dialogState.message}
-          confirmText={dialogState.confirmText}
-          cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
-          onClose={onCloseDialog}
-          onConfirm={() => {
-            if (dialogState.type === 'confirm') {
-              dialogState.onConfirm();
-            } else {
-              onCloseDialog();
-            }
-          }}
-          onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
-        />
-      )}
+          <DialogModal
+            open
+            title={dialogState.title}
+            description={dialogState.message}
+            confirmText={dialogState.confirmText}
+            cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
+            onClose={onCloseDialog}
+            onConfirm={() => {
+              if (dialogState.type === 'confirm') {
+                dialogState.onConfirm();
+              } else {
+                onCloseDialog();
+              }
+            }}
+            onCancel={dialogState.type === 'confirm' ? dialogState.onCancel : undefined}
+          />
+        )}
       {dialogState?.type === 'recurring-delete' && (
         <Modal open title={dialogState.title} onClose={recurringDeleteSubmitting ? () => undefined : onCloseDialog}>
           <p className={modalStyles.message}>{dialogState.message}</p>
@@ -230,9 +239,7 @@ export const AppModals: FC<AppModalsProps> = ({
                 disabled={recurringDeleteSubmitting}
                 onChange={(e) =>
                   onDialogStateChange((state) =>
-                    state?.type === 'recurring-delete'
-                      ? { ...state, applyToSeries: e.target.checked }
-                      : state,
+                    state?.type === 'recurring-delete' ? { ...state, applyToSeries: e.target.checked } : state,
                   )
                 }
               />
@@ -315,6 +322,20 @@ export const AppModals: FC<AppModalsProps> = ({
         previews={seriesScopeDialogState?.previews}
         onClose={cancelSeriesScope}
         onConfirm={confirmSeriesScope}
+      />
+
+      <LessonCancelDialog
+        open={Boolean(lessonCancelDialogLesson)}
+        lesson={lessonCancelDialogLesson}
+        linkedStudentsById={linkedStudentsById}
+        timeZone={timeZone}
+        onClose={() => setLessonCancelDialogLesson(null)}
+        onConfirm={(refundMode: LessonCancelRefundMode | undefined) => {
+          if (!lessonCancelDialogLesson) return;
+          const target = lessonCancelDialogLesson;
+          setLessonCancelDialogLesson(null);
+          void cancelLesson(target, 'SINGLE', refundMode);
+        }}
       />
     </>
   );

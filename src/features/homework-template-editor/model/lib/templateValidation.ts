@@ -59,12 +59,7 @@ const validateChoiceQuestion = (
 
   const correctOptionIds = (question.correctOptionIds ?? []).filter(Boolean);
   if (correctOptionIds.length === 0) {
-    pushIssue(
-      issues,
-      [...questionPath, 'correctOptionIds'],
-      'choice_correct_required',
-      'Выберите верный вариант.',
-    );
+    pushIssue(issues, [...questionPath, 'correctOptionIds'], 'choice_correct_required', 'Выберите верный вариант.');
   }
 };
 
@@ -160,12 +155,7 @@ const validateTableQuestion = (
   }
 
   if (!table.leadHeader?.trim()) {
-    pushIssue(
-      issues,
-      [...questionPath, 'table', 'leadHeader'],
-      'table_lead_header_required',
-      REQUIRED_FIELD_MESSAGE,
-    );
+    pushIssue(issues, [...questionPath, 'table', 'leadHeader'], 'table_lead_header_required', REQUIRED_FIELD_MESSAGE);
   }
 
   const answerHeaders = table.answerHeaders ?? [];
@@ -248,7 +238,7 @@ const validateQuestion = (
   }
 
   const questionKind = getQuestionKind(question);
-  if (questionKind === 'CHOICE') {
+  if (questionKind === 'SINGLE_CHOICE' || questionKind === 'MULTIPLE_CHOICE') {
     validateChoiceQuestion(issues, questionPath, question);
     return;
   }
@@ -274,7 +264,11 @@ const validateQuestion = (
   }
 };
 
-const validateResponseBlock = (issues: FormValidationIssue[], responseBlock: HomeworkBlockStudentResponse, index: number) => {
+const validateResponseBlock = (
+  issues: FormValidationIssue[],
+  responseBlock: HomeworkBlockStudentResponse,
+  index: number,
+) => {
   if (
     responseBlock.allowText ||
     responseBlock.allowFiles ||
@@ -337,12 +331,7 @@ export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBl
   }
 
   if (!summary.hasTest && !hasResponseChannel(draft.blocks)) {
-    pushIssue(
-      issues,
-      ['blocks'],
-      'template_answer_channel_required',
-      'Добавьте тест или блок ответа ученика.',
-    );
+    pushIssue(issues, ['blocks'], 'template_answer_channel_required', 'Добавьте тест или блок ответа ученика.');
   }
 
   const testBlocks = draft.blocks
@@ -350,7 +339,10 @@ export const validateTemplateDraft = (draft: { title: string; blocks: HomeworkBl
     .filter((entry): entry is { block: HomeworkBlockTest; blockIndex: number } => entry.block.type === 'TEST');
   const responseBlocks = draft.blocks
     .map((block, blockIndex) => ({ block, blockIndex }))
-    .filter((entry): entry is { block: HomeworkBlockStudentResponse; blockIndex: number } => entry.block.type === 'STUDENT_RESPONSE');
+    .filter(
+      (entry): entry is { block: HomeworkBlockStudentResponse; blockIndex: number } =>
+        entry.block.type === 'STUDENT_RESPONSE',
+    );
 
   if (summary.hasTest && getQuestionCount(draft.blocks) === 0) {
     const firstTestBlockIndex = testBlocks[0]?.blockIndex ?? 0;

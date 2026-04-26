@@ -64,7 +64,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(30, 36, 51, 0.04);
+  box-shadow: 0 8px 20px -6px rgba(30, 36, 51, 0.04);
   flex-shrink: 0;
 }
 
@@ -113,7 +113,7 @@
   border-radius: 18px;
   font-size: 14px;
   font-weight: 800;
-  box-shadow: 0 8px 18px rgba(30, 36, 51, 0.04);
+  box-shadow: 0 8px 18px -6px rgba(30, 36, 51, 0.04);
 }
 
 .liveBadgeActive {
@@ -123,12 +123,12 @@
 
 .liveBadgeDraft {
   background: #edf2ff;
-  color: #4760d1;
+  color: var(--status-blue-text);
 }
 
 .liveBadgeArchived {
-  background: #eef1f5;
-  color: #5b667a;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
 }
 
 .liveDot {
@@ -181,7 +181,7 @@
   background: var(--hw-surface);
   border: 1px solid #eef1f4;
   border-radius: 32px;
-  box-shadow: 0 18px 44px rgba(40, 45, 61, 0.05);
+  box-shadow: 0 18px 44px -14px rgba(40, 45, 61, 0.05);
 }
 
 .card,
@@ -611,7 +611,7 @@
   padding: 0 14px;
   border-radius: 8px;
   border: 1px solid var(--hw-border-strong);
-  background: #ffffff;
+  background: var(--surface-card);
   color: var(--hw-text);
   font-weight: 800;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
@@ -741,7 +741,7 @@
   padding: 14px;
   border-radius: 12px;
   border: 1px solid var(--hw-border);
-  background: #ffffff;
+  background: var(--surface-card);
 }
 
 .table {
@@ -818,7 +818,7 @@
 }
 
 .table tbody td:first-child > div {
-  background: #f5f6f9;
+  background: var(--surface-card-strong);
 }
 
 .table tbody td:not(:first-child) > div {
@@ -905,7 +905,7 @@
   height: 34px;
   border-radius: 12px;
   border: 1px solid var(--hw-border);
-  background: #fff;
+  background: var(--surface-card);
   color: #697286;
   display: inline-flex;
   align-items: center;
@@ -983,8 +983,8 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(15, 29, 11, 0.12);
+  background: var(--surface-card);
+  box-shadow: 0 2px 4px -1px rgba(15, 29, 11, 0.12);
 }
 
 .settingToggleOn {
@@ -1186,7 +1186,7 @@
   min-height: 48px;
   border: none;
   border-radius: 12px;
-  background: #f1f3f6;
+  background: var(--surface-card-strong);
   color: #3e4659;
   display: inline-flex;
   align-items: center;

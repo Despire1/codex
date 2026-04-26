@@ -45,10 +45,12 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
         </div>
 
         <div className={styles.centerCell}>
+          <span className={styles.cellLabel}>Уроков</span>
           <span className={styles.primaryValue}>{presentation.lessonsCount}</span>
         </div>
 
         <div className={styles.centerCell}>
+          <span className={styles.cellLabel}>Посещаемость</span>
           <span
             className={`${styles.attendanceBadge} ${
               presentation.attendanceTone === 'success'
@@ -65,6 +67,7 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
         </div>
 
         <div className={styles.lessonCell}>
+          <span className={styles.cellLabel}>Следующий урок</span>
           <div className={styles.lessonMeta}>
             <span
               className={`${styles.lessonDot} ${
@@ -81,6 +84,7 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
         </div>
 
         <div className={styles.statusCell}>
+          <span className={styles.cellLabel}>Статус</span>
           <span
             className={`${styles.statusText} ${
               presentation.statusTone === 'active'
@@ -95,9 +99,7 @@ export const StudentReferenceCompactTableRow: FC<StudentReferenceCardProps> = ({
             {presentation.statusLabel}
           </span>
           {presentation.activationLabel ? (
-            <span className={`${styles.statusText} ${styles.statusInactive}`}>
-              {presentation.activationLabel}
-            </span>
+            <span className={`${styles.statusText} ${styles.statusInactive}`}>{presentation.activationLabel}</span>
           ) : null}
         </div>
       </div>

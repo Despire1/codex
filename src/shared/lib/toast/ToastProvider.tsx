@@ -1,7 +1,17 @@
-import { PropsWithChildren, ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  PropsWithChildren,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon, TaskAltIcon } from '../../../icons/MaterialIcons';
 import { Toast } from '../../ui/Toast/Toast';
+import { hapticNotify } from '../../telegram/haptics';
 import { ToastController, ToastOptions, ToastVariant } from './types';
 
 const ToastContext = createContext<ToastController | null>(null);
@@ -38,6 +48,8 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
   const showToast = useCallback((options: ToastOptions) => {
     const variant = options.variant ?? 'success';
     const defaults = defaultStyles[variant];
+    if (variant === 'success') hapticNotify('success');
+    else if (variant === 'error') hapticNotify('error');
 
     setToast({
       id: Date.now(),

@@ -1,14 +1,13 @@
 import { type FC, type RefObject, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faFilter,
-  faGrip,
-  faList,
-  faPlus,
-} from '@fortawesome/free-solid-svg-icons';
+import { faFilter, faGrip, faList, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { StudentListItem } from '../../../../entities/types';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
-import { buildStudentCardPresentation, getStudentDisplayName, type StudentLifecycleStatus } from '../../model/referencePresentation';
+import {
+  buildStudentCardPresentation,
+  getStudentDisplayName,
+  type StudentLifecycleStatus,
+} from '../../model/referencePresentation';
 import { useStudentCardFilters } from '../../model/useStudentCardFilters';
 import { type StudentListViewMode } from '../../types';
 import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
@@ -98,14 +97,12 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | StudentLifecycleStatus>('all');
   const [levelFilter, setLevelFilter] = useState('Все уровни');
   const [sortBy, setSortBy] = useState<'name' | 'created' | 'score' | 'activity'>('name');
-  const effectiveViewMode: StudentListViewMode = isMobile ? 'standard' : studentsListViewMode;
+  const effectiveViewMode: StudentListViewMode = isMobile ? 'compact' : studentsListViewMode;
 
   const levelOptions = useMemo(() => {
     const uniqueLevels = Array.from(
       new Set(
-        students
-          .map((entry) => entry.link.studentLevel?.trim())
-          .filter((level): level is string => Boolean(level)),
+        students.map((entry) => entry.link.studentLevel?.trim()).filter((level): level is string => Boolean(level)),
       ),
     ).sort((a, b) => a.localeCompare(b, 'ru'));
 
@@ -148,8 +145,12 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
         return b.presentation.averageScore - a.presentation.averageScore;
       }
 
-      const aNext = a.presentation.nextLessonAt ? new Date(a.presentation.nextLessonAt).getTime() : Number.MAX_SAFE_INTEGER;
-      const bNext = b.presentation.nextLessonAt ? new Date(b.presentation.nextLessonAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const aNext = a.presentation.nextLessonAt
+        ? new Date(a.presentation.nextLessonAt).getTime()
+        : Number.MAX_SAFE_INTEGER;
+      const bNext = b.presentation.nextLessonAt
+        ? new Date(b.presentation.nextLessonAt).getTime()
+        : Number.MAX_SAFE_INTEGER;
       return aNext - bNext;
     });
   }, [levelFilter, sortBy, statusFilter, students, timeZone]);
@@ -263,7 +264,9 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                 ) : null}
 
                 {isLoading && preparedStudents.length === 0
-                  ? Array.from({ length: 6 }).map((_, index) => <div key={index} className={styles.compactRowSkeleton} />)
+                  ? Array.from({ length: 6 }).map((_, index) => (
+                      <div key={index} className={styles.compactRowSkeleton} />
+                    ))
                   : null}
               </div>
             </section>
@@ -298,12 +301,7 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
         </div>
       </div>
 
-      <button
-        type="button"
-        className={styles.mobileAddButton}
-        onClick={onAddStudent}
-        aria-label="Добавить ученика"
-      >
+      <button type="button" className={styles.mobileAddButton} onClick={onAddStudent} aria-label="Добавить ученика">
         <FontAwesomeIcon icon={faPlus} />
       </button>
     </div>

@@ -9,8 +9,8 @@
 .stateCard {
   margin: auto;
   width: min(560px, 100%);
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -31,7 +31,7 @@
   justify-content: space-between;
   gap: 16px;
   background: color-mix(in srgb, var(--color-white) 82%, transparent);
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   padding: 14px 16px;
   backdrop-filter: blur(6px);
@@ -48,9 +48,9 @@
   width: 38px;
   height: 38px;
   border-radius: 999px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -61,13 +61,13 @@
   margin: 0;
   font-size: 22px;
   line-height: 1.2;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .headerMeta {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .headerActions {
@@ -83,7 +83,7 @@
   border-radius: 12px;
   border: 1px solid var(--color-orange-200);
   background: var(--color-orange-50);
-  color: var(--color-orange-700);
+  color: var(--status-orange-text);
   font-size: 13px;
   font-weight: 700;
   padding: 9px 12px;
@@ -108,8 +108,8 @@
 .secondaryHeaderButton,
 .secondaryButton {
   border-color: var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
 }
 
 .primaryHeaderButton,
@@ -189,7 +189,7 @@
 
 .studentBadgeAttempt {
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
 }
 
 .studentName {
@@ -232,9 +232,9 @@
 }
 
 .questionCard {
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -252,7 +252,7 @@
   height: 32px;
   border-radius: 999px;
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -276,25 +276,25 @@
   padding: 4px 7px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   background: var(--color-blue-50);
 }
 
 .typePoints {
   font-size: 11px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .questionPrompt {
   margin: 8px 0 0;
   font-size: 17px;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .questionHint {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .answerPanel {
@@ -306,8 +306,8 @@
 .answerBlock,
 .correctBlock {
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
   padding: 11px;
   display: flex;
   flex-direction: column;
@@ -326,24 +326,24 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .correctLabel {
-  color: var(--color-green-700);
+  color: var(--status-green-text);
 }
 
 .answerText,
 .correctText {
   font-size: 13px;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .answerEmpty {
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .attachmentList,
@@ -358,9 +358,9 @@
   align-items: center;
   gap: 8px;
   border-radius: 10px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   text-decoration: none;
   padding: 8px 10px;
   font-size: 13px;
@@ -368,8 +368,8 @@
 
 .voiceItem {
   border-radius: 10px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -381,7 +381,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -426,7 +426,7 @@
   width: 84px;
   border-radius: 10px;
   border: 2px solid var(--color-slate-200);
-  background: var(--color-white);
+  background: var(--surface-card);
   font-size: 14px;
   font-weight: 700;
   text-align: center;
@@ -447,7 +447,7 @@
 
 .scoreMax {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .itemComment {
@@ -455,8 +455,8 @@
   resize: vertical;
   min-height: 70px;
   border-radius: 10px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
   padding: 10px 11px;
   color: var(--color-slate-800);
   font: inherit;
@@ -464,9 +464,9 @@
 }
 
 .feedbackCard {
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -484,7 +484,7 @@
   height: 32px;
   border-radius: 999px;
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -493,13 +493,13 @@
 .feedbackTitle {
   margin: 0;
   font-size: 17px;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .feedbackHint {
   margin: 3px 0 0;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .feedbackArea {
@@ -507,9 +507,9 @@
   min-height: 120px;
   resize: vertical;
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
-  color: var(--color-slate-900);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
+  color: var(--text-primary);
   padding: 12px 13px;
   font: inherit;
   font-size: 14px;
@@ -525,15 +525,15 @@
   border-radius: 10px;
   border: 1px solid var(--color-rose-200);
   background: var(--color-red-50);
-  color: var(--color-red-700);
+  color: var(--status-red-text);
   font-size: 13px;
   padding: 8px 10px;
 }
 
 .summaryCard {
   border-radius: 20px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -543,7 +543,7 @@
 .summaryTitle {
   margin: 0;
   font-size: 18px;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .summaryScore {
@@ -556,20 +556,20 @@
 .summaryScoreValue {
   font-size: 42px;
   line-height: 1;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   font-weight: 800;
 }
 
 .summaryScoreHint {
   margin-top: 3px;
   font-size: 12px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .summaryScoreSub {
   margin-top: 8px;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .summaryProgressWrap {
@@ -582,7 +582,7 @@
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
   overflow: hidden;
 }
 
@@ -594,7 +594,7 @@
 
 .summaryPercent {
   font-size: 12px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .summaryItems {
@@ -608,7 +608,7 @@
   align-items: center;
   justify-content: space-between;
   border-radius: 10px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   padding: 8px 10px;
   font-size: 12px;
 }
@@ -629,15 +629,15 @@
   font-size: 11px;
   font-weight: 700;
   background: var(--color-slate-200);
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .summaryItemLabel {
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .summaryItemScore {
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   font-weight: 700;
 }
 
@@ -669,7 +669,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .summaryProgressSuccess {
@@ -687,11 +687,11 @@
 }
 
 .summaryResultSuccess {
-  color: var(--color-green-700);
+  color: var(--status-green-text);
 }
 
 .summaryResultDanger {
-  color: var(--color-red-700);
+  color: var(--status-red-text);
 }
 
 @media (max-width: 1200px) {

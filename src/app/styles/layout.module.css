@@ -1,7 +1,7 @@
 .page {
   height: min(var(--app-vh, 100vh), 100vh);
-  background: var(--color-slate-50);
-  color: var(--color-slate-900);
+  background: var(--surface-page);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;

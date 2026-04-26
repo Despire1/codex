@@ -16,7 +16,7 @@
   align-items: center;
   gap: 16px;
   padding: 18px 24px;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--surface-card);
   border-bottom: 1px solid #edf1f7;
   backdrop-filter: blur(12px);
 }
@@ -31,10 +31,10 @@
 .mobileMenuButton {
   width: 38px;
   height: 38px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   border-radius: 12px;
-  color: #374151;
+  color: var(--text-secondary);
   display: none;
   align-items: center;
   justify-content: center;
@@ -45,13 +45,13 @@
   font-size: 28px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .headerRight {
@@ -70,17 +70,17 @@
   position: absolute;
   left: 12px;
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .searchInput {
   width: 260px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
   border-radius: 14px;
   padding: 10px 14px 10px 34px;
   font-size: 13px;
-  color: #111827;
+  color: var(--text-primary);
   outline: none;
 }
 
@@ -93,9 +93,9 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #4b5563;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -124,7 +124,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(17, 17, 17, 0.14);
+  box-shadow: 0 8px 24px -8px rgba(17, 17, 17, 0.14);
 }
 
 .addStudentPlus {
@@ -153,9 +153,9 @@
 .statCard {
   border-radius: 26px;
   border: 1px solid #edf1f7;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 18px;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.06);
 }
 
 .statHeaderRow {
@@ -175,7 +175,7 @@
 }
 
 .statIconBlue {
-  background: #eef4ff;
+  background: var(--surface-card-muted);
   color: #3164df;
 }
 
@@ -186,7 +186,7 @@
 
 .statIconViolet {
   background: #f2ecff;
-  color: #6d4cf8;
+  color: var(--status-violet-text);
 }
 
 .statIconOrange {
@@ -205,31 +205,31 @@
 
 .statBadgePositive {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statBadgeNeutral {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .statValue {
   font-size: 34px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
 .statLabel {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .filtersCard {
   border-radius: 28px;
   border: 1px solid #edf1f7;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 16px 18px;
   margin-bottom: 16px;
 }
@@ -253,7 +253,7 @@
   border-radius: 12px;
   padding: 10px 16px;
   background: transparent;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
   -webkit-tap-highlight-color: transparent;
@@ -266,17 +266,17 @@
 
 @media (hover: hover) and (pointer: fine) {
   .tabButton:hover {
-    background: #f3f4f6;
+    background: var(--surface-card-muted);
   }
 
   .tabButtonActive:hover {
-    background: #f3f4f6;
+    background: var(--surface-card-muted);
     color: #111111;
   }
 
   .viewModeButton:hover {
-    background: #eef2f7;
-    color: #111827;
+    background: var(--surface-card-muted);
+    color: var(--text-primary);
   }
 
   .viewModeButtonActive:hover {
@@ -299,7 +299,7 @@
   display: none;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.22);
   font-size: 18px;
 }
 
@@ -328,8 +328,8 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
   border-radius: 14px;
   padding: 4px;
   flex-shrink: 0;
@@ -344,7 +344,7 @@
 .viewModeButton {
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   width: 42px;
   height: 38px;
   border-radius: 10px;
@@ -363,16 +363,16 @@
 .viewModeButtonActive {
   background: #111111;
   color: #a3e635;
-  box-shadow: 0 6px 14px rgba(17, 17, 17, 0.14);
+  box-shadow: 0 6px 14px -4px rgba(17, 17, 17, 0.14);
 }
 
 .iconControlButton {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #4b5563;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -387,15 +387,15 @@
 .compactTable {
   border-radius: 32px;
   border: 1px solid #edf1f7;
-  background: #ffffff;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.06);
+  background: var(--surface-card);
+  box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.06);
   overflow: hidden;
 }
 
 .compactTableHeader {
   padding: 16px 32px;
   border-bottom: 1px solid #edf1f7;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
 }
 
 .compactTableBody {
@@ -417,7 +417,7 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .compactHeaderCenter {
@@ -431,8 +431,8 @@
 .compactEmptyState {
   text-align: center;
   padding: 28px 20px;
-  color: #64748b;
-  background: #ffffff;
+  color: var(--text-muted);
+  background: var(--surface-card);
 }
 
 .compactRowSkeleton {
@@ -444,9 +444,9 @@
 .studentCard {
   border-radius: 28px;
   border: 1px solid #edf1f7;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 16px;
-  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 16px 28px -9px rgba(15, 23, 42, 0.05);
   cursor: pointer;
 }
 
@@ -488,7 +488,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -504,7 +504,7 @@
 .studentLevel {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .studentDebtBadge {
@@ -525,9 +525,9 @@
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #6b7280;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -535,10 +535,10 @@
 }
 
 .cardMenuPopover {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.12);
   padding: 6px;
 }
 
@@ -556,7 +556,7 @@
   text-align: left;
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -566,17 +566,17 @@
 
 @media (hover: hover) and (pointer: fine) {
   .cardMenuButton:hover {
-    background: #f3f4f6;
-    border-color: #d1d5db;
+    background: var(--surface-card-muted);
+    border-color: var(--border-strong);
   }
 
   .cardMenuList button:hover {
-    background: #f3f4f6;
+    background: var(--surface-card-muted);
   }
 
   .cardMenuDanger:hover {
     background: rgba(239, 68, 68, 0.12);
-    color: #b91c1c !important;
+    color: var(--status-red-text) !important;
   }
 }
 
@@ -588,7 +588,7 @@
 }
 
 .metricCell {
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   border-radius: 12px;
   padding: 10px;
   text-align: center;
@@ -598,21 +598,21 @@
   font-size: 19px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .metricGreen {
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .metricBlue {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .metricLabel {
   margin-top: 4px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .homeworkProgressRow {
@@ -620,12 +620,12 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
 .homeworkProgressRow strong {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 12px;
 }
 
@@ -633,7 +633,7 @@
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
   overflow: hidden;
 }
 
@@ -646,7 +646,7 @@
 .studentCardFooter {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -681,7 +681,7 @@
 
 .nextLessonText {
   font-size: 11px;
-  color: #4b5563;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -698,7 +698,7 @@
 }
 
 .statusTextPaused {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .statusTextCompleted {
@@ -711,8 +711,8 @@
   border: 1px dashed #cfd8e6;
   border-radius: 20px;
   padding: 26px;
-  color: #64748b;
-  background: #ffffff;
+  color: var(--text-muted);
+  background: var(--surface-card);
 }
 
 .cardSkeleton {
@@ -817,7 +817,39 @@
   }
 
   .inner {
-    padding: 0;
+    padding: 12px;
+  }
+
+  .compactTable {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .compactTableHeader {
+    display: none;
+  }
+
+  .compactTableBody {
+    gap: 10px;
+  }
+
+  .compactTableBody > * + * {
+    border-top: none;
+  }
+
+  .compactTableBody > article {
+    border: 1px solid #edf1f7;
+    border-radius: 18px;
+    background: var(--surface-card);
+    box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.04);
+  }
+
+  .compactRowSkeleton {
+    border-radius: 18px;
+    height: 120px;
   }
 
   .filtersCard {

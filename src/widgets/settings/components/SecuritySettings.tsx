@@ -115,6 +115,31 @@ export const SecuritySettings: FC = () => {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [actionLoading, setActionLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportData = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const data = await api.exportAccount();
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `teacherbot-export-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast({ message: 'Архив с данными скачан', variant: 'success' });
+    } catch (_error) {
+      showToast({ message: 'Не удалось выгрузить данные', variant: 'error' });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadSessions = useCallback(async () => {
     setStatus('loading');
@@ -177,6 +202,34 @@ export const SecuritySettings: FC = () => {
   return (
     <div className={styles.moduleStack}>
       <section className={styles.settingsCard}>
+        <div className={styles.sectionHeaderCompact}>
+          <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
+            <SettingsIcon width={20} height={20} />
+          </div>
+          <div className={styles.sectionHeaderCopy}>
+            <h2 className={styles.sectionHeading}>Мои данные</h2>
+            <p className={styles.sectionDescription}>
+              Скачайте все данные аккаунта (учеников, уроки, домашки, оплаты) в формате JSON.
+            </p>
+          </div>
+        </div>
+        <div className={styles.helperText}>Архив пригодится для резервной копии или переноса в другой сервис.</div>
+        <button
+          className={`${controls.primaryButton} ${styles.headerSecondaryButton}`}
+          type="button"
+          onClick={() => {
+            void handleExportData();
+          }}
+          disabled={exporting}
+        >
+          <span aria-hidden style={{ marginRight: 6 }}>
+            ⬇
+          </span>
+          {exporting ? 'Готовим архив…' : 'Скачать архив (JSON)'}
+        </button>
+      </section>
+
+      <section className={styles.settingsCard}>
         <div className={styles.sectionHeaderBetween}>
           <div className={styles.sectionHeaderCompact}>
             <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
@@ -203,7 +256,11 @@ export const SecuritySettings: FC = () => {
         {status === 'error' && (
           <div className={styles.errorBox}>
             Не удалось загрузить список сессий.
-            <button className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`} type="button" onClick={loadSessions}>
+            <button
+              className={`${controls.secondaryButton} ${styles.headerSecondaryButton}`}
+              type="button"
+              onClick={loadSessions}
+            >
               Повторить
             </button>
           </div>
@@ -233,12 +290,15 @@ export const SecuritySettings: FC = () => {
                         {session.isCurrent && <span className={styles.sessionBadge}>Текущая</span>}
                       </div>
 
-                      <div className={styles.sessionMetaLine}>{session.ip ? `IP: ${session.ip}` : 'IP не определён'}</div>
+                      <div className={styles.sessionMetaLine}>
+                        {session.ip ? `IP: ${session.ip}` : 'IP не определён'}
+                      </div>
                       <div className={styles.sessionMetaSecondary}>
                         {formatSessionActivity(session.lastSeenAt ?? session.createdAt)}
                       </div>
                       <div className={styles.sessionMetaSecondary}>
-                        Вход: {new Date(session.createdAt).toLocaleString('ru-RU', {
+                        Вход:{' '}
+                        {new Date(session.createdAt).toLocaleString('ru-RU', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
@@ -264,6 +324,36 @@ export const SecuritySettings: FC = () => {
             })}
           </div>
         )}
+      </section>
+
+      <section className={styles.settingsCard}>
+        <div className={styles.sectionHeaderCompact}>
+          <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
+            <SettingsIcon width={20} height={20} />
+          </div>
+          <div className={styles.sectionHeaderCopy}>
+            <h2 className={styles.sectionHeading}>Текущая сессия</h2>
+            <p className={styles.sectionDescription}>
+              Выйти из аккаунта на этом устройстве. Чтобы вернуться, нужно будет заново войти через Telegram.
+            </p>
+          </div>
+        </div>
+        <button
+          className={`${controls.secondaryButton} ${styles.dangerActionButton}`}
+          type="button"
+          onClick={async () => {
+            if (!window.confirm('Выйти из аккаунта на этом устройстве?')) return;
+            try {
+              await api.logout();
+            } catch (error) {
+              console.error('Failed to logout', error);
+            } finally {
+              window.location.replace('/');
+            }
+          }}
+        >
+          Выйти из аккаунта
+        </button>
       </section>
     </div>
   );

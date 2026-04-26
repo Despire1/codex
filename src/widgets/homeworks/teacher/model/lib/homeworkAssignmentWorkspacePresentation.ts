@@ -1,5 +1,9 @@
 import { HomeworkAssignment, HomeworkTemplate } from '../../../../../entities/types';
-import { formatAssignmentStatus, resolveAssignmentDeadlineMeta, resolveAssignmentResponseMeta } from './assignmentPresentation';
+import {
+  formatAssignmentStatus,
+  resolveAssignmentDeadlineMeta,
+  resolveAssignmentResponseMeta,
+} from './assignmentPresentation';
 import {
   resolveHomeworkLibraryMetrics,
   resolveHomeworkLibraryUpdatedLabel,
@@ -112,8 +116,23 @@ export const resolveHomeworkAssignmentCardBadges = (assignment: HomeworkAssignme
 export const resolveHomeworkAssignmentCardMetrics = (assignment: HomeworkAssignment) =>
   resolveHomeworkLibraryMetrics(buildPreviewTemplate(assignment));
 
-export const resolveHomeworkAssignmentCardUpdatedLabel = (assignment: HomeworkAssignment) =>
-  resolveHomeworkLibraryUpdatedLabel(assignment.updatedAt);
+export const resolveHomeworkAssignmentCardUpdatedLabel = (assignment: HomeworkAssignment) => {
+  const deadlineAt = assignment.deadlineAt;
+  if (deadlineAt) {
+    const deadlineDate = new Date(deadlineAt);
+    if (!Number.isNaN(deadlineDate.getTime())) {
+      const formatted = deadlineDate.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: 'short',
+      });
+      if (assignment.status === 'OVERDUE') {
+        return `Просрочено с ${formatted}`;
+      }
+      return `Дедлайн: ${formatted}`;
+    }
+  }
+  return `Выдано ${resolveHomeworkLibraryUpdatedLabel(assignment.updatedAt).replace(/^Изм\.\s*/u, '')}`;
+};
 
 export const resolveHomeworkAssignmentActionLabel = (assignment: HomeworkAssignment) => {
   if (assignment.hasConfigError) return 'Исправить';

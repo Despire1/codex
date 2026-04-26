@@ -3,10 +3,10 @@
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.04);
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   font-size: 13px;
   line-height: 1.45;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .options {
@@ -22,11 +22,11 @@
   align-items: flex-start;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 

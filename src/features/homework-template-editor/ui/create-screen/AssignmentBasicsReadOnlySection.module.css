@@ -2,7 +2,7 @@
   padding: 32px;
   border: 1px solid #edf0f6;
   border-radius: 32px;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .field {
@@ -19,16 +19,16 @@
   font-size: 14px;
   line-height: 1.4;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .value {
   width: 100%;
   border: 1px solid #e6eaf1;
   border-radius: 18px;
-  background: #f7f8fc;
+  background: var(--surface-card-strong);
   padding: 15px 18px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.65;
 }

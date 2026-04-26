@@ -53,6 +53,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <button type="button" className={styles.secondaryButton} onClick={this.reset}>
               Попробовать ещё раз
             </button>
+            <a
+              className={styles.secondaryButton}
+              href="https://t.me/teacherbot_help"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Сообщить о проблеме
+            </a>
           </div>
           {this.state.error.message ? (
             <details className={styles.details}>

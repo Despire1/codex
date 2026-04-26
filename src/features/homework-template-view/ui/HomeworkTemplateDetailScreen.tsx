@@ -18,7 +18,10 @@ import {
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { resolveHomeworkStorageUrl } from '../../homework-submit/model/upload';
-import { extractEstimatedMinutes, getQuestionKind } from '../../homework-template-editor/model/lib/createTemplateScreen';
+import {
+  extractEstimatedMinutes,
+  getQuestionKind,
+} from '../../homework-template-editor/model/lib/createTemplateScreen';
 import {
   clearHomeworkTemplateDetailTopbarState,
   publishHomeworkTemplateDetailTopbarState,
@@ -105,8 +108,10 @@ const getAttachmentKind = (attachment: HomeworkAttachment) => {
   const source = `${attachment.fileName || ''} ${attachment.url || ''}`.toLowerCase();
   if (source.includes('.pdf')) return 'pdf';
   if (source.includes('.doc') || source.includes('.docx')) return 'word';
-  if (source.includes('.png') || source.includes('.jpg') || source.includes('.jpeg') || source.includes('.webp')) return 'image';
-  if (source.includes('.mp3') || source.includes('.wav') || source.includes('.ogg') || source.includes('.m4a')) return 'audio';
+  if (source.includes('.png') || source.includes('.jpg') || source.includes('.jpeg') || source.includes('.webp'))
+    return 'image';
+  if (source.includes('.mp3') || source.includes('.wav') || source.includes('.ogg') || source.includes('.m4a'))
+    return 'audio';
   if (source.startsWith('http')) return 'link';
   return 'file';
 };
@@ -143,11 +148,7 @@ const formatAttachmentMeta = (attachment: HomeworkAttachment) => {
 
 const getUniqueNonEmptyValues = (values: Array<string | null | undefined>) =>
   Array.from(
-    new Set(
-      values
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter((value) => value.length > 0),
-    ),
+    new Set(values.map((value) => (typeof value === 'string' ? value.trim() : '')).filter((value) => value.length > 0)),
   );
 
 const resolveIssuedDateLabel = (assignments: HomeworkAssignment[], timeZone: string) => {
@@ -204,10 +205,15 @@ const countFillInBlanks = (value: string) => (value.match(/\[___\]/g) ?? []).len
 const resolveStudentCardPresentation = (assignment: HomeworkAssignment) => {
   const hasDraftWork =
     assignment.latestSubmissionStatus === 'DRAFT' ||
-    (typeof assignment.latestSubmissionAttemptNo === 'number' && assignment.latestSubmissionAttemptNo > 0 && !assignment.latestSubmissionSubmittedAt);
+    (typeof assignment.latestSubmissionAttemptNo === 'number' &&
+      assignment.latestSubmissionAttemptNo > 0 &&
+      !assignment.latestSubmissionSubmittedAt);
 
   if (assignment.status === 'REVIEWED') {
-    return { label: assignment.lateState === 'LATE' ? 'Сдано поздно' : 'Сдано', toneClass: styles.studentStatusSuccess };
+    return {
+      label: assignment.lateState === 'LATE' ? 'Сдано поздно' : 'Сдано',
+      toneClass: styles.studentStatusSuccess,
+    };
   }
 
   if (assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW') {
@@ -402,7 +408,10 @@ const countQuestionPoints = (question: HomeworkTestQuestion) =>
   typeof question.points === 'number' && Number.isFinite(question.points) && question.points > 0 ? question.points : 0;
 
 const countSubmittedAssignments = (assignments: HomeworkAssignment[]) =>
-  assignments.filter((assignment) => assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' || assignment.status === 'REVIEWED').length;
+  assignments.filter(
+    (assignment) =>
+      assignment.status === 'SUBMITTED' || assignment.status === 'IN_REVIEW' || assignment.status === 'REVIEWED',
+  ).length;
 
 export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps> = ({
   homework,
@@ -450,15 +459,19 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
     [activeAssignments, testBlock?.questions.length, totalPoints],
   );
 
-  const issuedDateLabel = useMemo(() => resolveIssuedDateLabel(activeAssignments, timeZone), [activeAssignments, timeZone]);
+  const issuedDateLabel = useMemo(
+    () => resolveIssuedDateLabel(activeAssignments, timeZone),
+    [activeAssignments, timeZone],
+  );
   const deadlineLabel = useMemo(() => resolveDeadlineLabel(activeAssignments, timeZone), [activeAssignments, timeZone]);
   const headerStatusLabel = canEdit ? 'Черновик' : homework.isArchived ? 'В архиве' : 'Активно';
   const headerStatusTone = canEdit ? 'draft' : homework.isArchived ? 'archived' : 'active';
-  const hasAttentionDot = activeAssignments.some((assignment) =>
-    assignment.status === 'RETURNED' ||
-    assignment.status === 'OVERDUE' ||
-    assignment.status === 'SUBMITTED' ||
-    assignment.status === 'IN_REVIEW',
+  const hasAttentionDot = activeAssignments.some(
+    (assignment) =>
+      assignment.status === 'RETURNED' ||
+      assignment.status === 'OVERDUE' ||
+      assignment.status === 'SUBMITTED' ||
+      assignment.status === 'IN_REVIEW',
   );
 
   useLayoutEffect(() => {
@@ -486,7 +499,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
               </button>
               <div className={styles.headerTitleWrap}>
                 <h1 className={styles.title}>{homework.title || 'Домашнее задание без названия'}</h1>
-                <p className={styles.subtitle}>{canEdit ? 'Черновик домашнего задания' : 'Просмотр выданного задания'}</p>
+                <p className={styles.subtitle}>
+                  {canEdit ? 'Черновик домашнего задания' : 'Просмотр выданного задания'}
+                </p>
               </div>
             </div>
 
@@ -596,20 +611,26 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
               {activeAssignments.length > 0 ? (
                 <div className={styles.studentCards}>
                   {activeAssignments.map((assignment) => {
-                    const name = assignment.studentName || assignment.studentUsername || `Ученик #${assignment.studentId}`;
+                    const name =
+                      assignment.studentName || assignment.studentUsername || `Ученик #${assignment.studentId}`;
                     const avatarColor = resolveAssignmentStudentAvatarColor(assignment);
                     const avatarTextColor = resolveAssignmentStudentAvatarTextColor(avatarColor);
                     const presentation = resolveStudentCardPresentation(assignment);
                     return (
                       <div key={assignment.id} className={styles.studentCard}>
                         <div className={styles.studentAvatarWrap}>
-                          <div className={styles.studentAvatar} style={{ background: avatarColor, color: avatarTextColor }}>
+                          <div
+                            className={styles.studentAvatar}
+                            style={{ background: avatarColor, color: avatarTextColor }}
+                          >
                             {getStudentInitials(name)}
                           </div>
                         </div>
                         <div className={styles.studentMeta}>
                           <strong>{name}</strong>
-                          <span className={`${styles.studentStatus} ${presentation.toneClass}`}>{presentation.label}</span>
+                          <span className={`${styles.studentStatus} ${presentation.toneClass}`}>
+                            {presentation.label}
+                          </span>
                         </div>
                       </div>
                     );
@@ -631,7 +652,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                 </span>
                 <div>
                   <h2 className={styles.cardTitle}>Вопросы</h2>
-                  <p className={styles.cardHint}>Всего {stats.questions} вопросов • {formatPointsLabel(stats.maxPoints)}</p>
+                  <p className={styles.cardHint}>
+                    Всего {stats.questions} вопросов • {formatPointsLabel(stats.maxPoints)}
+                  </p>
                 </div>
               </div>
 
@@ -645,7 +668,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                           {TYPE_LABELS[getQuestionKind(question)] ?? 'Вопрос'}
                         </span>
                       </div>
-                      <span className={styles.questionScoreBadge}>{formatPointsLabel(countQuestionPoints(question))}</span>
+                      <span className={styles.questionScoreBadge}>
+                        {formatPointsLabel(countQuestionPoints(question))}
+                      </span>
                     </div>
                     <div className={styles.questionBody}>
                       <QuestionAnswerPreview question={question} />
@@ -683,10 +708,29 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                           <span>{formatAttachmentMeta(attachment)}</span>
                         </div>
                         <div className={styles.materialActions}>
-                          <a className={styles.materialAction} href={href} target="_blank" rel="noreferrer" aria-label="Открыть материал">
-                            {isExternal ? <HomeworkArrowUpRightFromSquareIcon size={12} /> : <HomeworkEyeIcon size={12} />}
+                          <a
+                            className={styles.materialAction}
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={isExternal ? 'Открыть в новой вкладке' : 'Превью материала'}
+                            title={isExternal ? 'Открыть в новой вкладке' : 'Превью материала'}
+                          >
+                            {isExternal ? (
+                              <HomeworkArrowUpRightFromSquareIcon size={12} />
+                            ) : (
+                              <HomeworkEyeIcon size={12} />
+                            )}
                           </a>
-                          <a className={styles.materialAction} href={href} target="_blank" rel="noreferrer" aria-label="Скачать материал">
+                          <a
+                            className={styles.materialAction}
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={isExternal ? undefined : (attachment.fileName ?? undefined)}
+                            aria-label={isExternal ? 'Перейти по ссылке' : 'Скачать файл'}
+                            title={isExternal ? 'Перейти по ссылке' : 'Скачать файл'}
+                          >
                             {isExternal ? <HomeworkLinkIcon size={12} /> : <HomeworkDownloadIcon size={12} />}
                           </a>
                         </div>
@@ -721,7 +765,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                     <span>{quizSettings.autoCheckEnabled ? 'Включена' : 'Выключена'}</span>
                   </div>
                 </div>
-                <span className={`${styles.settingToggle} ${quizSettings.autoCheckEnabled ? styles.settingToggleOn : ''}`} />
+                <span
+                  className={`${styles.settingToggle} ${quizSettings.autoCheckEnabled ? styles.settingToggleOn : ''}`}
+                />
               </div>
 
               <div className={styles.settingDivider} />
@@ -763,7 +809,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                 <div className={styles.toggleRowCompact}>
                   <span>Таймер</span>
                   {quizSettings.timerEnabled ? (
-                    <span className={styles.timerValue}>{quizSettings.timerDurationMinutes ? `${quizSettings.timerDurationMinutes} мин` : 'Да'}</span>
+                    <span className={styles.timerValue}>
+                      {quizSettings.timerDurationMinutes ? `${quizSettings.timerDurationMinutes} мин` : 'Да'}
+                    </span>
                   ) : (
                     <HomeworkXMarkIcon size={13} />
                   )}
@@ -797,7 +845,9 @@ export const HomeworkTemplateDetailScreen: FC<HomeworkTemplateDetailScreenProps>
                 <div className={styles.statProgressTitle}>Статус выполнения</div>
                 <div className={styles.statProgressRow}>
                   <span>Сдано</span>
-                  <strong>{stats.submitted}/{stats.students}</strong>
+                  <strong>
+                    {stats.submitted}/{stats.students}
+                  </strong>
                 </div>
                 <div className={styles.progressTrackDark}>
                   <div

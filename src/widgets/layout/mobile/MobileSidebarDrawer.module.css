@@ -21,7 +21,7 @@
   top: 0;
   width: 256px;
   height: 100dvh;
-  background: var(--color-white);
+  background: var(--surface-card);
   z-index: 50;
   transform: translateX(-100%);
   transition: transform 0.24s ease;
@@ -70,7 +70,7 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -80,7 +80,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -102,7 +102,7 @@
   border: none;
   border-radius: 16px;
   background: transparent;
-  color: #4b5563;
+  color: var(--text-secondary);
   min-height: 44px;
   padding: 10px 16px;
   display: flex;
@@ -173,7 +173,7 @@
   border: none;
   width: 100%;
   border-radius: 16px;
-  background: var(--color-gray-50);
+  background: var(--surface-card-strong);
   min-height: 64px;
   padding: 12px;
   display: flex;
@@ -184,7 +184,7 @@
 }
 
 .profileCard:hover {
-  background: var(--color-gray-100);
+  background: var(--surface-card-muted);
 }
 
 .avatar {
@@ -208,7 +208,7 @@
 .avatarFallback {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .profileMeta {
@@ -221,7 +221,7 @@
 .profileName {
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -229,14 +229,14 @@
 
 .profilePlan {
   font-size: 11px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .settingsIcon {
-  color: var(--color-gray-500);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;

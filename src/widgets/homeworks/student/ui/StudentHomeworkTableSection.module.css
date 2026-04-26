@@ -3,11 +3,11 @@
 }
 
 .tableWrap {
-  background: #ffffff;
-  border: 1px solid #eef1f5;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 2rem;
   overflow: hidden;
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 38px -12px rgba(15, 23, 42, 0.08);
 }
 
 .mobileList {
@@ -27,10 +27,10 @@
 
 .table thead th {
   padding: 16px 24px;
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   border-bottom: 1px solid #edf0f4;
   text-align: left;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -57,7 +57,7 @@
 }
 
 .row:hover {
-  background: #f9fafb;
+  background: var(--surface-card-strong);
 }
 
 .row:focus-visible {
@@ -109,8 +109,8 @@
 }
 
 .taskIcon_slate {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .taskMain {
@@ -130,7 +130,7 @@
   font-size: 14px;
   line-height: 1.25;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -140,7 +140,7 @@
   border-radius: 999px;
   padding: 2px 8px;
   background: #dcfce7;
-  color: #15803d;
+  color: var(--status-green-text);
   font-size: 11px;
   font-weight: 700;
   flex: 0 0 auto;
@@ -150,7 +150,7 @@
   margin: 4px 0 0;
   font-size: 12px;
   line-height: 1.3;
-  color: #6b7280;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -178,7 +178,7 @@
 
 .typeBadge_green {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .typeBadge_purple {
@@ -192,8 +192,8 @@
 }
 
 .typeBadge_slate {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .statusBadge {
@@ -220,7 +220,7 @@
 
 .statusBadge_new {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statusBadge_in_progress {
@@ -235,7 +235,7 @@
 
 .statusBadge_completed {
   background: #dcfce7;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statusDot_overdue {
@@ -264,7 +264,7 @@
 
 .deadlinePrimary {
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .deadlinePrimary_danger {
@@ -273,7 +273,7 @@
 
 .deadlineSecondary {
   margin-top: 2px;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -282,7 +282,7 @@
 }
 
 .deadlineSecondary_warning {
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .deadlineSecondary_success {
@@ -328,7 +328,7 @@
 .progressLabel {
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -337,7 +337,7 @@
 }
 
 .progressLabel_primary {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .progressLabel_amber {
@@ -373,13 +373,13 @@
 }
 
 .actionButton_ghost {
-  background: #ffffff;
-  color: #374151;
-  border-color: #e5e7eb;
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  border-color: var(--border-default);
 }
 
 .actionButton_ghost:hover {
-  background: #f9fafb;
+  background: var(--surface-card-strong);
 }
 
 .emptyState {
@@ -389,7 +389,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 14px;
   text-align: center;
 }
@@ -399,10 +399,10 @@
 }
 
 .emptyState button {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: #ffffff;
-  color: #334155;
+  background: var(--surface-card);
+  color: var(--text-secondary);
   font-size: 13px;
   padding: 8px 12px;
   cursor: pointer;
@@ -416,7 +416,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.06);
 }
 
 .mobileSkeletonHeader,
@@ -496,9 +496,9 @@
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.06);
   text-align: left;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .mobileEmptyState p {
@@ -511,8 +511,8 @@
   min-height: 44px;
   border: 1px solid #dbe3ef;
   border-radius: 14px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--surface-card);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;

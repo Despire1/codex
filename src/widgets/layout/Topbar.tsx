@@ -11,10 +11,10 @@ import {
   SaveOutlinedIcon,
 } from '../../icons/MaterialIcons';
 import { type HomeworkTemplateDetailTopbarTone } from '../../features/homework-template-view/model/lib/homeworkTemplateDetailTopbarBridge';
-import { Avatar } from '../../shared/ui/Avatar/Avatar';
 import { HomeworkPrintIcon } from '../../shared/ui/icons/HomeworkFaIcons';
 import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
 import { TopbarCreateMenu, type TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
+import { TopbarProfileMenu } from './ui/TopbarProfileMenu/TopbarProfileMenu';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -245,7 +245,9 @@ export const Topbar: FC<TopbarProps> = ({
 
             <div
               className={`${styles.createButtonSlot} ${
-                showCreateLesson || !reserveCreateButtonSpace ? styles.createButtonSlotVisible : styles.createButtonSlotHidden
+                showCreateLesson || !reserveCreateButtonSpace
+                  ? styles.createButtonSlotVisible
+                  : styles.createButtonSlotHidden
               }`}
             >
               {createMenuItems?.length ? (
@@ -280,8 +282,12 @@ export const Topbar: FC<TopbarProps> = ({
 
         {showProfile ? (
           <div className={styles.profile}>
-            <span className={styles.teacherName}>{teacherDisplayName}</span>
-            <Avatar src={profilePhotoUrl} alt="Профиль преподавателя" fallbackText={fallbackText} />
+            <TopbarProfileMenu
+              displayName={teacherDisplayName}
+              fallbackText={fallbackText}
+              profilePhotoUrl={profilePhotoUrl}
+              displayNameClassName={styles.teacherName}
+            />
           </div>
         ) : null}
       </div>

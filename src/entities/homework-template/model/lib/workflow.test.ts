@@ -1,9 +1,6 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import {
-  canTeacherDeleteHomeworkTemplate,
-  canTeacherEditHomeworkTemplate,
-} from './workflow';
+import { canTeacherDeleteHomeworkTemplate, canTeacherEditHomeworkTemplate } from './workflow';
 
 test('teacher can edit only templates without issued assignments', () => {
   assert.equal(canTeacherEditHomeworkTemplate({ issuedAssignmentsCount: 0 } as any), true);

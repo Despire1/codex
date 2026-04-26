@@ -1,6 +1,6 @@
-import { addDays, isSameDay } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addDays, isSameDay, ru } from 'date-fns';
 import type { ActivityFeedItem } from '../../../entities/types';
+import { inflectFirstName } from '../../../shared/lib/inflectName';
 import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 
 export type ActivityTimelineTone = 'success' | 'failed' | 'info';
@@ -74,7 +74,7 @@ const resolveParticipantNames = (item: ActivityFeedItem) => {
 const resolveParticipantPhrase = (item: ActivityFeedItem) => {
   const names = resolveParticipantNames(item);
   if (names.length === 0) return '';
-  if (names.length === 1) return `для ${names[0]}`;
+  if (names.length === 1) return `для ${inflectFirstName(names[0], 'genitive')}`;
   return `для учеников: ${names.join(', ')}`;
 };
 
@@ -99,9 +99,9 @@ const resolveStudentContexts = (item: ActivityFeedItem) => {
   const name = item.studentName?.trim() || null;
   return {
     name,
-    dative: name ? `ученику ${name}` : 'ученику',
-    genitive: name ? `у ${name}` : 'у ученика',
-    forName: name ? `для ${name}` : null,
+    dative: name ? `ученику ${inflectFirstName(name, 'dative')}` : 'ученику',
+    genitive: name ? `у ${inflectFirstName(name, 'genitive')}` : 'у ученика',
+    forName: name ? `для ${inflectFirstName(name, 'genitive')}` : null,
   };
 };
 
@@ -151,7 +151,9 @@ const composeNotificationMessage = (item: ActivityFeedItem, lessonContext: strin
   switch (item.action) {
     case 'PAYMENT_REMINDER_STUDENT':
       if (failed) {
-        return sentence(`Не удалось отправить напоминание об оплате ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`);
+        return sentence(
+          `Не удалось отправить напоминание об оплате ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`,
+        );
       }
       return sentence(
         `${item.source === 'USER' ? 'Отправлено ручное' : 'Отправлено'} напоминание об оплате ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`,
@@ -159,15 +161,17 @@ const composeNotificationMessage = (item: ActivityFeedItem, lessonContext: strin
     case 'PAYMENT_REMINDER_TEACHER':
       if (failed) {
         return sentence(
-          `Не удалось отправить вам служебное подтверждение: напоминание об оплате${student.forName ? ` ${student.forName}` : ''}${lessonContext ? ` ${lessonContext}` : ''}`,
+          `Напоминание ученику${student.forName ? ` ${student.forName}` : ''} отправлено, но копию вам прислать не смогли: нужно открыть чат с ботом в Telegram${lessonContext ? ` (${lessonContext})` : ''}`,
         );
       }
       return sentence(
-        `Вам отправлено служебное подтверждение: напоминание об оплате${student.forName ? ` ${student.forName}` : ''}${lessonContext ? ` ${lessonContext}` : ''}`,
+        `Вам пришла копия напоминания об оплате${student.forName ? ` ${student.forName}` : ''}${lessonContext ? ` ${lessonContext}` : ''}`,
       );
     case 'STUDENT_LESSON_REMINDER':
       if (failed) {
-        return sentence(`Не удалось отправить напоминание о занятии ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`);
+        return sentence(
+          `Не удалось отправить напоминание о занятии ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`,
+        );
       }
       return sentence(`Отправлено напоминание о занятии ${student.dative}${lessonContext ? ` ${lessonContext}` : ''}`);
     case 'TEACHER_LESSON_REMINDER':
@@ -192,7 +196,9 @@ const composePaymentMessage = (item: ActivityFeedItem, lessonContext: string | n
 
   switch (item.action) {
     case 'AUTO_CHARGE':
-      return sentence(`Выполнено автосписание за занятие ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`);
+      return sentence(
+        `Выполнено автосписание за занятие ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`,
+      );
     case 'MANUAL_PAID':
       if (reason === 'BALANCE_PAYMENT') {
         return sentence(`Списана оплата с баланса ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`);
@@ -204,7 +210,9 @@ const composePaymentMessage = (item: ActivityFeedItem, lessonContext: string | n
       return sentence(`Оформлен абонемент ${student.genitive}${value ? ` (${value})` : ''}`);
     case 'ADJUSTMENT':
       if (reason === 'LESSON_CANCELED') {
-        return sentence(`Сделан возврат после отмены занятия ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`);
+        return sentence(
+          `Сделан возврат после отмены занятия ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`,
+        );
       }
       if (reason === 'PAYMENT_REVERT_REFUND' || reason === 'PAYMENT_REVERT') {
         return sentence(`Отменена оплата с возвратом ${student.genitive}${lessonContext ? ` ${lessonContext}` : ''}`);
@@ -288,18 +296,25 @@ const resolveChangedFieldsDetail = (item: ActivityFeedItem) => {
   return `Изменено: ${labels.join(', ')}`;
 };
 
-const composeLessonDetails = (item: ActivityFeedItem, timeZone: string) => {
+const composeLessonDetails = (item: ActivityFeedItem, timeZone: string, lessonContext: string | null) => {
   const parts: string[] = [];
-  const lessonDate = resolveLessonDateDetail(item, timeZone);
   const weekdays = resolveWeekdayLabels(item);
   const repeatUntil = payloadString(item, 'repeatUntil');
   const participants = resolveParticipantNames(item);
 
-  if (lessonDate) {
-    parts.push(lessonDate);
+  if (!lessonContext) {
+    const lessonDate = resolveLessonDateDetail(item, timeZone);
+    if (lessonDate) {
+      parts.push(lessonDate);
+    }
   }
 
-  if (item.action === 'CREATE_RECURRING' || item.action === 'CONVERT_TO_SERIES' || item.action === 'UPDATE_SERIES' || item.action === 'DELETE_SERIES') {
+  if (
+    item.action === 'CREATE_RECURRING' ||
+    item.action === 'CONVERT_TO_SERIES' ||
+    item.action === 'UPDATE_SERIES' ||
+    item.action === 'DELETE_SERIES'
+  ) {
     if (weekdays.length > 0) {
       parts.push(`Дни: ${weekdays.join(', ')}`);
     }
@@ -325,7 +340,8 @@ const composeFallbackMessage = (item: ActivityFeedItem, lessonContext: string | 
   const student = resolveStudentContexts(item);
   const base = sentence(item.title || 'Событие');
   const hasStudentInTitle = student.name ? base.includes(student.name) : false;
-  const withStudentContext = student.forName && !hasStudentInTitle ? `${base.slice(0, -1)} (${student.forName}).` : base;
+  const withStudentContext =
+    student.forName && !hasStudentInTitle ? `${base.slice(0, -1)} (${student.forName}).` : base;
   if (lessonContext && !withStudentContext.includes(lessonContext)) {
     return `${withStudentContext.slice(0, -1)} (${lessonContext}).`;
   }
@@ -362,11 +378,9 @@ export const buildActivityTimelinePresentation = (
         ? 'info'
         : 'success';
 
-  const lessonDetails = item.category === 'LESSON' ? composeLessonDetails(item, timeZone) : null;
+  const lessonDetails = item.category === 'LESSON' ? composeLessonDetails(item, timeZone, lessonContext) : null;
   const baseDetails =
-    item.status === 'FAILED'
-      ? resolveFailureDetails(item)
-      : (lessonDetails ?? item.details?.trim() ?? null);
+    item.status === 'FAILED' ? resolveFailureDetails(item) : (lessonDetails ?? item.details?.trim() ?? null);
 
   return {
     timeLabel: resolveTimeLabel(item.occurredAt, timeZone),

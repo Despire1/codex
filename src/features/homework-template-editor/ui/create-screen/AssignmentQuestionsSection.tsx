@@ -30,7 +30,8 @@ interface AssignmentQuestionsSectionProps {
 }
 
 const QUESTION_KIND_OPTIONS: Array<{ value: CreateQuestionKind; label: string }> = [
-  { value: 'CHOICE', label: 'Выбор' },
+  { value: 'SINGLE_CHOICE', label: 'Один правильный вариант' },
+  { value: 'MULTIPLE_CHOICE', label: 'Несколько правильных вариантов' },
   { value: 'SHORT_TEXT', label: 'Короткий текст' },
   { value: 'LONG_TEXT', label: 'Длинный текст' },
   { value: 'AUDIO', label: 'Аудио' },
@@ -85,7 +86,11 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
 }) => {
   const questions = useMemo(() => testBlock?.questions ?? [], [testBlock]);
   const totalPoints = useMemo(
-    () => questions.reduce((sum, question) => sum + (Number.isFinite(Number(question.points)) ? Number(question.points) : 0), 0),
+    () =>
+      questions.reduce(
+        (sum, question) => sum + (Number.isFinite(Number(question.points)) ? Number(question.points) : 0),
+        0,
+      ),
     [questions],
   );
 
@@ -101,11 +106,12 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
     commitQuestions(questions.map((question, index) => (index === questionIndex ? updater(question) : question)));
   };
 
-  const addQuestion = (kind: CreateQuestionKind = 'CHOICE') => {
+  const addQuestion = (kind: CreateQuestionKind = 'SINGLE_CHOICE') => {
     commitQuestions([...questions, createQuestionByKind(kind)]);
   };
 
-  const promptPath = (index: number): FormValidationPath => (testBlockPath ? [...testBlockPath, 'questions', index, 'prompt'] : ['questions', index, 'prompt']);
+  const promptPath = (index: number): FormValidationPath =>
+    testBlockPath ? [...testBlockPath, 'questions', index, 'prompt'] : ['questions', index, 'prompt'];
 
   return (
     <section className={styles.card}>
@@ -117,7 +123,7 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
           </p>
         </div>
 
-        <button type="button" className={styles.addButton} onClick={() => addQuestion('CHOICE')}>
+        <button type="button" className={styles.addButton} onClick={() => addQuestion('SINGLE_CHOICE')}>
           <HomeworkPlusIcon size={12} />
           <span>Добавить</span>
         </button>
@@ -264,7 +270,9 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                                 updateQuestion(index, (currentQuestion) => ({
                                   ...currentQuestion,
                                   options: (currentQuestion.options ?? []).map((currentOption) =>
-                                    currentOption.id === option.id ? { ...currentOption, text: event.target.value } : currentOption,
+                                    currentOption.id === option.id
+                                      ? { ...currentOption, text: event.target.value }
+                                      : currentOption,
                                   ),
                                 }))
                               }
@@ -275,8 +283,12 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                               onClick={() =>
                                 updateQuestion(index, (currentQuestion) => ({
                                   ...currentQuestion,
-                                  options: (currentQuestion.options ?? []).filter((currentOption) => currentOption.id !== option.id),
-                                  correctOptionIds: (currentQuestion.correctOptionIds ?? []).filter((item) => item !== option.id),
+                                  options: (currentQuestion.options ?? []).filter(
+                                    (currentOption) => currentOption.id !== option.id,
+                                  ),
+                                  correctOptionIds: (currentQuestion.correctOptionIds ?? []).filter(
+                                    (item) => item !== option.id,
+                                  ),
                                 }))
                               }
                               aria-label="Удалить вариант"
@@ -306,7 +318,11 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                   {(presentation.kind === 'SHORT_TEXT' || presentation.kind === 'LONG_TEXT') && (
                     <div className={styles.answerPreview}>
                       <p>Пример ответа:</p>
-                      <textarea readOnly rows={presentation.kind === 'LONG_TEXT' ? 4 : 3} placeholder="Ученик введет текст здесь..." />
+                      <textarea
+                        readOnly
+                        rows={presentation.kind === 'LONG_TEXT' ? 4 : 3}
+                        placeholder="Ученик введет текст здесь..."
+                      />
                     </div>
                   )}
 
@@ -374,7 +390,9 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                               updateQuestion(index, (currentQuestion) => ({
                                 ...currentQuestion,
                                 matchingPairs: (currentQuestion.matchingPairs ?? []).map((currentPair) =>
-                                  currentPair.id === pair.id ? { ...currentPair, left: event.target.value } : currentPair,
+                                  currentPair.id === pair.id
+                                    ? { ...currentPair, left: event.target.value }
+                                    : currentPair,
                                 ),
                               }))
                             }
@@ -387,7 +405,9 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                               updateQuestion(index, (currentQuestion) => ({
                                 ...currentQuestion,
                                 matchingPairs: (currentQuestion.matchingPairs ?? []).map((currentPair) =>
-                                  currentPair.id === pair.id ? { ...currentPair, right: event.target.value } : currentPair,
+                                  currentPair.id === pair.id
+                                    ? { ...currentPair, right: event.target.value }
+                                    : currentPair,
                                 ),
                               }))
                             }
@@ -446,8 +466,9 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                                 table: currentQuestion.table
                                   ? {
                                       ...currentQuestion.table,
-                                      answerHeaders: currentQuestion.table.answerHeaders.map((currentHeader, currentIndex) =>
-                                        currentIndex === headerIndex ? event.target.value : currentHeader,
+                                      answerHeaders: currentQuestion.table.answerHeaders.map(
+                                        (currentHeader, currentIndex) =>
+                                          currentIndex === headerIndex ? event.target.value : currentHeader,
                                       ),
                                     }
                                   : currentQuestion.table,
@@ -469,7 +490,9 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
                                   ? {
                                       ...currentQuestion.table,
                                       rows: currentQuestion.table.rows.map((currentRow) =>
-                                        currentRow.id === row.id ? { ...currentRow, lead: event.target.value } : currentRow,
+                                        currentRow.id === row.id
+                                          ? { ...currentRow, lead: event.target.value }
+                                          : currentRow,
                                       ),
                                     }
                                   : currentQuestion.table,
@@ -523,7 +546,7 @@ export const AssignmentQuestionsSection: FC<AssignmentQuestionsSectionProps> = (
           </div>
         ) : null}
 
-        <button type="button" className={styles.addGhostButton} onClick={() => addQuestion('CHOICE')}>
+        <button type="button" className={styles.addGhostButton} onClick={() => addQuestion('SINGLE_CHOICE')}>
           <HomeworkPlusIcon size={12} />
           Добавить вопрос
         </button>

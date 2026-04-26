@@ -1,5 +1,8 @@
 import { HomeworkAssignment, HomeworkAssignmentStatus, HomeworkSubmissionStatus } from '../../../entities/types';
-import { resolveHomeworkAssignmentViewStatus, resolveHomeworkAssignmentWorkflow } from '../../../entities/homework-assignment/model/lib/workflow';
+import {
+  resolveHomeworkAssignmentViewStatus,
+  resolveHomeworkAssignmentWorkflow,
+} from '../../../entities/homework-assignment/model/lib/workflow';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { ru } from 'date-fns/locale';
 
@@ -61,12 +64,12 @@ export const resolveStudentProfileHomeworkMetaLabel = (assignment: HomeworkAssig
   }
 
   if (assignment.sendMode === 'AUTO_AFTER_LESSON_DONE') {
-    return 'Выдача после завершения урока';
+    return 'Автоматически после урока';
   }
   if (assignment.sendMode === 'SCHEDULED') {
-    return 'Выдача по расписанию';
+    return 'Запланирована отправка';
   }
-  return 'Выдача вручную';
+  return 'Выдано вручную';
 };
 
 export const canRemindStudentProfileHomework = (assignment: HomeworkAssignment, now = new Date()) => {

@@ -1,10 +1,13 @@
 .card {
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 2rem;
   overflow: hidden;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .card:hover {
@@ -66,12 +69,12 @@
 
 .statusBadge_new {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statusBadge_in_progress {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .statusBadge_submitted {
@@ -112,12 +115,12 @@
   margin: 0;
   font-size: 24px;
   line-height: 1.2;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .description {
   margin: 8px 0 0;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -130,7 +133,7 @@
 .deadlinePrimary {
   font-size: 15px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .deadlinePrimary_danger {
@@ -140,11 +143,11 @@
 .deadlineSecondary {
   margin-top: 4px;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .deadlineSecondary_danger {
-  color: #b91c1c;
+  color: var(--status-red-text);
 }
 
 .deadlineSecondary_warning {
@@ -152,11 +155,11 @@
 }
 
 .deadlineSecondary_success {
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .progressCard {
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   border-radius: 14px;
   padding: 14px;
 }
@@ -171,7 +174,7 @@
 .progressLabel {
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.09em;
 }
@@ -179,7 +182,7 @@
 .progressValue {
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .progressTrack {
@@ -219,14 +222,14 @@
 .infoTitle {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .infoText {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .footerRow {
@@ -254,7 +257,7 @@
 }
 
 .metaItem {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .metaItemAccent {
@@ -272,7 +275,10 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
   white-space: nowrap;
 }
 
@@ -285,20 +291,20 @@
 .actionButton_new,
 .actionButton_in_progress {
   background: #111827;
-  border-color: #111827;
+  border-color: var(--text-primary);
   color: var(--color-white);
 }
 
 .actionButton_submitted,
 .actionButton_completed {
-  background: var(--color-white);
+  background: var(--surface-card);
   border-color: var(--color-gray-200);
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .actionButton_submitted:hover,
 .actionButton_completed:hover {
-  background: var(--color-slate-50);
+  background: var(--surface-page);
 }
 
 @media (max-width: 860px) {
@@ -335,7 +341,7 @@
   .deadlineWrap {
     width: 100%;
     border-radius: 14px;
-    background: #f8fafc;
+    background: var(--surface-card-strong);
     padding: 10px 12px;
     display: flex;
     align-items: flex-end;

@@ -1,5 +1,4 @@
-import { addDays, addMinutes, isSameDay } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addDays, addMinutes, isSameDay, ru } from 'date-fns';
 import prisma from './prismaClient';
 import {
   createNotificationLogEntry,
@@ -10,11 +9,7 @@ import {
   type NotificationLogChannel,
 } from './notificationLogService';
 import { resolveStudentTelegramId } from './studentContacts';
-import {
-  buildDashboardDeepLink,
-  buildLessonDeepLink,
-  buildStudentProfileDeepLink,
-} from './server/lib/deepLinks';
+import { buildDashboardDeepLink, buildLessonDeepLink, buildStudentProfileDeepLink } from './server/lib/deepLinks';
 import {
   buildWebPushTextNotificationPayload,
   hasWebPushSubscriptionsForStudent,
@@ -23,6 +18,7 @@ import {
   sendWebPushToStudent,
   sendWebPushToTeacher,
 } from './webPushService';
+import { inflectFirstName } from '../shared/lib/inflectName';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
 import {
   DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
@@ -208,10 +204,11 @@ const buildTeacherPaymentReminderMessage = ({
   source: 'AUTO' | 'MANUAL';
 }) => {
   const dateLabel = formatLessonDateLabel(startAt, timeZone);
+  const studentDative = inflectFirstName(studentName, 'dative');
   if (source === 'MANUAL') {
-    return `Готово ✅ Напоминание отправлено ученику ${studentName} по занятию ${dateLabel}.`;
+    return `Готово ✅ Напоминание отправлено ученику ${studentDative} по занятию ${dateLabel}.`;
   }
-  return `Авто-напоминание отправлено ученику ${studentName} по занятию ${dateLabel}.`;
+  return `Авто-напоминание отправлено ученику ${studentDative} по занятию ${dateLabel}.`;
 };
 
 const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: string | null) => {
@@ -548,9 +545,7 @@ export const sendStudentLessonReminderManual = async ({
       dedupeKey,
       send: () =>
         sendTelegramMessage(telegramId as bigint, normalizedText, {
-          webAppButton: manualLessonLink
-            ? { label: manualLessonLink.label, url: manualLessonLink.fullUrl }
-            : null,
+          webAppButton: manualLessonLink ? { label: manualLessonLink.label, url: manualLessonLink.fullUrl } : null,
         }),
       onFailure: async (message) => {
         if (isTelegramUnreachableError(message)) {
@@ -729,10 +724,7 @@ export const sendStudentPaymentReminder = async ({
   const dateLabel = formatLessonDateLabel(lesson.startAt, teacher.timezone);
   const timeLabel = formatLessonTimeLabel(lesson.startAt, teacher.timezone);
   const dateTimeLabel = buildLessonDateTimeLabel(lesson.startAt, teacher.timezone);
-  const template = resolveStudentTemplate(
-    teacher.studentPaymentDueTemplate,
-    DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
-  );
+  const template = resolveStudentTemplate(teacher.studentPaymentDueTemplate, DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE);
   const text = fillTemplateVariables(
     template,
     {
@@ -767,9 +759,7 @@ export const sendStudentPaymentReminder = async ({
       source,
       send: () =>
         sendTelegramMessage(telegramId as bigint, normalizedText, {
-          webAppButton: paymentStudentLink
-            ? { label: 'Открыть занятие', url: paymentStudentLink.fullUrl }
-            : null,
+          webAppButton: paymentStudentLink ? { label: 'Открыть занятие', url: paymentStudentLink.fullUrl } : null,
         }),
       onFailure: async (message) => {
         if (isTelegramUnreachableError(message)) {

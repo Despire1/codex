@@ -9,14 +9,17 @@
   gap: 8px;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
   position: relative;
 }
 
 .card:hover {
   background: #f2f4f8;
   border-color: #dde3ec;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 28px -9px rgba(15, 23, 42, 0.08);
 }
 
 .card:focus-visible {
@@ -36,7 +39,7 @@
   font-size: 14px;
   font-weight: 700;
   line-height: 1.3;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .headerControls {
@@ -61,13 +64,16 @@
 
 .iconBadgeButton {
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .iconBadgeButton:hover {
   transform: translateY(-1px);
   border-color: rgba(37, 99, 235, 0.3);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 8px 18px -6px rgba(37, 99, 235, 0.16);
 }
 
 .iconBadgeIcon {
@@ -87,17 +93,21 @@
   border: none;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.84);
-  color: #64748b;
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .actionsButton:hover {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--surface-card);
+  color: var(--text-primary);
 }
 
 .actionsButton:focus-visible {
@@ -126,10 +136,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: #ffffff;
+  background: var(--surface-card);
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 18px 40px -13px rgba(15, 23, 42, 0.14);
 }
 
 .actionItem {
@@ -140,18 +150,20 @@
   font-size: 14px;
   font-weight: 500;
   text-align: left;
-  color: #334155;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .actionItem:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: var(--surface-card-muted);
 }
 
 .actionItem:disabled {
   cursor: not-allowed;
-  color: #94a3b8;
+  color: var(--text-faint);
 }
 
 .actionDanger {
@@ -166,7 +178,7 @@
   margin: 0;
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .footerRow {
@@ -179,7 +191,7 @@
 .time {
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .statusBadge {
@@ -187,8 +199,8 @@
   align-items: center;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #eef2f7;
-  color: #64748b;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.01em;

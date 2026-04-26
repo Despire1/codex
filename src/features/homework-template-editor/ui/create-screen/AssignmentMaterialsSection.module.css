@@ -2,7 +2,7 @@
   padding: 32px;
   border: 1px solid #edf0f6;
   border-radius: 32px;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .header {
@@ -18,13 +18,13 @@
   font-size: 26px;
   line-height: 1.1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .content {
@@ -45,15 +45,18 @@
   border: 2px dashed #d3d8e2;
   border-radius: 28px;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-muted);
   background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
   cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .uploadZone:hover {
   border-color: #f4c95d;
-  color: #4b5563;
+  color: var(--text-secondary);
   background: #fffdf6;
 }
 
@@ -71,13 +74,13 @@
   width: 56px;
   height: 56px;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
   color: #9aa3b2;
 }
 
 .uploadZone strong {
   font-size: 15px;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .uploadZone span,
@@ -98,7 +101,7 @@
   padding: 16px 18px;
   border: 1px solid #e9edf4;
   border-radius: 20px;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
 }
 
 .materialTitle {
@@ -106,7 +109,7 @@
   font-size: 14px;
   line-height: 1.45;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   word-break: break-word;
 }
 
@@ -114,7 +117,7 @@
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: #6b7280;
+  color: var(--text-muted);
   word-break: break-word;
 }
 
@@ -126,10 +129,12 @@
   height: 34px;
   border: 0;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-card);
   color: #9aa3b2;
   flex: 0 0 auto;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .removeButton:hover {
@@ -154,7 +159,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .linkRow {
@@ -168,12 +173,15 @@
   min-width: 0;
   border: 1px solid #e6eaf1;
   border-radius: 16px;
-  background: #f7f8fc;
+  background: var(--surface-card-strong);
   padding: 14px 16px;
   font: inherit;
-  color: #111827;
+  color: var(--text-primary);
   outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
 }
 
 .linkInput:focus {

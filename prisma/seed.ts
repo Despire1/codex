@@ -12,7 +12,8 @@ const resolveTeacherChatId = () => {
 const main = async () => {
   const teacherChatId = resolveTeacherChatId();
   const teacherUsername = process.env.LOCAL_DEV_USERNAME ?? 'local_teacher';
-  const teacherName = `${process.env.LOCAL_DEV_FIRST_NAME ?? 'Local'} ${process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher'}`.trim();
+  const teacherName =
+    `${process.env.LOCAL_DEV_FIRST_NAME ?? 'Local'} ${process.env.LOCAL_DEV_LAST_NAME ?? 'Teacher'}`.trim();
 
   const teacher = await prisma.teacher.upsert({
     where: { chatId: teacherChatId },
@@ -20,6 +21,14 @@ const main = async () => {
     create: { chatId: teacherChatId, username: teacherUsername, name: teacherName, timezone: 'Europe/Moscow' },
   });
   console.log(`Teacher: chatId=${teacher.chatId} username=${teacher.username ?? '(null)'}`);
+
+  const removedAssignments = await prisma.homeworkAssignment.deleteMany({ where: { teacherId: teacherChatId } });
+  const removedTemplates = await prisma.homeworkTemplate.deleteMany({ where: { teacherId: teacherChatId } });
+  if (removedAssignments.count || removedTemplates.count) {
+    console.log(
+      `Cleared homework data for teacher ${teacherChatId}: ${removedTemplates.count} templates, ${removedAssignments.count} assignments`,
+    );
+  }
 
   const seedStudents = [
     { username: 'seed_student_a', customName: 'Анна Иванова', level: 'Intermediate', price: 2000, balance: 4 },
@@ -102,7 +111,12 @@ const main = async () => {
 
   if (studentA) {
     const existingAssignment = await prisma.homeworkAssignment.findFirst({
-      where: { teacherId: teacherChatId, studentId: studentA.id, templateId: template.id, status: { in: ['SENT', 'IN_REVIEW', 'RETURNED'] } },
+      where: {
+        teacherId: teacherChatId,
+        studentId: studentA.id,
+        templateId: template.id,
+        status: { in: ['SENT', 'IN_REVIEW', 'RETURNED'] },
+      },
     });
     if (!existingAssignment) {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000);

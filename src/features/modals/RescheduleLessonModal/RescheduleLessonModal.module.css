@@ -1,6 +1,6 @@
 .subtitle {
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   margin-bottom: 16px;
 }
 
@@ -27,7 +27,7 @@
   margin-top: 14px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .duration {

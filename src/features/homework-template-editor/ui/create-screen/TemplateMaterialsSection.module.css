@@ -1,7 +1,7 @@
 .section {
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 32px;
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   padding: 32px;
 }
 
@@ -35,13 +35,13 @@
   font-size: 20px;
   line-height: 1.2;
   font-weight: 800;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .sectionSubtitle {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .materialsList {
@@ -56,8 +56,8 @@
   align-items: center;
   gap: 16px;
   border-radius: 18px;
-  border: 1px solid var(--color-gray-200);
-  background: var(--color-gray-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
   padding: 16px;
 }
 
@@ -102,8 +102,8 @@
 }
 
 .typeBadgeFile {
-  background: var(--color-slate-100);
-  color: var(--color-slate-600);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .materialContent {
@@ -115,7 +115,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -124,7 +124,7 @@
 .materialMeta {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -140,14 +140,17 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--color-gray-200);
-  background: var(--color-white);
-  color: var(--color-slate-500);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .actionOpen:hover {
@@ -156,7 +159,7 @@
 }
 
 .actionDownload:hover {
-  color: var(--color-green-700);
+  color: var(--status-green-text);
   border-color: var(--color-green-200);
 }
 
@@ -180,7 +183,7 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   cursor: pointer;
   transition: border-color 0.2s ease;
 }
@@ -197,7 +200,7 @@
   width: 64px;
   height: 64px;
   border-radius: 999px;
-  background: var(--color-gray-100);
+  background: var(--surface-card-muted);
   color: var(--color-slate-400);
   display: inline-flex;
   align-items: center;
@@ -205,7 +208,7 @@
 }
 
 .uploadArea strong {
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   font-size: 19px;
   font-weight: 800;
 }
@@ -253,25 +256,27 @@
 
 .linkInput {
   width: 100%;
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-gray-50);
+  background: var(--surface-card-strong);
   padding: 12px 14px;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .linkInput:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--shadow-primary-12);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .linkAddButton {
   border: none;
   border-radius: 12px;
-  background: var(--color-gray-100);
-  color: var(--color-slate-700);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 700;
   display: inline-flex;
@@ -279,7 +284,9 @@
   gap: 6px;
   padding: 0 16px;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .linkAddButton:hover:not(:disabled) {
@@ -296,7 +303,7 @@
   border-radius: 10px;
   border: 1px solid var(--color-rose-200);
   background: var(--color-red-50);
-  color: var(--color-red-700);
+  color: var(--status-red-text);
   font-size: 12px;
   padding: 8px 10px;
 }

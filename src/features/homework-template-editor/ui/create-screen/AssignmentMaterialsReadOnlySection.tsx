@@ -1,5 +1,6 @@
 import { FC } from 'react';
 import { HomeworkAttachment, HomeworkBlockMedia } from '../../../../entities/types';
+import { pluralizeRu } from '../../../../shared/lib/pluralizeRu';
 import { resolveHomeworkStorageUrl } from '../../../homework-submit/model/upload';
 import {
   formatTemplateMaterialSize,
@@ -58,9 +59,7 @@ const resolveAttachmentMeta = (attachment: HomeworkAttachment, kind: TemplateMat
   return formatTemplateMaterialSize(Number(attachment.size) || 0);
 };
 
-export const AssignmentMaterialsReadOnlySection: FC<AssignmentMaterialsReadOnlySectionProps> = ({
-  mediaBlock,
-}) => {
+export const AssignmentMaterialsReadOnlySection: FC<AssignmentMaterialsReadOnlySectionProps> = ({ mediaBlock }) => {
   const attachments = mediaBlock.attachments ?? [];
 
   return (
@@ -69,7 +68,9 @@ export const AssignmentMaterialsReadOnlySection: FC<AssignmentMaterialsReadOnlyS
         <div>
           <h2 className={styles.title}>Материалы</h2>
           <p className={styles.subtitle}>
-            {attachments.length > 0 ? `${attachments.length} материалов прикреплено` : 'Дополнительные материалы не добавлены'}
+            {attachments.length > 0
+              ? `${pluralizeRu(attachments.length, { one: 'материал', few: 'материала', many: 'материалов' })} прикреплено`
+              : 'Дополнительные материалы не добавлены'}
           </p>
         </div>
       </div>
@@ -91,9 +92,7 @@ export const AssignmentMaterialsReadOnlySection: FC<AssignmentMaterialsReadOnlyS
                 target="_blank"
                 rel="noreferrer"
               >
-                <span className={`${styles.materialIcon} ${TYPE_ICON_CLASS_MAP[kind]}`}>
-                  {resolveTypeIcon(kind)}
-                </span>
+                <span className={`${styles.materialIcon} ${TYPE_ICON_CLASS_MAP[kind]}`}>{resolveTypeIcon(kind)}</span>
 
                 <span className={styles.materialMeta}>
                   <strong>{resolveTemplateMaterialDisplayName(attachment)}</strong>

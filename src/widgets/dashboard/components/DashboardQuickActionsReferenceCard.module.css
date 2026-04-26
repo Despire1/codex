@@ -1,6 +1,6 @@
 .card {
-  background: #fff;
-  border: 1px solid #f3f4f6;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 32px;
   box-shadow: none;
   padding: 32px;
@@ -29,7 +29,7 @@
 
 .title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 20px;
   line-height: 1.2;
   font-weight: 700;
@@ -42,11 +42,11 @@
 
 .actionButton {
   width: 100%;
-  border: 2px solid #e5e7eb;
-  background: #f9fafb;
+  border: 2px solid var(--border-default);
+  background: var(--surface-card-strong);
   border-radius: 16px;
   padding: 16px;
-  color: #111827;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -67,7 +67,7 @@
 
 .actionButtonPrimary {
   background: var(--accent-primary, #a3e635);
-  color: #111827;
+  color: var(--text-primary);
   border: none;
 }
 
@@ -96,7 +96,7 @@
 
 .actionIconPrimary {
   background: rgba(17, 24, 39, 0.12);
-  color: #111827;
+  color: var(--text-primary);
   transition: all 0.2s ease;
 }
 
@@ -126,7 +126,7 @@
 }
 
 .actionLabel {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 16px;
   line-height: 1.2;
   font-weight: 700;
@@ -134,11 +134,11 @@
 }
 
 .actionLabelPrimary {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .actionArrow {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 14px;
   transition: color 0.2s ease;
   flex-shrink: 0;
@@ -149,17 +149,17 @@
 }
 
 .actionArrowPrimary {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .actionButtonPrimary:hover .actionArrowPrimary {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .tipSection {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .tipCard {
@@ -178,7 +178,7 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-card);
   color: #3a6fdc;
   display: inline-flex;
   align-items: center;
@@ -189,7 +189,7 @@
 
 .tipTitle {
   margin: 0 0 4px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.15;
   font-weight: 700;
@@ -197,7 +197,7 @@
 
 .tipText {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
 }

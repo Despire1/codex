@@ -66,22 +66,20 @@ const resolveIssuedStudentStatus = (
     return { label: 'В работе', tone: 'warning' };
   }
 
-  return { label: 'Не начато', tone: 'muted' };
+  return { label: 'Ещё не приступал', tone: 'muted' };
 };
 
 const buildIssuedStudentItems = (assignments: HomeworkAssignment[]): IssuedStudentItem[] => {
   const latestByStudentId = new Map<number, HomeworkAssignment>();
 
-  assignments
-    .filter(isIssuedAssignment)
-    .forEach((assignment) => {
-      const studentId = Number(assignment.studentId);
-      if (!Number.isFinite(studentId) || studentId <= 0) return;
-      const current = latestByStudentId.get(studentId);
-      if (!current || resolveAssignmentSortTs(assignment) > resolveAssignmentSortTs(current)) {
-        latestByStudentId.set(studentId, assignment);
-      }
-    });
+  assignments.filter(isIssuedAssignment).forEach((assignment) => {
+    const studentId = Number(assignment.studentId);
+    if (!Number.isFinite(studentId) || studentId <= 0) return;
+    const current = latestByStudentId.get(studentId);
+    if (!current || resolveAssignmentSortTs(assignment) > resolveAssignmentSortTs(current)) {
+      latestByStudentId.set(studentId, assignment);
+    }
+  });
 
   return Array.from(latestByStudentId.values())
     .sort((left, right) => {
@@ -102,7 +100,8 @@ const buildIssuedStudentItems = (assignments: HomeworkAssignment[]): IssuedStude
         avatarLabel: getStudentInitials(name),
         avatarColor,
         avatarTextColor: resolveAssignmentStudentAvatarTextColor(avatarColor),
-        photoUrl: typeof photoUrlCandidate === 'string' && photoUrlCandidate.trim().length > 0 ? photoUrlCandidate : null,
+        photoUrl:
+          typeof photoUrlCandidate === 'string' && photoUrlCandidate.trim().length > 0 ? photoUrlCandidate : null,
         statusLabel: status.label,
         statusTone: status.tone,
       };
@@ -123,26 +122,26 @@ const IssuedStudentCard: FC<IssuedStudentCardProps> = ({ item }) => {
       onClick={() => navigate(`/homeworks/assignments/${item.assignmentId}`)}
       aria-label={`Открыть задание ученика ${item.name}`}
     >
-    <div className={styles.avatarFrame}>
-      {item.photoUrl ? (
-        <img src={item.photoUrl} alt={item.name} className={styles.avatarImage} />
-      ) : (
-        <div
-          className={styles.avatarFallback}
-          style={{ background: item.avatarColor, color: item.avatarTextColor }}
-          aria-hidden="true"
-        >
-          {item.avatarLabel}
-        </div>
-      )}
-    </div>
+      <div className={styles.avatarFrame}>
+        {item.photoUrl ? (
+          <img src={item.photoUrl} alt={item.name} className={styles.avatarImage} />
+        ) : (
+          <div
+            className={styles.avatarFallback}
+            style={{ background: item.avatarColor, color: item.avatarTextColor }}
+            aria-hidden="true"
+          >
+            {item.avatarLabel}
+          </div>
+        )}
+      </div>
 
-    <div className={styles.studentMeta}>
-      <Ellipsis className={styles.studentName} title={item.name}>
-        {item.name}
-      </Ellipsis>
-      <p className={`${styles.studentStatus} ${styles[`studentStatus_${item.statusTone}`]}`}>{item.statusLabel}</p>
-    </div>
+      <div className={styles.studentMeta}>
+        <Ellipsis className={styles.studentName} title={item.name}>
+          {item.name}
+        </Ellipsis>
+        <p className={`${styles.studentStatus} ${styles[`studentStatus_${item.statusTone}`]}`}>{item.statusLabel}</p>
+      </div>
     </button>
   );
 };
@@ -187,10 +186,7 @@ export const IssuedStudentsHistory: FC<IssuedStudentsHistoryProps> = ({ assignme
       const cardWidth = Number.parseFloat(rawCardWidth);
       const normalizedCardWidth = Number.isFinite(cardWidth) && cardWidth > 0 ? cardWidth : 138;
       const availableSlots = Math.max(1, Math.floor((containerWidth + CHIP_GAP) / (normalizedCardWidth + CHIP_GAP)));
-      const nextVisibleCount =
-        items.length <= availableSlots
-          ? items.length
-          : Math.max(0, availableSlots - 1);
+      const nextVisibleCount = items.length <= availableSlots ? items.length : Math.max(0, availableSlots - 1);
 
       setVisibleCount(nextVisibleCount);
     };

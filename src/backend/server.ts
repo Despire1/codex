@@ -3,18 +3,9 @@ import http, { IncomingMessage, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import prisma from './prismaClient';
 import type { Student, User } from '@prisma/client';
-import type {
-  HomeworkStatus,
-  LessonMutationAction,
-  LessonSeriesScope,
-  PaymentCancelBehavior,
-} from '../entities/types';
+import type { HomeworkStatus, LessonMutationAction, LessonSeriesScope, PaymentCancelBehavior } from '../entities/types';
 import { normalizeLessonColor } from '../shared/lib/lessonColors';
-import {
-  isValidMeetingLink,
-  MEETING_LINK_MAX_LENGTH,
-  normalizeMeetingLinkInput,
-} from '../shared/lib/meetingLink';
+import { isValidMeetingLink, MEETING_LINK_MAX_LENGTH, normalizeMeetingLinkInput } from '../shared/lib/meetingLink';
 import { isValidEmail, normalizeEmail } from '../shared/lib/email';
 import {
   formatInTimeZone,
@@ -57,13 +48,7 @@ import {
 } from './webPushService';
 import { buildOnboardingReminderMessage, type OnboardingReminderTemplate } from '../shared/lib/onboardingReminder';
 import { logActivityEvent } from './activityFeedService';
-import {
-  badRequest,
-  notFound,
-  readBody,
-  readRawBody,
-  sendJson,
-} from './server/lib/http';
+import { badRequest, notFound, readBody, readRawBody, sendJson } from './server/lib/http';
 import {
   applyCorsHeaders,
   applySecurityHeaders,
@@ -73,11 +58,7 @@ import {
 } from './server/lib/security';
 import { createAuthService } from './server/modules/auth';
 import { createSessionService } from './server/modules/sessions';
-import {
-  createActivityFeedService,
-  parseActivityCategories,
-  parseQueryDate,
-} from './server/modules/activityFeed';
+import { createActivityFeedService, parseActivityCategories, parseQueryDate } from './server/modules/activityFeed';
 import { createStudentsService, normalizeTelegramUsername } from './server/modules/students';
 import { createSettingsService } from './server/modules/settings';
 import { createOverviewService } from './server/modules/overview';
@@ -109,6 +90,7 @@ import { tryHandleHomeworkRoutesV2 } from './server/routes/homeworkRoutesV2';
 import { tryHandleNotificationRoutes } from './server/routes/notificationRoutes';
 import { tryHandlePwaPushRoutes } from './server/routes/pwaPushRoutes';
 import { tryHandleSessionRoutes } from './server/routes/sessionRoutes';
+import { tryHandleAccountRoutes } from './server/routes/accountRoutes';
 import { tryHandleActivityFeedRoutes } from './server/routes/activityFeedRoutes';
 import { tryHandleStudentRoutes } from './server/routes/studentRoutes';
 import { tryHandleHomeworkRoutes } from './server/routes/homeworkRoutes';
@@ -134,12 +116,7 @@ const parseServerTimeout = (value: string | undefined, fallback: number, min: nu
 };
 const API_REQUEST_TIMEOUT_MS = parseServerTimeout(process.env.API_REQUEST_TIMEOUT_MS, 60_000, 1_000, 300_000);
 const API_HEADERS_TIMEOUT_MS = parseServerTimeout(process.env.API_HEADERS_TIMEOUT_MS, 65_000, 1_000, 300_000);
-const API_KEEP_ALIVE_TIMEOUT_MS = parseServerTimeout(
-  process.env.API_KEEP_ALIVE_TIMEOUT_MS,
-  5_000,
-  1_000,
-  120_000,
-);
+const API_KEEP_ALIVE_TIMEOUT_MS = parseServerTimeout(process.env.API_KEEP_ALIVE_TIMEOUT_MS, 5_000, 1_000, 120_000);
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_BOT_USERNAME = (process.env.TELEGRAM_BOT_USERNAME ?? '').trim().replace(/^@+/, '');
 const TELEGRAM_INITDATA_TTL_SEC = Number(process.env.TELEGRAM_INITDATA_TTL_SEC ?? 300);
@@ -206,11 +183,7 @@ const uploadsService = createUploadsService({
   readRawBody,
   notFound,
 });
-const {
-  createFilePresignUploadV2,
-  handlePresignedUploadPutV2,
-  handleUploadedFileObjectGetV2,
-} = uploadsService;
+const { createFilePresignUploadV2, handlePresignedUploadPutV2, handleUploadedFileObjectGetV2 } = uploadsService;
 const subscriptionService = createSubscriptionService({
   prisma,
   subscriptionMonthDays: SUBSCRIPTION_MONTH_DAYS,
@@ -254,10 +227,7 @@ const ensureLessonDateIsWorkingDay = (
   }
 };
 
-const ensureRecurringWeekdaysAreWorking = (
-  weekdays: number[],
-  teacher: { weekendWeekdays?: unknown },
-) => {
+const ensureRecurringWeekdaysAreWorking = (weekdays: number[], teacher: { weekendWeekdays?: unknown }) => {
   if (hasWeekdayOverlap(weekdays, resolveTeacherWeekendWeekdays(teacher))) {
     throw new Error('Серия занятий не может проходить в выходные дни');
   }
@@ -320,7 +290,6 @@ const safeLogActivityEvent = async (payload: Parameters<typeof logActivityEvent>
   try {
     await logActivityEvent(payload);
   } catch (error) {
-     
     console.error('Failed to log activity event', error);
   }
 };
@@ -343,6 +312,49 @@ const ensureTeacher = async (user: User) =>
       username: user.username ?? null,
     },
   });
+
+const serializeBigInt = <T>(value: T): T =>
+  JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val))) as T;
+
+const exportAccount = async (user: User) => {
+  const teacher = await ensureTeacher(user);
+  const teacherId = teacher.chatId;
+
+  const [students, lessons, homeworks, homeworkTemplates, homeworkAssignments, scheduleNotes, payments] =
+    await Promise.all([
+      prisma.teacherStudent.findMany({
+        where: { teacherId },
+        include: { student: true },
+      }),
+      prisma.lesson.findMany({
+        where: { teacherId },
+        include: { participants: true },
+      }),
+      prisma.homework.findMany({ where: { teacherId } }),
+      prisma.homeworkTemplate.findMany({ where: { teacherId } }),
+      prisma.homeworkAssignment.findMany({
+        where: { teacherId },
+        include: { submissions: true },
+      }),
+      prisma.scheduleNote.findMany({ where: { teacherId } }),
+      prisma.payment.findMany({
+        where: { teacherStudent: { teacherId } },
+      }),
+    ]);
+
+  return serializeBigInt({
+    exportedAt: new Date().toISOString(),
+    schemaVersion: 1,
+    teacher,
+    students,
+    lessons,
+    homeworks,
+    homeworkTemplates,
+    homeworkAssignments,
+    scheduleNotes,
+    payments,
+  });
+};
 const activityFeedService = createActivityFeedService({ ensureTeacher });
 const { listActivityFeed, getActivityFeedUnreadStatus, markActivityFeedSeen } = activityFeedService;
 
@@ -395,21 +407,14 @@ const scheduleNotesService = createScheduleNotesService({
   prisma,
   ensureTeacher,
 });
-const {
-  listScheduleNotes,
-  createScheduleNote,
-  updateScheduleNote,
-  deleteScheduleNote,
-} = scheduleNotesService;
-
+const { listScheduleNotes, createScheduleNote, updateScheduleNote, deleteScheduleNote } = scheduleNotesService;
 
 const addStudent = async (user: User, body: any) => studentsService.addStudent(user, body);
 
 const updateStudent = async (user: User, studentId: number, body: any) =>
   studentsService.updateStudent(user, studentId, body);
 
-const archiveStudentLink = async (user: User, studentId: number) =>
-  studentsService.archiveStudentLink(user, studentId);
+const archiveStudentLink = async (user: User, studentId: number) => studentsService.archiveStudentLink(user, studentId);
 
 const toggleAutoReminder = async (user: User, studentId: number, value: boolean) =>
   studentsService.toggleAutoReminder(user, studentId, value);
@@ -441,8 +446,7 @@ const studentsService = createStudentsService({
   parseDateFilter,
 });
 
-const normalizeCancelBehavior = (value: any): PaymentCancelBehavior =>
-  value === 'writeoff' ? 'writeoff' : 'refund';
+const normalizeCancelBehavior = (value: any): PaymentCancelBehavior => (value === 'writeoff' ? 'writeoff' : 'refund');
 
 const normalizeLessonPaymentHandling = (value: unknown): 'KEEP' | 'RETURN_TO_BALANCE' =>
   value === 'RETURN_TO_BALANCE' ? 'RETURN_TO_BALANCE' : 'KEEP';
@@ -505,8 +509,7 @@ const {
   createRecurringLessons,
 } = lessonSchedulingService;
 
-const LESSON_HISTORY_LOCK_MESSAGE =
-  'Этот урок уже связан с домашкой, уведомлениями или оплатой. Изменение недоступно.';
+const LESSON_HISTORY_LOCK_MESSAGE = 'Этот урок уже связан с домашкой, уведомлениями или оплатой. Изменение недоступно.';
 const LESSON_EDIT_WARNING_MESSAGE =
   'Урок уже проведён или оплачен. После сохранения проверьте оплату, домашку и уведомления.';
 const LESSON_EDIT_PAYMENT_RESET_MESSAGE =
@@ -515,8 +518,7 @@ const LESSON_EDIT_HARD_LOCK_MESSAGE =
   'Этот урок уже связан с домашкой или отправленными уведомлениями. Можно менять только дату, время, цвет и ссылку.';
 const LESSON_SERIES_HISTORY_LOCK_MESSAGE =
   'В выбранной части серии есть оплаченные, проведённые или уже связанные с историей уроки. Чтобы не переписать историю, начните изменение с более позднего урока или редактируйте один урок отдельно.';
-const LESSON_SERIES_NO_EDITABLE_TAIL_MESSAGE =
-  'После выбранного урока нет занятий, которые можно безопасно изменить.';
+const LESSON_SERIES_NO_EDITABLE_TAIL_MESSAGE = 'После выбранного урока нет занятий, которые можно безопасно изменить.';
 const LESSON_SERIES_PROTECTED_INSIDE_TAIL_MESSAGE =
   'В будущем хвосте серии есть уже связанные с историей уроки. Чтобы не переписать историю частично, выберите другой урок.';
 const LESSON_SERIES_SPLIT_WARNING_MESSAGE =
@@ -684,10 +686,7 @@ const lessonEditingService = createLessonEditingService({
   lessonSeriesSplitWarningMessage: LESSON_SERIES_SPLIT_WARNING_MESSAGE,
   lessonEditHardLockMessage: LESSON_EDIT_HARD_LOCK_MESSAGE,
 });
-const {
-  previewLessonEditMutation,
-  updateLesson,
-} = lessonEditingService;
+const { previewLessonEditMutation, updateLesson } = lessonEditingService;
 
 const settingsService = createSettingsService({
   prisma,
@@ -835,8 +834,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const apiUser = sessionUser as User | null;
     const requireApiUser = () => apiUser as User;
     if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser)) {
-      const actingAsStudent =
-        role === 'STUDENT' && (await resolveStudentAccessLinks(apiUser)).length > 0;
+      const actingAsStudent = role === 'STUDENT' && (await resolveStudentAccessLinks(apiUser)).length > 0;
       if (!actingAsStudent) {
         return sendJson(res, 403, { message: 'subscription_required' });
       }
@@ -1031,6 +1029,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (
+      await tryHandleAccountRoutes({
+        req,
+        res,
+        pathname,
+        requireApiUser,
+        handlers: { exportAccount },
+      })
+    ) {
+      return;
+    }
+
+    if (
       await tryHandleScheduleNoteRoutes({
         req,
         res,
@@ -1164,9 +1174,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
     const statusCodeRaw = (error as { statusCode?: unknown } | null)?.statusCode;
     const statusCode =
-      typeof statusCodeRaw === 'number' && Number.isFinite(statusCodeRaw)
-        ? Math.trunc(statusCodeRaw)
-        : null;
+      typeof statusCodeRaw === 'number' && Number.isFinite(statusCodeRaw) ? Math.trunc(statusCodeRaw) : null;
     const message = error instanceof Error ? error.message : 'Unexpected error';
     const issues = Array.isArray((error as { issues?: unknown } | null)?.issues)
       ? (error as { issues: unknown[] }).issues
@@ -1180,7 +1188,6 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
 setInterval(() => {
   runLessonAutomationTick().catch((error) => {
-     
     console.error('Не удалось выполнить автоматические сценарии', error);
   });
 }, AUTOMATION_TICK_MS);
@@ -1189,7 +1196,6 @@ void runLessonAutomationTick();
 
 setInterval(() => {
   runNotificationTick().catch((error) => {
-     
     console.error('Не удалось отправить уведомления', error);
   });
 }, NOTIFICATION_TICK_MS);
@@ -1198,13 +1204,11 @@ void runNotificationTick();
 
 setInterval(() => {
   runOnboardingNudgeTick().catch((error) => {
-     
     console.error('Не удалось отправить напоминание по онбордингу', error);
   });
 }, ONBOARDING_NUDGE_TICK_MS);
 
 void runOnboardingNudgeTick().catch((error) => {
-   
   console.error('Не удалось отправить напоминание по онбордингу', error);
 });
 
@@ -1219,6 +1223,5 @@ server.keepAliveTimeout = API_KEEP_ALIVE_TIMEOUT_MS;
 server.maxHeadersCount = 100;
 
 server.listen(PORT, () => {
-   
   console.log(`API server running on http://localhost:${PORT}`);
 });

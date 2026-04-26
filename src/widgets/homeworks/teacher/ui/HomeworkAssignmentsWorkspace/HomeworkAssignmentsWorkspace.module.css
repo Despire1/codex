@@ -6,9 +6,9 @@
 
 .filtersCard {
   border-radius: 32px;
-  border: 1px solid #eef2f7;
-  background: #fff;
-  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: 0 22px 56px -18px rgba(15, 23, 42, 0.06);
   padding: 14px 16px 16px;
 }
 
@@ -25,7 +25,7 @@
   height: 48px;
   border-radius: 999px;
   border: 1px solid #edf1f6;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
   padding: 0 16px;
   display: inline-flex;
   align-items: center;
@@ -38,7 +38,7 @@
 
 .searchField:focus-within {
   border-color: #dce2eb;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .searchIcon {
@@ -51,7 +51,7 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #1a2030;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.2;
   font-weight: 600;
@@ -74,18 +74,18 @@
   height: 40px;
   border-radius: 14px;
   border: 1px solid #edf1f6;
-  background: #fff;
+  background: var(--surface-card);
   color: #667085;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 10px 20px -6px rgba(15, 23, 42, 0.04);
 }
 
 .iconButton:hover {
-  background: #f8fafc;
-  color: #111827;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
 }
 
 .viewToggle {
@@ -94,7 +94,7 @@
   gap: 4px;
   border-radius: 16px;
   border: 1px solid #edf1f6;
-  background: #fff;
+  background: var(--surface-card);
   padding: 4px;
 }
 
@@ -113,8 +113,8 @@
 
 .viewToggleButtonActive {
   background: #f3f5f8;
-  color: #1a2030;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  color: var(--text-primary);
+  box-shadow: 0 8px 18px -6px rgba(15, 23, 42, 0.08);
 }
 
 .metaRow {
@@ -136,49 +136,55 @@
 }
 
 .scopeTab {
-  border: none;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
   border-radius: 999px;
-  background: transparent;
+  background: var(--color-white, #ffffff);
   color: #5e6678;
-  min-height: 36px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
+  padding: 0 12px;
   font-size: 12px;
   line-height: 1;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .scopeTab:hover {
-  color: #111827;
-  background: #f8fafc;
+  color: var(--text-primary);
+  border-color: var(--color-slate-300, #cbd5e1);
+  background: var(--color-slate-50, #f8fafc);
 }
 
 .scopeTabActive {
-  background: #080b12;
-  color: #fff;
+  background: color-mix(in srgb, var(--accent-primary, #a3e635) 18%, #ffffff);
+  border-color: var(--accent-primary, #a3e635);
+  color: var(--text-primary);
 }
 
 .scopeCount {
   border-radius: 999px;
-  background: #edf1f6;
-  color: #798293;
+  background: var(--color-slate-100, #f1f5f9);
+  color: #5e6678;
   min-width: 20px;
-  height: 20px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 6px;
   font-size: 11px;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .scopeCountActive {
-  background: #b9fa51;
-  color: #10131a;
+  background: var(--accent-primary, #a3e635);
+  color: var(--text-primary);
 }
 
 .librarySection {
@@ -215,13 +221,13 @@
 
 .stateCard {
   border-radius: 28px;
-  border: 1px solid #eef2f7;
-  background: #fff;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
   padding: 32px 24px;
   color: #687385;
   font-size: 14px;
   line-height: 1.5;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 18px 44px -14px rgba(15, 23, 42, 0.05);
 }
 
 @media (max-width: 1280px) {

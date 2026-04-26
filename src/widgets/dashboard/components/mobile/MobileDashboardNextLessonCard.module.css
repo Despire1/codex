@@ -1,5 +1,5 @@
 .card {
-  background: var(--color-white);
+  background: var(--surface-card);
   border: 1px solid var(--color-blue-100);
   border-left: 4px solid var(--color-blue-600);
   border-radius: 16px;
@@ -14,7 +14,7 @@
   align-items: center;
   width: fit-content;
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   border-radius: 999px;
   padding: 5px 10px;
   text-transform: uppercase;
@@ -38,13 +38,13 @@
 
 .subtitle {
   margin: 0;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.4;
 }
 
 .time {
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   text-align: right;
@@ -58,8 +58,8 @@
 }
 
 .tag {
-  background: var(--color-slate-100);
-  color: var(--color-slate-600);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 11px;
@@ -69,7 +69,7 @@
 .action {
   border: 1px solid var(--color-blue-100);
   background: var(--color-blue-50);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   border-radius: 12px;
   min-height: 42px;
   display: inline-flex;

@@ -30,8 +30,8 @@
 
 .filterPopover {
   width: min(540px, calc(100vw - 24px));
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
   overflow: visible;
 }
@@ -49,9 +49,9 @@
 }
 
 .categoryButton {
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-600);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 13px;
@@ -61,7 +61,7 @@
 .categoryButton.categoryButtonActive {
   background: var(--color-slate-900);
   color: var(--color-white);
-  border-color: var(--color-slate-900);
+  border-color: var(--text-primary);
 }
 
 .controlsRow {
@@ -75,7 +75,7 @@
   display: grid;
   gap: 4px;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .studentControl {

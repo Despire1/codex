@@ -61,10 +61,13 @@ export const StudentDebtPopoverContent = ({
                     <button
                       type="button"
                       className={styles.remindButton}
+                      aria-label={reminderDisabledReason ?? 'Отправить напоминание об оплате'}
                       onClick={() => onSendPaymentReminder(item.id)}
                       disabled={isReminderLoading}
                     >
-                      {isReminderLoading ? <span className={styles.remindSpinner} aria-hidden /> : (
+                      {isReminderLoading ? (
+                        <span className={styles.remindSpinner} aria-hidden />
+                      ) : (
                         <NotificationsNoneOutlinedIcon width={16} height={16} />
                       )}
                     </button>

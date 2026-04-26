@@ -1,0 +1,135 @@
+.modeOptions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.modeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.modeOption:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.modeOption[data-selected='true'] {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.modeIcon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-card-muted);
+  color: var(--text-primary);
+}
+
+.modeOption[data-selected='true'] .modeIcon {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}
+
+.modeLabel {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.modeHint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+
+.previewWrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.previewCard {
+  position: relative;
+  border-radius: 18px;
+  border: 1px solid var(--border-default);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.previewLight {
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
+}
+
+.previewDark {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.previewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(163, 230, 53, 0.18);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.previewLine {
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.16;
+}
+
+.previewLine.short {
+  width: 60%;
+}
+
+@media (max-width: 720px) {
+  .modeOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .previewWrap {
+    grid-template-columns: 1fr;
+  }
+}

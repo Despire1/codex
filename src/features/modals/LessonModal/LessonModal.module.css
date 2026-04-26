@@ -13,7 +13,7 @@
   top: 0;
   z-index: 3;
   padding: 16px;
-  background: var(--color-white);
+  background: var(--surface-card);
   border-bottom: 1px solid var(--color-gray-100);
 }
 
@@ -38,7 +38,7 @@
   z-index: 3;
   margin-top: 0;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: var(--color-white);
+  background: var(--surface-card);
   border-top: 1px solid var(--color-gray-100);
 }
 
@@ -48,7 +48,7 @@
   gap: 8px;
   margin-right: auto;
   padding: 10px 14px;
-  color: #b91c1c;
+  color: var(--status-red-text);
   background: #fef2f2;
   border-color: #fecaca;
   font-weight: 700;
@@ -106,14 +106,14 @@
 
 .statusBadgeScheduled {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
   border-color: #bfdbfe;
 }
 
 .statusBadgeCanceled {
-  background: #f1f5f9;
-  color: #64748b;
-  border-color: #cbd5e1;
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
+  border-color: var(--border-strong);
 }
 
 .closeButtonTop {
@@ -128,7 +128,7 @@
   border-radius: 14px;
   background: var(--color-orange-50);
   border: 1px solid var(--color-orange-200);
-  color: var(--color-orange-700);
+  color: var(--status-orange-text);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -154,7 +154,10 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .quickAction:hover:not(:disabled) {
@@ -179,7 +182,7 @@
 }
 
 .quickActionDanger {
-  color: #b91c1c;
+  color: var(--status-red-text);
   border-color: #fecaca;
   background: #fff5f5;
 }

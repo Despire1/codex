@@ -22,11 +22,11 @@
 .card {
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface-card);
   border-radius: 26px;
   border: 1px solid #f0f0f0;
   padding: 48px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.08);
 }
 
 .bgGlowTop,
@@ -77,7 +77,7 @@
   justify-content: center;
   background: linear-gradient(145deg, #111827 0%, #374151 100%);
   color: #fff;
-  box-shadow: 0 24px 45px rgba(15, 23, 42, 0.26);
+  box-shadow: 0 24px 45px -15px rgba(15, 23, 42, 0.26);
   animation: float 3.6s ease-in-out infinite;
 }
 
@@ -96,9 +96,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #111827;
+  color: var(--text-primary);
   background: #f59e0b;
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.35);
   animation: pulseSlow 2.6s ease-in-out infinite;
 }
 
@@ -119,13 +119,13 @@
   font-weight: 800;
   line-height: 1.18;
   letter-spacing: -0.02em;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 0 auto;
   max-width: 680px;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 19px;
   line-height: 1.55;
 }
@@ -147,12 +147,14 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .featureCard:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 16px 30px -10px rgba(15, 23, 42, 0.1);
 }
 
 .featureBlue {
@@ -202,12 +204,12 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .featureDescription {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -267,14 +269,14 @@
 
 .infoTitle {
   margin: 0 0 4px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 17px;
   font-weight: 700;
 }
 
 .infoDescription {
   margin: 0;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -296,11 +298,11 @@
 .ctaIcon {
   width: 15px;
   height: 15px;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .ctaText {
-  color: #374151;
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
 }
@@ -308,12 +310,12 @@
 .bottomText {
   margin: 28px 0 0;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .bottomLink {
-  color: #111827;
+  color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
 }

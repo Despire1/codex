@@ -3,11 +3,11 @@
 }
 
 .panel {
-  background: #ffffff;
-  border: 1px solid #eef1f5;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 2rem;
   padding: 20px 24px;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -28,7 +28,7 @@
 }
 
 .label {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -37,7 +37,7 @@
 
 .summaryText {
   margin: 0;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.4;
   font-weight: 600;
@@ -65,12 +65,16 @@
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 10px 18px;
-  background: #ffffff;
-  color: #6b7280;
+  background: var(--surface-card);
+  color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -78,20 +82,20 @@
 }
 
 .filterChip:hover {
-  background: #f9fafb;
+  background: var(--surface-card-strong);
 }
 
 .filterChipActive {
   background: #111827;
   color: #ffffff;
-  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.2);
+  box-shadow: 0 10px 24px -8px rgba(17, 24, 39, 0.2);
 }
 
 .totalBadge {
   border-radius: 7px;
   padding: 2px 6px;
   background: #d7f65f;
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -101,7 +105,7 @@
   min-width: 220px;
   border: 1px solid #e2e8f0;
   border-radius: 1rem;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
@@ -110,7 +114,7 @@
 
 .sortLabel {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-faint);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -120,7 +124,7 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;

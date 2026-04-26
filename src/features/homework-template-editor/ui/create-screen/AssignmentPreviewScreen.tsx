@@ -1,11 +1,13 @@
 import { FC, useMemo, useState } from 'react';
 import type { HomeworkGroupListItem, HomeworkSubmission } from '../../../../entities/types';
-import { StudentHomeworkDetailView, type StudentHomeworkSubmitPayload } from '../../../homework-submit/ui/StudentHomeworkDetailView';
-import type { HomeworkEditorDraft } from '../../model/types';
 import {
-  buildPreviewHomeworkAssignment,
-  createPreviewAttemptSubmission,
-} from '../../model/lib/previewAssignment';
+  StudentHomeworkDetailView,
+  type StudentHomeworkSubmitPayload,
+} from '../../../homework-submit/ui/StudentHomeworkDetailView';
+import type { HomeworkEditorDraft } from '../../model/types';
+import { buildPreviewHomeworkAssignment, createPreviewAttemptSubmission } from '../../model/lib/previewAssignment';
+import { useIsMobile } from '../../../../shared/lib/useIsMobile';
+import styles from './AssignmentPreviewScreen.module.css';
 
 interface AssignmentPreviewScreenProps {
   draft: HomeworkEditorDraft;
@@ -14,12 +16,11 @@ interface AssignmentPreviewScreenProps {
   onClose: () => void;
 }
 
-export const AssignmentPreviewScreen: FC<AssignmentPreviewScreenProps> = ({
-  draft,
-  students,
-  groups,
-  onClose,
-}) => {
+type PreviewViewport = 'desktop' | 'mobile';
+
+export const AssignmentPreviewScreen: FC<AssignmentPreviewScreenProps> = ({ draft, students, groups, onClose }) => {
+  const isMobileDevice = useIsMobile(900);
+  const [viewport, setViewport] = useState<PreviewViewport>('desktop');
   const studentName = students.find((entry) => entry.id === draft.assignment.studentId)?.name ?? null;
   const groupTitle = groups.find((entry) => entry.id === draft.assignment.groupId)?.title ?? null;
   const assignment = useMemo(
@@ -47,7 +48,7 @@ export const AssignmentPreviewScreen: FC<AssignmentPreviewScreenProps> = ({
     return true;
   };
 
-  return (
+  const detail = (
     <StudentHomeworkDetailView
       assignment={assignment}
       submissions={submissions}
@@ -63,5 +64,43 @@ export const AssignmentPreviewScreen: FC<AssignmentPreviewScreenProps> = ({
         onFinish: onClose,
       }}
     />
+  );
+
+  // На реальном мобильном устройстве переключатель не нужен — ученик и так увидит mobile-вид.
+  if (isMobileDevice) {
+    return detail;
+  }
+
+  return (
+    <div className={styles.shell}>
+      <div className={styles.toolbar} role="tablist" aria-label="Режим превью">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewport === 'desktop'}
+          className={`${styles.toggleButton} ${viewport === 'desktop' ? styles.toggleButtonActive : ''}`}
+          onClick={() => setViewport('desktop')}
+        >
+          Desktop
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewport === 'mobile'}
+          className={`${styles.toggleButton} ${viewport === 'mobile' ? styles.toggleButtonActive : ''}`}
+          onClick={() => setViewport('mobile')}
+        >
+          Mobile
+        </button>
+      </div>
+
+      {viewport === 'mobile' ? (
+        <div className={styles.mobileFrameWrap}>
+          <div className={styles.mobileFrame}>{detail}</div>
+        </div>
+      ) : (
+        detail
+      )}
+    </div>
   );
 };

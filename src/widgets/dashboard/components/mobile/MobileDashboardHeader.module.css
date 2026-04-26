@@ -7,8 +7,8 @@
   justify-content: space-between;
   gap: 10px;
   padding: 14px 16px;
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   box-shadow: none;
 }
@@ -31,7 +31,7 @@
 }
 
 .date {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -39,10 +39,10 @@
 .notificationButton {
   width: 38px;
   height: 38px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,7 +64,7 @@
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
-  background: var(--color-gray-100);
+  background: var(--surface-card-muted);
   border-radius: 10px;
   padding: 2px;
 }
@@ -72,7 +72,7 @@
 .toggleButton {
   border: none;
   background: transparent;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   padding: 8px 10px;
@@ -81,7 +81,7 @@
 }
 
 .toggleButtonActive {
-  background: var(--color-white);
-  color: var(--color-slate-900);
+  background: var(--surface-card);
+  color: var(--text-primary);
   box-shadow: none;
 }

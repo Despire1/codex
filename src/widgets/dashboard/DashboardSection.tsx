@@ -342,11 +342,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 maxVisibleEntries={1}
                 showToggle={false}
               />
-              <button
-                type="button"
-                className={styles.unpaidShowAllButton}
-                onClick={() => setIsUnpaidOpen(true)}
-              >
+              <button type="button" className={styles.unpaidShowAllButton} onClick={() => setIsUnpaidOpen(true)}>
                 Показать все
               </button>
             </div>
@@ -359,7 +355,14 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
                 onOpenStudent={onOpenStudent}
                 onTogglePaid={togglePaid}
                 onRemindLessonPayment={handleRemindLessonPayment}
+                maxVisibleEntries={3}
+                showToggle={false}
               />
+              {unpaidEntries.length > 3 && (
+                <button type="button" className={styles.unpaidShowAllButton} onClick={() => setIsUnpaidOpen(true)}>
+                  Показать все
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -411,6 +414,26 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           fitContainer
         />
       </BottomSheet>
+
+      {!isDashboardMobile && (
+        <Modal open={isUnpaidOpen} onClose={() => setIsUnpaidOpen(false)} title="Неоплаченные занятия">
+          <UnpaidLessonsPopoverContent
+            entries={unpaidEntries}
+            reminderDelayHours={teacher.paymentReminderDelayHours}
+            globalPaymentRemindersEnabled={teacher.globalPaymentRemindersEnabled}
+            onOpenStudent={(studentId) => {
+              setIsUnpaidOpen(false);
+              onOpenStudent(studentId);
+            }}
+            onTogglePaid={togglePaid}
+            onRemindLessonPayment={handleRemindLessonPayment}
+            showAll
+            showToggle={false}
+            stickyHeader
+            hideHeader
+          />
+        </Modal>
+      )}
 
       <BottomSheet
         isOpen={isDashboardMobile && isActivityOpen}

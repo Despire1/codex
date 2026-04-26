@@ -8,9 +8,9 @@
   position: relative;
   overflow: hidden;
   border-radius: 2rem;
-  border: 1px solid #f0f2f5;
-  background: #ffffff;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: 0 16px 36px -12px rgba(15, 23, 42, 0.08);
 }
 
 .cardPrimary {
@@ -76,7 +76,7 @@
 
 .iconWrapDark {
   background: rgba(0, 0, 0, 0.1);
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .value,
@@ -92,7 +92,7 @@
 }
 
 .valueDark {
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .label,
@@ -108,7 +108,7 @@
 }
 
 .labelDark {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .labelBlack {
@@ -145,7 +145,7 @@
   gap: 6px;
   border-radius: 10px;
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 700;
@@ -206,7 +206,7 @@
 .metricBlueLabel {
   margin-top: 5px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -226,7 +226,7 @@
 .metricPurpleLabel {
   margin-top: 5px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
@@ -248,7 +248,7 @@
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--surface-card);
   border: 2px solid #d7f65f;
   display: inline-flex;
   align-items: center;
@@ -280,7 +280,7 @@
   font-size: 15px;
   line-height: 1.1;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .metricDarkLabel {

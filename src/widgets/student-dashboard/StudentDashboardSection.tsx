@@ -48,9 +48,7 @@ const formatDeadlineLabel = (assignment: HomeworkAssignment) => {
   const diffMs = date.getTime() - now.getTime();
   if (diffMs < 0) return 'просрочено';
   const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
+    date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
   const timeLabel = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
   if (sameDay) return `сегодня в ${timeLabel}`;
   const tomorrow = new Date(now);
@@ -75,7 +73,9 @@ export const StudentDashboardSection: FC<StudentDashboardSectionProps> = ({ acti
     setLoading(true);
     Promise.all([
       api.getStudentHomeworkSummaryV2().catch(() => emptySummary),
-      api.listStudentHomeworkAssignmentsV2({ filter: 'active', limit: 20 }).catch(() => ({ items: [] as HomeworkAssignment[] })),
+      api
+        .listStudentHomeworkAssignmentsV2({ filter: 'active', limit: 20 })
+        .catch(() => ({ items: [] as HomeworkAssignment[] })),
     ])
       .then(([summaryResult, assignmentsResult]) => {
         if (cancelled) return;
@@ -114,11 +114,7 @@ export const StudentDashboardSection: FC<StudentDashboardSectionProps> = ({ acti
             >
               Открыть задание
             </button>
-            <button
-              type="button"
-              className={styles.heroSecondaryAction}
-              onClick={() => navigate('/homeworks')}
-            >
+            <button type="button" className={styles.heroSecondaryAction} onClick={() => navigate('/homeworks')}>
               Все задания
             </button>
           </div>
@@ -144,25 +140,33 @@ export const StudentDashboardSection: FC<StudentDashboardSectionProps> = ({ acti
         </article>
       ) : null}
 
-      <h4 className={styles.statsHeading}>Статистика</h4>
-      <div className={styles.grid}>
-        <article className={styles.card}>
-          <div className={styles.label}>Активные</div>
-          <div className={styles.value}>{loading ? '…' : summary.activeCount}</div>
-        </article>
-        <article className={styles.card}>
-          <div className={styles.label}>Дедлайн сегодня</div>
-          <div className={styles.value}>{loading ? '…' : summary.dueTodayCount}</div>
-        </article>
-        <article className={styles.card}>
-          <div className={styles.label}>Просроченные</div>
-          <div className={styles.value}>{loading ? '…' : summary.overdueCount}</div>
-        </article>
-        <article className={styles.card}>
-          <div className={styles.label}>Проверенные</div>
-          <div className={styles.value}>{loading ? '…' : summary.reviewedCount}</div>
-        </article>
-      </div>
+      {!loading &&
+      (summary.activeCount > 0 ||
+        summary.dueTodayCount > 0 ||
+        summary.overdueCount > 0 ||
+        summary.reviewedCount > 0) ? (
+        <>
+          <h4 className={styles.statsHeading}>Статистика</h4>
+          <div className={styles.grid}>
+            <article className={styles.card}>
+              <div className={styles.label}>Активные</div>
+              <div className={styles.value}>{summary.activeCount}</div>
+            </article>
+            <article className={styles.card}>
+              <div className={styles.label}>Дедлайн сегодня</div>
+              <div className={styles.value}>{summary.dueTodayCount}</div>
+            </article>
+            <article className={styles.card}>
+              <div className={styles.label}>Просроченные</div>
+              <div className={styles.value}>{summary.overdueCount}</div>
+            </article>
+            <article className={styles.card}>
+              <div className={styles.label}>Проверенные</div>
+              <div className={styles.value}>{summary.reviewedCount}</div>
+            </article>
+          </div>
+        </>
+      ) : null}
 
       <div className={styles.quickActions}>
         <button type="button" className={styles.quickAction} onClick={() => navigate('/homeworks')}>

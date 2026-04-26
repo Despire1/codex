@@ -16,8 +16,8 @@
   display: flex;
   flex-direction: column;
   border-radius: 32px;
-  background: #fff;
-  box-shadow: 0 28px 72px rgba(17, 24, 39, 0.24);
+  background: var(--surface-card);
+  box-shadow: 0 28px 72px -24px rgba(17, 24, 39, 0.24);
   overflow: hidden;
   border: 1px solid #edf0f5;
 }
@@ -39,7 +39,7 @@
 
 .title {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 34px;
   line-height: 1.1;
   font-weight: 800;
@@ -47,7 +47,7 @@
 
 .subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.35;
 }
@@ -56,21 +56,24 @@
   width: 38px;
   height: 38px;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-muted);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .closeButton:hover {
-  border-color: #d1d5db;
+  border-color: var(--border-strong);
   background: #e5e7eb;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .body {
@@ -103,7 +106,7 @@
 
 .label {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
@@ -114,21 +117,24 @@
 }
 
 .labelOptional {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 600;
 }
 
 .input,
 .textarea {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: #f9fafb;
-  color: #111827;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.25;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .input {
@@ -145,7 +151,7 @@
 
 .input:focus,
 .textarea:focus {
-  background: #fff;
+  background: var(--surface-card);
   border-color: #a3e635;
   box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.22);
 }
@@ -155,7 +161,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -168,21 +174,23 @@
 
 .iconPreviewButton {
   width: 100%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   padding: 10px;
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .iconPreviewButton:hover {
-  border-color: #d1d5db;
-  background: #f3f4f6;
+  border-color: var(--border-strong);
+  background: var(--surface-card-muted);
 }
 
 .iconPreview {
@@ -205,14 +213,14 @@
 }
 
 .iconMetaLabel {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.2;
   font-weight: 700;
 }
 
 .iconMetaColor {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -222,9 +230,9 @@
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #6b7280;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -239,29 +247,29 @@
 
 .sectionHint {
   margin: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.35;
 }
 
 .pickerCard {
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-default);
   border-radius: 24px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .tabsRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .tabButton {
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   min-height: 50px;
   font-size: 14px;
   font-weight: 800;
@@ -271,24 +279,27 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .tabButton:hover {
-  color: #111827;
-  background: #f8fafc;
+  color: var(--text-primary);
+  background: var(--surface-card-strong);
 }
 
 .tabButtonActive {
   color: #fff;
-  border-bottom-color: #111827;
+  border-bottom-color: var(--text-primary);
   background: #111827;
 }
 
 .tabCounter {
   border-radius: 6px;
   background: #a3e635;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 11px;
   line-height: 1;
   font-weight: 800;
@@ -311,24 +322,27 @@
 .searchIcon {
   position: absolute;
   left: 12px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .searchInput {
   width: 100%;
   min-height: 42px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: #f9fafb;
-  color: #111827;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
   font-size: 13px;
   padding: 10px 12px 10px 34px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .searchInput:focus {
-  background: #fff;
+  background: var(--surface-card);
   border-color: #a3e635;
   box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.2);
 }
@@ -343,19 +357,21 @@
 }
 
 .itemCard {
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-default);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-card);
   padding: 12px 12px 12px 10px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .itemCard:hover {
-  border-color: #cbd5e1;
+  border-color: var(--border-strong);
 }
 
 .itemCardChecked {
@@ -367,7 +383,7 @@
   width: 16px;
   height: 16px;
   margin-top: 2px;
-  accent-color: #111827;
+  accent-color: var(--text-primary);
   flex-shrink: 0;
 }
 
@@ -388,7 +404,7 @@
 
 .itemTitle {
   margin: 0;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
@@ -400,7 +416,7 @@
 
 .itemDescription {
   margin: 2px 0 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.25;
   display: -webkit-box;
@@ -436,7 +452,7 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1.2;
 }
@@ -453,15 +469,15 @@
 }
 
 .itemMetaMuted {
-  color: #6b7280;
+  color: var(--text-muted);
   font-weight: 600;
 }
 
 .emptyState {
   border: 1px dashed #cbd5e1;
   border-radius: 12px;
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--surface-card-strong);
+  color: var(--text-muted);
   text-align: center;
   padding: 14px;
   font-size: 13px;
@@ -474,7 +490,7 @@
   gap: 12px;
   padding: 18px 24px;
   border-top: 1px solid #f1f5f9;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .footerLeft {
@@ -487,7 +503,7 @@
 .cancelButton {
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1;
   font-weight: 800;
@@ -496,14 +512,14 @@
 }
 
 .cancelButton:hover {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .deleteButton {
   border: 1px solid #fecaca;
   border-radius: 12px;
-  background: #fff;
-  color: #b91c1c;
+  background: var(--surface-card);
+  color: var(--status-red-text);
   font-size: 13px;
   line-height: 1;
   font-weight: 700;

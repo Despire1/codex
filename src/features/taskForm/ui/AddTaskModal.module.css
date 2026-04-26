@@ -9,11 +9,12 @@
   position: relative;
   padding: 18px;
   border-radius: 16px;
-  background: radial-gradient(circle at 20% 20%, rgba(110, 169, 255, 0.18), transparent 45%),
+  background:
+    radial-gradient(circle at 20% 20%, rgba(110, 169, 255, 0.18), transparent 45%),
     radial-gradient(circle at 80% 10%, rgba(255, 171, 94, 0.16), transparent 40%),
     linear-gradient(135deg, rgba(62, 121, 240, 0.15), rgba(62, 121, 240, 0.05));
   border: 1px solid var(--border);
-  box-shadow: 0 12px 28px rgba(10, 46, 99, 0.12);
+  box-shadow: 0 12px 28px -9px rgba(10, 46, 99, 0.12);
 }
 
 .badge {
@@ -21,7 +22,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 999px;
   font-weight: 700;
   font-size: 12px;
@@ -61,11 +62,11 @@
 }
 
 .formCard {
-  background: var(--color-white);
+  background: var(--surface-card);
   border-radius: 16px;
   border: 1px solid var(--border);
   padding: 12px;
-  box-shadow: 0 12px 28px rgba(12, 18, 36, 0.08);
+  box-shadow: 0 12px 28px -9px rgba(12, 18, 36, 0.08);
 }
 
 @media (max-width: 720px) {

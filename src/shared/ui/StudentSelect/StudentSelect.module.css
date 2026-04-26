@@ -9,19 +9,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid var(--color-slate-300);
-  background: var(--color-white);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
   border-radius: 12px;
   min-height: 42px;
   padding: 10px 12px;
   cursor: pointer;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .triggerButton:disabled {
   cursor: not-allowed;
   color: var(--color-slate-300);
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   border-color: var(--border);
   box-shadow: none;
 }
@@ -47,11 +47,11 @@
 .dropdown {
   position: fixed;
   z-index: 80;
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 18px 40px -13px rgba(15, 23, 42, 0.16);
   transform-origin: top center;
 }
 
@@ -59,7 +59,7 @@
   display: grid;
   gap: 8px;
   padding: 8px;
-  background: var(--color-white);
+  background: var(--surface-card);
 }
 
 .searchInput {
@@ -83,7 +83,7 @@
 }
 
 .optionsList::-webkit-scrollbar-track {
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
   border-radius: 999px;
 }
 
@@ -100,8 +100,8 @@
 .option {
   width: 100%;
   border: 1px solid transparent;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   border-radius: 10px;
   min-height: 40px;
   padding: 8px 10px;
@@ -114,13 +114,13 @@
 }
 
 .option:hover {
-  background: var(--color-slate-50);
+  background: var(--surface-page);
 }
 
 .optionActive {
   border-color: var(--color-blue-200);
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
 }
 
 .check {

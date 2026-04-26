@@ -2,10 +2,11 @@
   min-width: 348px;
   max-width: 412px;
   padding: 16px 16px 18px;
-  background: var(--color-white);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--surface-card);
+  color: var(--color-slate-900, #0f172a);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
   border-radius: 26px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.16);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -32,16 +33,20 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .iconButton:hover {
   transform: translateY(-1px);
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
   border-color: transparent;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .iconButton:disabled {
@@ -51,7 +56,7 @@
 }
 
 .iconButtonDanger:hover {
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   background: rgba(255, 241, 242, 0.9);
 }
 
@@ -61,8 +66,8 @@
 }
 
 .closeButton:hover {
-  color: var(--color-slate-900);
-  background: var(--color-slate-100);
+  color: var(--text-primary);
+  background: var(--surface-card-muted);
 }
 
 .icon {
@@ -94,13 +99,13 @@
   line-height: 1.12;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .primaryMeta {
   font-size: 15px;
   line-height: 1.4;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .primaryMetaDivider {
@@ -110,7 +115,7 @@
 .secondaryMeta {
   font-size: 14px;
   line-height: 1.4;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .statusGrid {
@@ -156,7 +161,7 @@
 }
 
 .statusBadge_completed {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
   background: #dbeafe;
 }
 
@@ -166,7 +171,7 @@
 }
 
 .statusBadge_unpaid {
-  color: #475569;
+  color: var(--text-secondary);
   background: #e2e8f0;
 }
 

@@ -1,11 +1,14 @@
 .card {
   border-radius: 28px;
   border: 1px solid #edf1f7;
-  background: #ffffff;
+  background: var(--surface-card);
   padding: 16px;
-  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 16px 28px -9px rgba(15, 23, 42, 0.05);
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .card:focus-visible {
@@ -57,7 +60,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,7 +69,7 @@
 .level {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .debtBadge {
@@ -119,7 +122,7 @@
 }
 
 .metricCell {
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   border-radius: 12px;
   padding: 10px;
   text-align: center;
@@ -129,21 +132,21 @@
   font-size: 19px;
   line-height: 1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .metricGreen {
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .metricBlue {
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .metricLabel {
   margin-top: 4px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .homeworkProgressRow {
@@ -151,12 +154,12 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
 .homeworkProgressRow strong {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 12px;
 }
 
@@ -164,7 +167,7 @@
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--surface-card-muted);
   overflow: hidden;
 }
 
@@ -177,7 +180,7 @@
 .footer {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -212,7 +215,7 @@
 
 .nextLessonText {
   font-size: 11px;
-  color: #4b5563;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -229,7 +232,7 @@
 }
 
 .statusTextPaused {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .statusTextCompleted {
@@ -239,7 +242,7 @@
 @media (hover: hover) and (pointer: fine) {
   .card:hover {
     border-color: #dbe5f2;
-    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 18px 34px -11px rgba(15, 23, 42, 0.08);
     transform: translateY(-1px);
   }
 }

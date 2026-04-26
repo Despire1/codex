@@ -1,10 +1,5 @@
-import {
-  type FC,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faAddressCard,
@@ -47,6 +42,9 @@ import { LessonCancelDialog } from '@/features/lessons/ui/LessonCancelDialog/Les
 import { LessonRestoreDialog } from '@/features/lessons/ui/LessonRestoreDialog/LessonRestoreDialog';
 import { SeriesScopeDialog } from '@/features/lessons/ui/SeriesScopeDialog/SeriesScopeDialog';
 import { api } from '@/shared/api/client';
+import { useStudentsActions } from '../../model/useStudentsActions';
+import { useTelegramBotUsername } from '@/features/auth/telegram/model/useTelegramBotUsername';
+import { useToast } from '@/shared/lib/toast';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import {
   buildProfileStats,
@@ -62,16 +60,18 @@ import {
   resolveStudentProfileHomeworkStatusLabel,
   resolveStudentProfileHomeworkTone,
 } from '../../model/referenceHomeworkPresentation';
-import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
+import { formatInTimeZone, toZonedDate } from '../../../../shared/lib/timezoneDates';
 import { AdaptivePopover } from '@/shared/ui/AdaptivePopover/AdaptivePopover';
 import { BottomSheet } from '@/shared/ui/BottomSheet/BottomSheet';
 import { Modal } from '@/shared/ui/Modal/Modal';
 import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import controls from '@/shared/styles/controls.module.css';
 import {
+  AttachMoneyOutlinedIcon,
   CancelCircleOutlinedIcon,
   DeleteOutlineIcon,
   EditOutlinedIcon,
+  MoneyOffOutlinedIcon,
   ReplayOutlinedIcon,
 } from '@/icons/MaterialIcons';
 import { StudentDebtPopoverContent } from '../StudentDebtPopoverContent';
@@ -168,7 +168,7 @@ const getPaymentEventTitle = (event: PaymentEvent) => {
         return 'Оплата отменена, урок возвращён на баланс';
       }
       if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
-        return 'Оплата отменена без возврата';
+        return 'Оплата снята, баланс ученика не пополнен';
       }
       if (event.lessonsDelta > 0) {
         return 'Возврат урока на баланс';
@@ -267,7 +267,24 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   timeZone,
 }) => {
   const isMobile = useIsMobile(760);
+  const navigate = useNavigate();
   const { startEditLesson, requestDeleteLessonFromList, cancelLesson, restoreLesson } = useLessonActions();
+  const { priceEditState, startEditPrice, setPriceValue, savePrice, cancelPriceEdit } = useStudentsActions();
+  const botUsername = useTelegramBotUsername();
+  const { showToast } = useToast();
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!botUsername) {
+      showToast({ message: 'Имя бота не настроено', variant: 'error' });
+      return;
+    }
+    const link = `https://t.me/${botUsername}?start=invite-${studentEntry.student.id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast({ message: 'Ссылка скопирована', variant: 'success' });
+    } catch {
+      showToast({ message: 'Не удалось скопировать ссылку', variant: 'error' });
+    }
+  }, [botUsername, showToast, studentEntry.student.id]);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
   const [isDebtPopoverOpen, setIsDebtPopoverOpen] = useState(false);
@@ -281,10 +298,16 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const [pendingPaymentIds, setPendingPaymentIds] = useState<number[]>([]);
   const [pendingReminderIds, setPendingReminderIds] = useState<number[]>([]);
   const [shouldAutoCloseDebt, setShouldAutoCloseDebt] = useState(false);
+  const [paymentsPeriod, setPaymentsPeriod] = useState<'all' | 'year' | 'month'>('all');
   const previousDebtCount = useRef(0);
   const cardPresentation = buildStudentCardPresentation(studentEntry, timeZone);
   const statusMeta = getStatusUiMeta(cardPresentation.status);
-  const profileStats = buildProfileStats(studentEntry, studentLessonsSummary, studentHomeworkAssignments, studentDebtItems);
+  const profileStats = buildProfileStats(
+    studentEntry,
+    studentLessonsSummary,
+    studentHomeworkAssignments,
+    studentDebtItems,
+  );
 
   const homeworkAssignmentsOrdered = useMemo(
     () =>
@@ -326,7 +349,23 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
     }
 
     if (homeworkAssignmentsOrdered.length === 0) {
-      return <div className={styles.tabEmpty}>У ученика пока нет домашних заданий.</div>;
+      return (
+        <div className={styles.homeworkEmptyState}>
+          <p className={styles.homeworkEmptyTitle}>У ученика пока нет домашних заданий.</p>
+          <div className={styles.homeworkEmptyActions}>
+            <button type="button" className={styles.homeworkEmptyPrimary} onClick={() => navigate('/homeworks')}>
+              + Выдать ДЗ из библиотеки
+            </button>
+            <button
+              type="button"
+              className={styles.homeworkEmptySecondary}
+              onClick={() => navigate('/homeworks/templates/new')}
+            >
+              + Создать новое
+            </button>
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -337,10 +376,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const statusLabel = resolveStudentProfileHomeworkStatusLabel(assignment);
 
           const recipientName =
-            assignment.studentName ||
-            studentEntry.link?.customName ||
-            studentEntry.student.username ||
-            '';
+            assignment.studentName || studentEntry.link?.customName || studentEntry.student.username || '';
 
           return (
             <article
@@ -361,9 +397,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <p className={styles.activitySubtitle}>
                     {resolveStudentProfileHomeworkDeadlineLabel(assignment, timeZone)}
                   </p>
-                  {recipientName ? (
-                    <p className={styles.activityRecipient}>Выдано: {recipientName}</p>
-                  ) : null}
+                  {recipientName ? <p className={styles.activityRecipient}>Выдано: {recipientName}</p> : null}
                 </div>
                 <span className={styles.statusBadge}>{statusLabel}</span>
               </div>
@@ -416,20 +450,16 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const lessonTimestamp = new Date(lesson.startAt).getTime();
           const lessonEndAt = new Date(lessonTimestamp + Math.max(0, lesson.durationMinutes || 0) * 60_000);
           const lessonYearLabel = formatInTimeZone(lesson.startAt, 'yyyy', { timeZone });
-          const lessonDatePattern =
-            lessonYearLabel === currentYearLabel ? 'd MMMM • HH:mm' : 'd MMMM yyyy • HH:mm';
+          const lessonDatePattern = lessonYearLabel === currentYearLabel ? 'd MMMM • HH:mm' : 'd MMMM yyyy • HH:mm';
           const isJoinAvailable = lesson.status === 'SCHEDULED' && lessonEndAt.getTime() >= Date.now();
-          const lessonParticipant = lesson.participants?.find((participant) => participant.studentId === studentEntry.student.id);
+          const lessonParticipant = lesson.participants?.find(
+            (participant) => participant.studentId === studentEntry.student.id,
+          );
           const isPaidForStudent = lessonParticipant?.isPaid ?? lesson.isPaid;
           const statusLabel = resolveLessonStatusLabel(lesson);
           const statusTone = resolveLessonStatusTone(lesson);
-          const isFutureScheduled =
-            lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
-          const paymentLabel = isPaidForStudent
-            ? 'Оплачено'
-            : isFutureScheduled
-              ? 'Оплата после урока'
-              : 'Не оплачено';
+          const isFutureScheduled = lesson.status === 'SCHEDULED' && new Date(lesson.startAt).getTime() > Date.now();
+          const paymentLabel = isPaidForStudent ? 'Оплачено' : isFutureScheduled ? 'Оплата после урока' : 'Не оплачено';
           const paymentTone = isPaidForStudent ? 'paid' : isFutureScheduled ? 'pending' : 'unpaid';
           const recurrenceLabel = resolveLessonRecurrenceLabel(lesson);
           const lessonKindLabel = lesson.meetingLink ? 'Онлайн занятие' : 'Индивидуальный урок';
@@ -437,11 +467,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           const cancelCopy = resolveLessonCancelActionCopy(lesson);
           const isCanceled = lesson.status === 'CANCELED';
           const icon =
-            lesson.status === 'COMPLETED'
-              ? faCheck
-              : lesson.status === 'CANCELED'
-                ? faCalendar
-                : faCalendarPlus;
+            lesson.status === 'COMPLETED' ? faCheck : lesson.status === 'CANCELED' ? faCalendar : faCalendarPlus;
 
           return (
             <article key={lesson.id} className={`${styles.activityCard} ${styles.lessonCard}`}>
@@ -468,24 +494,34 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       <span className={`${styles.lessonStatusBadge} ${styles[`lessonStatusBadge_${statusTone}`]}`}>
                         {statusLabel}
                       </span>
-                      <Tooltip content={isPaidForStudent ? 'Отменить оплату' : 'Отметить оплату'}>
-                        <button
-                          type="button"
-                          className={`${styles.lessonStatusBadge} ${styles[`lessonPaymentBadge_${paymentTone}`]} ${styles.lessonPaymentButton}`}
-                          disabled={pendingPaymentIds.includes(lesson.id)}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleMarkPaid(lesson.id, isPaidForStudent);
-                          }}
-                        >
-                          {paymentLabel}
-                        </button>
-                      </Tooltip>
+                      <span className={`${styles.lessonStatusBadge} ${styles[`lessonPaymentBadge_${paymentTone}`]}`}>
+                        {paymentLabel}
+                      </span>
                       {recurrenceLabel ? <span className={styles.lessonMetaBadge}>{recurrenceLabel}</span> : null}
                     </div>
                   </div>
                 </div>
                 <div className={styles.lessonQuickActions}>
+                  <Tooltip content={isPaidForStudent ? 'Отменить оплату' : 'Отметить оплату'}>
+                    <button
+                      type="button"
+                      className={`${styles.lessonActionButton} ${
+                        isPaidForStudent ? styles.lessonActionButtonPayRevert : styles.lessonActionButtonPay
+                      }`}
+                      disabled={pendingPaymentIds.includes(lesson.id)}
+                      aria-label={isPaidForStudent ? 'Отменить оплату' : 'Отметить оплату'}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleMarkPaid(lesson.id, isPaidForStudent);
+                      }}
+                    >
+                      {isPaidForStudent ? (
+                        <MoneyOffOutlinedIcon className={styles.lessonActionIcon} />
+                      ) : (
+                        <AttachMoneyOutlinedIcon className={styles.lessonActionIcon} />
+                      )}
+                    </button>
+                  </Tooltip>
                   <Tooltip content={editDisabledReason ?? 'Редактировать'}>
                     <button
                       type="button"
@@ -572,27 +608,96 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   };
 
   const renderPaymentsTab = () => {
-    if (paymentsLoading && paymentsOrdered.length === 0) {
-      return <div className={styles.tabEmpty}>Загружаем оплаты…</div>;
-    }
+    const periodTabs: Array<{ id: 'all' | 'year' | 'month'; label: string }> = [
+      { id: 'all', label: 'Все' },
+      { id: 'year', label: 'Этот год' },
+      { id: 'month', label: 'Этот месяц' },
+    ];
 
-    if (paymentsOrdered.length === 0) {
-      return <div className={styles.tabEmpty}>Платежей пока нет.</div>;
-    }
-
-    const groupedPayments = paymentsOrdered.reduce<Array<{ title: string; items: PaymentEvent[] }>>((groups, event) => {
-      const groupTitle = formatInTimeZone(event.createdAt, 'd MMMM', { locale: ru, timeZone });
-      const currentGroup = groups[groups.length - 1];
-      if (currentGroup?.title === groupTitle) {
-        currentGroup.items.push(event);
-        return groups;
+    const nowZoned = toZonedDate(new Date(), timeZone);
+    const filteredPayments = paymentsOrdered.filter((event) => {
+      if (paymentsPeriod === 'all') return true;
+      const eventZoned = toZonedDate(event.createdAt, timeZone);
+      if (paymentsPeriod === 'year') {
+        return eventZoned.getFullYear() === nowZoned.getFullYear();
       }
-      groups.push({ title: groupTitle, items: [event] });
-      return groups;
-    }, []);
+      return eventZoned.getFullYear() === nowZoned.getFullYear() && eventZoned.getMonth() === nowZoned.getMonth();
+    });
+
+    const totalRub = filteredPayments.reduce((sum, event) => {
+      const amount = typeof event.moneyAmount === 'number' && event.moneyAmount > 0 ? event.moneyAmount : 0;
+      if (event.type === 'CHARGE' || (event.type === 'ADJUSTMENT' && event.reason === 'PAYMENT_REVERT_WRITE_OFF')) {
+        return sum - amount;
+      }
+      return sum + amount;
+    }, 0);
+
+    const summaryHeader = (
+      <div className={styles.paymentsSummary}>
+        <div className={styles.paymentsPeriodTabs} role="tablist" aria-label="Период оплат">
+          {periodTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={paymentsPeriod === tab.id}
+              className={`${styles.paymentsPeriodTab} ${paymentsPeriod === tab.id ? styles.paymentsPeriodTabActive : ''}`}
+              onClick={() => setPaymentsPeriod(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className={styles.paymentsAddButton} onClick={onOpenBalanceTopup}>
+          + Записать оплату
+        </button>
+        <div className={styles.paymentsTotalRow}>
+          <span>
+            Итого: <strong>{Math.round(totalRub).toLocaleString('ru-RU')} ₽</strong>
+          </span>
+          <span>·</span>
+          <span>Транзакций: {filteredPayments.length}</span>
+        </div>
+      </div>
+    );
+
+    if (paymentsLoading && paymentsOrdered.length === 0) {
+      return (
+        <>
+          {summaryHeader}
+          <div className={styles.tabEmpty}>Загружаем оплаты…</div>
+        </>
+      );
+    }
+
+    if (filteredPayments.length === 0) {
+      return (
+        <>
+          {summaryHeader}
+          <div className={styles.tabEmpty}>
+            {paymentsOrdered.length === 0 ? 'Платежей пока нет.' : 'За выбранный период оплат нет.'}
+          </div>
+        </>
+      );
+    }
+
+    const groupedPayments = filteredPayments.reduce<Array<{ title: string; items: PaymentEvent[] }>>(
+      (groups, event) => {
+        const groupTitle = formatInTimeZone(event.createdAt, 'd MMMM', { locale: ru, timeZone });
+        const currentGroup = groups[groups.length - 1];
+        if (currentGroup?.title === groupTitle) {
+          currentGroup.items.push(event);
+          return groups;
+        }
+        groups.push({ title: groupTitle, items: [event] });
+        return groups;
+      },
+      [],
+    );
 
     return (
       <div className={styles.paymentsListStack}>
+        {summaryHeader}
         {groupedPayments.map((group) => (
           <section key={group.title} className={styles.paymentGroup}>
             <div className={styles.paymentGroupTitle}>{group.title}</div>
@@ -855,12 +960,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
           {isMobile ? (
             <div className={styles.backRow}>
               <Tooltip content="Вернуться к списку" side="bottom" align="start">
-                <button
-                  type="button"
-                  className={styles.backButton}
-                  onClick={onBack}
-                  aria-label="Вернуться к списку"
-                >
+                <button type="button" className={styles.backButton} onClick={onBack} aria-label="Вернуться к списку">
                   <FontAwesomeIcon icon={faArrowLeft} />
                 </button>
               </Tooltip>
@@ -896,9 +996,24 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                         </Tooltip>
                       ) : null}
                       {showActivationBadge ? (
-                        <Tooltip content={activationHint} side="bottom" align="center">
-                          <span className={styles.heroInactiveBadge}>Telegram не привязан</span>
-                        </Tooltip>
+                        <>
+                          <Tooltip content={activationHint} side="bottom" align="center">
+                            <span className={styles.heroInactiveBadge}>Telegram не привязан</span>
+                          </Tooltip>
+                          {botUsername ? (
+                            <Tooltip content="Скопировать ссылку-приглашение для ученика" side="bottom" align="center">
+                              <button
+                                type="button"
+                                className={styles.heroInviteButton}
+                                onClick={() => {
+                                  void handleCopyInviteLink();
+                                }}
+                              >
+                                Скопировать приглашение
+                              </button>
+                            </Tooltip>
+                          ) : null}
+                        </>
                       ) : null}
                       <Tooltip content="Статус обучения" side="bottom" align="center">
                         <span
@@ -915,9 +1030,9 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       </Tooltip>
                     </div>
                   </div>
-                  <div className={styles.heroUsernameRow}>
-                    <span className={styles.heroUsernameLabel}>Telegram:</span>
-                    {telegramUsername ? (
+                  {studentEntry.student.isActivated && telegramUsername ? (
+                    <div className={styles.heroUsernameRow}>
+                      <span className={styles.heroUsernameLabel}>Telegram:</span>
                       <button
                         type="button"
                         className={`${styles.heroUsernameValue} ${styles.heroUsernameButton}`}
@@ -925,21 +1040,19 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       >
                         @{telegramUsername}
                       </button>
-                    ) : (
-                      <span className={styles.heroUsernameValue}>@нет</span>
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                   {emailLabel || phoneLabel ? (
                     <div className={styles.heroContactsRow}>
                       {emailLabel ? (
-                        <span className={styles.contactItem}>
+                        <a className={styles.contactItem} href={`mailto:${emailLabel}`}>
                           <FontAwesomeIcon icon={faEnvelope} /> {emailLabel}
-                        </span>
+                        </a>
                       ) : null}
                       {phoneLabel ? (
-                        <span className={styles.contactItem}>
+                        <a className={styles.contactItem} href={`tel:${phoneLabel.replace(/[^+\d]/g, '')}`}>
                           <FontAwesomeIcon icon={faPhone} /> {phoneLabel}
-                        </span>
+                        </a>
                       ) : null}
                     </div>
                   ) : null}
@@ -980,7 +1093,11 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                     Настройки уведомлений
                   </button>
                   <div className={styles.menuSeparator} aria-hidden />
-                  <button type="button" className={styles.dangerButton} onClick={() => handleMenuAction(onRequestDeleteStudent)}>
+                  <button
+                    type="button"
+                    className={styles.dangerButton}
+                    onClick={() => handleMenuAction(onRequestDeleteStudent)}
+                  >
                     Удалить ученика
                   </button>
                 </AdaptivePopover>
@@ -992,17 +1109,45 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <div className={styles.heroStatValue}>{profileStats.lessonsConducted}</div>
                 <div className={styles.heroStatLabel}>Уроков проведено</div>
               </div>
-              <Tooltip content="Изменить цену урока" side="bottom" align="start">
-                <button
-                  type="button"
-                  className={styles.heroStatButton}
-                  onClick={() => onEditStudent({ focusField: 'price' })}
-                  aria-label="Изменить цену занятия"
-                >
-                  <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{priceValueLabel}</div>
+              {priceEditState.id === studentEntry.student.id ? (
+                <div className={styles.heroStatButton}>
+                  <input
+                    type="number"
+                    min={0}
+                    autoFocus
+                    className={styles.heroStatInput}
+                    value={priceEditState.value}
+                    onChange={(event) => setPriceValue(event.target.value)}
+                    onBlur={() => {
+                      void savePrice();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void savePrice();
+                      }
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelPriceEdit();
+                      }
+                    }}
+                  />
                   <div className={styles.heroStatLabel}>Цена за урок</div>
-                </button>
-              </Tooltip>
+                </div>
+              ) : (
+                <Tooltip content="Изменить цену урока" side="bottom" align="start">
+                  <button
+                    type="button"
+                    className={styles.heroStatButton}
+                    onClick={() => startEditPrice({ ...studentEntry.student, link: studentEntry.link })}
+                    aria-label="Изменить цену занятия"
+                  >
+                    <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{priceValueLabel}</div>
+                    <div className={styles.heroStatLabel}>Цена за урок</div>
+                  </button>
+                </Tooltip>
+              )}
+
               {hasUnpaidLessons ? (
                 <AdaptivePopover
                   isOpen={isDebtPopoverOpen}
@@ -1011,7 +1156,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   align="start"
                   offset={8}
                   className={styles.debtPopover}
-                  trigger={(
+                  trigger={
                     <Tooltip content="Посмотреть неоплаченные занятия" side="bottom" align="center">
                       <button
                         type="button"
@@ -1019,11 +1164,13 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                         onClick={() => setIsDebtPopoverOpen((prev) => !prev)}
                         aria-label="Показать неоплаченные занятия"
                       >
-                        <div className={`${styles.heroStatValue} ${styles.heroStatDanger}`}>{unpaidLessonsValueLabel}</div>
+                        <div className={`${styles.heroStatValue} ${styles.heroStatDanger}`}>
+                          {unpaidLessonsValueLabel}
+                        </div>
                         <div className={styles.heroStatLabel}>{unpaidLessonsLabel}</div>
                       </button>
                     </Tooltip>
-                  )}
+                  }
                 >
                   <StudentDebtPopoverContent
                     items={studentDebtItems}
@@ -1058,28 +1205,32 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </button>
               </Tooltip>
               <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>{profileStats.completedHomeworks}</div>
+                <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>
+                  {profileStats.completedHomeworks}
+                </div>
                 <div className={styles.heroStatLabel}>Домашек сдано</div>
               </div>
             </div>
           </section>
 
           {!isMobile && (
-            <Modal open={isReminderSettingsOpen} title="Настройки уведомлений" onClose={() => setIsReminderSettingsOpen(false)}>
+            <Modal
+              open={isReminderSettingsOpen}
+              title="Настройки уведомлений"
+              onClose={() => setIsReminderSettingsOpen(false)}
+            >
               <div className={styles.reminderSheet}>
                 <div className={styles.reminderRow}>
                   <div>
                     <div className={styles.reminderLabel}>Напоминания об оплате</div>
                     <div className={styles.reminderHelper}>
-                      {paymentRemindersEnabled ? 'Сейчас включены для этого ученика' : 'Сейчас выключены для этого ученика'}
+                      {paymentRemindersEnabled
+                        ? 'Сейчас включены для этого ученика'
+                        : 'Сейчас выключены для этого ученика'}
                     </div>
                   </div>
                   <label className={controls.switch}>
-                    <input
-                      type="checkbox"
-                      checked={paymentRemindersEnabled}
-                      onChange={handleTogglePaymentReminders}
-                    />
+                    <input type="checkbox" checked={paymentRemindersEnabled} onChange={handleTogglePaymentReminders} />
                     <span className={controls.slider} />
                   </label>
                 </div>
@@ -1107,15 +1258,13 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   <div>
                     <div className={styles.reminderLabel}>Напоминания об оплате</div>
                     <div className={styles.reminderHelper}>
-                      {paymentRemindersEnabled ? 'Сейчас включены для этого ученика' : 'Сейчас выключены для этого ученика'}
+                      {paymentRemindersEnabled
+                        ? 'Сейчас включены для этого ученика'
+                        : 'Сейчас выключены для этого ученика'}
                     </div>
                   </div>
                   <label className={controls.switch}>
-                    <input
-                      type="checkbox"
-                      checked={paymentRemindersEnabled}
-                      onChange={handleTogglePaymentReminders}
-                    />
+                    <input type="checkbox" checked={paymentRemindersEnabled} onChange={handleTogglePaymentReminders} />
                     <span className={controls.slider} />
                   </label>
                 </div>
@@ -1180,18 +1329,28 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 <div className={styles.contactList}>
                   <div>
                     <FontAwesomeIcon icon={faPaperPlane} />
-                    <span>{studentEntry.student.username ? `@${studentEntry.student.username}` : 'Не указан'}</span>
+                    {studentEntry.student.username ? (
+                      <a
+                        href={`https://t.me/${studentEntry.student.username}`}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        @{studentEntry.student.username}
+                      </a>
+                    ) : (
+                      <span>Не указан</span>
+                    )}
                   </div>
                   {phoneLabel ? (
                     <div>
                       <FontAwesomeIcon icon={faPhone} />
-                      <span>{phoneLabel}</span>
+                      <a href={`tel:${phoneLabel.replace(/[^+\d]/g, '')}`}>{phoneLabel}</a>
                     </div>
                   ) : null}
                   {emailLabel ? (
                     <div>
                       <FontAwesomeIcon icon={faEnvelope} />
-                      <span>{emailLabel}</span>
+                      <a href={`mailto:${emailLabel}`}>{emailLabel}</a>
                     </div>
                   ) : null}
                   {studentLevelLabel ? (
@@ -1206,7 +1365,6 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   </div>
                 </div>
               </section>
-
             </div>
           </div>
         </div>
@@ -1240,9 +1398,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
               : undefined
         }
         confirmText={
-          scopeDialog?.type === 'cancel'
-            ? resolveScopeDialogCopy(scopeDialog.lesson).confirmText
-            : 'Восстановить'
+          scopeDialog?.type === 'cancel' ? resolveScopeDialogCopy(scopeDialog.lesson).confirmText : 'Восстановить'
         }
         previews={scopeDialog?.previews}
         onClose={() => setScopeDialog(null)}

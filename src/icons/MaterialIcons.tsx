@@ -279,12 +279,18 @@ export const DoneOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 export const PaidOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
-    <AttachMoneyIcon width={props.width} height={props.height}/>
+  <AttachMoneyIcon width={props.width} height={props.height} />
 );
 
 export const AttachMoneyOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.19 0 2.06.39 2.83 1.24l1.54-1.54C14.9 5.69 13.76 5.2 12.5 5.06V3h-2v2.06C8.09 5.32 6.8 6.97 6.8 8.89c0 2.38 1.96 3.46 4.7 4.13 2.32.58 2.9 1.21 2.9 2.13 0 1.01-.9 1.72-2.16 1.72-1.34 0-2.31-.54-3.11-1.49l-1.56 1.56c1.02 1.26 2.34 2.03 3.93 2.24V21h2v-1.97c2.28-.27 3.8-1.86 3.8-4.03 0-2.79-2.3-3.75-4.7-4.2z" />
+  </svg>
+);
+
+export const MoneyOffOutlinedIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12.5 6.9c1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-.53.12-1.03.3-1.48.54l1.47 1.47c.41-.17.91-.27 1.51-.27zM5.33 4.06 4.06 5.33 7.5 8.77c0 2.08 1.56 3.21 3.91 3.91l3.51 3.51c-.34.48-1.05.91-2.42.91-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c.96-.18 1.82-.55 2.45-1.12l2.22 2.22 1.27-1.27z" />
   </svg>
 );
 
@@ -330,5 +336,33 @@ export const OpenInNewIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
     <path d="M19 3h-6v2h2.59l-7.83 7.83 1.41 1.41L17 6.41V9h2V3z" />
     <path d="M5 5h6V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6h-2v6H5V5z" />
+  </svg>
+);
+
+export const PaletteIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z" />
+    <circle cx="6.5" cy="11.5" r="1.5" />
+    <circle cx="9.5" cy="7.5" r="1.5" />
+    <circle cx="14.5" cy="7.5" r="1.5" />
+    <circle cx="17.5" cy="11.5" r="1.5" />
+  </svg>
+);
+
+export const SunIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-13a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1zm0 17a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0v-2a1 1 0 0 1 1-1zm10-8a1 1 0 0 1-1 1h-2a1 1 0 1 1 0-2h2a1 1 0 0 1 1 1zM5 12a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h2a1 1 0 0 1 1 1zm13.66-7.07a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.42l1.41-1.41a1 1 0 0 1 1.42 0zM7.17 16.83a1 1 0 0 1 0 1.41l-1.41 1.42a1 1 0 1 1-1.42-1.42l1.42-1.41a1 1 0 0 1 1.41 0zm11.49 1.41l1.42 1.42a1 1 0 1 1-1.42 1.41l-1.41-1.41a1 1 0 1 1 1.41-1.42zM5.76 4.93l1.41 1.41a1 1 0 1 1-1.41 1.42L4.34 6.34a1 1 0 0 1 1.42-1.41z" />
+  </svg>
+);
+
+export const MoonIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
+export const ContrastIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden focusable="false" {...props}>
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18V4a8 8 0 0 1 0 16z" />
   </svg>
 );

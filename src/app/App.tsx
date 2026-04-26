@@ -3,6 +3,8 @@ import { initTelegramFullscreen } from '@/shared/telegram/fullscreen';
 import { initTelegramLayoutInsetsMobileOnly } from '@/shared/telegram/layoutInsets';
 import { SelectedStudentProvider } from '@/entities/student/model/selectedStudent';
 import { AppPage } from './AppPage';
+import { InstallAppBanner } from './components/InstallAppBanner';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 export const App = () => {
   useEffect(() => {
@@ -16,6 +18,8 @@ export const App = () => {
 
   return (
     <SelectedStudentProvider>
+      <OfflineIndicator />
+      <InstallAppBanner />
       <AppPage />
     </SelectedStudentProvider>
   );

@@ -20,6 +20,8 @@ import {
 } from '../shared/lib/pwaNotifications';
 import layoutStyles from './styles/layout.module.css';
 import { Topbar, type TopbarCreateMenuItem } from '../widgets/layout/Topbar';
+import { StudentTopbar } from '../widgets/layout/StudentTopbar';
+import { CommandPalette } from '../features/search/CommandPalette';
 import { NotificationsBellButton } from '../features/notifications/bellDropdown/NotificationsBellButton';
 import { Sidebar } from '../widgets/layout/Sidebar';
 import { buildSidebarNavItems, type SidebarNavItem } from '../widgets/layout/model/navigation';
@@ -40,11 +42,7 @@ import { type StudentTabId } from '../widgets/students/types';
 import { StudentsDataProvider, useStudentsDataInternal } from '../widgets/students/model/useStudentsData';
 import { StudentsActionsProvider, useStudentsActionsInternal } from '../widgets/students/model/useStudentsActions';
 import { StudentsHomeworkProvider, useStudentsHomeworkInternal } from '../widgets/students/model/useStudentsHomework';
-import {
-  HomeworkFileLinesIcon,
-  HomeworkFolderIcon,
-  HomeworkLinkIcon,
-} from '../shared/ui/icons/HomeworkFaIcons';
+import { HomeworkFileLinesIcon, HomeworkFolderIcon, HomeworkLinkIcon } from '../shared/ui/icons/HomeworkFaIcons';
 import { LessonActionsProvider, useLessonActionsInternal } from '../features/lessons/model/useLessonActions';
 import { ScheduleStateProvider, useScheduleStateInternal } from '../widgets/schedule/model/useScheduleState';
 import { DashboardStateProvider, useDashboardStateInternal } from '../widgets/dashboard/model/useDashboardState';
@@ -115,7 +113,7 @@ const initialTeacher: Teacher = {
 const LAST_VISITED_ROUTE_KEY = 'calendar_last_route';
 
 const desktopTitleByTab: Record<TabId, string> = {
-  dashboard: 'Обзор',
+  dashboard: 'Главная',
   students: 'Ученики',
   schedule: 'Расписание',
   homeworks: 'Задания',
@@ -159,8 +157,17 @@ const AppPageContent = () => {
   const blockNavigation = useBlockNavigation();
   const { showToast } = useToast();
   const { getActiveEntry, clearEntry, requestNavigationBypass, consumeNavigationBypass } = useUnsavedChanges();
-  const { state: sessionState, refresh: refreshSession, hasSubscription, user: sessionUser } = useSessionStatus();
-  const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(refreshSession, refreshSession);
+  const {
+    state: sessionState,
+    refresh: refreshSession,
+    hasSubscription,
+    user: sessionUser,
+    sessionExpired,
+  } = useSessionStatus();
+  const { state: telegramState, hasInitData: hasTelegramInitData } = useTelegramWebAppAuth(
+    refreshSession,
+    refreshSession,
+  );
   const hasTelegramAccess = !hasTelegramInitData || telegramState === 'authenticated';
   const hasAccess = sessionState === 'authenticated' && hasTelegramAccess;
   const isStudentRole = sessionUser?.role?.toUpperCase() === 'STUDENT';
@@ -182,6 +189,20 @@ const AppPageContent = () => {
   const [studentContextLoading, setStudentContextLoading] = useState(false);
   const [studentContextRevision, setStudentContextRevision] = useState(0);
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    if (isStudentRole) return undefined;
+    const handler = (event: KeyboardEvent) => {
+      const isPaletteHotkey = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+      if (isPaletteHotkey) {
+        event.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isStudentRole]);
   const isMobile = useIsMobile(767);
   const isDesktop = useIsDesktop();
   const [templateCreateTopbarState, setTemplateCreateTopbarState] = useState<HomeworkTemplateCreateTopbarState>({
@@ -196,14 +217,19 @@ const AppPageContent = () => {
     primaryActionLabel: '',
     primarySubmittingLabel: '',
   });
-  const [homeworkDetailTopbarState, setHomeworkDetailTopbarState] = useState<HomeworkTemplateDetailTopbarState | null>(null);
+  const [homeworkDetailTopbarState, setHomeworkDetailTopbarState] = useState<HomeworkTemplateDetailTopbarState | null>(
+    null,
+  );
   const [homeworkAssignModalOpen, setHomeworkAssignModalOpen] = useState(false);
   const [homeworkAssignSubmitting, setHomeworkAssignSubmitting] = useState(false);
   const [homeworkAssignLoading, setHomeworkAssignLoading] = useState(false);
   const [homeworkAssignTemplates, setHomeworkAssignTemplates] = useState<HomeworkTemplate[]>([]);
   const [homeworkAssignGroups, setHomeworkAssignGroups] = useState<HomeworkGroupListItem[]>([]);
   const [homeworkAssignStudents, setHomeworkAssignStudents] = useState<TeacherHomeworkStudentOption[]>([]);
-  const [homeworkAssignDefaults, setHomeworkAssignDefaults] = useState<{ studentId: number | null; lessonId: number | null }>({
+  const [homeworkAssignDefaults, setHomeworkAssignDefaults] = useState<{
+    studentId: number | null;
+    lessonId: number | null;
+  }>({
     studentId: null,
     lessonId: null,
   });
@@ -278,8 +304,7 @@ const AppPageContent = () => {
         title: active.entry.title ?? 'Несохранённые изменения',
         message: active.entry.message ?? 'Вы изменили данные. Сохранить перед выходом?',
         confirmText: active.entry.confirmText ?? 'Сохранить',
-        cancelText:
-          active.entry.cancelText ?? (cancelKeepsEditing ? 'Остаться' : 'Выйти без сохранения'),
+        cancelText: active.entry.cancelText ?? (cancelKeepsEditing ? 'Остаться' : 'Выйти без сохранения'),
         onConfirm: () => {
           active.entry
             .onSave()
@@ -370,9 +395,12 @@ const AppPageContent = () => {
     guardedNavigate(tabPathById.students);
   }, [guardedNavigate]);
 
-  const navigateToStudentProfile = useCallback((studentId: number) => {
-    guardedNavigate(`${tabPathById.students}/${studentId}`);
-  }, [guardedNavigate]);
+  const navigateToStudentProfile = useCallback(
+    (studentId: number) => {
+      guardedNavigate(`${tabPathById.students}/${studentId}`);
+    },
+    [guardedNavigate],
+  );
 
   const navigateToSchedule = useCallback(() => {
     guardedNavigate(tabPathById.schedule);
@@ -408,10 +436,7 @@ const AppPageContent = () => {
     removeLessonsFromRanges,
   } = scheduleLessons;
 
-  const availableTabs = useMemo(
-    () => getTabsByRole(isStudentRole ? 'STUDENT' : 'TEACHER'),
-    [isStudentRole],
-  );
+  const availableTabs = useMemo(() => getTabsByRole(isStudentRole ? 'STUDENT' : 'TEACHER'), [isStudentRole]);
 
   const activeTabByPath = useMemo<TabId | null>(() => {
     const matchedTab = availableTabs.find(
@@ -445,9 +470,7 @@ const AppPageContent = () => {
     const assignmentId = params.get('assignmentId');
     const lessonId = params.get('lessonId');
     if (assignmentId && /^\d+$/.test(assignmentId)) {
-      const target = isStudentRole
-        ? `/homeworks/${assignmentId}`
-        : `/homeworks/assignments/${assignmentId}`;
+      const target = isStudentRole ? `/homeworks/${assignmentId}` : `/homeworks/assignments/${assignmentId}`;
       navigate(target, { replace: true });
       return;
     }
@@ -465,7 +488,8 @@ const AppPageContent = () => {
   const activeTabNeedsDashboardHomeworks = activeTabByPath === 'dashboard';
 
   const isTeacherAssignmentCreateRoute = !isStudentRole && /^\/homeworks\/new\/?$/.test(location.pathname);
-  const isTeacherAssignmentEditRoute = !isStudentRole && /^\/homeworks\/assignments\/\d+\/edit\/?$/.test(location.pathname);
+  const isTeacherAssignmentEditRoute =
+    !isStudentRole && /^\/homeworks\/assignments\/\d+\/edit\/?$/.test(location.pathname);
   const isTeacherAssignmentDetailRoute = !isStudentRole && /^\/homeworks\/assignments\/\d+\/?$/.test(location.pathname);
   const isTeacherTemplateCreateRoute = !isStudentRole && /^\/homeworks\/templates\/new\/?$/.test(location.pathname);
   const isTeacherTemplateEditRoute = !isStudentRole && /^\/homeworks\/\d+\/edit\/?$/.test(location.pathname);
@@ -486,9 +510,7 @@ const AppPageContent = () => {
   }, [activeTab, location.pathname, location.search]);
   const isMobileSettingsRootRoute = !isDesktop && activeTab === 'settings' && !mobileSettingsDetail;
   const isMobileSettingsDetailRoute = !isDesktop && activeTab === 'settings' && Boolean(mobileSettingsDetail);
-  const teacherHomeworkEditorBackPath = isTeacherTemplateEditorRoute
-    ? tabPathById.homeworks
-    : tabPathById.homeworks;
+  const teacherHomeworkEditorBackPath = isTeacherTemplateEditorRoute ? tabPathById.homeworks : tabPathById.homeworks;
 
   const desktopTopbarTitle = desktopTitleByTab[activeTab];
   const desktopTopbarResolvedTitle = isTeacherHomeworkEditorRoute
@@ -501,7 +523,7 @@ const AppPageContent = () => {
         : 'Создание домашнего задания'
       : isTeacherHomeworkSourceDetailRoute
         ? 'Домашнее задание'
-      : desktopTopbarTitle;
+        : desktopTopbarTitle;
   const desktopTopbarTitleWithOverrides = homeworkDetailTopbarState?.title ?? desktopTopbarResolvedTitle;
   const desktopDateLabel = useMemo(
     () =>
@@ -514,11 +536,10 @@ const AppPageContent = () => {
     [],
   );
   const desktopTopbarResolvedSubtitle = isTeacherHomeworkEditorRoute
-    ? templateCreateTopbarState.subtitleOverride ??
+    ? (templateCreateTopbarState.subtitleOverride ??
       (isTeacherAssignmentEditRoute
-      ? 'Обновите контент и параметры выдачи'
-      : 'Соберите домашку и подготовьте её к отправке'
-      )
+        ? 'Обновите контент и параметры выдачи'
+        : 'Соберите домашку и подготовьте её к отправке'))
     : isTeacherTemplateEditorRoute
       ? templateCreateTopbarState.draftSavedAtLabel
         ? `Черновик сохранен: ${templateCreateTopbarState.draftSavedAtLabel}`
@@ -527,27 +548,21 @@ const AppPageContent = () => {
           : 'Новая домашка, которую можно будет выдавать ученикам'
       : isTeacherHomeworkSourceDetailRoute
         ? 'Карточка домашнего задания и история выдач по ученикам'
-      : desktopDateLabel;
+        : desktopDateLabel;
   const isHomeworkDetailTopbarVisible = Boolean(homeworkDetailTopbarState);
   const hasDesktopHomeworkDetailChrome =
     isTeacherHomeworkSourceDetailRoute || isTeacherAssignmentDetailRoute || isHomeworkDetailTopbarVisible;
   const desktopTopbarSubtitleWithOverrides = homeworkDetailTopbarState?.subtitle ?? desktopTopbarResolvedSubtitle;
   const isDesktopHomeworksLibraryChrome =
     activeTab === 'homeworks' && !hasDesktopHomeworkDetailChrome && !isTeacherAnyHomeworkEditorRoute;
-  const editorPrimaryActionLabel = templateCreateTopbarState.primaryActionLabel || (
-    isTeacherHomeworkEditorRoute
-      ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать')
-      : 'Сохранить'
-  );
+  const editorPrimaryActionLabel =
+    templateCreateTopbarState.primaryActionLabel ||
+    (isTeacherHomeworkEditorRoute ? (isTeacherAssignmentEditRoute ? 'Выдать' : 'Создать') : 'Сохранить');
   const editorSecondaryActionLabel = templateCreateTopbarState.secondaryActionLabel || 'Сохранить черновик';
-  const showEditorSecondaryAction =
-    templateCreateTopbarState.showSecondaryAction || isTeacherTemplateCreateRoute;
+  const showEditorSecondaryAction = templateCreateTopbarState.showSecondaryAction || isTeacherTemplateCreateRoute;
   const editorPrimarySubmittingLabel =
-    templateCreateTopbarState.primarySubmittingLabel || (
-      isTeacherHomeworkEditorRoute
-        ? (isTeacherAssignmentEditRoute ? 'Выдаю…' : 'Создаю…')
-        : 'Сохраняю…'
-    );
+    templateCreateTopbarState.primarySubmittingLabel ||
+    (isTeacherHomeworkEditorRoute ? (isTeacherAssignmentEditRoute ? 'Выдаю…' : 'Создаю…') : 'Сохраняю…');
   const editorPrimaryDisabled =
     templateCreateTopbarState.hasValidationErrors || templateCreateTopbarState.primaryActionDisabled;
 
@@ -576,8 +591,7 @@ const AppPageContent = () => {
     isActive: hasTeacherAccess && activeTabByPath === 'dashboard',
   });
   const { summary: dashboardSummaryData } = dashboardSummary;
-  const isZeroSummary =
-    dashboardSummaryData?.studentsCount === 0 && dashboardSummaryData?.lessonsCount === 0;
+  const isZeroSummary = dashboardSummaryData?.studentsCount === 0 && dashboardSummaryData?.lessonsCount === 0;
   const onboardingState = useOnboardingStateInternal({
     teacherId: dashboardSummaryData?.teacherId ?? null,
     isZero: Boolean(isZeroSummary),
@@ -606,16 +620,13 @@ const AppPageContent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTabByPath, dashboardSummary.refresh]);
 
-  const openDashboardHomeworkAssignModal = useCallback(
-    (studentId?: number | null, lessonId?: number | null) => {
-      setHomeworkAssignDefaults({
-        studentId: typeof studentId === 'number' && Number.isFinite(studentId) ? studentId : null,
-        lessonId: typeof lessonId === 'number' && Number.isFinite(lessonId) ? lessonId : null,
-      });
-      setHomeworkAssignModalOpen(true);
-    },
-    [],
-  );
+  const openDashboardHomeworkAssignModal = useCallback((studentId?: number | null, lessonId?: number | null) => {
+    setHomeworkAssignDefaults({
+      studentId: typeof studentId === 'number' && Number.isFinite(studentId) ? studentId : null,
+      lessonId: typeof lessonId === 'number' && Number.isFinite(lessonId) ? lessonId : null,
+    });
+    setHomeworkAssignModalOpen(true);
+  }, []);
 
   const closeDashboardHomeworkAssignModal = useCallback(() => {
     if (homeworkAssignSubmitting) return;
@@ -660,7 +671,6 @@ const AppPageContent = () => {
         });
         return true;
       } catch (error) {
-         
         console.error('Failed to create homework assignment from dashboard sheet', error);
         showToast({ message: 'Не удалось выдать домашнее задание', variant: 'error' });
         return false;
@@ -689,7 +699,6 @@ const AppPageContent = () => {
         setHomeworkAssignStudents(studentsResponse);
       })
       .catch((error) => {
-         
         console.error('Failed to preload homework assign modal data', error);
         if (isCancelled) return;
         showToast({ message: 'Не удалось загрузить данные для домашки', variant: 'error' });
@@ -881,12 +890,10 @@ const AppPageContent = () => {
         return `${String(slotHours).padStart(2, '0')}:${String(slotMinutes).padStart(2, '0')}`;
       })();
 
-      openLessonModal(
-        lessonIso,
-        roundedStartTime,
-        undefined,
-        { skipNavigation: true, variant: isDesktop ? 'modal' : 'sheet' },
-      );
+      openLessonModal(lessonIso, roundedStartTime, undefined, {
+        skipNavigation: true,
+        variant: isDesktop ? 'modal' : 'sheet',
+      });
     },
     [
       isDesktop,
@@ -1130,7 +1137,6 @@ const AppPageContent = () => {
         applyStudentContext(byStorage ?? byBackend ?? fallbackContext);
       })
       .catch((error) => {
-         
         console.error('Failed to load student context', error);
         if (cancelled) return;
         setStudentContexts([]);
@@ -1190,9 +1196,7 @@ const AppPageContent = () => {
         if (initialRange) {
           applyLessonsForRange(initialRange, data.lessons ?? []);
         }
-
       } catch (error) {
-         
         console.error('Failed to bootstrap app', error);
       }
     };
@@ -1241,7 +1245,6 @@ const AppPageContent = () => {
         }
       })
       .catch((error) => {
-         
         console.error('Failed to bootstrap roster', error);
       })
       .finally(() => {
@@ -1276,7 +1279,6 @@ const AppPageContent = () => {
         studentsHomework.replaceHomeworks(data.homeworks ?? []);
       })
       .catch((error) => {
-         
         console.error('Failed to bootstrap dashboard homeworks', error);
       })
       .finally(() => {
@@ -1340,7 +1342,15 @@ const AppPageContent = () => {
       setSelectedMonthDay(lessonIso);
       guardedNavigate(tabPathById.schedule);
     },
-    [guardedNavigate, resolvedTimeZone, setDayViewDate, setMonthAnchor, setMonthOffset, setScheduleView, setSelectedMonthDay],
+    [
+      guardedNavigate,
+      resolvedTimeZone,
+      setDayViewDate,
+      setMonthAnchor,
+      setMonthOffset,
+      setScheduleView,
+      setSelectedMonthDay,
+    ],
   );
 
   const onDashboardOpenStudent = useCallback(
@@ -1393,7 +1403,7 @@ const AppPageContent = () => {
       },
       {
         id: 'assign_homework',
-        label: 'Отправить домашнее задание',
+        label: 'Выдать задание',
         description: 'Выдать уже готовую домашку ученику или группе учеников.',
         onSelect: () => openDashboardHomeworkAssignModal(),
         icon: <HomeworkLinkIcon size={12} />,
@@ -1453,14 +1463,7 @@ const AppPageContent = () => {
       onOpenHomeworkAssign: onDashboardOpenHomeworkAssign,
       studentListReloadKey,
     }),
-    [
-      hasTeacherAccess,
-      lessons,
-      onDashboardOpenHomeworkAssign,
-      setStudentActiveTab,
-      studentListReloadKey,
-      teacher,
-    ],
+    [hasTeacherAccess, lessons, onDashboardOpenHomeworkAssign, setStudentActiveTab, studentListReloadKey, teacher],
   );
 
   const scheduleRouteProps = useMemo(
@@ -1539,8 +1542,10 @@ const AppPageContent = () => {
 
   if (sessionState !== 'authenticated' || !hasTelegramAccess) {
     const fallbackState =
-      sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending') ? 'checking' : 'unauthenticated';
-    return <SessionFallback state={fallbackState} />;
+      sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending')
+        ? 'checking'
+        : 'unauthenticated';
+    return <SessionFallback state={fallbackState} expired={sessionExpired} />;
   }
 
   if (isStudentRole && studentContextLoading) {
@@ -1597,197 +1602,236 @@ const AppPageContent = () => {
                 <OnboardingStateProvider value={onboardingState}>
                   <ScheduleStateProvider value={scheduleState}>
                     <TimeZoneProvider timeZone={resolvedTimeZone}>
-                <div id="app" className={`${layoutStyles.page} app-content`}>
-                  <div className="app-surface">
-                    <div
-                      className={`${layoutStyles.pageInner} ${
-                        isDesktop ? layoutStyles.pageInnerDesktop : layoutStyles.pageInnerMobile
-                      }`}
-                    >
-                      {!isDesktop ? (
-                        <MobileSidebarDrawer
-                          isOpen={isMobileSidebarOpen}
-                          activeTab={activeTab}
-                          items={mobileDrawerItems}
-                          profileName={mobileProfileName}
-                          profilePlanLabel={mobilePlanLabel}
-                          profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                          onClose={() => setMobileSidebarOpen(false)}
-                          onNavigate={onMobileNavigate}
-                          onOpenSettings={onMobileOpenProfileSettings}
-                        />
-                      ) : null}
+                      <div id="app" className={`${layoutStyles.page} app-content`}>
+                        <div className="app-surface">
+                          <div
+                            className={`${layoutStyles.pageInner} ${
+                              isDesktop ? layoutStyles.pageInnerDesktop : layoutStyles.pageInnerMobile
+                            }`}
+                          >
+                            {!isDesktop ? (
+                              <MobileSidebarDrawer
+                                isOpen={isMobileSidebarOpen}
+                                activeTab={activeTab}
+                                items={mobileDrawerItems}
+                                profileName={mobileProfileName}
+                                profilePlanLabel={mobilePlanLabel}
+                                profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                                onClose={() => setMobileSidebarOpen(false)}
+                                onNavigate={onMobileNavigate}
+                                onOpenSettings={onMobileOpenProfileSettings}
+                              />
+                            ) : null}
 
-                      {isDesktop ? (
-                        <Sidebar
-                          pathname={location.pathname}
-                          onNavigate={onSidebarNavigate}
-                          onToggleCollapsed={onSidebarToggle}
-                          items={sidebarItems}
-                        />
-                      ) : null}
+                            {isDesktop ? (
+                              <Sidebar
+                                pathname={location.pathname}
+                                onNavigate={onSidebarNavigate}
+                                onToggleCollapsed={onSidebarToggle}
+                                items={sidebarItems}
+                              />
+                            ) : null}
 
-                      <div className={`${layoutStyles.mainColumn} ${!isDesktop ? layoutStyles.mainColumnMobile : ''}`}>
-                        {!isDesktop &&
-                        !isTeacherHomeworkEditorRoute &&
-                        !isTeacherTemplateEditRoute &&
-                        !isTeacherHomeworkSourceDetailRoute &&
-                        !isTeacherAssignmentDetailRoute &&
-                        !isTeacherHomeworksRootRoute ? (
-                          <MobileTopbar
-                            profileName={mobileProfileName}
-                            profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                            variant={isMobileSettingsDetailRoute ? 'back' : isMobileSettingsRootRoute ? 'title' : 'default'}
-                            title={isMobileSettingsDetailRoute ? mobileSettingsDetail?.label ?? 'Настройки' : 'Настройки'}
-                            onOpenSidebar={() => setMobileSidebarOpen(true)}
-                            onOpenNotifications={onOpenNotifications}
-                            renderNotificationBell={renderNotificationBell}
-                            onBack={isMobileSettingsDetailRoute ? () => guardedNavigate(tabPathById.settings) : undefined}
-                          />
-                        ) : null}
+                            <div
+                              className={`${layoutStyles.mainColumn} ${!isDesktop ? layoutStyles.mainColumnMobile : ''}`}
+                            >
+                              {!isDesktop &&
+                              !isTeacherHomeworkEditorRoute &&
+                              !isTeacherTemplateEditRoute &&
+                              !isTeacherHomeworkSourceDetailRoute &&
+                              !isTeacherAssignmentDetailRoute &&
+                              !isTeacherHomeworksRootRoute ? (
+                                <MobileTopbar
+                                  profileName={mobileProfileName}
+                                  profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                                  variant={
+                                    isMobileSettingsDetailRoute
+                                      ? 'back'
+                                      : isMobileSettingsRootRoute
+                                        ? 'title'
+                                        : 'default'
+                                  }
+                                  title={
+                                    isMobileSettingsDetailRoute
+                                      ? (mobileSettingsDetail?.label ?? 'Настройки')
+                                      : 'Настройки'
+                                  }
+                                  onOpenSidebar={() => setMobileSidebarOpen(true)}
+                                  onOpenNotifications={onOpenNotifications}
+                                  renderNotificationBell={renderNotificationBell}
+                                  onBack={
+                                    isMobileSettingsDetailRoute
+                                      ? () => guardedNavigate(tabPathById.settings)
+                                      : undefined
+                                  }
+                                />
+                              ) : null}
 
-                        {isDesktop &&
-                        !isStudentRole &&
-                        !isTeacherHomeworkReviewRoute &&
-                        !isTeacherHomeworkEditorRoute &&
-                        !isTeacherTemplateEditRoute &&
-                        !isTeacherHomeworkSourceDetailRoute &&
-                        !isTeacherAssignmentDetailRoute &&
-                        !isTeacherHomeworksRootRoute ? (
-                          <Topbar
-                            teacher={teacher}
-                            title={desktopTopbarTitleWithOverrides}
-                            subtitle={desktopTopbarSubtitleWithOverrides}
-                            variant={isDesktopHomeworksLibraryChrome ? 'homeworks' : 'default'}
-                            showCreateLesson={
-                              hasTeacherAccess &&
-                              !hasDesktopHomeworkDetailChrome &&
-                              !isTeacherAnyHomeworkEditorRoute &&
-                              (
-                                activeTab === 'homeworks' ||
-                                activeTab === 'students' ||
-                                activeTab === 'schedule'
-                              )
-                            }
-                            createButtonLabel={
-                              activeTab === 'homeworks'
-                                ? 'Добавить'
-                                : activeTab === 'students'
-                                  ? 'Добавить ученика'
-                                  : 'Создать урок'
-                            }
-                            createButtonIconAccent={
-                              activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
-                            }
-                            reserveCreateButtonSpace={!hasDesktopHomeworkDetailChrome}
-                            createMenuItems={activeTab === 'homeworks' ? homeworkTopbarCreateMenuItems : undefined}
-                            showEditorActions={isTeacherAnyHomeworkEditorRoute && !isHomeworkDetailTopbarVisible}
-                            showEditorSecondaryAction={showEditorSecondaryAction}
-                            showEditorPrimaryAction={templateCreateTopbarState.showPrimaryAction}
-                            showBackButton={hasDesktopHomeworkDetailChrome || isTeacherAnyHomeworkEditorRoute || isStudentProfileRoute}
-                            onBack={() =>
-                              guardedNavigate(
-                                hasDesktopHomeworkDetailChrome
-                                  ? tabPathById.homeworks
-                                  : isTeacherAnyHomeworkEditorRoute
-                                    ? teacherHomeworkEditorBackPath
-                                    : tabPathById.students,
-                              )
-                            }
-                            backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
-                            onEditorSecondaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
-                            onEditorPrimaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
-                            editorSubmitting={templateCreateTopbarState.submitting}
-                            editorPrimaryDisabled={editorPrimaryDisabled}
-                            editorSecondaryActionLabel={editorSecondaryActionLabel}
-                            editorPrimaryActionLabel={editorPrimaryActionLabel}
-                            editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}
-                            onOpenNotifications={onOpenNotifications}
-                            renderNotificationBell={renderNotificationBell}
-                            onCreateLesson={onTopbarCreateAction}
-                            profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                            showScheduleViewToggle={activeTab === 'schedule'}
-                            scheduleView={scheduleView}
-                            onScheduleViewChange={setScheduleView}
-                            statusBadgeLabel={homeworkDetailTopbarState?.statusLabel ?? null}
-                            statusBadgeTone={homeworkDetailTopbarState?.statusTone}
-                            showPrintAction={Boolean(homeworkDetailTopbarState)}
-                            onPrintAction={() => {
-                              if (typeof window !== 'undefined') {
-                                window.print();
-                              }
-                            }}
-                            notificationDotVisible={homeworkDetailTopbarState?.hasAttentionDot ?? true}
-                            showProfile={!isDesktopHomeworksLibraryChrome}
-                          />
-                        ) : null}
+                              {isDesktop &&
+                              !isStudentRole &&
+                              !isTeacherHomeworkReviewRoute &&
+                              !isTeacherHomeworkEditorRoute &&
+                              !isTeacherTemplateEditRoute &&
+                              !isTeacherHomeworkSourceDetailRoute &&
+                              !isTeacherAssignmentDetailRoute &&
+                              !isTeacherHomeworksRootRoute ? (
+                                <Topbar
+                                  teacher={teacher}
+                                  title={desktopTopbarTitleWithOverrides}
+                                  subtitle={desktopTopbarSubtitleWithOverrides}
+                                  variant={isDesktopHomeworksLibraryChrome ? 'homeworks' : 'default'}
+                                  showCreateLesson={
+                                    hasTeacherAccess &&
+                                    !hasDesktopHomeworkDetailChrome &&
+                                    !isTeacherAnyHomeworkEditorRoute &&
+                                    (activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule')
+                                  }
+                                  createButtonLabel={
+                                    activeTab === 'homeworks'
+                                      ? 'Добавить'
+                                      : activeTab === 'students'
+                                        ? 'Добавить ученика'
+                                        : 'Создать урок'
+                                  }
+                                  createButtonIconAccent={
+                                    activeTab === 'homeworks' || activeTab === 'students' || activeTab === 'schedule'
+                                  }
+                                  reserveCreateButtonSpace={!hasDesktopHomeworkDetailChrome}
+                                  createMenuItems={
+                                    activeTab === 'homeworks' ? homeworkTopbarCreateMenuItems : undefined
+                                  }
+                                  showEditorActions={isTeacherAnyHomeworkEditorRoute && !isHomeworkDetailTopbarVisible}
+                                  showEditorSecondaryAction={showEditorSecondaryAction}
+                                  showEditorPrimaryAction={templateCreateTopbarState.showPrimaryAction}
+                                  showBackButton={
+                                    hasDesktopHomeworkDetailChrome ||
+                                    isTeacherAnyHomeworkEditorRoute ||
+                                    isStudentProfileRoute
+                                  }
+                                  onBack={() =>
+                                    guardedNavigate(
+                                      hasDesktopHomeworkDetailChrome
+                                        ? tabPathById.homeworks
+                                        : isTeacherAnyHomeworkEditorRoute
+                                          ? teacherHomeworkEditorBackPath
+                                          : tabPathById.students,
+                                    )
+                                  }
+                                  backButtonTooltip={isStudentProfileRoute ? 'Вернуться к списку' : 'Назад'}
+                                  onEditorSecondaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('save')}
+                                  onEditorPrimaryAction={() => dispatchHomeworkTemplateCreateTopbarCommand('submit')}
+                                  editorSubmitting={templateCreateTopbarState.submitting}
+                                  editorPrimaryDisabled={editorPrimaryDisabled}
+                                  editorSecondaryActionLabel={editorSecondaryActionLabel}
+                                  editorPrimaryActionLabel={editorPrimaryActionLabel}
+                                  editorPrimarySubmittingLabel={editorPrimarySubmittingLabel}
+                                  onOpenNotifications={onOpenNotifications}
+                                  renderNotificationBell={renderNotificationBell}
+                                  onCreateLesson={onTopbarCreateAction}
+                                  profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                                  showScheduleViewToggle={activeTab === 'schedule'}
+                                  scheduleView={scheduleView}
+                                  onScheduleViewChange={setScheduleView}
+                                  statusBadgeLabel={homeworkDetailTopbarState?.statusLabel ?? null}
+                                  statusBadgeTone={homeworkDetailTopbarState?.statusTone}
+                                  showPrintAction={Boolean(homeworkDetailTopbarState)}
+                                  onPrintAction={() => {
+                                    if (typeof window !== 'undefined') {
+                                      window.print();
+                                    }
+                                  }}
+                                  notificationDotVisible={homeworkDetailTopbarState?.hasAttentionDot ?? true}
+                                  showProfile={!isDesktopHomeworksLibraryChrome}
+                                />
+                              ) : null}
 
-                        <main
-                          className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
-                            !isDesktop && isTeacherHomeworksRootRoute ? layoutStyles.contentMobileHomeworks : ''
-                          } ${
-                            !isDesktop && isTeacherAnyHomeworkEditorRoute ? layoutStyles.contentMobileHomeworkEditor : ''
-                          } ${
-                            isTeacherAnyHomeworkEditorRoute ||
-                            isTeacherHomeworkSourceDetailRoute ||
-                            isTeacherAssignmentDetailRoute
-                              ? layoutStyles.contentNoScroll
-                              : ''
-                          }`}
-                        >
-                          <AppRoutes
-                            key={isStudentRole ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}` : 'teacher'}
-                            isStudentRole={isStudentRole}
-                            resolveLastVisitedPath={resolveLastVisitedPath}
-                            dashboard={dashboardRouteProps}
-                            students={studentsRouteProps}
-                            schedule={scheduleRouteProps}
-                            settings={settingsRouteProps}
-                            dashboardSummary={dashboardSummaryRouteProps}
-                            homeworks={homeworksRouteProps}
-                            studentDashboard={studentDashboardRouteProps}
-                            studentSettings={studentSettingsRouteProps}
-                          />
-                        </main>
+                              {isDesktop && isStudentRole ? (
+                                <StudentTopbar
+                                  title={desktopTopbarTitleWithOverrides}
+                                  subtitle={desktopTopbarSubtitleWithOverrides}
+                                  displayName={mobileProfileName}
+                                  fallbackText={mobileProfileName.charAt(0).toUpperCase() || 'У'}
+                                  profilePhotoUrl={sessionUser?.photoUrl ?? null}
+                                  onOpenNotifications={onOpenNotifications}
+                                  renderNotificationBell={renderNotificationBell}
+                                />
+                              ) : null}
 
-                        {!isDesktop ? (
-                          <MobileBottomTabs
-                            activeTab={activeTab}
-                            items={mobileTabbarItems}
-                            onNavigate={onMobileNavigate}
-                          />
+                              <main
+                                className={`${layoutStyles.content} ${!isDesktop ? layoutStyles.contentMobile : ''} ${
+                                  !isDesktop && isTeacherHomeworksRootRoute ? layoutStyles.contentMobileHomeworks : ''
+                                } ${
+                                  !isDesktop && isTeacherAnyHomeworkEditorRoute
+                                    ? layoutStyles.contentMobileHomeworkEditor
+                                    : ''
+                                } ${
+                                  isTeacherAnyHomeworkEditorRoute ||
+                                  isTeacherHomeworkSourceDetailRoute ||
+                                  isTeacherAssignmentDetailRoute
+                                    ? layoutStyles.contentNoScroll
+                                    : ''
+                                }`}
+                              >
+                                <AppRoutes
+                                  key={
+                                    isStudentRole
+                                      ? `student-${activeStudentContext?.teacherId ?? 'none'}-${studentContextRevision}`
+                                      : 'teacher'
+                                  }
+                                  isStudentRole={isStudentRole}
+                                  resolveLastVisitedPath={resolveLastVisitedPath}
+                                  dashboard={dashboardRouteProps}
+                                  students={studentsRouteProps}
+                                  schedule={scheduleRouteProps}
+                                  settings={settingsRouteProps}
+                                  dashboardSummary={dashboardSummaryRouteProps}
+                                  homeworks={homeworksRouteProps}
+                                  studentDashboard={studentDashboardRouteProps}
+                                  studentSettings={studentSettingsRouteProps}
+                                />
+                              </main>
+
+                              {!isDesktop ? (
+                                <MobileBottomTabs
+                                  activeTab={activeTab}
+                                  items={mobileTabbarItems}
+                                  onNavigate={onMobileNavigate}
+                                />
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+
+                        {!isStudentRole ? (
+                          <>
+                            <HomeworkAssignModal
+                              open={homeworkAssignModalOpen}
+                              variant={isDesktop ? 'side-sheet' : 'sheet'}
+                              templates={homeworkAssignTemplates}
+                              groups={homeworkAssignGroups}
+                              students={homeworkAssignStudents}
+                              loading={homeworkAssignLoading}
+                              submitting={homeworkAssignSubmitting}
+                              defaultStudentId={homeworkAssignDefaults.studentId}
+                              defaultLessonId={homeworkAssignDefaults.lessonId}
+                              onSubmit={handleDashboardHomeworkAssignSubmit}
+                              onClose={closeDashboardHomeworkAssignModal}
+                            />
+
+                            <AppModals
+                              linkedStudents={linkedStudents}
+                              weekendWeekdays={teacher.weekendWeekdays}
+                              dialogState={dialogState}
+                              onCloseDialog={closeDialog}
+                              onDialogStateChange={setDialogState}
+                            />
+                          </>
                         ) : null}
                       </div>
-                    </div>
-                  </div>
-
-                  {!isStudentRole ? (
-                    <>
-                      <HomeworkAssignModal
-                        open={homeworkAssignModalOpen}
-                        variant={isDesktop ? 'side-sheet' : 'sheet'}
-                        templates={homeworkAssignTemplates}
-                        groups={homeworkAssignGroups}
-                        students={homeworkAssignStudents}
-                        loading={homeworkAssignLoading}
-                        submitting={homeworkAssignSubmitting}
-                        defaultStudentId={homeworkAssignDefaults.studentId}
-                        defaultLessonId={homeworkAssignDefaults.lessonId}
-                        onSubmit={handleDashboardHomeworkAssignSubmit}
-                        onClose={closeDashboardHomeworkAssignModal}
-                      />
-
-                      <AppModals
-                        linkedStudents={linkedStudents}
-                        weekendWeekdays={teacher.weekendWeekdays}
-                        dialogState={dialogState}
-                        onCloseDialog={closeDialog}
-                        onDialogStateChange={setDialogState}
-                      />
-                    </>
-                  ) : null}
-                </div>
-                {showSubscriptionGate ? <SubscriptionGate /> : null}
+                      {showSubscriptionGate ? <SubscriptionGate /> : null}
+                      {!isStudentRole ? (
+                        <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+                      ) : null}
                     </TimeZoneProvider>
                   </ScheduleStateProvider>
                 </OnboardingStateProvider>

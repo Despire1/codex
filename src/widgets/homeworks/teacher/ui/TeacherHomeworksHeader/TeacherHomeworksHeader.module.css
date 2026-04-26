@@ -4,13 +4,13 @@
   z-index: 8;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 12px;
   min-height: 64px;
   padding: 10px 16px;
   border: 1px solid #e2e8f0;
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  background: var(--surface-card);
+  box-shadow: 0 12px 28px -9px rgba(15, 23, 42, 0.06);
 }
 
 .topRow {
@@ -49,7 +49,7 @@
 
 .subtitle {
   margin: 0;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1;
   font-weight: 500;
@@ -70,18 +70,18 @@
   height: 40px;
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface-card);
   color: #667085;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.06);
 }
 
 .iconButton:hover {
-  background: #f8fafc;
-  color: #111827;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
 }
 
 .notificationDot {
@@ -107,7 +107,7 @@
   font-size: 14px;
   line-height: 1;
   font-weight: 700;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.14);
 }
 
 .createButton:hover {
@@ -125,11 +125,12 @@
   width: fit-content;
   max-width: 100%;
   padding: 3px;
-  border: 1px solid #eef2f7;
+  border: 1px solid var(--border-subtle);
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+  background: var(--surface-card);
+  box-shadow: 0 8px 16px -5px rgba(15, 23, 42, 0.06);
   flex-shrink: 0;
+  justify-self: center;
 }
 
 .tabButton {
@@ -150,14 +151,14 @@
 }
 
 .tabButton:hover {
-  background: #f8fafc;
-  color: #111827;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
 }
 
 .tabButtonActive {
   background: #080b12;
   color: #fff;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 14px 28px -9px rgba(15, 23, 42, 0.14);
 }
 
 @media (max-width: 960px) {
@@ -168,7 +169,7 @@
   }
 
   .topRow {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .titleBlock {
@@ -176,11 +177,12 @@
   }
 
   .actions {
-    justify-content: space-between;
-    justify-self: stretch;
+    justify-self: end;
   }
 
   .tabsWrap {
+    grid-column: 1 / -1;
+    justify-self: stretch;
     width: 100%;
     overflow-x: auto;
     scrollbar-width: none;

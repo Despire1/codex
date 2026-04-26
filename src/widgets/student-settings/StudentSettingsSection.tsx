@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircleOutlineIcon,
   ContentCopyOutlinedIcon,
@@ -6,6 +6,7 @@ import {
   SettingsIcon,
 } from '../../icons/MaterialIcons';
 import controls from '../../shared/styles/controls.module.css';
+import { getTimeZoneOptions } from '../../shared/lib/timezones';
 import styles from './StudentSettingsSection.module.css';
 import { api } from '../../shared/api/client';
 
@@ -27,19 +28,52 @@ export const StudentSettingsSection: FC<StudentSettingsSectionProps> = ({ active
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const teacherInitials = useMemo(() => getTeacherInitials(activeTeacherName), [activeTeacherName]);
+  const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
+  const lastSavedRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
 
-  const onSave = async () => {
+  useEffect(() => {
+    if (timezone) return;
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected) setTimezone(detected);
+    } catch (_error) {
+      // ignore
+    }
+  }, [timezone]);
+
+  const saveTimezone = useCallback(async (value: string) => {
+    if (lastSavedRef.current === value) return;
+    lastSavedRef.current = value;
     setSaving(true);
     setMessage(null);
     try {
-      await api.updateStudentPreferencesV2({ timezone: timezone.trim() || null });
+      await api.updateStudentPreferencesV2({ timezone: value || null });
       setMessage('Сохранено');
     } catch (_error) {
       setMessage('Не удалось сохранить');
     } finally {
       setSaving(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (lastSavedRef.current === null) {
+      lastSavedRef.current = timezone.trim();
+      return;
+    }
+    const next = timezone.trim();
+    if (next === lastSavedRef.current) return;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      void saveTimezone(next);
+    }, 500);
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [timezone, saveTimezone]);
 
   return (
     <section className={styles.page}>
@@ -56,21 +90,27 @@ export const StudentSettingsSection: FC<StudentSettingsSectionProps> = ({ active
 
         <div className={styles.heroBody}>
           <p className={styles.heroCaption}>
-            Этот раздел содержит специальные настройки, которые применяются к профилю ученика. Изменения здесь не
-            влияют на настройки преподавателя.
+            Этот раздел содержит специальные настройки, которые применяются к профилю ученика. Изменения здесь не влияют
+            на настройки преподавателя.
           </p>
 
           <div className={styles.fieldBlock}>
             <label className={styles.label} htmlFor="student-timezone-input">
               Таймзона ученика
             </label>
-            <input
+            <select
               id="student-timezone-input"
               className={`${controls.input} ${styles.input}`}
-              placeholder="Например, Europe/Moscow"
               value={timezone}
               onChange={(event) => setTimezone(event.target.value)}
-            />
+            >
+              <option value="">Выберите часовой пояс</option>
+              {timeZoneOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <div className={styles.helperText}>Используется для расчёта времени занятий.</div>
           </div>
 
@@ -85,10 +125,9 @@ export const StudentSettingsSection: FC<StudentSettingsSectionProps> = ({ active
             </div>
           </div>
 
-          <button type="button" className={`${controls.primaryButton} ${styles.saveButton}`} disabled={saving} onClick={onSave}>
-            {saving ? 'Сохраняем…' : 'Сохранить изменения'}
-          </button>
-          {message ? <div className={styles.message}>{message}</div> : null}
+          <div className={styles.message}>
+            {saving ? 'Сохраняем…' : (message ?? 'Изменения сохраняются автоматически')}
+          </div>
         </div>
       </section>
 

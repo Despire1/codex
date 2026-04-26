@@ -9,7 +9,7 @@
   --app-vh-stable: 100vh;
   --app-safe-top-bg: transparent;
   --app-surface-radius: 24px;
-  --app-surface-bg: var(--color-slate-50);
+  --app-surface-bg: var(--surface-page);
 }
 
 html,
@@ -59,7 +59,7 @@ body {
 @media (max-width: 1023px) {
   :root {
     --app-surface-radius: 24px;
-    --app-surface-bg: var(--color-white);
+    --app-surface-bg: var(--surface-card);
   }
 }
 

@@ -55,8 +55,8 @@
 }
 
 .card {
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   padding: 14px;
   box-shadow: none;
@@ -83,7 +83,7 @@
 }
 
 .todayMeta {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -99,9 +99,9 @@
 }
 
 .unpaidShowAllButton {
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
-  color: var(--color-slate-600);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
+  color: var(--text-secondary);
   font-weight: 600;
   cursor: pointer;
   text-align: center;
@@ -126,14 +126,14 @@
 }
 
 .unpaidSummary {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .unpaidPopover {
   width: min(360px, calc(100vw - 24px));
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   box-shadow: none;
 }

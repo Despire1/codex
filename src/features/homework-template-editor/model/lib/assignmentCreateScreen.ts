@@ -36,16 +36,17 @@ const relativeLuminance = (hexColor: string) => {
   return 0.2126 * transform(r) + 0.7152 * transform(g) + 0.0722 * transform(b);
 };
 
-export const resolveAssignmentStudentOptionAvatarColor = (uiColor?: string | null) =>
-  normalizeStudentUiColor(uiColor);
+export const resolveAssignmentStudentOptionAvatarColor = (uiColor?: string | null) => normalizeStudentUiColor(uiColor);
 
 export const resolveAssignmentStudentOptionAvatarTextColor = (avatarColor: string) =>
   relativeLuminance(avatarColor) > 0.42 ? '#0F172A' : '#FFFFFF';
 
-export const resolveAssignmentQuestionKind = (question: HomeworkTestQuestion): CreateQuestionKind => getQuestionKind(question);
+export const resolveAssignmentQuestionKind = (question: HomeworkTestQuestion): CreateQuestionKind =>
+  getQuestionKind(question);
 
 export const QUESTION_KIND_LABELS: Record<CreateQuestionKind, string> = {
-  CHOICE: 'Выбор',
+  SINGLE_CHOICE: 'Один правильный вариант',
+  MULTIPLE_CHOICE: 'Несколько правильных вариантов',
   SHORT_TEXT: 'Текст',
   LONG_TEXT: 'Текст',
   AUDIO: 'Аудио',
@@ -57,7 +58,8 @@ export const QUESTION_KIND_LABELS: Record<CreateQuestionKind, string> = {
 };
 
 export const QUESTION_KIND_TONES: Record<CreateQuestionKind, 'blue' | 'purple' | 'green' | 'amber' | 'rose'> = {
-  CHOICE: 'blue',
+  SINGLE_CHOICE: 'blue',
+  MULTIPLE_CHOICE: 'purple',
   SHORT_TEXT: 'purple',
   LONG_TEXT: 'purple',
   AUDIO: 'green',

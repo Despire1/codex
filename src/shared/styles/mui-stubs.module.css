@@ -10,7 +10,7 @@
 
 .label {
   font-size: 13px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -19,24 +19,25 @@
 .textInput {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--color-slate-300);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   font-size: 14px;
-  background: var(--color-white);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: var(--surface-card);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .input:focus,
 .select:focus,
 .textInput:focus {
   outline: none;
-  border-color: var(--color-blue-600);
-  box-shadow: 0 0 0 2px var(--shadow-blue-600-12);
+  border-color: var(--accent-primary);
 }
 
 .helperText {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .error .textInput,
@@ -69,8 +70,8 @@
 .toggleButton {
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid var(--color-slate-300);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-page);
   cursor: pointer;
   font-size: 13px;
 }
@@ -78,17 +79,17 @@
 .toggleButton.selected {
   background: var(--color-blue-600);
   color: var(--color-white);
-  border-color: var(--color-blue-700);
+  border-color: var(--status-blue-text);
 }
 
 .inlineLabel {
   font-size: 14px;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .caption {
   font-size: 12px;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .stack {

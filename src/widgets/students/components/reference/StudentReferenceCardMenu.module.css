@@ -2,9 +2,9 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #6b7280;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -13,10 +13,10 @@
 }
 
 .popover {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.12);
   padding: 6px;
 }
 
@@ -34,7 +34,7 @@
   text-align: left;
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -44,7 +44,7 @@
 
 .separator {
   height: 1px;
-  background: #f1f5f9;
+  background: var(--surface-card-muted);
   margin: 4px 4px;
 }
 
@@ -54,16 +54,16 @@
 
 @media (hover: hover) and (pointer: fine) {
   .trigger:hover {
-    background: #f3f4f6;
-    border-color: #d1d5db;
+    background: var(--surface-card-muted);
+    border-color: var(--border-strong);
   }
 
   .menu button:hover {
-    background: #f3f4f6;
+    background: var(--surface-card-muted);
   }
 
   .danger:hover {
     background: rgba(239, 68, 68, 0.12);
-    color: #b91c1c !important;
+    color: var(--status-red-text) !important;
   }
 }

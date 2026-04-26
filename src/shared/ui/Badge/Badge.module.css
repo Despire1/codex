@@ -7,8 +7,8 @@
   font-weight: 700;
   font-size: 12px;
   border: 1px solid transparent;
-  background: var(--color-slate-50);
-  color: var(--color-slate-900);
+  background: var(--surface-page);
+  color: var(--text-primary);
   cursor: default;
   line-height: 1.2;
 }
@@ -49,7 +49,7 @@
 }
 
 .groupUnpaid {
-  background: var(--color-white)4e5;
+  background: var(--color-white) 4e5;
   color: #b15e09;
   border-color: #f5d9b0;
 }

@@ -1,0 +1,109 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 16px 16px;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  cursor: default;
+}
+
+.panel {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+
+.input {
+  border: none;
+  outline: none;
+  padding: 18px 20px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--color-slate-100, #f1f5f9);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent-primary, #a3e635);
+  outline-offset: -2px;
+}
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.empty {
+  padding: 24px 20px;
+  color: var(--color-slate-500, #64748b);
+  font-size: 14px;
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resultItemActive {
+  background: var(--color-slate-50, #f8fafc);
+}
+
+.resultName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-slate-900, #0f172a);
+}
+
+.resultMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-slate-500, #64748b);
+}
+
+.resultLevel {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-700, #334155);
+  font-weight: 600;
+}
+
+.resultUsername {
+  color: var(--color-slate-500, #64748b);
+}
+
+.footer {
+  display: flex;
+  gap: 16px;
+  padding: 8px 20px;
+  border-top: 1px solid var(--color-slate-100, #f1f5f9);
+  background: var(--color-slate-50, #f8fafc);
+  color: var(--color-slate-500, #64748b);
+  font-size: 12px;
+}

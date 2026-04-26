@@ -1,12 +1,4 @@
-import {
-  type PropsWithChildren,
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { addDays, addMonths, endOfMonth, format, startOfMonth } from 'date-fns';
 import { toUtcDateFromDate, toZonedDate } from '../../../shared/lib/timezoneDates';
 
@@ -34,10 +26,7 @@ export type ScheduleStateContextValue = {
 
 const ScheduleStateContext = createContext<ScheduleStateContextValue | null>(null);
 
-export const ScheduleStateProvider = ({
-  children,
-  value,
-}: PropsWithChildren<{ value: ScheduleStateContextValue }>) => {
+export const ScheduleStateProvider = ({ children, value }: PropsWithChildren<{ value: ScheduleStateContextValue }>) => {
   return <ScheduleStateContext.Provider value={value}>{children}</ScheduleStateContext.Provider>;
 };
 
@@ -50,8 +39,24 @@ export const useScheduleState = () => {
 };
 
 export const useScheduleStateInternal = ({ timeZone }: { timeZone: string }): ScheduleStateContextValue => {
-  const [scheduleView, setScheduleView] = useState<ScheduleView>('month');
+  const [scheduleView, setScheduleViewRaw] = useState<ScheduleView>('month');
   const [dayViewDate, setDayViewDate] = useState<Date>(() => toZonedDate(new Date(), timeZone));
+
+  const setScheduleView = useCallback(
+    (next: ScheduleView) => {
+      setScheduleViewRaw((current) => {
+        if (current !== 'month' && (next === 'week' || next === 'day')) {
+          return next;
+        }
+        if ((next === 'week' || next === 'day') && current === 'month') {
+          const today = toZonedDate(new Date(), timeZone);
+          setDayViewDate(today);
+        }
+        return next;
+      });
+    },
+    [timeZone],
+  );
   const [monthAnchor, setMonthAnchor] = useState<Date>(() => startOfMonth(toZonedDate(new Date(), timeZone)));
   const [monthOffset, setMonthOffset] = useState(0);
   const [dayLabelKey, setDayLabelKey] = useState(0);

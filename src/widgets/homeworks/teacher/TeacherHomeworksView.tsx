@@ -3,8 +3,7 @@
 // старые импорты/хелперы/константы оставлены для поэтапного допереноса.
 import { ChangeEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { format, ru } from 'date-fns';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';
@@ -387,10 +386,7 @@ const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, r
   );
   const selectedTimeParts = useMemo(() => getDraftTimeParts(draftValue), [draftValue]);
   const monthViewDate = useMemo(() => selectedDraftDate ?? new Date(), [selectedDraftDate]);
-  const timeOptions = useMemo(
-    () => Array.from({ length: 12 }, (_, index) => padTimePart(index * 5)),
-    [],
-  );
+  const timeOptions = useMemo(() => Array.from({ length: 12 }, (_, index) => padTimePart(index * 5)), []);
 
   const handlePersist = async (nextLocalValue: string | undefined = draftValue) => {
     if (saving) return;
@@ -412,21 +408,19 @@ const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, r
   const handleDateSelect = (date?: Date) => {
     if (!date) return;
     const { hours, minutes } = getDraftTimeParts(draftValue);
-    setDraftValue(`${format(date, "yyyy-MM-dd")}T${hours}:${minutes}`);
+    setDraftValue(`${format(date, 'yyyy-MM-dd')}T${hours}:${minutes}`);
   };
 
-  const handleTimeChange =
-    (part: 'hours' | 'minutes') =>
-    (event: ChangeEvent<HTMLSelectElement>) => {
-      const baseDate = selectedDraftDate ?? new Date();
-      const nextDate = format(baseDate, 'yyyy-MM-dd');
-      const currentParts = getDraftTimeParts(draftValue);
-      const nextParts =
-        part === 'hours'
-          ? { hours: event.target.value, minutes: currentParts.minutes }
-          : { hours: currentParts.hours, minutes: event.target.value };
-      setDraftValue(`${nextDate}T${nextParts.hours}:${nextParts.minutes}`);
-    };
+  const handleTimeChange = (part: 'hours' | 'minutes') => (event: ChangeEvent<HTMLSelectElement>) => {
+    const baseDate = selectedDraftDate ?? new Date();
+    const nextDate = format(baseDate, 'yyyy-MM-dd');
+    const currentParts = getDraftTimeParts(draftValue);
+    const nextParts =
+      part === 'hours'
+        ? { hours: event.target.value, minutes: currentParts.minutes }
+        : { hours: currentParts.hours, minutes: event.target.value };
+    setDraftValue(`${nextDate}T${nextParts.hours}:${nextParts.minutes}`);
+  };
 
   return (
     <>
@@ -518,11 +512,7 @@ const AssignmentDeadlineCell: FC<AssignmentDeadlineCellProps> = ({ assignment, r
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              className={styles.deadlineApplyButton}
-              onClick={() => closeEditor(draftValue)}
-            >
+            <button type="button" className={styles.deadlineApplyButton} onClick={() => closeEditor(draftValue)}>
               Готово
             </button>
           </div>
@@ -645,14 +635,8 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState<TeacherBulkAction>('SEND_NOW');
-  const workspaceSearchParams = useMemo(
-    () => new URLSearchParams(location.search),
-    [location.search],
-  );
-  const workspaceMode = useMemo(
-    () => resolveWorkspaceMode(workspaceSearchParams.get('view')),
-    [workspaceSearchParams],
-  );
+  const workspaceSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const workspaceMode = useMemo(() => resolveWorkspaceMode(workspaceSearchParams.get('view')), [workspaceSearchParams]);
 
   const setWorkspaceMode = (nextMode: WorkspaceMode) => {
     if (nextMode === 'drafts') {
@@ -751,7 +735,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
     },
     {
       id: 'assign_homework',
-      label: 'Отправить домашнее задание',
+      label: 'Выдать задание',
       description: 'Создать или открыть назначение для конкретного ученика.',
       onSelect: () => openAssignModal(),
       icon: <HomeworkLinkIcon size={12} />,
@@ -933,7 +917,6 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
       replace: true,
     });
     // openCreateGroupEditor — локальная функция, читает только setters; перевыполнять при её пересоздании не нужно.
-     
   }, [location.pathname, location.search, navigate, workspaceSearchParams]);
 
   return (
@@ -1106,186 +1089,188 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             />
           ) : null}
           {workspaceMode === 'groups' ? (
-          <section className={styles.workspace}>
-            <section className={styles.groupsSection}>
-              <div className={styles.groupsTopBar}>
-              <input
-                type="search"
-                className={styles.groupsSearchInput}
-                placeholder="Поиск по группам..."
-                value={groupSearchQuery}
-                onChange={(event) => setGroupSearchQuery(event.target.value)}
-              />
-              <button type="button" className={styles.groupsCreateButton} onClick={() => openCreateGroupEditor()}>
-                <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
-                <span>Создать группу</span>
-              </button>
-            </div>
+            <section className={styles.workspace}>
+              <section className={styles.groupsSection}>
+                <div className={styles.groupsTopBar}>
+                  <input
+                    type="search"
+                    className={styles.groupsSearchInput}
+                    placeholder="Поиск по группам..."
+                    value={groupSearchQuery}
+                    onChange={(event) => setGroupSearchQuery(event.target.value)}
+                  />
+                  <button type="button" className={styles.groupsCreateButton} onClick={() => openCreateGroupEditor()}>
+                    <HomeworkPlusIcon size={12} className={`${styles.toolbarIcon} ${styles.positivePlusIcon}`} />
+                    <span>Создать группу</span>
+                  </button>
+                </div>
 
-            {groupsError ? <div className={styles.error}>{groupsError}</div> : null}
-            {loadingGroups ? <div className={styles.groupsEmptyState}>Загрузка групп...</div> : null}
-            {!loadingGroups && filteredGroups.length === 0 ? (
-              <div className={styles.groupsEmptyState}>Группы не найдены</div>
-            ) : null}
+                {groupsError ? <div className={styles.error}>{groupsError}</div> : null}
+                {loadingGroups ? <div className={styles.groupsEmptyState}>Загрузка групп...</div> : null}
+                {!loadingGroups && filteredGroups.length === 0 ? (
+                  <div className={styles.groupsEmptyState}>Группы не найдены</div>
+                ) : null}
 
-            {!loadingGroups ? (
-              <div className={styles.groupsList}>
-                {filteredGroups.map((group) => {
-                  const groupKey = toGroupKey(group.id);
-                  const groupAssignments = groupAssignmentsByKey[groupKey] ?? [];
-                  const groupLoading = Boolean(groupAssignmentsLoadingByKey[groupKey]);
-                  const groupError = groupAssignmentsErrorByKey[groupKey];
-                  const groupNextOffset = groupAssignmentsNextOffsetByKey[groupKey] ?? null;
-                  const expanded = Boolean(expandedGroups[groupKey]);
-                  const palette = resolveGroupCardPalette(group.bgColor);
+                {!loadingGroups ? (
+                  <div className={styles.groupsList}>
+                    {filteredGroups.map((group) => {
+                      const groupKey = toGroupKey(group.id);
+                      const groupAssignments = groupAssignmentsByKey[groupKey] ?? [];
+                      const groupLoading = Boolean(groupAssignmentsLoadingByKey[groupKey]);
+                      const groupError = groupAssignmentsErrorByKey[groupKey];
+                      const groupNextOffset = groupAssignmentsNextOffsetByKey[groupKey] ?? null;
+                      const expanded = Boolean(expandedGroups[groupKey]);
+                      const palette = resolveGroupCardPalette(group.bgColor);
 
-                  return (
-                    <article key={group.id ?? 'ungrouped'} className={styles.groupCard}>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        className={styles.groupCardHeader}
-                        style={{ background: palette.headerBackground }}
-                        onClick={() => toggleGroupExpanded(group)}
-                        onKeyDown={(event) => {
-                          if (event.target !== event.currentTarget) return;
-                          if (event.key !== 'Enter' && event.key !== ' ') return;
-                          event.preventDefault();
-                          toggleGroupExpanded(group);
-                        }}
-                      >
-                        <span className={styles.groupCardMain}>
-                          <span
-                            className={styles.groupIconBadge}
-                            style={{
-                              backgroundColor: palette.iconBackground,
-                              color: palette.iconColor,
+                      return (
+                        <article key={group.id ?? 'ungrouped'} className={styles.groupCard}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={styles.groupCardHeader}
+                            style={{ background: palette.headerBackground }}
+                            onClick={() => toggleGroupExpanded(group)}
+                            onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
+                              if (event.key !== 'Enter' && event.key !== ' ') return;
+                              event.preventDefault();
+                              toggleGroupExpanded(group);
                             }}
                           >
-                            <GroupIconView iconKey={group.iconKey} size={14} />
-                          </span>
-                          <span className={styles.groupTitleBlock}>
-                            <span className={styles.groupTitleRow}>
-                              <span className={styles.groupTitle}>{group.title}</span>
+                            <span className={styles.groupCardMain}>
                               <span
-                                className={styles.groupCountBadge}
+                                className={styles.groupIconBadge}
                                 style={{
-                                  backgroundColor: palette.countBadgeBackground,
-                                  color: palette.countBadgeColor,
+                                  backgroundColor: palette.iconBackground,
+                                  color: palette.iconColor,
                                 }}
                               >
-                                {group.assignmentsCount} заданий
+                                <GroupIconView iconKey={group.iconKey} size={14} />
+                              </span>
+                              <span className={styles.groupTitleBlock}>
+                                <span className={styles.groupTitleRow}>
+                                  <span className={styles.groupTitle}>{group.title}</span>
+                                  <span
+                                    className={styles.groupCountBadge}
+                                    style={{
+                                      backgroundColor: palette.countBadgeBackground,
+                                      color: palette.countBadgeColor,
+                                    }}
+                                  >
+                                    {group.assignmentsCount} заданий
+                                  </span>
+                                </span>
+                                <span className={styles.groupSubtitle}>
+                                  {group.description || 'Задания внутри группы'}
+                                </span>
                               </span>
                             </span>
-                            <span className={styles.groupSubtitle}>{group.description || 'Задания внутри группы'}</span>
-                          </span>
-                        </span>
-                        <span className={styles.groupHeaderActions}>
-                          {!group.isSystem && group.id !== null ? (
-                            <Tooltip content="Редактировать группу">
-                              <button
-                                type="button"
-                                className={styles.groupEditIconButton}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openEditGroupEditor(group);
-                                }}
-                                aria-label="Редактировать группу"
-                              >
-                                <HomeworkPenIcon size={11} className={styles.inlineFaIcon} />
-                              </button>
-                            </Tooltip>
-                          ) : null}
-                          <HomeworkChevronDownIcon
-                            size={12}
-                            className={`${styles.groupChevron} ${expanded ? styles.groupChevronExpanded : ''}`}
-                          />
-                        </span>
-                      </div>
+                            <span className={styles.groupHeaderActions}>
+                              {!group.isSystem && group.id !== null ? (
+                                <Tooltip content="Редактировать группу">
+                                  <button
+                                    type="button"
+                                    className={styles.groupEditIconButton}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openEditGroupEditor(group);
+                                    }}
+                                    aria-label="Редактировать группу"
+                                  >
+                                    <HomeworkPenIcon size={11} className={styles.inlineFaIcon} />
+                                  </button>
+                                </Tooltip>
+                              ) : null}
+                              <HomeworkChevronDownIcon
+                                size={12}
+                                className={`${styles.groupChevron} ${expanded ? styles.groupChevronExpanded : ''}`}
+                              />
+                            </span>
+                          </div>
 
-                      {expanded ? (
-                        <div className={styles.groupCardContent}>
-                          {groupError ? <div className={styles.groupErrorState}>{groupError}</div> : null}
-                          {groupLoading && groupAssignments.length === 0 ? (
-                            <div className={styles.groupLoadingState}>Загрузка заданий...</div>
-                          ) : null}
-                          {!groupLoading && groupAssignments.length === 0 ? (
-                            <div className={styles.groupLoadingState}>В этой группе пока нет домашних заданий</div>
-                          ) : null}
-                          {groupAssignments.length > 0 ? (
-                            <div className={styles.groupAssignmentsList}>
-                              {groupAssignments.map((assignment) => {
-                                const studentLabel =
-                                  assignment.studentName ||
-                                  studentsById.get(assignment.studentId) ||
-                                  `Ученик #${assignment.studentId}`;
-                                const tone = resolveStatusTone(assignment);
-                                const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
-                              return (
-                                <article key={assignment.id} className={styles.groupAssignmentItem}>
-                                  <div className={styles.groupAssignmentIcon}>
-                                    <HomeworkFileLinesIcon size={13} className={styles.inlineFaIcon} />
-                                  </div>
+                          {expanded ? (
+                            <div className={styles.groupCardContent}>
+                              {groupError ? <div className={styles.groupErrorState}>{groupError}</div> : null}
+                              {groupLoading && groupAssignments.length === 0 ? (
+                                <div className={styles.groupLoadingState}>Загрузка заданий...</div>
+                              ) : null}
+                              {!groupLoading && groupAssignments.length === 0 ? (
+                                <div className={styles.groupLoadingState}>В этой группе пока нет домашних заданий</div>
+                              ) : null}
+                              {groupAssignments.length > 0 ? (
+                                <div className={styles.groupAssignmentsList}>
+                                  {groupAssignments.map((assignment) => {
+                                    const studentLabel =
+                                      assignment.studentName ||
+                                      studentsById.get(assignment.studentId) ||
+                                      `Ученик #${assignment.studentId}`;
+                                    const tone = resolveStatusTone(assignment);
+                                    const canEditAssignment = canTeacherEditHomeworkAssignment(assignment);
+                                    return (
+                                      <article key={assignment.id} className={styles.groupAssignmentItem}>
+                                        <div className={styles.groupAssignmentIcon}>
+                                          <HomeworkFileLinesIcon size={13} className={styles.inlineFaIcon} />
+                                        </div>
 
-                                    <div className={styles.groupAssignmentMain}>
-                                      <div className={styles.groupAssignmentTitleRow}>
-                                        <h4 className={styles.groupAssignmentTitle}>{assignment.title}</h4>
-                                        <span className={styles.groupAssignmentTypeBadge}>Домашка</span>
-                                      </div>
-                                      <div className={styles.groupAssignmentMeta}>
-                                        <span>Создано {formatDateTime(assignment.createdAt)}</span>
-                                        <span className={styles.metaDot} />
-                                        <span>{studentLabel}</span>
-                                      </div>
-                                    </div>
+                                        <div className={styles.groupAssignmentMain}>
+                                          <div className={styles.groupAssignmentTitleRow}>
+                                            <h4 className={styles.groupAssignmentTitle}>{assignment.title}</h4>
+                                            <span className={styles.groupAssignmentTypeBadge}>Домашка</span>
+                                          </div>
+                                          <div className={styles.groupAssignmentMeta}>
+                                            <span>Создано {formatDateTime(assignment.createdAt)}</span>
+                                            <span className={styles.metaDot} />
+                                            <span>{studentLabel}</span>
+                                          </div>
+                                        </div>
 
-                                    <div className={styles.groupAssignmentActions}>
-                                      <span
-                                        className={`${styles.groupAssignmentStatus} ${
-                                          styles[`groupAssignmentStatus_${tone}`] || ''
-                                        }`}
-                                      >
-                                        {resolveStatusLabel(assignment)}
-                                      </span>
-                                      <Tooltip content={canEditAssignment ? 'Редактировать' : 'Открыть'}>
-                                        <button
-                                          type="button"
-                                          className={styles.groupAssignmentEditButton}
-                                          onClick={() => onOpenDetail(assignment)}
-                                          aria-label={canEditAssignment ? 'Редактировать' : 'Открыть'}
-                                        >
-                                          <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
-                                        </button>
-                                      </Tooltip>
-                                    </div>
-                                  </article>
-                                );
-                              })}
+                                        <div className={styles.groupAssignmentActions}>
+                                          <span
+                                            className={`${styles.groupAssignmentStatus} ${
+                                              styles[`groupAssignmentStatus_${tone}`] || ''
+                                            }`}
+                                          >
+                                            {resolveStatusLabel(assignment)}
+                                          </span>
+                                          <Tooltip content={canEditAssignment ? 'Редактировать' : 'Открыть'}>
+                                            <button
+                                              type="button"
+                                              className={styles.groupAssignmentEditButton}
+                                              onClick={() => onOpenDetail(assignment)}
+                                              aria-label={canEditAssignment ? 'Редактировать' : 'Открыть'}
+                                            >
+                                              <HomeworkPenToSquareIcon size={12} className={styles.inlineFaIcon} />
+                                            </button>
+                                          </Tooltip>
+                                        </div>
+                                      </article>
+                                    );
+                                  })}
+                                </div>
+                              ) : null}
+                              {groupNextOffset !== null ? (
+                                <div className={styles.groupLoadMoreRow}>
+                                  <button
+                                    type="button"
+                                    className={styles.groupLoadMoreButton}
+                                    onClick={() => {
+                                      void onLoadGroupAssignments(groupKey, { append: true });
+                                    }}
+                                    disabled={groupLoading}
+                                  >
+                                    {groupLoading ? 'Загрузка...' : 'Показать еще'}
+                                  </button>
+                                </div>
+                              ) : null}
                             </div>
                           ) : null}
-                          {groupNextOffset !== null ? (
-                            <div className={styles.groupLoadMoreRow}>
-                              <button
-                                type="button"
-                                className={styles.groupLoadMoreButton}
-                                onClick={() => {
-                                  void onLoadGroupAssignments(groupKey, { append: true });
-                                }}
-                                disabled={groupLoading}
-                              >
-                                {groupLoading ? 'Загрузка...' : 'Показать еще'}
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
             </section>
-          </section>
           ) : null}
         </>
       )}
@@ -1348,11 +1333,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
         onClose={onCloseReview}
         onSubmitReview={onSubmitReview}
       />
-      <Modal
-        open={isActivityModalOpen}
-        onClose={() => setIsActivityModalOpen(false)}
-        title="События домашних заданий"
-      >
+      <Modal open={isActivityModalOpen} onClose={() => setIsActivityModalOpen(false)} title="События домашних заданий">
         {homeworkActivityLoading ? <div className={styles.modalState}>Загрузка...</div> : null}
         {!homeworkActivityLoading ? (
           <div className={styles.activityList}>

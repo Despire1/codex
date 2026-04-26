@@ -15,7 +15,7 @@
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 42%),
     linear-gradient(135deg, #fff9ec 0%, #f5f1ff 52%, #eef6ff 100%);
   border: 1px solid rgba(223, 209, 175, 0.7);
-  box-shadow: 0 22px 60px rgba(36, 38, 54, 0.08);
+  box-shadow: 0 22px 60px -20px rgba(36, 38, 54, 0.08);
 }
 
 .heroMain {
@@ -119,7 +119,11 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
 }
 
 .secondaryButton {
@@ -131,7 +135,7 @@
 .previewButton {
   background: #1f2333;
   color: #fff;
-  box-shadow: 0 16px 34px rgba(31, 35, 51, 0.18);
+  box-shadow: 0 16px 34px -11px rgba(31, 35, 51, 0.18);
 }
 
 .cancelIssueButton {
@@ -171,9 +175,9 @@
 .sectionCard {
   border-radius: 22px;
   padding: 20px;
-  background: #fff;
+  background: var(--surface-card);
   border: 1px solid rgba(223, 227, 239, 0.9);
-  box-shadow: 0 14px 40px rgba(32, 39, 66, 0.06);
+  box-shadow: 0 14px 40px -13px rgba(32, 39, 66, 0.06);
 }
 
 .sectionHeader {
@@ -181,6 +185,27 @@
   gap: 12px;
   align-items: flex-start;
   margin-bottom: 16px;
+}
+
+.sectionHeaderText {
+  flex: 1;
+  min-width: 0;
+}
+
+.correctAnswersToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #4a5c8f;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.correctAnswersToggle input[type='checkbox'] {
+  margin: 0;
+  cursor: pointer;
 }
 
 .sectionHeader h2 {
@@ -289,6 +314,25 @@
 
 .answerListItem {
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.answerListItemCorrect {
+  color: #166534;
+  font-weight: 600;
+}
+
+.answerCorrectBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .answerListOrdered {

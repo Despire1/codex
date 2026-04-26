@@ -1,6 +1,5 @@
 import { FC, useMemo } from 'react';
-import { addDays, isSameDay } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addDays, isSameDay, ru } from 'date-fns';
 import { Box, Chip, List, ListItem, ListItemText, Stack } from '@mui/material';
 
 import { Lesson, PaymentEvent } from '../../../entities/types';
@@ -37,7 +36,7 @@ const getEventTitle = (event: PaymentEvent) => {
         return 'Оплата отменена, урок возвращён на баланс';
       }
       if (event.reason === 'PAYMENT_REVERT_WRITE_OFF') {
-        return 'Оплата отменена без возврата';
+        return 'Оплата снята, баланс ученика не пополнен';
       }
       if (event.lessonsDelta > 0) {
         return 'Возврат урока на баланс';
@@ -124,11 +123,7 @@ const formatEventValue = (event: PaymentEvent) => {
   return { value: `${sign}${event.lessonsDelta}`, withSuffix: true };
 };
 
-export const PaymentList: FC<PaymentListProps> = ({
-  payments,
-  onOpenLesson,
-  isLoading,
-}) => {
+export const PaymentList: FC<PaymentListProps> = ({ payments, onOpenLesson, isLoading }) => {
   const timeZone = useTimeZone();
   const todayZoned = toZonedDate(new Date(), timeZone);
 
@@ -165,15 +160,15 @@ export const PaymentList: FC<PaymentListProps> = ({
             {groupEntries.map(([groupLabel, events]) => (
               <li key={groupLabel} className={styles.paymentGroup}>
                 <ul className={styles.paymentGroupList}>
-                  <div className={styles.paymentGroupTitle}>
-                    {groupLabel}
-                  </div>
+                  <div className={styles.paymentGroupTitle}>{groupLabel}</div>
                   {events.map((event) => {
                     const timestamp = formatInTimeZone(event.createdAt, 'd MMM yyyy, HH:mm', {
                       locale: ru,
                       timeZone,
                     });
-                    const lessonLabel = event.lessonId ? formatLessonLabel(event.lesson, timeZone) : 'Без привязки к занятию';
+                    const lessonLabel = event.lessonId
+                      ? formatLessonLabel(event.lesson, timeZone)
+                      : 'Без привязки к занятию';
                     const lessonTimestamp = event.lesson?.startAt
                       ? formatInTimeZone(event.lesson.startAt, 'd MMM, HH:mm', { locale: ru, timeZone })
                       : 'Без привязки к занятию';
@@ -182,9 +177,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                     const amountNode = (
                       <Box className={`${styles.paymentAmount} ${styles.paymentDesktopOnly}`}>
                         <span>{valueMeta.value}</span>
-                        {valueMeta.withSuffix && (
-                          <span className={styles.paymentAmountSuffix}>ур.</span>
-                        )}
+                        {valueMeta.withSuffix && <span className={styles.paymentAmountSuffix}>ур.</span>}
                       </Box>
                     );
                     const chipClassName = `${styles.paymentChip} ${getEventChipClass(event)}`;
@@ -217,9 +210,7 @@ export const PaymentList: FC<PaymentListProps> = ({
                             </span>
                             <Box className={`${styles.paymentAmount} ${styles.paymentMobileAmount}`}>
                               <span>{valueMeta.value}</span>
-                              {valueMeta.withSuffix && (
-                                <span className={styles.paymentAmountSuffix}>ур.</span>
-                              )}
+                              {valueMeta.withSuffix && <span className={styles.paymentAmountSuffix}>ур.</span>}
                             </Box>
                           </div>
                           <div className={styles.paymentMobileChips}>

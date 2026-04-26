@@ -1,6 +1,6 @@
 .card {
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   padding: 14px;
   box-shadow: none;
@@ -30,7 +30,7 @@
 
 .empty {
   margin: 0;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -69,12 +69,12 @@
 .time {
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   padding-top: 2px;
 }
 
 .timeHighlight {
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
 }
 
 .timelineDot {
@@ -100,7 +100,7 @@
 }
 
 .dayItemHighlight .name {
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   font-weight: 800;
 }
 
@@ -114,7 +114,7 @@
 .name {
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -129,7 +129,7 @@
 
 .subtitle {
   font-size: 11px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,7 +154,7 @@
 }
 
 .dayItemPast .name {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   text-decoration: line-through;
 }
 
@@ -165,17 +165,17 @@
 
 .badge_done {
   background: var(--color-slate-200);
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .badge_soon {
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
 }
 
 .badge_muted {
-  background: var(--color-gray-100);
-  color: var(--color-slate-600);
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
 }
 
 .weekList {
@@ -184,9 +184,9 @@
 }
 
 .weekRow {
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   text-align: left;
   padding: 10px 12px;
   display: grid;
@@ -201,10 +201,10 @@
 .weekLabel {
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .weekMeta {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }

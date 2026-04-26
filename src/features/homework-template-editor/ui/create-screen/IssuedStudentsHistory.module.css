@@ -16,7 +16,7 @@
   display: block;
   font-size: 14px;
   font-weight: 800;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .row {
@@ -38,8 +38,8 @@
   max-width: var(--issued-student-card-width);
   min-height: 52px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card-strong);
 }
 
 .studentCard {
@@ -118,7 +118,7 @@
   font-size: 14px;
   line-height: 1.25;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .studentStatus {
@@ -138,13 +138,13 @@
 }
 
 .studentStatus_muted {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .moreButton {
   justify-content: center;
   padding: 8px 14px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
   line-height: 1;
   font-weight: 700;
@@ -156,8 +156,8 @@
   padding: 12px;
   border: 1px solid rgba(229, 231, 235, 0.96);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.14);
+  background: var(--surface-card);
+  box-shadow: 0 18px 42px -14px rgba(17, 24, 39, 0.14);
   backdrop-filter: blur(12px);
 }
 
@@ -178,7 +178,7 @@
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .popoverHeader span {
@@ -189,8 +189,8 @@
   height: 24px;
   padding: 0 8px;
   border-radius: 999px;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1;
   font-weight: 700;

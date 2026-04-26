@@ -45,13 +45,13 @@
   font-size: 20px;
   line-height: 1.15;
   font-weight: 900;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .headerSubtitle {
   margin-top: 4px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .tabRow {
@@ -59,7 +59,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .tabButtons {
@@ -79,14 +79,14 @@
   background: transparent;
   padding: 0 18px 14px;
   border-bottom: 2px solid transparent;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .tabButtonActive {
-  color: #111827;
+  color: var(--text-primary);
   border-bottom-color: #b7ff42;
 }
 
@@ -106,7 +106,7 @@
 .editorTitle {
   font-size: 14px;
   font-weight: 800;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .editorDescription {
@@ -129,7 +129,7 @@
   padding: 8px 14px;
   border-radius: 12px;
   background: #eef8d9;
-  color: #1f2937;
+  color: var(--text-primary);
   text-align: left;
   line-height: 1;
 }
@@ -137,7 +137,7 @@
 .variableLabel {
   font-size: 12px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .variableCode {
@@ -168,7 +168,7 @@
 .previewTitle {
   font-size: 14px;
   font-weight: 800;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .fieldError {
@@ -202,12 +202,12 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .exampleButtonActive {
   background: transparent;
-  color: #111827;
+  color: var(--text-primary);
   border-color: #b7ff42;
 }
 
@@ -223,15 +223,15 @@
   white-space: pre-wrap;
   font-size: 14px;
   line-height: 1.5;
-  color: #111827;
-  background: #fff;
+  color: var(--text-primary);
+  background: var(--surface-card);
   border: 1px solid #e6e8ee;
   border-radius: 20px;
   padding: 16px 18px;
 }
 
 .previewMissing {
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .previewAccent {
@@ -262,19 +262,19 @@
 
 .resetButton {
   background: #f1f3f7;
-  color: #4b5563;
+  color: var(--text-secondary);
   border-color: transparent;
 }
 
 .sendTestButton {
   background: transparent;
-  color: #111827;
+  color: var(--text-primary);
   border: 2px solid var(--accent-primary, #a3e635);
 }
 
 .sendTestButton:hover:not(:disabled) {
   background: var(--accent-primary, #a3e635);
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .saveButton {
@@ -298,8 +298,8 @@
 .overflowPopover {
   padding: 8px;
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  background: var(--surface-card);
+  box-shadow: 0 18px 40px -13px rgba(15, 23, 42, 0.12);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -307,12 +307,12 @@
 
 .overflowAction {
   border: none;
-  background: #f9fafb;
+  background: var(--surface-card-strong);
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   text-align: left;
 }
 
@@ -331,8 +331,8 @@
 .emojiPopover {
   padding-bottom: 3px;
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  background: var(--surface-card);
+  box-shadow: 0 18px 40px -13px rgba(15, 23, 42, 0.12);
 }
 
 .emojiPickerWrapper {
@@ -343,7 +343,7 @@
 .textArea {
   min-height: 144px;
   border-radius: 20px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-default);
   padding: 16px 18px;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.02);
 }
@@ -377,8 +377,8 @@
     gap: 10px;
     padding: 10px;
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+    background: var(--surface-card);
+    box-shadow: 0 16px 32px -10px rgba(15, 23, 42, 0.12);
     z-index: 5;
   }
 

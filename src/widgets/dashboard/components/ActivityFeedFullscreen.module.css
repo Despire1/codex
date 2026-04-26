@@ -23,7 +23,7 @@
 }
 
 .state {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -46,7 +46,7 @@
 }
 
 .loadingMoreState {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   font-size: 13px;
   text-align: center;
   padding: 4px 0 10px;

@@ -4,9 +4,10 @@ import styles from './SessionFallback.module.css';
 
 interface SessionFallbackProps {
   state: 'checking' | 'unauthenticated';
+  expired?: boolean;
 }
 
-export const SessionFallback: FC<SessionFallbackProps> = ({ state }) => {
+export const SessionFallback: FC<SessionFallbackProps> = ({ state, expired = false }) => {
   const isLocalAuthBypass = import.meta.env.DEV && import.meta.env.VITE_LOCAL_AUTH_BYPASS === 'true';
 
   if (state === 'checking') {
@@ -23,6 +24,11 @@ export const SessionFallback: FC<SessionFallbackProps> = ({ state }) => {
   return (
     <div id="app" className={`${styles.container} app-content`}>
       <div className={styles.card}>
+        {expired && !isLocalAuthBypass ? (
+          <div className={styles.expiredNotice} role="status">
+            <strong>Сессия истекла.</strong> Войдите снова, чтобы продолжить работу.
+          </div>
+        ) : null}
         {isLocalAuthBypass ? (
           <>
             <h1>Локальный доступ недоступен</h1>

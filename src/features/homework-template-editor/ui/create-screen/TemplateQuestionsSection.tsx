@@ -11,12 +11,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { HomeworkBlockTest, HomeworkTestQuestion, HomeworkTestTableConfig } from '../../../../entities/types';
 import { pathToKey } from '../../../../shared/lib/form-validation/path';
@@ -37,6 +32,7 @@ import {
   HomeworkArrowsLeftRightIcon,
   HomeworkCheckIcon,
   HomeworkChevronDownIcon,
+  HomeworkCircleCheckIcon,
   HomeworkCopyIcon,
   HomeworkFileArrowUpIcon,
   HomeworkGripVerticalIcon,
@@ -80,11 +76,18 @@ type QuestionCreateGroup = {
 
 const QUESTION_CREATE_OPTIONS_PRIMARY: QuestionCreateOption[] = [
   {
-    id: 'CHOICE',
-    title: 'Множественный выбор',
-    description: 'Один или несколько вариантов',
-    icon: <HomeworkListCheckIcon size={15} />,
+    id: 'SINGLE_CHOICE',
+    title: 'Один правильный вариант',
+    description: 'Ученик выбирает один вариант ответа',
+    icon: <HomeworkCircleCheckIcon size={15} />,
     tone: 'blue',
+  },
+  {
+    id: 'MULTIPLE_CHOICE',
+    title: 'Несколько правильных вариантов',
+    description: 'Ученик отмечает все подходящие ответы',
+    icon: <HomeworkListCheckIcon size={15} />,
+    tone: 'indigo',
   },
   {
     id: 'SHORT_TEXT',
@@ -155,14 +158,14 @@ const QUESTION_CREATE_OPTIONS: QuestionCreateOption[] = [
 const QUESTION_CREATE_GROUPS: QuestionCreateGroup[] = [
   {
     id: 'test',
-    title: 'Тестовые',
-    options: ['CHOICE', 'FILL_WORD', 'MATCHING', 'ORDERING', 'TABLE']
+    title: 'Тесты',
+    options: ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'FILL_WORD', 'MATCHING', 'ORDERING', 'TABLE']
       .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
       .filter((option): option is QuestionCreateOption => Boolean(option)),
   },
   {
     id: 'response',
-    title: 'Кастомные',
+    title: 'Открытые ответы',
     options: ['SHORT_TEXT', 'LONG_TEXT', 'AUDIO', 'FILE']
       .map((id) => QUESTION_CREATE_OPTIONS.find((option) => option.id === id))
       .filter((option): option is QuestionCreateOption => Boolean(option)),
@@ -306,7 +309,7 @@ const cloneQuestion = (question: HomeworkTestQuestion): HomeworkTestQuestion => 
         })),
       },
       caseSensitive: question.caseSensitive ?? false,
-      allowPartialCredit: question.allowPartialCredit ?? (question.table?.partialCredit ?? true),
+      allowPartialCredit: question.allowPartialCredit ?? question.table?.partialCredit ?? true,
     };
   }
 
@@ -341,10 +344,10 @@ interface QuestionEditorCardProps {
   onDuplicate: () => void;
   onRemove: () => void;
   onPromptChange: (value: string) => void;
-  onToggleMultiple?: (checked: boolean) => void;
   onPointsChange: (value: string) => void;
   style?: CSSProperties;
   dragging?: boolean;
+  className?: string;
   itemRef?: (node: HTMLElement | null) => void;
   handleRef?: (node: HTMLButtonElement | null) => void;
   handleProps?: HTMLAttributes<HTMLButtonElement>;
@@ -363,10 +366,10 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
   onDuplicate,
   onRemove,
   onPromptChange,
-  onToggleMultiple,
   onPointsChange,
   style,
   dragging = false,
+  className,
   itemRef,
   handleRef,
   handleProps,
@@ -374,7 +377,7 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
   <article
     ref={itemRef}
     style={style}
-    className={`${styles.questionCard} ${dragging ? styles.questionCardDragging : ''}`}
+    className={`${styles.questionCard} ${dragging ? styles.questionCardDragging : ''} ${className ?? ''}`.trim()}
   >
     <div className={styles.questionHeader}>
       <div className={styles.questionHeaderLeft}>
@@ -389,20 +392,19 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
         </button>
         <div className={styles.questionHeaderMeta}>
           <span className={styles.questionIndex}>
-            {showQuestionKindLabel ? `Вопрос ${questionIndex + 1} • ${resolveQuestionKindTitle(questionKind)}` : `Вопрос ${questionIndex + 1}`}
+            {showQuestionKindLabel
+              ? `Вопрос ${questionIndex + 1} • ${resolveQuestionKindTitle(questionKind)}`
+              : `Вопрос ${questionIndex + 1}`}
           </span>
-          {!showQuestionKindLabel && questionKindControl ? <span className={styles.questionMetaDot} aria-hidden /> : null}
+          {!showQuestionKindLabel && questionKindControl ? (
+            <span className={styles.questionMetaDot} aria-hidden />
+          ) : null}
           {questionKindControl}
         </div>
       </div>
 
       <div className={styles.questionActions}>
-        <button
-          type="button"
-          className={styles.iconButton}
-          onClick={onDuplicate}
-          aria-label="Дублировать вопрос"
-        >
+        <button type="button" className={styles.iconButton} onClick={onDuplicate} aria-label="Дублировать вопрос">
           <HomeworkCopyIcon size={12} />
         </button>
         <button
@@ -431,16 +433,6 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
     {children}
 
     <div className={styles.questionFooter}>
-      {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && onToggleMultiple ? (
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={isQuestionMultipleChoice(question)}
-            onChange={(event) => onToggleMultiple(event.target.checked)}
-          />
-          <span>Несколько верных ответов</span>
-        </label>
-      ) : null}
       <label className={styles.pointsField}>
         Баллы:
         <input
@@ -455,11 +447,10 @@ const QuestionEditorCard: FC<QuestionEditorCardProps> = ({
   </article>
 );
 
-interface SortableQuestionCardProps
-  extends Omit<
-    QuestionEditorCardProps,
-    'style' | 'dragging' | 'itemRef' | 'handleRef' | 'handleProps'
-  > {
+interface SortableQuestionCardProps extends Omit<
+  QuestionEditorCardProps,
+  'style' | 'dragging' | 'itemRef' | 'handleRef' | 'handleProps'
+> {
   onItemRef?: (node: HTMLElement | null) => void;
 }
 
@@ -489,32 +480,6 @@ const SortableQuestionCard: FC<SortableQuestionCardProps> = (props) => {
   );
 };
 
-interface QuestionDragOverlayCardProps {
-  question: HomeworkTestQuestion;
-  questionKind: CreateQuestionKind;
-  questionIndex: number;
-}
-
-const QuestionDragOverlayCard: FC<QuestionDragOverlayCardProps> = ({
-  question,
-  questionKind,
-  questionIndex,
-}) => (
-  <div className={`${styles.questionCard} ${styles.questionCardOverlay}`}>
-    <div className={styles.questionHeader}>
-      <div className={styles.questionHeaderLeft}>
-        <span className={styles.dragHandleButton} aria-hidden>
-          <HomeworkGripVerticalIcon size={12} />
-        </span>
-        <span className={styles.questionIndex}>
-          Вопрос {questionIndex + 1} • {resolveQuestionKindTitle(questionKind)}
-        </span>
-      </div>
-    </div>
-    <div className={styles.questionOverlayTitle}>{question.prompt.trim() || 'Новый вопрос'}</div>
-  </div>
-);
-
 export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   surface = 'card',
   testBlock,
@@ -527,6 +492,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
 }) => {
   const [addQuestionTrigger, setAddQuestionTrigger] = useState<'header' | 'fab' | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [activeQuestionRect, setActiveQuestionRect] = useState<{ width: number; height: number } | null>(null);
   const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
   const [questionKindMenuQuestionId, setQuestionKindMenuQuestionId] = useState<string | null>(null);
   const [dragOrderingState, setDragOrderingState] = useState<{ questionId: string; itemIndex: number } | null>(null);
@@ -541,8 +507,11 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
 
   const questions = useMemo(() => testBlock?.questions ?? [], [testBlock?.questions]);
   const questionIds = useMemo(() => questions.map((question) => question.id), [questions]);
-  const questionById = useMemo(() => new Map(questions.map((question) => [question.id, question] as const)), [questions]);
-  const activeQuestion = activeQuestionId ? questionById.get(activeQuestionId) ?? null : null;
+  const questionById = useMemo(
+    () => new Map(questions.map((question) => [question.id, question] as const)),
+    [questions],
+  );
+  const activeQuestion = activeQuestionId ? (questionById.get(activeQuestionId) ?? null) : null;
   const activeQuestionIndex = activeQuestionId ? questionIds.indexOf(activeQuestionId) : -1;
   const questionsRootPath: FormValidationPath = [...(testBlockPath ?? ['blocks', 0]), 'questions'];
   const resolveQuestionPath = (questionIndex: number): FormValidationPath => [
@@ -613,10 +582,19 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
   };
 
   const handleQuestionDragStart = ({ active }: DragStartEvent) => {
-    setActiveQuestionId(String(active.id));
+    const activeId = String(active.id);
+    setActiveQuestionId(activeId);
+    const node = questionNodeMapRef.current.get(activeId);
+    if (node) {
+      const rect = node.getBoundingClientRect();
+      setActiveQuestionRect({ width: rect.width, height: rect.height });
+    } else {
+      setActiveQuestionRect(null);
+    }
   };
 
   const handleQuestionDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveQuestionRect(null);
     if (!over) {
       setActiveQuestionId(null);
       return;
@@ -637,6 +615,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
 
   const handleQuestionDragCancel = () => {
     setActiveQuestionId(null);
+    setActiveQuestionRect(null);
   };
 
   const addQuestion = (kind: CreateQuestionKind) => {
@@ -664,7 +643,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
 
   const handleAddQuestionTriggerClick = (trigger: 'header' | 'fab') => {
     if (addQuestionMode === 'default-choice') {
-      addQuestion('CHOICE');
+      addQuestion('SINGLE_CHOICE');
       return;
     }
 
@@ -680,8 +659,15 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
               <div className={styles.dropdownGroupTitle}>{group.title}</div>
               <div className={styles.dropdownGroupList}>
                 {group.options.map((option) => (
-                  <button key={option.id} type="button" className={styles.dropdownItem} onClick={() => addQuestion(option.id)}>
-                    <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>{option.icon}</span>
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={styles.dropdownItem}
+                    onClick={() => addQuestion(option.id)}
+                  >
+                    <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>
+                      {option.icon}
+                    </span>
                     <span className={styles.dropdownItemMeta}>
                       <span className={styles.dropdownTitle}>{option.title}</span>
                       <span className={styles.dropdownDescription}>{option.description}</span>
@@ -828,25 +814,23 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                   placeholder={`Вариант ${optionIndex + 1}`}
                   value={option.text}
                   data-validation-path={pathToKey(optionTextPath)}
-                  onChange={(event) =>
-                    {
-                      onFieldEdit(optionTextPath);
-                      updateQuestion(questionIndex, (previousQuestion) => {
-                        if (previousQuestion.type !== 'SINGLE_CHOICE' && previousQuestion.type !== 'MULTIPLE_CHOICE') {
-                          return previousQuestion;
-                        }
-                        const nextOptions = [...(previousQuestion.options ?? [])];
-                        nextOptions[optionIndex] = {
-                          ...nextOptions[optionIndex],
-                          text: event.target.value,
-                        };
-                        return {
-                          ...previousQuestion,
-                          options: nextOptions,
-                        };
-                      });
-                    }
-                  }
+                  onChange={(event) => {
+                    onFieldEdit(optionTextPath);
+                    updateQuestion(questionIndex, (previousQuestion) => {
+                      if (previousQuestion.type !== 'SINGLE_CHOICE' && previousQuestion.type !== 'MULTIPLE_CHOICE') {
+                        return previousQuestion;
+                      }
+                      const nextOptions = [...(previousQuestion.options ?? [])];
+                      nextOptions[optionIndex] = {
+                        ...nextOptions[optionIndex],
+                        text: event.target.value,
+                      };
+                      return {
+                        ...previousQuestion,
+                        options: nextOptions,
+                      };
+                    });
+                  }}
                 />
                 {renderFieldError(optionTextPath)}
 
@@ -937,21 +921,19 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
               placeholder="Используйте [___] для обозначения пропуска"
               value={fillText}
               data-validation-path={pathToKey(fillTextPath)}
-              onChange={(event) =>
-                {
-                  onFieldEdit(fillTextPath);
-                  updateQuestion(questionIndex, (previousQuestion) => {
-                    const nextText = event.target.value;
-                    const nextBlankCount = countFillInBlanks(nextText);
-                    const nextAnswerCount = Math.max(1, nextBlankCount);
-                    return {
-                      ...previousQuestion,
-                      fillInTheBlankText: nextText,
-                      acceptedAnswers: normalizeAnswersLength(previousQuestion.acceptedAnswers, nextAnswerCount),
-                    };
-                  });
-                }
-              }
+              onChange={(event) => {
+                onFieldEdit(fillTextPath);
+                updateQuestion(questionIndex, (previousQuestion) => {
+                  const nextText = event.target.value;
+                  const nextBlankCount = countFillInBlanks(nextText);
+                  const nextAnswerCount = Math.max(1, nextBlankCount);
+                  return {
+                    ...previousQuestion,
+                    fillInTheBlankText: nextText,
+                    acceptedAnswers: normalizeAnswersLength(previousQuestion.acceptedAnswers, nextAnswerCount),
+                  };
+                });
+              }}
             />
             {renderFieldError(fillTextPath)}
           </label>
@@ -1085,23 +1067,25 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                     />
                     {renderFieldError(rightPath)}
                   </div>
-                <button
-                  type="button"
-                  className={styles.removeOptionButton}
-                  onClick={() =>
-                    updateQuestion(questionIndex, (previousQuestion) => {
-                      if (previousQuestion.type !== 'MATCHING') return previousQuestion;
-                      const nextPairs = (previousQuestion.matchingPairs ?? []).filter((_, index) => index !== pairIndex);
-                      if (nextPairs.length < 2) return previousQuestion;
-                      return {
-                        ...previousQuestion,
-                        matchingPairs: nextPairs,
-                      };
-                    })
-                  }
-                >
-                  <HomeworkXMarkIcon size={11} />
-                </button>
+                  <button
+                    type="button"
+                    className={styles.removeOptionButton}
+                    onClick={() =>
+                      updateQuestion(questionIndex, (previousQuestion) => {
+                        if (previousQuestion.type !== 'MATCHING') return previousQuestion;
+                        const nextPairs = (previousQuestion.matchingPairs ?? []).filter(
+                          (_, index) => index !== pairIndex,
+                        );
+                        if (nextPairs.length < 2) return previousQuestion;
+                        return {
+                          ...previousQuestion,
+                          matchingPairs: nextPairs,
+                        };
+                      })
+                    }
+                  >
+                    <HomeworkXMarkIcon size={11} />
+                  </button>
                 </div>
               );
             })}
@@ -1117,14 +1101,16 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                 if (previousQuestion.type !== 'MATCHING') return previousQuestion;
                 return {
                   ...previousQuestion,
-                  matchingPairs: [...(previousQuestion.matchingPairs ?? []), { id: createHomeworkBlockId(), left: '', right: '' }],
+                  matchingPairs: [
+                    ...(previousQuestion.matchingPairs ?? []),
+                    { id: createHomeworkBlockId(), left: '', right: '' },
+                  ],
                 };
               });
             }}
           >
             <HomeworkPlusIcon size={11} /> Добавить пару
           </button>
-
         </div>
       );
     }
@@ -1195,22 +1181,20 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                   placeholder={`Шаг ${itemIndex + 1}`}
                   value={item.text}
                   data-validation-path={pathToKey(resolveFieldPath(questionIndex, 'orderingItems', itemIndex, 'text'))}
-                  onChange={(event) =>
-                    {
-                      onFieldEdit(resolveFieldPath(questionIndex, 'orderingItems', itemIndex, 'text'));
-                      updateQuestion(questionIndex, (previousQuestion) => {
-                        const nextItems = [...(previousQuestion.orderingItems ?? [])];
-                        nextItems[itemIndex] = {
-                          ...nextItems[itemIndex],
-                          text: event.target.value,
-                        };
-                        return {
-                          ...previousQuestion,
-                          orderingItems: nextItems,
-                        };
-                      });
-                    }
-                  }
+                  onChange={(event) => {
+                    onFieldEdit(resolveFieldPath(questionIndex, 'orderingItems', itemIndex, 'text'));
+                    updateQuestion(questionIndex, (previousQuestion) => {
+                      const nextItems = [...(previousQuestion.orderingItems ?? [])];
+                      nextItems[itemIndex] = {
+                        ...nextItems[itemIndex],
+                        text: event.target.value,
+                      };
+                      return {
+                        ...previousQuestion,
+                        orderingItems: nextItems,
+                      };
+                    });
+                  }}
                 />
                 {renderFieldError(resolveFieldPath(questionIndex, 'orderingItems', itemIndex, 'text'))}
                 <button
@@ -1218,7 +1202,9 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                   className={styles.removeOptionButton}
                   onClick={() =>
                     updateQuestion(questionIndex, (previousQuestion) => {
-                      const nextItems = (previousQuestion.orderingItems ?? []).filter((_, index) => index !== itemIndex);
+                      const nextItems = (previousQuestion.orderingItems ?? []).filter(
+                        (_, index) => index !== itemIndex,
+                      );
                       if (nextItems.length < 2) return previousQuestion;
                       return {
                         ...previousQuestion,
@@ -1284,7 +1270,10 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                 onFieldEdit(resolveFieldPath(questionIndex, 'table', 'answerHeaders'));
                 updateQuestion(questionIndex, (previousQuestion) => {
                   const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
-                  const nextHeaders = [...currentTable.answerHeaders, `Колонка ${currentTable.answerHeaders.length + 1}`];
+                  const nextHeaders = [
+                    ...currentTable.answerHeaders,
+                    `Колонка ${currentTable.answerHeaders.length + 1}`,
+                  ];
                   return {
                     ...previousQuestion,
                     table: {
@@ -1376,23 +1365,23 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                           className={getFieldClassName(styles.tableHeaderInput, headerPath)}
                           value={header}
                           data-validation-path={pathToKey(headerPath)}
-                          onChange={(event) =>
-                            {
-                              onFieldEdit(headerPath);
-                              updateQuestion(questionIndex, (previousQuestion) => {
-                                const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
-                                const nextHeaders = [...currentTable.answerHeaders];
-                                nextHeaders[headerIndex] = event.target.value;
-                                return {
-                                  ...previousQuestion,
-                                  table: {
-                                    ...currentTable,
-                                    answerHeaders: nextHeaders,
-                                  },
-                                };
-                              });
-                            }
-                          }
+                          onChange={(event) => {
+                            onFieldEdit(headerPath);
+                            updateQuestion(questionIndex, (previousQuestion) => {
+                              const currentTable = normalizeTableConfig(
+                                previousQuestion.table ?? createDefaultTableConfig(),
+                              );
+                              const nextHeaders = [...currentTable.answerHeaders];
+                              nextHeaders[headerIndex] = event.target.value;
+                              return {
+                                ...previousQuestion,
+                                table: {
+                                  ...currentTable,
+                                  answerHeaders: nextHeaders,
+                                },
+                              };
+                            });
+                          }}
                         />
                         {renderFieldError(headerPath)}
                       </th>
@@ -1412,31 +1401,38 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                           className={getFieldClassName(styles.tableCellInput, leadPath)}
                           value={row.lead}
                           data-validation-path={pathToKey(leadPath)}
-                          onChange={(event) =>
-                            {
-                              onFieldEdit(leadPath);
-                              updateQuestion(questionIndex, (previousQuestion) => {
-                                const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
-                                const nextRows = [...currentTable.rows];
-                                nextRows[rowIndex] = {
-                                  ...nextRows[rowIndex],
-                                  lead: event.target.value,
-                                };
-                                return {
-                                  ...previousQuestion,
-                                  table: {
-                                    ...currentTable,
-                                    rows: nextRows,
-                                  },
-                                };
-                              });
-                            }
-                          }
+                          onChange={(event) => {
+                            onFieldEdit(leadPath);
+                            updateQuestion(questionIndex, (previousQuestion) => {
+                              const currentTable = normalizeTableConfig(
+                                previousQuestion.table ?? createDefaultTableConfig(),
+                              );
+                              const nextRows = [...currentTable.rows];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                lead: event.target.value,
+                              };
+                              return {
+                                ...previousQuestion,
+                                table: {
+                                  ...currentTable,
+                                  rows: nextRows,
+                                },
+                              };
+                            });
+                          }}
                         />
                         {renderFieldError(leadPath)}
                       </td>
                       {table.answerHeaders.map((_, answerIndex) => {
-                        const answerPath = resolveFieldPath(questionIndex, 'table', 'rows', rowIndex, 'answers', answerIndex);
+                        const answerPath = resolveFieldPath(
+                          questionIndex,
+                          'table',
+                          'rows',
+                          rowIndex,
+                          'answers',
+                          answerIndex,
+                        );
                         return (
                           <td key={`${row.id}_answer_${answerIndex}`}>
                             <input
@@ -1445,54 +1441,59 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                               placeholder="Правильный ответ"
                               value={row.answers[answerIndex] ?? ''}
                               data-validation-path={pathToKey(answerPath)}
-                              onChange={(event) =>
-                                {
-                                  onFieldEdit(answerPath);
-                                  updateQuestion(questionIndex, (previousQuestion) => {
-                                    const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
-                                    const nextRows = [...currentTable.rows];
-                                    const nextAnswers = normalizeAnswersLength(nextRows[rowIndex]?.answers, currentTable.answerHeaders.length);
-                                    nextAnswers[answerIndex] = event.target.value;
-                                    nextRows[rowIndex] = {
-                                      ...nextRows[rowIndex],
-                                      answers: nextAnswers,
-                                    };
-                                    return {
-                                      ...previousQuestion,
-                                      table: {
-                                        ...currentTable,
-                                        rows: nextRows,
-                                      },
-                                    };
-                                  });
-                                }
-                              }
+                              onChange={(event) => {
+                                onFieldEdit(answerPath);
+                                updateQuestion(questionIndex, (previousQuestion) => {
+                                  const currentTable = normalizeTableConfig(
+                                    previousQuestion.table ?? createDefaultTableConfig(),
+                                  );
+                                  const nextRows = [...currentTable.rows];
+                                  const nextAnswers = normalizeAnswersLength(
+                                    nextRows[rowIndex]?.answers,
+                                    currentTable.answerHeaders.length,
+                                  );
+                                  nextAnswers[answerIndex] = event.target.value;
+                                  nextRows[rowIndex] = {
+                                    ...nextRows[rowIndex],
+                                    answers: nextAnswers,
+                                  };
+                                  return {
+                                    ...previousQuestion,
+                                    table: {
+                                      ...currentTable,
+                                      rows: nextRows,
+                                    },
+                                  };
+                                });
+                              }}
                             />
                             {renderFieldError(answerPath)}
                           </td>
                         );
                       })}
-                    <td className={styles.tableActionCell}>
-                      <button
-                        type="button"
-                        className={styles.removeOptionButton}
-                        onClick={() =>
-                          updateQuestion(questionIndex, (previousQuestion) => {
-                            const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
-                            if (currentTable.rows.length <= 1) return previousQuestion;
-                            return {
-                              ...previousQuestion,
-                              table: {
-                                ...currentTable,
-                                rows: currentTable.rows.filter((_, index) => index !== rowIndex),
-                              },
-                            };
-                          })
-                        }
-                      >
-                        <HomeworkXMarkIcon size={11} />
-                      </button>
-                    </td>
+                      <td className={styles.tableActionCell}>
+                        <button
+                          type="button"
+                          className={styles.removeOptionButton}
+                          onClick={() =>
+                            updateQuestion(questionIndex, (previousQuestion) => {
+                              const currentTable = normalizeTableConfig(
+                                previousQuestion.table ?? createDefaultTableConfig(),
+                              );
+                              if (currentTable.rows.length <= 1) return previousQuestion;
+                              return {
+                                ...previousQuestion,
+                                table: {
+                                  ...currentTable,
+                                  rows: currentTable.rows.filter((_, index) => index !== rowIndex),
+                                },
+                              };
+                            })
+                          }
+                        >
+                          <HomeworkXMarkIcon size={11} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1531,7 +1532,7 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
             <label className={styles.checkboxLabel}>
               <input
                 type="checkbox"
-                checked={question.allowPartialCredit ?? (question.table?.partialCredit ?? true)}
+                checked={question.allowPartialCredit ?? question.table?.partialCredit ?? true}
                 onChange={(event) =>
                   updateQuestion(questionIndex, (previousQuestion) => {
                     const currentTable = normalizeTableConfig(previousQuestion.table ?? createDefaultTableConfig());
@@ -1639,7 +1640,9 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                               type="button"
                               className={`${styles.questionKindButton} ${resolveDropdownIconToneClass(questionKindOption.tone)}`}
                               onClick={() =>
-                                setQuestionKindMenuQuestionId((current) => (current === question.id ? null : question.id))
+                                setQuestionKindMenuQuestionId((current) =>
+                                  current === question.id ? null : question.id,
+                                )
                               }
                               aria-haspopup="dialog"
                               aria-expanded={questionKindMenuQuestionId === question.id}
@@ -1671,7 +1674,9 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                                             setQuestionKindMenuQuestionId(null);
                                           }}
                                         >
-                                          <span className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}>
+                                          <span
+                                            className={`${styles.dropdownIcon} ${resolveDropdownIconToneClass(option.tone)}`}
+                                          >
                                             {option.icon}
                                           </span>
                                           <span className={styles.questionKindDropdownMeta}>
@@ -1701,14 +1706,6 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
                         prompt: value,
                       }));
                     }}
-                    onToggleMultiple={
-                      question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE'
-                        ? (checked) =>
-                            updateQuestion(questionIndex, (previousQuestion) =>
-                              toggleQuestionMultipleChoice(previousQuestion, checked),
-                            )
-                        : undefined
-                    }
                     onPointsChange={(value) =>
                       updateQuestion(questionIndex, (previousQuestion) => ({
                         ...previousQuestion,
@@ -1742,14 +1739,49 @@ export const TemplateQuestionsSection: FC<TemplateQuestionsSectionProps> = ({
           </SortableContext>
           {typeof document !== 'undefined'
             ? createPortal(
-                <DragOverlay adjustScale={false}>
-                  {activeQuestion ? (
-                    <QuestionDragOverlayCard
-                      question={activeQuestion}
-                      questionKind={getQuestionKind(activeQuestion)}
-                      questionIndex={activeQuestionIndex === -1 ? 0 : activeQuestionIndex}
-                    />
-                  ) : null}
+                <DragOverlay adjustScale={false} dropAnimation={null}>
+                  {activeQuestion && activeQuestionIndex >= 0
+                    ? (() => {
+                        const overlayKind = getQuestionKind(activeQuestion);
+                        const overlayOption = resolveQuestionKindOption(overlayKind);
+                        const overlayPromptPath = resolveFieldPath(activeQuestionIndex, 'prompt');
+                        const overlayKindControl = enableQuestionKindSelect ? (
+                          <span
+                            className={`${styles.questionKindButton} ${resolveDropdownIconToneClass(overlayOption.tone)}`}
+                            aria-hidden
+                          >
+                            <span className={styles.questionKindButtonIcon}>{overlayOption.icon}</span>
+                            <span className={styles.questionKindButtonLabel}>{overlayOption.title}</span>
+                            <HomeworkChevronDownIcon size={10} />
+                          </span>
+                        ) : null;
+                        return (
+                          <div
+                            className={styles.questionOverlayWrap}
+                            style={activeQuestionRect ? { width: activeQuestionRect.width } : undefined}
+                          >
+                            <QuestionEditorCard
+                              question={activeQuestion}
+                              questionIndex={activeQuestionIndex}
+                              questionKind={overlayKind}
+                              showQuestionKindLabel={!enableQuestionKindSelect}
+                              questionKindControl={overlayKindControl}
+                              promptPathKey={pathToKey(overlayPromptPath)}
+                              promptClassName={styles.questionPrompt}
+                              promptError={null}
+                              onDuplicate={() => {}}
+                              onRemove={() => {}}
+                              onPromptChange={() => {}}
+                              onPointsChange={() => {}}
+                              dragging={false}
+                              className={styles.questionCardOverlay}
+                            >
+                              {renderQuestionSpecificFields(activeQuestion, activeQuestionIndex)}
+                            </QuestionEditorCard>
+                          </div>
+                        );
+                      })()
+                    : null}
                 </DragOverlay>,
                 document.body,
               )

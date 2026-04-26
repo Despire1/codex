@@ -60,6 +60,7 @@ const teacherTabbarOrder: Partial<Record<TabId, number>> = {
   schedule: 20,
   students: 30,
   homeworks: 40,
+  settings: 50,
 };
 
 const studentTabbarOrder: Partial<Record<TabId, number>> = {

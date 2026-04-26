@@ -41,6 +41,7 @@ export type StudentHomeworkReferenceDashboardStats = {
   groupRankLabel: string;
   levelLabel: string;
   xp: number;
+  hasGamificationData: boolean;
 };
 
 export type StudentHomeworkReferenceTypeMeta = {
@@ -122,10 +123,7 @@ const formatRelativeDeadlinePrimary = (date: Date, now: Date) => {
 };
 
 const resolveEffectiveDeadlineDate = (assignment: HomeworkAssignment) =>
-  toValidDate(assignment.deadlineAt) ??
-  toValidDate(assignment.sentAt) ??
-  toValidDate(assignment.createdAt) ??
-  null;
+  toValidDate(assignment.deadlineAt) ?? toValidDate(assignment.sentAt) ?? toValidDate(assignment.createdAt) ?? null;
 
 const resolveAverageScore = (assignments: HomeworkAssignment[]) => {
   const values = assignments
@@ -377,10 +375,15 @@ export const buildStudentHomeworkReferenceDashboardStats = (
   const streakDays = calculateStudentHomeworkCurrentStreak(assignments, now);
   const averageScore = resolveAverageScore(assignments);
 
+  const hasAnyAssignment =
+    summary.activeCount + summary.overdueCount + summary.reviewedCount + summary.submittedCount > 0;
   const overdueBasedPerformance = clamp(100 - summary.overdueCount * 5, 0, 100);
   const scoreBasedPerformance = averageScore === null ? 0 : clamp(Math.round(averageScore * 10), 0, 100);
-  const performancePercent =
-    scoreBasedPerformance > 0 ? Math.max(scoreBasedPerformance, overdueBasedPerformance) : overdueBasedPerformance;
+  const performancePercent = !hasAnyAssignment
+    ? 0
+    : scoreBasedPerformance > 0
+      ? Math.max(scoreBasedPerformance, overdueBasedPerformance)
+      : overdueBasedPerformance;
 
   const awardsCount = [performancePercent >= 90, completedThisWeek >= 3, streakDays >= 7].filter(Boolean).length;
 
@@ -389,7 +392,11 @@ export const buildStudentHomeworkReferenceDashboardStats = (
   const xp = Math.max(
     0,
     Math.round(
-      summary.reviewedCount * 4 + completedThisWeek * 10 + streakDays * 2 + (averageScore ?? 0) + (summary.reviewedCount > 0 ? 1 : 0),
+      summary.reviewedCount * 4 +
+        completedThisWeek * 10 +
+        streakDays * 2 +
+        (averageScore ?? 0) +
+        (summary.reviewedCount > 0 ? 1 : 0),
     ),
   );
 
@@ -404,9 +411,10 @@ export const buildStudentHomeworkReferenceDashboardStats = (
     streakDays,
     performancePercent,
     awardsCount,
-    groupRankLabel: `TOP ${rank}`,
+    groupRankLabel: hasAnyAssignment ? `TOP ${rank}` : '—',
     levelLabel: resolveLevelLabel(performancePercent),
     xp,
+    hasGamificationData: hasAnyAssignment,
   };
 };
 

@@ -7,7 +7,7 @@
 .orderingItem {
   border: 2px solid #e2e8f0;
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-card);
   padding: 10px 12px;
   display: grid;
   grid-template-columns: auto auto 1fr;
@@ -54,7 +54,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-faint);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -63,7 +63,7 @@
 }
 
 .orderingDragHandle:hover:not(:disabled) {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .orderingDragHandle:active:not(:disabled) {
@@ -78,7 +78,7 @@
 
 .orderingText {
   font-size: 14px;
-  color: #0f172a;
+  color: var(--text-primary);
   font-weight: 600;
 }
 

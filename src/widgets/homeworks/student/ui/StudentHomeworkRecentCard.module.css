@@ -1,10 +1,12 @@
 .card {
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 1.5rem;
   padding: 20px;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .card:hover {
@@ -50,13 +52,13 @@
   margin: 0 0 8px;
   font-size: 18px;
   line-height: 1.25;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .description {
   margin: 0;
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -74,13 +76,13 @@
 }
 
 .date {
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
 .result {
-  color: #15803d;
+  color: var(--status-green-text);
   font-weight: 700;
 }

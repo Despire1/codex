@@ -3,17 +3,16 @@
   padding: 12px;
   box-sizing: border-box;
   max-width: 100%;
-  border: 1px solid var(--color-slate-300);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   font-size: 14px;
-  background: var(--color-white);
+  background: var(--surface-card);
 }
 
 .input:focus,
 .input:focus-visible {
   outline: none;
-  border-color: var(--color-blue-600);
-  box-shadow: 0 0 0 1px var(--shadow-blue-600-12);
+  border-color: var(--accent-primary);
 }
 
 .textArea {
@@ -21,10 +20,10 @@
   padding: 12px;
   box-sizing: border-box;
   min-height: 80px;
-  border: 1px solid var(--color-slate-300);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   font-size: 14px;
-  background: var(--color-white);
+  background: var(--surface-card);
   resize: vertical;
 }
 
@@ -55,16 +54,16 @@
   border: 1px solid var(--color-blue-600);
   border-radius: 12px;
   background: var(--color-blue-100);
-  color: var(--color-blue-700);
+  color: var(--status-blue-text);
   font-weight: 600;
   cursor: pointer;
 }
 
 .secondaryButton {
   padding: 10px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-white);
+  background: var(--surface-card);
   cursor: pointer;
 }
 
@@ -72,16 +71,16 @@
   padding: 10px;
   border: 1px solid var(--color-rose-200);
   border-radius: 12px;
-  background: var(--color-white)1f2;
-  color: var(--color-red-700);
+  background: var(--color-white) 1f2;
+  color: var(--status-red-text);
   cursor: pointer;
 }
 
 .smallButton {
   padding: 8px 10px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  background: var(--color-white);
+  background: var(--surface-card);
   cursor: pointer;
   font-size: 13px;
 }
@@ -93,9 +92,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-white);
-  color: var(--color-slate-900);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -131,14 +130,14 @@
   width: 20px;
   left: 4px;
   bottom: 3px;
-  background-color: white;
+  background-color: var(--surface-card);
   transition: 0.2s;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.15);
 }
 
 .switch input:checked + .slider {
-  background-color: var(--switch-on-bg, var(--color-blue-600));
+  background-color: var(--switch-on-bg, var(--accent-primary, #a3e635));
 }
 
 .switch input:checked + .slider:before {

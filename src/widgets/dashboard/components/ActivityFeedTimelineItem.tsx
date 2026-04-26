@@ -34,15 +34,27 @@ const TEACHER_ACTIONS_WITH_BOT_CTA = new Set([
   'TEACHER_TOMORROW_SUMMARY',
 ]);
 
+const resolveCategoryClass = (category: string) => {
+  switch (category) {
+    case 'LESSON':
+      return styles.dotLesson;
+    case 'PAYMENT':
+      return styles.dotPayment;
+    case 'HOMEWORK':
+      return styles.dotHomework;
+    case 'NOTIFICATION':
+      return styles.dotNotification;
+    case 'SETTINGS':
+      return styles.dotSettings;
+    default:
+      return styles.dotDefault;
+  }
+};
+
 export const ActivityFeedTimelineItem: FC<ActivityFeedTimelineItemProps> = ({ item, timeZone, isLast }) => {
   const presentation = buildActivityTimelinePresentation(item, timeZone);
   const botUsername = useTelegramBotUsername();
-  const toneClass =
-    presentation.tone === 'failed'
-      ? styles.dotFailed
-      : presentation.tone === 'info'
-        ? styles.dotInfo
-        : styles.dotSuccess;
+  const toneClass = presentation.tone === 'failed' ? styles.dotFailed : resolveCategoryClass(item.category);
 
   const showBotCta = useMemo(() => {
     if (item.status !== 'FAILED') return false;
@@ -62,12 +74,7 @@ export const ActivityFeedTimelineItem: FC<ActivityFeedTimelineItemProps> = ({ it
         <div className={styles.message}>{renderHighlightedMessage(presentation.message, item.studentName)}</div>
         {presentation.details && <div className={styles.details}>{presentation.details}</div>}
         {showBotCta && botUsername ? (
-          <a
-            className={styles.cta}
-            href={`https://t.me/${botUsername}`}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
+          <a className={styles.cta} href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer noopener">
             Открыть бота в Telegram
           </a>
         ) : null}

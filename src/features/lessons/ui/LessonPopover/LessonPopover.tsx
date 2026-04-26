@@ -1,5 +1,4 @@
-import { addMinutes, format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addMinutes, format, ru } from 'date-fns';
 import { useMemo } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
 import {
@@ -22,9 +21,7 @@ import {
   resolveLessonStatusLabel,
   resolveLessonStatusTone,
 } from '../../../../entities/lesson/lib/lessonStatusPresentation';
-import {
-  resolveLessonEditDisabledReason,
-} from '../../../../entities/lesson/lib/lessonMutationGuards';
+import { resolveLessonEditDisabledReason } from '../../../../entities/lesson/lib/lessonMutationGuards';
 import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import { LessonPopoverPaymentControl } from './LessonPopoverPaymentControl';
 import styles from './LessonPopover.module.css';
@@ -53,7 +50,10 @@ export const LessonPopover = ({
   onClose,
 }: LessonPopoverProps) => {
   const participants = useMemo(() => buildParticipants(lesson, linkedStudentsById), [lesson, linkedStudentsById]);
-  const lessonLabel = useMemo(() => getLessonLabel(participants, linkedStudentsById), [participants, linkedStudentsById]);
+  const lessonLabel = useMemo(
+    () => getLessonLabel(participants, linkedStudentsById),
+    [participants, linkedStudentsById],
+  );
   const isCanceled = lesson.status === 'CANCELED';
   const cancelCopy = resolveLessonCancelActionCopy(lesson);
   const editDisabledReason = resolveLessonEditDisabledReason(lesson);
@@ -90,6 +90,7 @@ export const LessonPopover = ({
             <button
               type="button"
               className={styles.iconButton}
+              aria-label={editDisabledReason ?? 'Редактировать урок'}
               disabled={Boolean(editDisabledReason)}
               onClick={onEditFull}
             >
@@ -100,6 +101,7 @@ export const LessonPopover = ({
             <button
               type="button"
               className={`${styles.iconButton} ${isCanceled ? styles.iconButtonNeutral : styles.iconButtonDanger}`}
+              aria-label={isCanceled ? 'Восстановить урок' : cancelCopy.actionLabel}
               onClick={isCanceled ? onRestore : onCancel}
             >
               {isCanceled ? (
@@ -110,12 +112,17 @@ export const LessonPopover = ({
             </button>
           </Tooltip>
           <Tooltip content="Удалить">
-            <button type="button" className={styles.iconButton} onClick={onDelete}>
+            <button type="button" className={styles.iconButton} aria-label="Удалить урок" onClick={onDelete}>
               <DeleteOutlineIcon className={styles.icon} />
             </button>
           </Tooltip>
           <Tooltip content="Закрыть">
-            <button type="button" className={`${styles.iconButton} ${styles.closeButton}`} onClick={onClose}>
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.closeButton}`}
+              aria-label="Закрыть"
+              onClick={onClose}
+            >
               <CloseIcon className={styles.icon} />
             </button>
           </Tooltip>

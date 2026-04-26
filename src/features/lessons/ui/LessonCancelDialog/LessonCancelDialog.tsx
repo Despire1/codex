@@ -1,5 +1,4 @@
-import { addMinutes, format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addMinutes, format, ru } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
 import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../../entities/lesson/lib/lessonDetails';
@@ -53,7 +52,7 @@ export const LessonCancelDialog = ({
       setRefundMode('KEEP_AS_PAID');
       return;
     }
-    setRefundMode(undefined);
+    setRefundMode('RETURN_TO_BALANCE');
   }, [hasPaidParticipants, open, refundableToBalance]);
 
   if (!lesson) return null;
@@ -107,9 +106,7 @@ export const LessonCancelDialog = ({
                 {!refundableToBalance && <span className={styles.optionHint}>Недоступно для этого урока</span>}
               </span>
             </label>
-            <label
-              className={`${styles.option} ${refundMode === 'KEEP_AS_PAID' ? styles.optionActive : ''}`}
-            >
+            <label className={`${styles.option} ${refundMode === 'KEEP_AS_PAID' ? styles.optionActive : ''}`}>
               <input
                 type="radio"
                 name="refundMode"
@@ -130,12 +127,7 @@ export const LessonCancelDialog = ({
           <button type="button" className={controls.secondaryButton} onClick={onClose}>
             {cancelCopy.cancelText}
           </button>
-          <button
-            type="button"
-            className={controls.dangerButton}
-            disabled={isConfirmDisabled}
-            onClick={handleConfirm}
-          >
+          <button type="button" className={controls.dangerButton} disabled={isConfirmDisabled} onClick={handleConfirm}>
             {cancelCopy.confirmText}
           </button>
         </div>

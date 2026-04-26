@@ -7,6 +7,7 @@ import { ScheduleNoteModal } from '../../../../features/modals/ScheduleNoteModal
 import { useIsMobile } from '../../../../shared/lib/useIsMobile';
 import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { DialogModal } from '../../../../shared/ui/Modal/DialogModal';
+import { Tooltip } from '../../../../shared/ui/Tooltip/Tooltip';
 import styles from './StudentProfileNotesPanel.module.css';
 
 interface StudentProfileNotesPanelProps {
@@ -127,18 +128,24 @@ export const StudentProfileNotesPanel: FC<StudentProfileNotesPanelProps> = ({
               >
                 <div className={styles.noteHeader}>
                   <div className={styles.noteBody}>
-                    <div
-                      className={`${styles.noteIconWrap} ${
-                        tone === 'warning' ? styles.noteIconWrapWarning : styles.noteIconWrapInfo
-                      }`}
-                      aria-hidden
+                    <Tooltip
+                      content={tone === 'warning' ? 'Важная заметка (закреплена сверху)' : 'Информационная заметка'}
+                      align="center"
                     >
-                      {tone === 'warning' ? (
-                        <ThumbtackIcon className={styles.noteIcon} />
-                      ) : (
-                        <InfoCircleIcon className={styles.noteIcon} />
-                      )}
-                    </div>
+                      <div
+                        className={`${styles.noteIconWrap} ${
+                          tone === 'warning' ? styles.noteIconWrapWarning : styles.noteIconWrapInfo
+                        }`}
+                        role="img"
+                        aria-label={tone === 'warning' ? 'Важная заметка' : 'Информационная заметка'}
+                      >
+                        {tone === 'warning' ? (
+                          <ThumbtackIcon className={styles.noteIcon} />
+                        ) : (
+                          <InfoCircleIcon className={styles.noteIcon} />
+                        )}
+                      </div>
+                    </Tooltip>
                     <p className={styles.noteContent}>{note.content}</p>
                   </div>
 

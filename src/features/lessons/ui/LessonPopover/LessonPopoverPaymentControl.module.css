@@ -7,17 +7,20 @@
 .badgeButton {
   border: none;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
 
 .badgeButton:hover {
   transform: translateY(-1px);
   filter: saturate(1.04);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 22px -7px rgba(15, 23, 42, 0.08);
 }
 
 .badgeButtonExpanded {
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.1);
 }
 
 .badgeButton:focus-visible,
@@ -36,7 +39,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .participantTooltip {
@@ -55,13 +58,16 @@
   background: rgba(248, 250, 252, 0.9);
   cursor: pointer;
   text-align: left;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
 .participantButton:hover {
   transform: translateY(-1px);
   border-color: rgba(100, 116, 139, 0.26);
-  background: rgba(255, 255, 255, 1);
+  background: var(--surface-card);
 }
 
 .participantName {
@@ -88,6 +94,6 @@
 }
 
 .participantStatusUnpaid {
-  color: #475569;
+  color: var(--text-secondary);
   background: #e2e8f0;
 }

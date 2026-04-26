@@ -2,7 +2,7 @@
   padding: 32px;
   border: 1px solid #edf0f6;
   border-radius: 32px;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .header {
@@ -18,13 +18,46 @@
   font-size: 26px;
   line-height: 1.1;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
+}
+
+.correctAnswersToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #4a5c8f);
+  cursor: pointer;
+  user-select: none;
+}
+
+.correctAnswersToggle input[type='checkbox'] {
+  cursor: pointer;
+  accent-color: var(--accent-primary, #a3e635);
+}
+
+.choiceRowCorrect {
+  background: #f0fdf4;
+  border-color: #bbf7d0 !important;
+}
+
+.choiceCorrectBadge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .questionsList {
@@ -34,9 +67,9 @@
 
 .questionCard {
   padding: 24px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-default);
   border-radius: 28px;
-  background: #f7f8fc;
+  background: var(--surface-card-strong);
 }
 
 .questionMetaRow {
@@ -58,7 +91,7 @@
 .questionIndex {
   font-size: 12px;
   font-weight: 800;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .kindBadge,
@@ -84,15 +117,15 @@
 }
 
 .pointsBadge {
-  background: #ffffff;
-  color: #475569;
+  background: var(--surface-card);
+  color: var(--text-secondary);
   border: 1px solid #dde3ed;
   white-space: nowrap;
 }
 
 .tone_blue {
   background: #dbeafe;
-  color: #1d4ed8;
+  color: var(--status-blue-text);
 }
 
 .tone_purple {
@@ -102,7 +135,7 @@
 
 .tone_green {
   background: #dcfce7;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .tone_amber {
@@ -119,7 +152,7 @@
   margin: 0 0 16px;
   font-size: 18px;
   line-height: 1.5;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .choiceList,
@@ -138,8 +171,8 @@
   padding: 0 14px;
   border: 1px solid #e0e6ef;
   border-radius: 16px;
-  background: #fff;
-  color: #111827;
+  background: var(--surface-card);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -148,7 +181,7 @@
   height: 18px;
   flex: 0 0 auto;
   border: 2px solid #c3cedd;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
 }
 
 .choiceMarkerRadio {
@@ -182,7 +215,7 @@
 .matchingLabel {
   font-size: 12px;
   font-weight: 800;
-  color: #6b7280;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -191,9 +224,9 @@
   min-height: 52px;
   border: 1px solid #e0e6ef;
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface-card);
   padding: 15px 16px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -206,7 +239,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 10px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 15px;
   line-height: 1.7;
 }
@@ -218,9 +251,9 @@
   min-width: 72px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--surface-card);
   border: 1px dashed #cbd5e1;
-  color: #94a3b8;
+  color: var(--text-faint);
 }
 
 .matchingGrid {
@@ -251,15 +284,15 @@
   padding: 12px 14px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
-  background: #fff;
+  background: var(--surface-card);
   text-align: left;
   font-size: 14px;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .table thead th {
   font-weight: 800;
-  background: #f8fafc;
+  background: var(--surface-card-strong);
 }
 
 .table thead th:first-child {
@@ -290,15 +323,15 @@
   min-width: 62px;
   min-height: 30px;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #94a3b8;
+  background: var(--surface-card-strong);
+  color: var(--text-faint);
   font-size: 12px;
   font-weight: 700;
 }
 
 .helperText {
   margin: 0;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -309,13 +342,13 @@
   gap: 12px;
   padding: 18px;
   border-radius: 20px;
-  background: #f8fafc;
-  color: #6b7280;
+  background: var(--surface-card-strong);
+  color: var(--text-muted);
 }
 
 .emptyState strong {
   display: block;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 14px;
 }
 

@@ -102,7 +102,9 @@ export const MonthDayLessonCard = ({
             <div className={styles.headerInfo}>
               <div className={styles.timeBadge}>
                 <span className={styles.timeStart}>{startTime}</span>
-                <span className={styles.timeDivider} aria-hidden="true" />
+                <span className={styles.timeDivider} aria-hidden="true">
+                  –
+                </span>
                 <span className={styles.timeEnd}>{endTime}</span>
               </div>
 
@@ -160,7 +162,8 @@ export const MonthDayLessonCard = ({
                             onCloseActions();
                           }}
                         >
-                          Перенести урок
+                          <span>Перенести урок</span>
+                          <small className={styles.actionItemHint}>Только дата и время</small>
                         </button>
                       </Tooltip>
 
@@ -175,7 +178,8 @@ export const MonthDayLessonCard = ({
                             onCloseActions();
                           }}
                         >
-                          Редактировать
+                          <span>Редактировать</span>
+                          <small className={styles.actionItemHint}>Ученик, цена, повторы и т.д.</small>
                         </button>
                       </Tooltip>
 
@@ -188,7 +192,8 @@ export const MonthDayLessonCard = ({
                           onCloseActions();
                         }}
                       >
-                        {cancelCopy.actionLabel}
+                        <span>{cancelCopy.actionLabel}</span>
+                        <small className={styles.actionItemHint}>Сохранить в истории, не списывать оплату</small>
                       </button>
                     </>
                   ) : (
@@ -216,7 +221,8 @@ export const MonthDayLessonCard = ({
                         onCloseActions();
                       }}
                     >
-                      Удалить урок
+                      <span>Удалить урок</span>
+                      <small className={styles.actionItemHint}>Полностью убрать запись без следов в истории</small>
                     </button>
                   </Tooltip>
                 </div>

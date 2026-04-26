@@ -1,0 +1,17 @@
+dist
+build
+node_modules
+.next
+.cache
+.vite
+coverage
+public/sw.js
+prisma/migrations
+agent-runtime
+playwright-report
+test-results
+*.lock
+*.log
+*.min.js
+*.min.css
+design-sistem

@@ -29,7 +29,7 @@
   width: min(560px, calc(100vw - 24px));
   margin: 14px 14px 14px 0;
   border-radius: 24px;
-  background: #ffffff;
+  background: var(--surface-card);
   box-shadow:
     0 28px 60px rgba(15, 23, 42, 0.18),
     0 8px 20px rgba(15, 23, 42, 0.08);

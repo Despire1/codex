@@ -1,11 +1,14 @@
 import type { PropsWithChildren } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ToastProvider } from '../../shared/lib/toast';
+import { ThemeProvider } from './ThemeProvider';
 
 export const AppProviders = ({ children }: PropsWithChildren) => {
   return (
-    <BrowserRouter>
-      <ToastProvider>{children}</ToastProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <ToastProvider>{children}</ToastProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 };

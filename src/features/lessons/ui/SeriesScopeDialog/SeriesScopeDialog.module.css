@@ -11,11 +11,11 @@
   align-items: center;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
@@ -35,31 +35,31 @@
 
 .optionTitle {
   font-weight: 600;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .optionDescription {
   font-size: 12px;
   line-height: 1.4;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .summary {
   margin-top: 12px;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--color-slate-600);
+  color: var(--text-secondary);
 }
 
 .notice {
   margin-top: 12px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid var(--color-slate-200);
-  background: var(--color-slate-50);
+  border: 1px solid var(--border-default);
+  background: var(--surface-page);
   font-size: 13px;
   line-height: 1.45;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
 
 .noticeBlocked {

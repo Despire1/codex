@@ -9,8 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { addMinutes, addYears, format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addMinutes, addMonths, format, ru } from 'date-fns';
 import { api } from '../../../shared/api/client';
 import {
   isVisibleLesson,
@@ -30,7 +29,13 @@ import {
   toZonedDate,
 } from '../../../shared/lib/timezoneDates';
 import { hasWeekdayOverlap, isDateInWeekdayList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
-import { Lesson, LessonPaymentHandling, PaymentCancelBehavior, StudentDebtItem, TeacherStudent } from '../../../entities/types';
+import {
+  Lesson,
+  LessonPaymentHandling,
+  PaymentCancelBehavior,
+  StudentDebtItem,
+  TeacherStudent,
+} from '../../../entities/types';
 import type {
   LessonCancelRefundMode,
   LessonModalFocus,
@@ -148,11 +153,7 @@ export type LessonActionsConfig = {
   setDayViewDate: Dispatch<SetStateAction<Date>>;
   filterLessonsForCurrentRange: (lessons: Lesson[]) => Lesson[];
   syncLessonsInRanges: (lessons: Lesson[]) => void;
-  removeLessonsFromRanges: (options: {
-    ids?: number[];
-    recurrenceGroupId?: string | null;
-    startFrom?: Date;
-  }) => void;
+  removeLessonsFromRanges: (options: { ids?: number[]; recurrenceGroupId?: string | null; startFrom?: Date }) => void;
   loadStudentLessons: () => Promise<void>;
   loadStudentLessonsSummary: () => Promise<void>;
   loadStudentUnpaidLessons: (options?: { studentIdOverride?: number | null; force?: boolean }) => Promise<void>;
@@ -180,12 +181,7 @@ export type LessonActionsContextValue = {
   rescheduleModalSubmitting: boolean;
   rescheduleDraft: RescheduleDraft;
   rescheduleLesson: Lesson | null;
-  openLessonModal: (
-    dateISO: string,
-    time?: string,
-    existing?: Lesson,
-    options?: OpenLessonModalOptions,
-  ) => void;
+  openLessonModal: (dateISO: string, time?: string, existing?: Lesson, options?: OpenLessonModalOptions) => void;
   openRescheduleModal: (lesson: Lesson, options?: { skipNavigation?: boolean }) => void;
   closeLessonModal: () => void;
   closeRescheduleModal: () => void;
@@ -209,7 +205,12 @@ export type LessonActionsContextValue = {
     studentId?: number,
     options?: { force?: boolean },
   ) => Promise<{ status: 'sent' | 'error' }>;
-  shiftLessonTime: (lesson: Lesson, minutes: number, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => Promise<void>;
+  shiftLessonTime: (
+    lesson: Lesson,
+    minutes: number,
+    scope: LessonSeriesScope,
+    options?: { skipToast?: boolean },
+  ) => Promise<void>;
   cancelLesson: (
     lesson: Lesson,
     scope: LessonSeriesScope,
@@ -224,10 +225,7 @@ export type LessonActionsContextValue = {
 
 const LessonActionsContext = createContext<LessonActionsContextValue | null>(null);
 
-export const LessonActionsProvider = ({
-  children,
-  value,
-}: PropsWithChildren<{ value: LessonActionsContextValue }>) => {
+export const LessonActionsProvider = ({ children, value }: PropsWithChildren<{ value: LessonActionsContextValue }>) => {
   return <LessonActionsContext.Provider value={value}>{children}</LessonActionsContext.Provider>;
 };
 
@@ -256,9 +254,7 @@ const createLessonDraft = (timeZone: string, defaultDuration: number): LessonDra
 });
 
 const normalizeLessonStudentIds = (studentIds?: number[]) =>
-  Array.from(
-    new Set((studentIds ?? []).filter((studentId) => Number.isInteger(studentId) && studentId > 0)),
-  );
+  Array.from(new Set((studentIds ?? []).filter((studentId) => Number.isInteger(studentId) && studentId > 0)));
 
 const createNewLessonDraft = ({
   timeZone,
@@ -354,12 +350,7 @@ export const useLessonActionsInternal = ({
   }, [teacherDefaultLessonDuration]);
 
   const openLessonModal = useCallback(
-    (
-      dateISO: string,
-      time?: string,
-      existing?: Lesson,
-      options?: OpenLessonModalOptions,
-    ) => {
+    (dateISO: string, time?: string, existing?: Lesson, options?: OpenLessonModalOptions) => {
       if (existing) {
         const disabledReason = resolveLessonEditDisabledReason(existing);
         if (disabledReason) {
@@ -705,13 +696,17 @@ export const useLessonActionsInternal = ({
       scope: LessonSeriesScope,
       meta?: { acknowledgeRisk?: boolean; paymentHandling?: LessonPaymentHandling },
     ) => {
-      const data = await performLessonUpdate(lesson, {
-        startAt,
-        durationMinutes,
+      const data = await performLessonUpdate(
+        lesson,
+        {
+          startAt,
+          durationMinutes,
+          scope,
+          acknowledgeRisk: meta?.acknowledgeRisk,
+          paymentHandling: meta?.paymentHandling,
+        },
         scope,
-        acknowledgeRisk: meta?.acknowledgeRisk,
-        paymentHandling: meta?.paymentHandling,
-      }, scope);
+      );
       return data;
     },
     [performLessonUpdate],
@@ -727,7 +722,8 @@ export const useLessonActionsInternal = ({
         if (scope !== 'SINGLE' && recurrenceGroupId) {
           removeLessonsFromRanges({
             recurrenceGroupId,
-            startFrom: scope === 'FOLLOWING' && editingLessonOriginal ? new Date(editingLessonOriginal.startAt) : new Date(),
+            startFrom:
+              scope === 'FOLLOWING' && editingLessonOriginal ? new Date(editingLessonOriginal.startAt) : new Date(),
           });
         } else if (editingLessonId) {
           removeLessonsFromRanges({ ids: [editingLessonId] });
@@ -740,7 +736,7 @@ export const useLessonActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить урок';
         showInfoDialog('Ошибка', message);
-         
+
         console.error('Failed to delete lesson', error);
       }
     },
@@ -856,8 +852,8 @@ export const useLessonActionsInternal = ({
 
           const timeChanged = Boolean(
             original &&
-              (new Date(original.startAt).getTime() !== new Date(startAt).getTime() ||
-                original.durationMinutes !== durationMinutes),
+            (new Date(original.startAt).getTime() !== new Date(startAt).getTime() ||
+              original.durationMinutes !== durationMinutes),
           );
 
           const repeatUntilPayload =
@@ -957,7 +953,7 @@ export const useLessonActionsInternal = ({
                 .catch((error) => {
                   const message = error instanceof Error ? error.message : 'Не удалось сохранить изменения';
                   showInfoDialog('Ошибка', message);
-                   
+
                   console.error('Failed to update lesson', error);
                 })
                 .finally(() => {
@@ -978,7 +974,7 @@ export const useLessonActionsInternal = ({
           const resolvedRepeatUntil = lessonDraft.repeatUntil
             ? toUtcEndOfDay(lessonDraft.repeatUntil, timeZone).toISOString()
             : toUtcEndOfDay(
-                formatInTimeZone(addYears(new Date(startAt), 1), 'yyyy-MM-dd', { timeZone }),
+                formatInTimeZone(addMonths(new Date(startAt), 3), 'yyyy-MM-dd', { timeZone }),
                 timeZone,
               ).toISOString();
 
@@ -1033,7 +1029,7 @@ export const useLessonActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось создать урок';
         showInfoDialog('Ошибка', message);
-         
+
         console.error('Failed to create lesson', error);
         if (!editingLessonId) {
           onLessonCreateError?.(error, lessonModalContext.source);
@@ -1090,8 +1086,7 @@ export const useLessonActionsInternal = ({
 
     const startAtDate = toUtcDateFromTimeZone(rescheduleDraft.date, rescheduleDraft.time, timeZone);
     const startAt = startAtDate.toISOString();
-    const timeChanged =
-      startAt !== rescheduleLesson.startAt || durationMinutes !== rescheduleLesson.durationMinutes;
+    const timeChanged = startAt !== rescheduleLesson.startAt || durationMinutes !== rescheduleLesson.durationMinutes;
 
     if (!timeChanged) {
       closeRescheduleModal();
@@ -1170,7 +1165,7 @@ export const useLessonActionsInternal = ({
             })
             .catch((error) => {
               showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-               
+
               console.error('Failed to reschedule lesson', error);
             })
             .finally(() => {
@@ -1183,7 +1178,7 @@ export const useLessonActionsInternal = ({
       }
     } catch (error) {
       showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-       
+
       console.error('Failed to reschedule lesson', error);
       setRescheduleModalSubmitting(false);
     }
@@ -1215,7 +1210,10 @@ export const useLessonActionsInternal = ({
   );
 
   const openCreateLessonForStudent = useCallback(
-    (studentId?: number, options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean }) => {
+    (
+      studentId?: number,
+      options?: { source?: LessonActionSource; variant?: ModalVariant; skipNavigation?: boolean },
+    ) => {
       if (studentId) {
         setSelectedStudentId((prev) => prev ?? studentId);
       }
@@ -1244,7 +1242,6 @@ export const useLessonActionsInternal = ({
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
       } catch (error) {
-         
         console.error('Failed to delete lesson', error);
       }
     },
@@ -1329,7 +1326,7 @@ export const useLessonActionsInternal = ({
           message: 'Не удалось отметить занятие проведённым',
           variant: 'error',
         });
-         
+
         console.error('Failed to complete lesson', error);
       }
     },
@@ -1355,9 +1352,7 @@ export const useLessonActionsInternal = ({
         syncLessonsInRanges([mergedLesson]);
 
         if (data.links && data.links.length > 0) {
-          const previousLinks = new Map(
-            links.map((link) => [`${link.teacherId}_${link.studentId}`, link]),
-          );
+          const previousLinks = new Map(links.map((link) => [`${link.teacherId}_${link.studentId}`, link]));
           const chargedLinks = data.links.filter((link) => {
             const previous = previousLinks.get(`${link.teacherId}_${link.studentId}`);
             return previous ? link.balanceLessons < previous.balanceLessons : false;
@@ -1382,7 +1377,6 @@ export const useLessonActionsInternal = ({
         await loadStudentLessonsSummary();
         await loadDashboardUnpaidLessons();
       } catch (error) {
-         
         console.error('Failed to update lesson status', error);
       }
     },
@@ -1420,7 +1414,7 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось изменить время', variant: 'error' });
-         
+
         console.error('Failed to shift lesson time', error);
       }
     },
@@ -1442,7 +1436,7 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось восстановить урок', variant: 'error' });
-         
+
         console.error('Failed to restore lesson', error);
       }
     },
@@ -1485,7 +1479,7 @@ export const useLessonActionsInternal = ({
         }
       } catch (error) {
         showToast({ message: 'Не удалось отменить урок', variant: 'error' });
-         
+
         console.error('Failed to cancel lesson', error);
       }
     },
@@ -1510,10 +1504,12 @@ export const useLessonActionsInternal = ({
       if (state.request.kind === 'delete') {
         requestLessonDeleteResolution({
           hasPaidLessons:
-            (selectedPreview?.paidCount ?? (scope === 'SINGLE' && resolveLessonHasPaidParticipant(state.lesson) ? 1 : 0)) > 0,
+            (selectedPreview?.paidCount ??
+              (scope === 'SINGLE' && resolveLessonHasPaidParticipant(state.lesson) ? 1 : 0)) > 0,
           affectsSeries: scope !== 'SINGLE',
           onConfirm: (refundMode) => {
-            void api.deleteLesson(state.lesson.id, { scope, refundMode })
+            void api
+              .deleteLesson(state.lesson.id, { scope, refundMode })
               .then(async (data) => {
                 if (scope !== 'SINGLE' && state.lesson.recurrenceGroupId) {
                   removeLessonsFromRanges({
@@ -1532,7 +1528,7 @@ export const useLessonActionsInternal = ({
               })
               .catch((error) => {
                 showToast({ message: 'Не удалось удалить урок', variant: 'error' });
-                 
+
                 console.error('Failed to confirm lesson series scope', error);
                 if (state.reopenModal === 'reschedule') {
                   setRescheduleModalOpen(true);
@@ -1571,8 +1567,7 @@ export const useLessonActionsInternal = ({
             scope,
           )
             .then(() => {
-              const successMessage =
-                state.action === 'RESCHEDULE' ? 'Урок перенесён' : 'Изменения сохранены';
+              const successMessage = state.action === 'RESCHEDULE' ? 'Урок перенесён' : 'Изменения сохранены';
               showToast({ message: successMessage, variant: 'success' });
 
               if (state.action === 'RESCHEDULE') {
@@ -1583,11 +1578,9 @@ export const useLessonActionsInternal = ({
             })
             .catch((error) => {
               const message =
-                state.action === 'RESCHEDULE'
-                  ? 'Не удалось перенести урок'
-                  : 'Не удалось сохранить изменения';
+                state.action === 'RESCHEDULE' ? 'Не удалось перенести урок' : 'Не удалось сохранить изменения';
               showToast({ message, variant: 'error' });
-               
+
               console.error('Failed to confirm lesson series scope', error);
               if (state.reopenModal === 'reschedule') {
                 setRescheduleModalOpen(true);
@@ -1746,8 +1739,8 @@ export const useLessonActionsInternal = ({
       const isCurrentlyPaid =
         options?.currentIsPaid ??
         (studentId !== undefined
-          ? targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false
-          : targetLesson?.isPaid ?? false);
+          ? (targetLesson?.participants?.find((participant) => participant.studentId === studentId)?.isPaid ?? false)
+          : (targetLesson?.isPaid ?? false));
 
       if (isCurrentlyPaid) {
         openPaymentCancelDialog({
@@ -1782,7 +1775,14 @@ export const useLessonActionsInternal = ({
 
       await markPaidWithBalance(lessonId, studentId, false);
     },
-    [applyTogglePaid, lessons, markPaidWithBalance, openPaymentBalanceDialog, openPaymentCancelDialog, resolvePaymentTarget],
+    [
+      applyTogglePaid,
+      lessons,
+      markPaidWithBalance,
+      openPaymentBalanceDialog,
+      openPaymentCancelDialog,
+      resolvePaymentTarget,
+    ],
   );
 
   const undoMarkPaid = useCallback(
@@ -1846,7 +1846,7 @@ export const useLessonActionsInternal = ({
             ? 'Ученик не активировал бота — отправка напоминаний невозможна'
             : 'Не удалось отправить напоминание';
         showToast({ message, variant: 'error' });
-         
+
         console.error('Failed to send payment reminder', error);
         return { status: 'error' as const };
       }

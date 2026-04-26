@@ -2,7 +2,7 @@
   padding: 32px;
   border: 1px solid #edf0f6;
   border-radius: 32px;
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .cardPlain {
@@ -26,7 +26,7 @@
   font-size: 14px;
   line-height: 1.4;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .required {
@@ -37,12 +37,15 @@
   width: 100%;
   border: 1px solid #e6eaf1;
   border-radius: 18px;
-  background: #f7f8fc;
+  background: var(--surface-card-strong);
   padding: 15px 18px;
   font: inherit;
-  color: #111827;
+  color: var(--text-primary);
   outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
 }
 
 .input::placeholder {
@@ -52,7 +55,7 @@
 .input:focus {
   border-color: #a3e635;
   box-shadow: 0 0 0 4px rgba(163, 230, 53, 0.18);
-  background: #fff;
+  background: var(--surface-card);
 }
 
 .inputError {

@@ -171,9 +171,7 @@ export const createHomeworkV2Service = ({
       orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }, { id: 'desc' }],
     });
 
-    const groupIds = groups
-      .map((group: any) => Number(group.id))
-      .filter((id: number) => Number.isFinite(id) && id > 0);
+    const groupIds = groups.map((group: any) => Number(group.id)).filter((id: number) => Number.isFinite(id) && id > 0);
     const countsRows = groupIds.length
       ? await (prisma as any).homeworkAssignment.groupBy({
           by: ['groupId'],
@@ -359,10 +357,7 @@ export const createHomeworkV2Service = ({
     return defaultMetaByTemplateId;
   };
 
-  const listHomeworkTemplatesV2 = async (
-    user: User,
-    params: { query?: string | null; includeArchived?: boolean },
-  ) => {
+  const listHomeworkTemplatesV2 = async (user: User, params: { query?: string | null; includeArchived?: boolean }) => {
     const teacher = await ensureTeacher(user);
     const query = params.query?.trim() ?? '';
     const where: Record<string, unknown> = {
@@ -448,7 +443,8 @@ export const createHomeworkV2Service = ({
     const nextBlocks = hasBlocksUpdate
       ? (normalizeHomeworkBlocks(body.blocks) as unknown as HomeworkBlock[])
       : (normalizeHomeworkBlocks(template.blocks) as unknown as HomeworkBlock[]);
-    const nextTags = 'tags' in body ? normalizeHomeworkTemplateTags(body.tags) : normalizeHomeworkTemplateTags(template.tags);
+    const nextTags =
+      'tags' in body ? normalizeHomeworkTemplateTags(body.tags) : normalizeHomeworkTemplateTags(template.tags);
     const normalizedCurrentTags = normalizeHomeworkTemplateTags(template.tags);
     const currentTagsWithoutFavorite = normalizedCurrentTags.filter((tag) => tag.trim().toLowerCase() !== '__favorite');
     const nextTagsWithoutFavorite = nextTags.filter((tag) => tag.trim().toLowerCase() !== '__favorite');
@@ -647,7 +643,7 @@ export const createHomeworkV2Service = ({
     });
     const sorted = sortHomeworkAssignmentsV2(filtered, sort);
     const pagedItems = shouldSortInMemory ? sorted.slice(offset, offset + limit) : sorted;
-    const resolvedTotal = shouldSortInMemory ? sorted.length : total ?? sorted.length;
+    const resolvedTotal = shouldSortInMemory ? sorted.length : (total ?? sorted.length);
     return {
       items: pagedItems.map((item: any) => serializeHomeworkAssignmentV2(item, now)),
       total: resolvedTotal,
@@ -727,7 +723,10 @@ export const createHomeworkV2Service = ({
       .filter((assignment: any) => {
         const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
         const reviewedAt = toValidDate(assignment.reviewedAt);
-        return workflow.status === 'REVIEWED' && Boolean(reviewedAt && reviewedAt >= scoreWindowStart && reviewedAt <= todayEnd);
+        return (
+          workflow.status === 'REVIEWED' &&
+          Boolean(reviewedAt && reviewedAt >= scoreWindowStart && reviewedAt <= todayEnd)
+        );
       })
       .map((item: any) => {
         const raw = item.finalScore ?? item.manualScore ?? item.autoScore;
@@ -756,7 +755,12 @@ export const createHomeworkV2Service = ({
       if (workflow.needsStudentAction && !workflow.isOverdue) inProgressCount += 1;
       if (workflow.hasConfigError) configErrorCount += 1;
       if (workflow.status === 'RETURNED') returnedCount += 1;
-      if (workflow.needsTeacherAction || workflow.status === 'RETURNED' || workflow.isOverdue || workflow.hasConfigError) {
+      if (
+        workflow.needsTeacherAction ||
+        workflow.status === 'RETURNED' ||
+        workflow.isOverdue ||
+        workflow.hasConfigError
+      ) {
         inboxCount += 1;
       }
       if (workflow.needsStudentAction && deadlineAt && deadlineAt >= todayStart && deadlineAt <= todayEnd) {
@@ -860,14 +864,16 @@ export const createHomeworkV2Service = ({
     // TEA-24: Идемпотентность создания черновика из шаблона.
     // Если для (teacher, student, template) уже есть неотправленный DRAFT — переиспользуем его,
     // чтобы не плодить дубликатов (частый сценарий: открыли «Выдать из шаблона» дважды).
-    if (template?.id && resolvedStatus === 'DRAFT') {
+    if (resolvedStatus === 'DRAFT') {
+      const baseDraftWhere = {
+        teacherId: teacher.chatId,
+        studentId,
+        status: 'DRAFT' as const,
+      };
       const existingDraft = await (prisma as any).homeworkAssignment.findFirst({
-        where: {
-          teacherId: teacher.chatId,
-          studentId,
-          templateId: template.id,
-          status: 'DRAFT',
-        },
+        where: template?.id
+          ? { ...baseDraftWhere, templateId: template.id }
+          : { ...baseDraftWhere, title: resolvedTitle },
         orderBy: { updatedAt: 'desc' },
       });
       if (existingDraft) {
@@ -1268,11 +1274,7 @@ export const createHomeworkV2Service = ({
     const teacher = await ensureTeacher(user);
     const ids = Array.isArray(body.ids)
       ? Array.from(
-          new Set(
-            body.ids
-              .map((value) => Number(value))
-              .filter((value) => Number.isFinite(value) && value > 0),
-          ),
+          new Set(body.ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)),
         )
       : [];
     if (!ids.length) throw new Error('ids обязательны');
@@ -1682,7 +1684,7 @@ export const createHomeworkV2Service = ({
     const autoScore = clampHomeworkScore(body.autoScore ?? submission.autoScore ?? assignment.autoScore);
     const manualScore = clampHomeworkScore(body.manualScore ?? submission.manualScore ?? assignment.manualScore);
     const overrideFinal = clampHomeworkScore(body.finalScore);
-    const finalScore = overrideFinal ?? (manualScore ?? autoScore);
+    const finalScore = overrideFinal ?? manualScore ?? autoScore;
     const now = new Date();
     const reviewDraft = normalizeHomeworkReviewDraftV2(submission.reviewDraft);
     const reviewResult = buildHomeworkReviewResultV2({

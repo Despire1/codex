@@ -20,13 +20,13 @@
   font-size: 22px;
   line-height: 1.15;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .welcomeDate {
   margin: 0;
   font-size: 13px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .heroCard {
@@ -92,8 +92,8 @@
 
 .statCard {
   border-radius: 20px;
-  border: 1px solid var(--color-gray-100);
-  background: var(--color-white);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
   padding: 14px;
   box-shadow: 0 8px 18px var(--shadow-slate-900-06);
   display: grid;
@@ -112,7 +112,7 @@
 
 .statIconGreen {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .statIconBlue {
@@ -122,7 +122,7 @@
 
 .statIconOrange {
   background: #fff7ed;
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .statIconPurple {
@@ -135,13 +135,13 @@
   font-size: 30px;
   line-height: 1.1;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .statLabel {
   margin: 0;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .sectionHeader {
@@ -156,7 +156,7 @@
   font-size: 22px;
   line-height: 1.2;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .sectionAction {
@@ -184,9 +184,9 @@
 }
 
 .quickAction {
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -221,19 +221,19 @@
 
 .quickActionGreen {
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
 }
 
 .quickActionTitle {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .quickActionSubtitle {
   margin-top: -6px;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .attentionList {
@@ -242,9 +242,9 @@
 }
 
 .attentionCard {
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   border-radius: 18px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 14px;
   display: flex;
   align-items: flex-start;
@@ -269,7 +269,7 @@
 
 .attentionIconOrange {
   background: #fff7ed;
-  color: #c2410c;
+  color: var(--status-orange-text);
 }
 
 .attentionIconBlue {
@@ -286,13 +286,13 @@
 .attentionBody h3 {
   margin: 0;
   font-size: 14px;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .attentionBody p {
   margin: 0;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .attentionAction {
@@ -308,7 +308,7 @@
 .attentionEmpty {
   margin: 0;
   font-size: 13px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .weekList {
@@ -317,9 +317,9 @@
 }
 
 .weekDayCard {
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   border-radius: 18px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -335,13 +335,13 @@
 .weekDayHeader h3 {
   margin: 0;
   font-size: 14px;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .weekDayHeader span {
   border-radius: 10px;
   background: #ecfdf3;
-  color: #15803d;
+  color: var(--status-green-text);
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 700;
@@ -386,26 +386,26 @@
 
 .weekLessonText strong {
   font-size: 12px;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .weekLessonText small {
   font-size: 11px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .weekEmpty,
 .upcomingEmpty {
   margin: 0;
   font-size: 13px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .unpaidSection {
   border-radius: 18px;
-  background: var(--color-white);
-  border: 1px solid var(--color-gray-100);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
   padding: 14px;
 }
 
@@ -415,10 +415,10 @@
 }
 
 .upcomingCard {
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
   border-left-width: 4px;
   border-radius: 16px;
-  background: var(--color-white);
+  background: var(--surface-card);
   padding: 14px;
   text-align: left;
   display: grid;
@@ -447,13 +447,13 @@
 .upcomingTop h3 {
   margin: 0;
   font-size: 14px;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .upcomingTop p {
   margin: 3px 0 0;
   font-size: 12px;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
 }
 
 .upcomingTop span {
@@ -471,7 +471,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  color: var(--color-gray-500);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -507,12 +507,12 @@
 .lessonSheetTitle {
   font-size: 16px;
   font-weight: 700;
-  color: var(--color-slate-900);
+  color: var(--text-primary);
 }
 
 .lessonSheetMeta {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .sheetActions {
@@ -529,21 +529,21 @@
 }
 
 .sheetAction {
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   min-height: 44px;
   padding: 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
   text-align: center;
 }
 
 .sheetAction:disabled {
   cursor: not-allowed;
   color: var(--color-slate-400);
-  background: var(--color-slate-100);
+  background: var(--surface-card-muted);
 }
 
 .sheetActionDanger {
@@ -558,13 +558,13 @@
   min-height: 40px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .sheetHelper {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .bottomSpacer {

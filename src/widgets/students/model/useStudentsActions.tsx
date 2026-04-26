@@ -109,10 +109,20 @@ export const useStudentsActions = () => {
   return context;
 };
 
+const DEFAULT_STUDENT_PRICE_KEY = 'tb_default_student_price';
+
+const readDefaultStudentPrice = (): string => {
+  if (typeof window === 'undefined') return '';
+  const stored = window.localStorage.getItem(DEFAULT_STUDENT_PRICE_KEY);
+  if (!stored) return '';
+  const parsed = Number(stored);
+  return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
+};
+
 const createEmptyDraft = (): StudentDraft => ({
   customName: '',
   username: '',
-  pricePerLesson: '',
+  pricePerLesson: readDefaultStudentPrice(),
   email: '',
   phone: '',
   studentLevel: '',
@@ -160,11 +170,7 @@ export const useStudentsActionsInternal = ({
   const studentEmailSuggestions = useMemo(
     () =>
       Array.from(
-        new Set(
-          links
-            .map((link) => normalizeEmail(link.email))
-            .filter((value): value is string => Boolean(value)),
-        ),
+        new Set(links.map((link) => normalizeEmail(link.email)).filter((value): value is string => Boolean(value))),
       ),
     [links],
   );
@@ -185,33 +191,32 @@ export const useStudentsActionsInternal = ({
     [resetStudentDraft],
   );
 
-  const openEditStudentModal = useCallback((options?: {
-    studentId?: number;
-    variant?: ModalVariant;
-    focusField?: StudentModalFocusField;
-  }) => {
-    const targetStudentId = options?.studentId ?? selectedStudentId;
-    if (!targetStudentId) return;
-    const student = students.find((entry) => entry.id === targetStudentId);
-    const link = links.find((entry) => entry.studentId === targetStudentId && !entry.isArchived);
-    if (!student || !link) return;
-    setNewStudentDraft({
-      customName: link.customName,
-      username: student.username ?? '',
-      pricePerLesson: typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
-      email: link.email ?? '',
-      phone: link.phone ?? '',
-      studentLevel: link.studentLevel ?? '',
-      learningGoal: link.learningGoal ?? '',
-      notes: getStudentPrimaryNoteText(link.notes),
-    });
-    setSelectedStudentId(targetStudentId);
-    setEditingStudentId(targetStudentId);
-    setStudentModalSource('default');
-    setStudentModalVariant(options?.variant ?? 'modal');
-    setStudentModalFocusField(options?.focusField ?? null);
-    setStudentModalOpen(true);
-  }, [links, selectedStudentId, setSelectedStudentId, students]);
+  const openEditStudentModal = useCallback(
+    (options?: { studentId?: number; variant?: ModalVariant; focusField?: StudentModalFocusField }) => {
+      const targetStudentId = options?.studentId ?? selectedStudentId;
+      if (!targetStudentId) return;
+      const student = students.find((entry) => entry.id === targetStudentId);
+      const link = links.find((entry) => entry.studentId === targetStudentId && !entry.isArchived);
+      if (!student || !link) return;
+      setNewStudentDraft({
+        customName: link.customName,
+        username: student.username ?? '',
+        pricePerLesson: typeof link.pricePerLesson === 'number' ? String(link.pricePerLesson) : '',
+        email: link.email ?? '',
+        phone: link.phone ?? '',
+        studentLevel: link.studentLevel ?? '',
+        learningGoal: link.learningGoal ?? '',
+        notes: getStudentPrimaryNoteText(link.notes),
+      });
+      setSelectedStudentId(targetStudentId);
+      setEditingStudentId(targetStudentId);
+      setStudentModalSource('default');
+      setStudentModalVariant(options?.variant ?? 'modal');
+      setStudentModalFocusField(options?.focusField ?? null);
+      setStudentModalOpen(true);
+    },
+    [links, selectedStudentId, setSelectedStudentId, students],
+  );
 
   const closeStudentModal = useCallback(() => {
     setStudentModalOpen(false);
@@ -285,7 +290,6 @@ export const useStudentsActionsInternal = ({
       }
       onStudentCreated?.({ student, link, source: studentModalSource });
     } catch (error) {
-       
       console.error('Failed to add student', error);
       onStudentCreateError?.(error, studentModalSource);
     } finally {
@@ -351,15 +355,12 @@ export const useStudentsActionsInternal = ({
 
       setStudents((prev) => prev.map((s) => (s.id === data.student.id ? data.student : s)));
       setLinks((prev) =>
-        prev.map((l) =>
-          l.studentId === data.link.studentId && l.teacherId === data.link.teacherId ? data.link : l,
-        ),
+        prev.map((l) => (l.studentId === data.link.studentId && l.teacherId === data.link.teacherId ? data.link : l)),
       );
       resetStudentDraft();
       closeStudentModal();
       triggerStudentsListReload();
     } catch (error) {
-       
       console.error('Failed to update student', error);
     } finally {
       setIsStudentSubmitting(false);
@@ -406,7 +407,7 @@ export const useStudentsActionsInternal = ({
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Не удалось удалить ученика';
         showInfoDialog('Ошибка', message);
-         
+
         console.error('Failed to delete student', error);
       }
     },
@@ -456,7 +457,6 @@ export const useStudentsActionsInternal = ({
       setPriceEditState({ id: null, value: '' });
       triggerStudentsListReload();
     } catch (error) {
-       
       console.error('Failed to update price', error);
     }
   }, [priceEditState.id, priceEditState.value, setLinks, triggerStudentsListReload]);
@@ -495,7 +495,6 @@ export const useStudentsActionsInternal = ({
         await refreshPayments(studentId);
         triggerStudentsListReload();
       } catch (error) {
-         
         console.error('Failed to adjust balance', error);
       }
     },

@@ -1,10 +1,6 @@
 import { FC, KeyboardEvent, MouseEvent, ReactNode, useMemo, useState } from 'react';
-import {
-  canCancelHomeworkAssignmentIssue,
-} from '../../../../../entities/homework-assignment/model/lib/assignmentIssuance';
-import {
-  canReissueHomeworkAssignment,
-} from '../../../../../entities/homework-assignment/model/lib/workflow';
+import { canCancelHomeworkAssignmentIssue } from '../../../../../entities/homework-assignment/model/lib/assignmentIssuance';
+import { canReissueHomeworkAssignment } from '../../../../../entities/homework-assignment/model/lib/workflow';
 import { HomeworkAssignment } from '../../../../../entities/types';
 import { AnchoredPopover } from '../../../../../shared/ui/AnchoredPopover/AnchoredPopover';
 import {
@@ -92,60 +88,69 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
   const canReissue = canReissueHomeworkAssignment(assignment);
   const canRemind = assignment.status === 'SENT' || assignment.status === 'RETURNED' || assignment.status === 'OVERDUE';
 
-  const menuItems = useMemo(
-    () => {
-      const items: Array<HomeworkAssignmentMenuAction | null> = [
-        {
-          id: 'open',
-          label: 'Открыть',
-          icon: <HomeworkPenIcon size={12} />,
-          onSelect: () => onOpen(assignment),
-        },
-        canSendNow
-          ? {
-              id: 'send',
-              label: 'Выдать сейчас',
-              icon: <HomeworkPaperPlaneIcon size={12} />,
-              onSelect: () => onSendNow(assignment),
-            }
-          : null,
-        canCancelIssue
-          ? {
-              id: 'cancel',
-              label: 'Отменить выдачу',
-              icon: <HomeworkPaperPlaneIcon size={12} />,
-              onSelect: () => onCancelIssue(assignment),
-            }
-          : null,
-        canReissue
-          ? {
-              id: 'reissue',
-              label: 'Переоткрыть домашку',
-              icon: <HomeworkRotateRightIcon size={12} />,
-              onSelect: () => onReissue(assignment),
-            }
-          : null,
-        canRemind
-          ? {
-              id: 'remind',
-              label: 'Напомнить ученику',
-              icon: <HomeworkBellRegularIcon size={12} />,
-              onSelect: () => onRemind(assignment),
-            }
-          : null,
-        {
-          id: 'delete',
-          label: 'Удалить',
-          icon: <HomeworkTrashIcon size={12} />,
-          danger: true,
-          onSelect: () => onDelete(assignment),
-        },
-      ];
+  const menuItems = useMemo(() => {
+    const items: Array<HomeworkAssignmentMenuAction | null> = [
+      {
+        id: 'open',
+        label: 'Открыть',
+        icon: <HomeworkPenIcon size={12} />,
+        onSelect: () => onOpen(assignment),
+      },
+      canSendNow
+        ? {
+            id: 'send',
+            label: 'Выдать сейчас',
+            icon: <HomeworkPaperPlaneIcon size={12} />,
+            onSelect: () => onSendNow(assignment),
+          }
+        : null,
+      canCancelIssue
+        ? {
+            id: 'cancel',
+            label: 'Отменить выдачу',
+            icon: <HomeworkPaperPlaneIcon size={12} />,
+            onSelect: () => onCancelIssue(assignment),
+          }
+        : null,
+      canReissue
+        ? {
+            id: 'reissue',
+            label: 'Переоткрыть домашку',
+            icon: <HomeworkRotateRightIcon size={12} />,
+            onSelect: () => onReissue(assignment),
+          }
+        : null,
+      canRemind
+        ? {
+            id: 'remind',
+            label: 'Напомнить ученику',
+            icon: <HomeworkBellRegularIcon size={12} />,
+            onSelect: () => onRemind(assignment),
+          }
+        : null,
+      {
+        id: 'delete',
+        label: 'Удалить',
+        icon: <HomeworkTrashIcon size={12} />,
+        danger: true,
+        onSelect: () => onDelete(assignment),
+      },
+    ];
 
-      return items.filter((item): item is HomeworkAssignmentMenuAction => item !== null);
-    },
-    [assignment, canCancelIssue, canRemind, canReissue, canSendNow, onCancelIssue, onDelete, onOpen, onReissue, onRemind, onSendNow],
-  );
+    return items.filter((item): item is HomeworkAssignmentMenuAction => item !== null);
+  }, [
+    assignment,
+    canCancelIssue,
+    canRemind,
+    canReissue,
+    canSendNow,
+    onCancelIssue,
+    onDelete,
+    onOpen,
+    onReissue,
+    onRemind,
+    onSendNow,
+  ]);
 
   const handleOpen = () => {
     onOpen(assignment);
@@ -164,7 +169,9 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
 
   return (
     <article
-      className={`${styles.card} ${viewMode === 'list' ? styles.cardList : ''}`}
+      className={`${styles.card} ${viewMode === 'list' ? styles.cardList : ''} ${
+        assignment.status === 'OVERDUE' || assignment.isOverdue ? styles.cardOverdue : ''
+      }`}
       tabIndex={0}
       role="button"
       onClick={handleOpen}
@@ -174,7 +181,9 @@ export const HomeworkAssignmentCard: FC<HomeworkAssignmentCardProps> = ({
       <div className={styles.cardBody}>
         <div className={styles.head}>
           <div className={styles.headLeft}>
-            <span className={`${styles.categoryBadge} ${styles[`categoryBadge${categoryTone[0].toUpperCase()}${categoryTone.slice(1)}`]}`}>
+            <span
+              className={`${styles.categoryBadge} ${styles[`categoryBadge${categoryTone[0].toUpperCase()}${categoryTone.slice(1)}`]}`}
+            >
               {categoryLabel}
             </span>
           </div>

@@ -4,7 +4,7 @@
   right: 0;
   bottom: 0;
   z-index: 35;
-  background: #ffffff;
+  background: var(--surface-card);
   border-top: 1px solid #e7ecf4;
   padding: 8px 12px calc(8px + var(--app-safe-bottom));
 }

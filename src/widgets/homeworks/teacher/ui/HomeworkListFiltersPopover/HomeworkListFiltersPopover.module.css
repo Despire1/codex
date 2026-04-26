@@ -1,9 +1,9 @@
 .popover {
   min-width: 320px;
-  background: var(--color-white);
-  border: 1px solid var(--color-slate-200);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 18px 38px -12px rgba(15, 23, 42, 0.14);
   padding: 14px;
 }
 
@@ -28,7 +28,7 @@
 .label {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .select {
@@ -36,16 +36,16 @@
   min-height: 42px;
   border: 1px solid #dbe3ef;
   border-radius: 12px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
   font-size: 14px;
   padding: 0 12px;
   outline: none;
 }
 
 .select:focus {
-  border-color: #94a3b8;
-  background: var(--color-white);
+  border-color: var(--text-faint);
+  background: var(--surface-card);
 }
 
 .actions {
@@ -56,8 +56,8 @@
 .resetButton {
   border: 1px solid #dbe3ef;
   border-radius: 12px;
-  background: var(--color-white);
-  color: #475569;
+  background: var(--surface-card);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
   padding: 9px 12px;
@@ -71,28 +71,31 @@
 
 .triggerButton {
   min-height: 40px;
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: var(--color-white);
-  color: var(--color-slate-700);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 0 12px;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .triggerButton:hover {
-  background: var(--color-slate-50);
+  background: var(--surface-page);
   border-color: var(--color-slate-300);
 }
 
 .triggerButtonActive {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #0f172a;
+  border-color: var(--border-strong);
+  background: var(--surface-card-strong);
+  color: var(--text-primary);
 }
 
 .triggerMain {
@@ -112,7 +115,7 @@
   height: 18px;
   border-radius: 999px;
   background: #e2e8f0;
-  color: #334155;
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 800;
   display: inline-flex;

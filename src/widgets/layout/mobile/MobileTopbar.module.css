@@ -7,7 +7,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 14px 16px;
-  background: var(--color-white);
+  background: var(--surface-card);
   border-bottom: 1px solid var(--color-gray-100);
 }
 
@@ -23,8 +23,8 @@
   height: 40px;
   border: none;
   border-radius: 12px;
-  background: var(--color-gray-50);
-  color: var(--color-slate-600);
+  background: var(--surface-card-strong);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -47,7 +47,7 @@
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -55,7 +55,7 @@
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--color-gray-900);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -72,9 +72,9 @@
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  border: 1px solid var(--color-gray-200);
-  background: var(--color-white);
-  color: var(--color-slate-600);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -112,5 +112,5 @@
 .avatarFallback {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-slate-700);
+  color: var(--text-secondary);
 }
