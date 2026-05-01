@@ -1,4 +1,5 @@
-import ru, { addDays, isSameDay } from 'date-fns';
+import { addDays, isSameDay } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import { FC, ReactNode, UIEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {

@@ -1,4 +1,4 @@
-import ru, {
+import {
   addDays,
   addMonths,
   addYears,
@@ -13,6 +13,7 @@ import ru, {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import type { Locale } from 'date-fns';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';

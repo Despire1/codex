@@ -1,4 +1,5 @@
-import ru, { format } from 'date-fns';
+import { format } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import {
   ChangeEvent,
   type KeyboardEvent,

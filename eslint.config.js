@@ -64,7 +64,9 @@ export default tseslint.config(
       'no-useless-escape': 'warn',
 
       // import-plugin — мягкие правила, чтобы не утопить codebase в warning'ах.
-      'import/no-duplicates': 'warn',
+      // no-duplicates отключено: TS-резолвер ошибочно сливает 'date-fns' и 'date-fns/locale/ru'
+      // в один модуль, ломая обходной импорт `ru` (который не экспортируется из корня в v2).
+      'import/no-duplicates': 'off',
       'import/no-cycle': ['warn', { maxDepth: 1, ignoreExternal: true }],
     },
   },

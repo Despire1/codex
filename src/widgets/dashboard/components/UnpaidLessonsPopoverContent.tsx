@@ -1,4 +1,5 @@
-import ru, { formatDistanceToNowStrict } from 'date-fns';
+import { formatDistanceToNowStrict } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import { formatInTimeZone } from '../../../shared/lib/timezoneDates';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import controls from '../../../shared/styles/controls.module.css';

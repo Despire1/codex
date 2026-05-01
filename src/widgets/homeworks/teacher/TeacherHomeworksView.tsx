@@ -3,7 +3,8 @@
 // старые импорты/хелперы/константы оставлены для поэтапного допереноса.
 import { ChangeEvent, FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import ru, { format } from 'date-fns';
+import { format } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import { useIsMobile } from '../../../shared/lib/useIsMobile';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from './TeacherHomeworksView.module.css';

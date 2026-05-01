@@ -1,4 +1,5 @@
-import ru, { addDays, isSameDay } from 'date-fns';
+import { addDays, isSameDay } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {

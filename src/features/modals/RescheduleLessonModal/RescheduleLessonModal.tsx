@@ -1,4 +1,5 @@
-import ru, { addMinutes, format } from 'date-fns';
+import { addMinutes, format } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import { type FC, useRef } from 'react';
 import { TextField } from '@mui/material';
 import type { Lesson, LinkedStudent } from '../../../entities/types';

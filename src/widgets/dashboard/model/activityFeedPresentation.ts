@@ -1,4 +1,5 @@
-import ru, { addDays, isSameDay } from 'date-fns';
+import { addDays, isSameDay } from 'date-fns';
+import ru from 'date-fns/locale/ru';
 import type { ActivityFeedItem } from '../../../entities/types';
 import { inflectFirstName } from '../../../shared/lib/inflectName';
 import { formatInTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
