@@ -9,7 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { addMinutes, addMonths, format, ru } from 'date-fns';
+import ru, { addMinutes, addMonths, format } from 'date-fns';
 import { api } from '../../../shared/api/client';
 import {
   isVisibleLesson,

@@ -1,4 +1,4 @@
-import { format, ru } from 'date-fns';
+import ru, { format } from 'date-fns';
 import {
   ChangeEvent,
   type KeyboardEvent,

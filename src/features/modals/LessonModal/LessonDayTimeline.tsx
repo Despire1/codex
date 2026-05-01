@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from 'react';
-import { addMinutes, format, ru } from 'date-fns';
+import ru, { addMinutes, format } from 'date-fns';
 import { api } from '../../../shared/api/client';
 import type { Lesson, LinkedStudent } from '../../../entities/types';
 import { buildParticipants, getLessonLabel } from '../../../entities/lesson/lib/lessonDetails';

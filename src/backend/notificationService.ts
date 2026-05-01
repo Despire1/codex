@@ -1,4 +1,4 @@
-import { addDays, addMinutes, isSameDay, ru } from 'date-fns';
+import ru, { addDays, addMinutes, isSameDay } from 'date-fns';
 import prisma from './prismaClient';
 import {
   createNotificationLogEntry,

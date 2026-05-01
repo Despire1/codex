@@ -1,4 +1,4 @@
-import {
+import ru, {
   addDays,
   addMonths,
   addYears,
@@ -12,7 +12,6 @@ import {
   startOfDay,
   startOfMonth,
   startOfWeek,
-  ru,
 } from 'date-fns';
 import type { Locale } from 'date-fns';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';

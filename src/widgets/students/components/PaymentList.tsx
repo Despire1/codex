@@ -1,5 +1,5 @@
 import { FC, useMemo } from 'react';
-import { addDays, isSameDay, ru } from 'date-fns';
+import ru, { addDays, isSameDay } from 'date-fns';
 import { Box, Chip, List, ListItem, ListItemText, Stack } from '@mui/material';
 
 import { Lesson, PaymentEvent } from '../../../entities/types';

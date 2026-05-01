@@ -1,5 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { startOfDay, ru } from 'date-fns';
+import ru, { startOfDay } from 'date-fns';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { MeetingLinkIcon, MoreHorizIcon } from '../../../icons/MaterialIcons';
 import {

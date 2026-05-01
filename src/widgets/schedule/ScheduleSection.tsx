@@ -1,4 +1,4 @@
-import { addDays, addMinutes, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek, ru } from 'date-fns';
+import ru, { addDays, addMinutes, addMonths, endOfMonth, format, isSameDay, startOfMonth, startOfWeek } from 'date-fns';
 import {
   useCallback,
   useEffect,

@@ -1,4 +1,4 @@
-import { addMinutes, format, ru } from 'date-fns';
+import ru, { addMinutes, format } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lesson, LinkedStudent } from '../../../../entities/types';
 import { buildParticipants, getLessonLabel, resolveLessonPaid } from '../../../../entities/lesson/lib/lessonDetails';
