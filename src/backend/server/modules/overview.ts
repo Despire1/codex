@@ -35,7 +35,11 @@ const parseDateFilter = (value?: string | null) => {
 };
 
 const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
-  new Intl.DateTimeFormat('sv-SE', { timeZone, dateStyle: 'short', timeStyle: 'short' }).format(date);
+  new Intl.DateTimeFormat('sv-SE', {
+    timeZone: timeZone && timeZone.trim() ? timeZone : 'UTC',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
 
 export const createOverviewService = ({
   prisma,
@@ -80,9 +84,7 @@ export const createOverviewService = ({
         })
       : [];
     const includeHomeworks = filters?.includeHomeworks !== false;
-    const homeworks = includeHomeworks
-      ? await prisma.homework.findMany({ where: { teacherId: teacher.chatId } })
-      : [];
+    const homeworks = includeHomeworks ? await prisma.homework.findMany({ where: { teacherId: teacher.chatId } }) : [];
     let lessons: any[] = [];
     if (filters?.lessonsStart || filters?.lessonsEnd) {
       const lessonsWhere: Record<string, any> = { teacherId: teacher.chatId, isSuppressed: false, startAt: {} };

@@ -20,7 +20,12 @@ import {
 import { DEFAULT_LESSON_COLOR } from '../../../shared/lib/lessonColors';
 import { normalizeMeetingLinkInput } from '../../../shared/lib/meetingLink';
 import { normalizeLesson, todayISO } from '../../../shared/lib/normalizers';
-import { addMinutesToTime, diffTimeMinutes } from '../../../shared/lib/timeFields';
+import {
+  addMinutesToTime,
+  diffTimeMinutes,
+  formatMinutesToTime,
+  parseTimeToMinutes,
+} from '../../../shared/lib/timeFields';
 import {
   formatInTimeZone,
   toUtcEndOfDay,
@@ -187,8 +192,13 @@ export type LessonActionsContextValue = {
   closeRescheduleModal: () => void;
   setLessonDraft: (draft: LessonDraft) => void;
   setRescheduleDraft: (draft: RescheduleDraft) => void;
-  saveLesson: (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => void;
-  saveRescheduleLesson: () => void;
+  saveLesson: (options?: {
+    applyToSeriesOverride?: boolean;
+    detachFromSeries?: boolean;
+    acknowledgePastDate?: boolean;
+    acknowledgeConflict?: boolean;
+  }) => void;
+  saveRescheduleLesson: (options?: { acknowledgePastDate?: boolean; acknowledgeConflict?: boolean }) => void;
   requestDeleteLesson: () => void;
   startEditLesson: (lesson: Lesson, options?: { skipNavigation?: boolean }) => void;
   openCreateLessonForStudent: (
@@ -239,6 +249,34 @@ export const useLessonActions = () => {
 
 const resolveLessonEndTime = (startTime: string, durationMinutes: number) =>
   addMinutesToTime(startTime, durationMinutes) || startTime;
+
+const findFreeStartTime = (
+  lessons: Lesson[],
+  dateISO: string,
+  durationMinutes: number,
+  baseTime: string,
+  timeZone: string,
+) => {
+  const startMinutes = parseTimeToMinutes(baseTime);
+  if (startMinutes === null) return baseTime;
+  const ranges = lessons
+    .filter((lesson) => {
+      if (lesson.status === 'CANCELED') return false;
+      const localDate = formatInTimeZone(lesson.startAt, 'yyyy-MM-dd', { timeZone });
+      return localDate === dateISO;
+    })
+    .map((lesson) => {
+      const zoned = toZonedDate(lesson.startAt, timeZone);
+      const start = zoned.getHours() * 60 + zoned.getMinutes();
+      return { start, end: start + lesson.durationMinutes };
+    });
+  const dayEnd = 24 * 60;
+  for (let m = startMinutes; m + durationMinutes <= dayEnd; m += 30) {
+    const conflict = ranges.some((range) => m < range.end && range.start < m + durationMinutes);
+    if (!conflict) return formatMinutesToTime(m);
+  }
+  return baseTime;
+};
 
 const createLessonDraft = (timeZone: string, defaultDuration: number): LessonDraft => ({
   studentId: undefined as number | undefined,
@@ -382,12 +420,14 @@ export const useLessonActionsInternal = ({
             : [];
 
       if (!existing) {
+        const resolvedTime =
+          time ?? findFreeStartTime(lessons, dateISO, teacherDefaultLessonDuration, '18:00', timeZone);
         setLessonDraft(
           createNewLessonDraft({
             timeZone,
             defaultDuration: teacherDefaultLessonDuration,
             dateISO,
-            time,
+            time: resolvedTime,
             studentIds: options?.studentIds,
           }),
         );
@@ -420,7 +460,7 @@ export const useLessonActionsInternal = ({
       }
       setDayViewDate(toZonedDate(toUtcDateFromDate(dateISO, timeZone), timeZone));
     },
-    [navigateToSchedule, setDayViewDate, showInfoDialog, teacherDefaultLessonDuration, timeZone],
+    [lessons, navigateToSchedule, setDayViewDate, showInfoDialog, teacherDefaultLessonDuration, timeZone],
   );
 
   const openRescheduleModal = useCallback(
@@ -795,7 +835,12 @@ export const useLessonActionsInternal = ({
   ]);
 
   const saveLesson = useCallback(
-    async (options?: { applyToSeriesOverride?: boolean; detachFromSeries?: boolean }) => {
+    async (options?: {
+      applyToSeriesOverride?: boolean;
+      detachFromSeries?: boolean;
+      acknowledgePastDate?: boolean;
+      acknowledgeConflict?: boolean;
+    }) => {
       if (lessonModalSubmitting) return;
       if (lessonDraft.studentIds.length === 0 || !lessonDraft.date || !lessonDraft.time) {
         showInfoDialog('Заполните все поля', 'Выберите хотя бы одного ученика, дату и время');
@@ -822,6 +867,42 @@ export const useLessonActionsInternal = ({
       }
 
       const startAtDate = toUtcDateFromTimeZone(lessonDraft.date, lessonDraft.time, timeZone);
+      if (!options?.acknowledgePastDate && startAtDate.getTime() < Date.now()) {
+        openConfirmDialog({
+          title: 'Дата урока в прошлом',
+          message: 'Вы сохраняете урок на дату или время, которые уже прошли. Сохранить?',
+          confirmText: 'Сохранить',
+          cancelText: 'Отмена',
+          onConfirm: () => {
+            void saveLesson({ ...(options ?? {}), acknowledgePastDate: true });
+          },
+        });
+        return;
+      }
+      if (!options?.acknowledgeConflict) {
+        const draftStartMs = startAtDate.getTime();
+        const draftEndMs = draftStartMs + durationMinutes * 60_000;
+        const conflicts = lessons.filter((lesson) => {
+          if (editingLessonId && lesson.id === editingLessonId) return false;
+          if (lesson.status === 'CANCELED') return false;
+          const lessonStart = new Date(lesson.startAt).getTime();
+          if (Number.isNaN(lessonStart)) return false;
+          const lessonEnd = lessonStart + lesson.durationMinutes * 60_000;
+          return draftStartMs < lessonEnd && lessonStart < draftEndMs;
+        });
+        if (conflicts.length > 0) {
+          openConfirmDialog({
+            title: 'В это время уже есть урок',
+            message: 'Урок пересекается по времени с другим занятием. Сохранить всё равно?',
+            confirmText: 'Сохранить',
+            cancelText: 'Отмена',
+            onConfirm: () => {
+              void saveLesson({ ...(options ?? {}), acknowledgeConflict: true });
+            },
+          });
+          return;
+        }
+      }
       const startAt = startAtDate.toISOString();
       const meetingLinkPayload = normalizeMeetingLinkInput(lessonDraft.meetingLink ?? '');
       const meetingLink = meetingLinkPayload ? meetingLinkPayload : null;
@@ -873,8 +954,7 @@ export const useLessonActionsInternal = ({
           };
 
           if (
-            original?.isRecurring &&
-            (original.recurrenceGroupId || original.seriesId) &&
+            (original?.isRecurring || original?.recurrenceGroupId || original?.seriesId) &&
             options?.applyToSeriesOverride === undefined
           ) {
             const previews = await fetchSeriesScopePreviews(original, 'EDIT', {
@@ -1048,6 +1128,7 @@ export const useLessonActionsInternal = ({
       filterLessonsForCurrentRange,
       lessonDraft,
       lessonModalSubmitting,
+      lessons,
       normalizedWeekendWeekdays,
       loadStudentLessons,
       loadStudentLessonsSummary,
@@ -1055,6 +1136,7 @@ export const useLessonActionsInternal = ({
       onLessonCreateError,
       onLessonCreateStarted,
       onLessonCreated,
+      openConfirmDialog,
       performLessonUpdate,
       requestLessonUpdateResolution,
       showInfoDialog,
@@ -1066,137 +1148,179 @@ export const useLessonActionsInternal = ({
     ],
   );
 
-  const saveRescheduleLesson = useCallback(async () => {
-    if (rescheduleModalSubmitting) return;
-    if (!rescheduleLesson) return;
-    if (!rescheduleDraft.date || !rescheduleDraft.time) {
-      showInfoDialog('Проверьте дату и время', 'Укажите дату и время урока');
-      return;
-    }
-    const selectedDate = toZonedDate(toUtcDateFromDate(rescheduleDraft.date, timeZone), timeZone);
-    if (isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
-      showInfoDialog('Выбран выходной день', 'На выходной день нельзя перенести занятие');
-      return;
-    }
-    const durationMinutes = diffTimeMinutes(rescheduleDraft.time, rescheduleDraft.endTime);
-    if (!durationMinutes || durationMinutes <= 0) {
-      showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
-      return;
-    }
+  const saveRescheduleLesson = useCallback(
+    async (options?: { acknowledgePastDate?: boolean; acknowledgeConflict?: boolean }) => {
+      if (rescheduleModalSubmitting) return;
+      if (!rescheduleLesson) return;
+      if (!rescheduleDraft.date || !rescheduleDraft.time) {
+        showInfoDialog('Проверьте дату и время', 'Укажите дату и время урока');
+        return;
+      }
+      const selectedDate = toZonedDate(toUtcDateFromDate(rescheduleDraft.date, timeZone), timeZone);
+      if (isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
+        showInfoDialog('Выбран выходной день', 'На выходной день нельзя перенести занятие');
+        return;
+      }
+      const durationMinutes = diffTimeMinutes(rescheduleDraft.time, rescheduleDraft.endTime);
+      if (!durationMinutes || durationMinutes <= 0) {
+        showInfoDialog('Проверьте время', 'Время окончания должно быть позже времени начала');
+        return;
+      }
 
-    const startAtDate = toUtcDateFromTimeZone(rescheduleDraft.date, rescheduleDraft.time, timeZone);
-    const startAt = startAtDate.toISOString();
-    const timeChanged = startAt !== rescheduleLesson.startAt || durationMinutes !== rescheduleLesson.durationMinutes;
+      const startAtDate = toUtcDateFromTimeZone(rescheduleDraft.date, rescheduleDraft.time, timeZone);
+      const isOriginallyInPast = new Date(rescheduleLesson.startAt).getTime() < Date.now();
+      if (!options?.acknowledgePastDate && !isOriginallyInPast && startAtDate.getTime() < Date.now()) {
+        openConfirmDialog({
+          title: 'Перенос в прошлое',
+          message: 'Вы переносите урок на дату или время в прошлом. Продолжить?',
+          confirmText: 'Перенести',
+          cancelText: 'Отмена',
+          onConfirm: () => {
+            void saveRescheduleLesson({ ...(options ?? {}), acknowledgePastDate: true });
+          },
+        });
+        return;
+      }
+      if (!options?.acknowledgeConflict) {
+        const draftStartMs = startAtDate.getTime();
+        const draftEndMs = draftStartMs + durationMinutes * 60_000;
+        const conflicts = lessons.filter((lesson) => {
+          if (lesson.id === rescheduleLesson.id) return false;
+          if (lesson.status === 'CANCELED') return false;
+          const lessonStart = new Date(lesson.startAt).getTime();
+          if (Number.isNaN(lessonStart)) return false;
+          const lessonEnd = lessonStart + lesson.durationMinutes * 60_000;
+          return draftStartMs < lessonEnd && lessonStart < draftEndMs;
+        });
+        if (conflicts.length > 0) {
+          openConfirmDialog({
+            title: 'В это время уже есть урок',
+            message: 'Новое время пересекается с другим занятием. Перенести всё равно?',
+            confirmText: 'Перенести',
+            cancelText: 'Отмена',
+            onConfirm: () => {
+              void saveRescheduleLesson({ ...(options ?? {}), acknowledgeConflict: true });
+            },
+          });
+          return;
+        }
+      }
+      const startAt = startAtDate.toISOString();
+      const timeChanged = startAt !== rescheduleLesson.startAt || durationMinutes !== rescheduleLesson.durationMinutes;
 
-    if (!timeChanged) {
-      closeRescheduleModal();
-      return;
-    }
+      if (!timeChanged) {
+        closeRescheduleModal();
+        return;
+      }
 
-    setRescheduleModalSubmitting(true);
+      setRescheduleModalSubmitting(true);
 
-    if (rescheduleLesson.isRecurring && (rescheduleLesson.recurrenceGroupId || rescheduleLesson.seriesId)) {
+      if (rescheduleLesson.isRecurring && (rescheduleLesson.recurrenceGroupId || rescheduleLesson.seriesId)) {
+        try {
+          const previews = await fetchSeriesScopePreviews(rescheduleLesson, 'RESCHEDULE', {
+            startAt,
+            durationMinutes,
+          });
+          setSeriesScopeDialogState({
+            action: 'RESCHEDULE',
+            title: 'Перенести урок',
+            confirmText: 'Перенести',
+            lesson: rescheduleLesson,
+            defaultScope: 'SINGLE',
+            reopenModal: 'reschedule',
+            previews,
+            request: {
+              kind: 'update',
+              payload: {
+                startAt,
+                durationMinutes,
+              },
+            },
+          });
+          setRescheduleModalOpen(false);
+        } catch (_error) {
+          showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
+        } finally {
+          setRescheduleModalSubmitting(false);
+        }
+        return;
+      }
+
       try {
-        const previews = await fetchSeriesScopePreviews(rescheduleLesson, 'RESCHEDULE', {
+        const previewData = await api.previewLessonMutation(rescheduleLesson.id, {
+          action: 'RESCHEDULE',
+          scope: 'SINGLE',
           startAt,
           durationMinutes,
         });
-        setSeriesScopeDialogState({
-          action: 'RESCHEDULE',
-          title: 'Перенести урок',
+        let proceededWithSave = false;
+        requestLessonUpdateResolution({
+          preview: previewData.preview,
           confirmText: 'Перенести',
-          lesson: rescheduleLesson,
-          defaultScope: 'SINGLE',
-          reopenModal: 'reschedule',
-          previews,
-          request: {
-            kind: 'update',
-            payload: {
-              startAt,
-              durationMinutes,
-            },
+          onProceed: (meta) => {
+            proceededWithSave = true;
+            setRescheduleModalSubmitting(true);
+            void updateLessonTiming(rescheduleLesson, startAt, durationMinutes, 'SINGLE', meta)
+              .then(() => {
+                showToast({
+                  message: 'Урок перенесён',
+                  variant: 'success',
+                  actionLabel: 'Отменить',
+                  onAction: () => {
+                    void updateLessonTiming(
+                      rescheduleLesson,
+                      rescheduleLesson.startAt,
+                      rescheduleLesson.durationMinutes,
+                      'SINGLE',
+                      {
+                        acknowledgeRisk: true,
+                        paymentHandling: 'KEEP',
+                      },
+                    ).catch(() => {
+                      showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
+                    });
+                  },
+                });
+                closeRescheduleModal();
+              })
+              .catch((error) => {
+                showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+
+                console.error('Failed to reschedule lesson', error);
+              })
+              .finally(() => {
+                setRescheduleModalSubmitting(false);
+              });
           },
         });
-        setRescheduleModalOpen(false);
-      } catch (_error) {
-        showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
-      } finally {
+        if (!proceededWithSave) {
+          setRescheduleModalSubmitting(false);
+        }
+      } catch (error) {
+        showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+
+        console.error('Failed to reschedule lesson', error);
         setRescheduleModalSubmitting(false);
       }
-      return;
-    }
-
-    try {
-      const previewData = await api.previewLessonMutation(rescheduleLesson.id, {
-        action: 'RESCHEDULE',
-        scope: 'SINGLE',
-        startAt,
-        durationMinutes,
-      });
-      let proceededWithSave = false;
-      requestLessonUpdateResolution({
-        preview: previewData.preview,
-        confirmText: 'Перенести',
-        onProceed: (meta) => {
-          proceededWithSave = true;
-          setRescheduleModalSubmitting(true);
-          void updateLessonTiming(rescheduleLesson, startAt, durationMinutes, 'SINGLE', meta)
-            .then(() => {
-              showToast({
-                message: 'Урок перенесён',
-                variant: 'success',
-                actionLabel: 'Отменить',
-                onAction: () => {
-                  void updateLessonTiming(
-                    rescheduleLesson,
-                    rescheduleLesson.startAt,
-                    rescheduleLesson.durationMinutes,
-                    'SINGLE',
-                    {
-                      acknowledgeRisk: true,
-                      paymentHandling: 'KEEP',
-                    },
-                  ).catch(() => {
-                    showToast({ message: 'Не удалось отменить изменения', variant: 'error' });
-                  });
-                },
-              });
-              closeRescheduleModal();
-            })
-            .catch((error) => {
-              showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-
-              console.error('Failed to reschedule lesson', error);
-            })
-            .finally(() => {
-              setRescheduleModalSubmitting(false);
-            });
-        },
-      });
-      if (!proceededWithSave) {
-        setRescheduleModalSubmitting(false);
-      }
-    } catch (error) {
-      showToast({ message: 'Не удалось перенести урок', variant: 'error' });
-
-      console.error('Failed to reschedule lesson', error);
-      setRescheduleModalSubmitting(false);
-    }
-  }, [
-    closeRescheduleModal,
-    fetchSeriesScopePreviews,
-    requestLessonUpdateResolution,
-    rescheduleModalSubmitting,
-    rescheduleDraft.date,
-    rescheduleDraft.endTime,
-    rescheduleDraft.time,
-    rescheduleLesson,
-    normalizedWeekendWeekdays,
-    showInfoDialog,
-    showToast,
-    timeZone,
-    updateLessonTiming,
-  ]);
+    },
+    [
+      closeRescheduleModal,
+      fetchSeriesScopePreviews,
+      lessons,
+      openConfirmDialog,
+      requestLessonUpdateResolution,
+      rescheduleModalSubmitting,
+      rescheduleDraft.date,
+      rescheduleDraft.endTime,
+      rescheduleDraft.time,
+      rescheduleLesson,
+      normalizedWeekendWeekdays,
+      showInfoDialog,
+      showToast,
+      timeZone,
+      updateLessonTiming,
+    ],
+  );
 
   const startEditLesson = useCallback(
     (lesson: Lesson, options?: { skipNavigation?: boolean }) => {

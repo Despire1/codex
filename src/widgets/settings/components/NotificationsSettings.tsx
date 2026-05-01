@@ -13,8 +13,10 @@ import { StudentNotificationTemplates } from './StudentNotificationTemplates';
 
 interface NotificationsSettingsProps {
   teacher: Teacher;
+  savedTeacher: Teacher;
   onChange: (patch: Partial<Teacher>) => void;
-  onSaveNow: (patch: Partial<Teacher>) => Promise<{ ok: boolean; error?: string }>;
+  onSaveTemplates: (patch: Partial<Teacher>) => Promise<{ ok: boolean; error?: string }>;
+  disabled?: boolean;
 }
 
 type NotificationsPane = 'me' | 'student' | 'templates';
@@ -25,12 +27,18 @@ const paymentRepeatOptions = [24, 48, 72];
 const paymentMaxOptions = [1, 2, 3, 5];
 const homeworkOverdueMaxOptions = [1, 2, 3, 5];
 
-export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher, onChange, onSaveNow }) => {
+export const NotificationsSettings: FC<NotificationsSettingsProps> = ({
+  teacher,
+  savedTeacher,
+  onChange,
+  onSaveTemplates,
+  disabled = false,
+}) => {
   const [activePane, setActivePane] = useState<NotificationsPane>('me');
   const studentSectionDisabled = !teacher.studentNotificationsEnabled;
 
   return (
-    <div className={styles.moduleStack}>
+    <div className={styles.moduleStack} data-hint="settings-notifications">
       <div className={styles.sectionTabs}>
         <button
           type="button"
@@ -56,7 +64,7 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
       </div>
 
       {activePane === 'me' ? (
-        <>
+        <fieldset className={styles.fieldset} disabled={disabled}>
           <section className={styles.settingsCard}>
             <div className={styles.sectionHeader}>
               <div className={`${styles.sectionIcon} ${styles.sectionIconBlue}`}>
@@ -170,11 +178,11 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
               ) : null}
             </div>
           </section>
-        </>
+        </fieldset>
       ) : null}
 
       {activePane === 'student' ? (
-        <>
+        <fieldset className={styles.fieldset} disabled={disabled}>
           <section className={styles.settingsCard}>
             <div className={styles.sectionHeader}>
               <div className={`${styles.sectionIcon} ${styles.sectionIconGreen}`}>
@@ -450,12 +458,12 @@ export const NotificationsSettings: FC<NotificationsSettingsProps> = ({ teacher,
               ) : null}
             </div>
           </section>
-        </>
+        </fieldset>
       ) : null}
 
       {activePane === 'templates' ? (
         <section className={styles.settingsCard}>
-          <StudentNotificationTemplates teacher={teacher} onChange={onChange} onSaveNow={onSaveNow} />
+          <StudentNotificationTemplates teacher={savedTeacher} onChange={onChange} onSaveNow={onSaveTemplates} />
         </section>
       ) : null}
     </div>

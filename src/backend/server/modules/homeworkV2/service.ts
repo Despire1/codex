@@ -80,14 +80,38 @@ type ValidateHomeworkTemplatePayload = (payload: { title: string; blocks: Homewo
   errorIssues: any[];
 };
 
-const sanitizeTemplateTitleForAssignment = (title: string): string => {
+// TEA-279: ранее регулярка слепо вырезала любое " для <Слово>" из заголовка
+// и портила валидные названия вроде «Упражнение 3 для повторения».
+// Теперь обрезаем только если имя получателя реально передано и совпадает.
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const sanitizeTemplateTitleForAssignment = (title: string, recipientName?: string | null): string => {
   const trimmed = title.trim();
   if (!trimmed) return trimmed;
+  const recipient = recipientName?.trim();
+  if (!recipient) return trimmed;
+  const escaped = escapeRegExp(recipient);
+  const recipientPattern = new RegExp(`\\s+для\\s+${escaped}\\b`, 'iu');
   const withoutRecipient = trimmed
-    .replace(/\s+для\s+[A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'\-]*(?:\s+[A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'\-]*)?/giu, '')
+    .replace(recipientPattern, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
   return withoutRecipient || trimmed;
+};
+
+// TEA-268: cron автоматизации запускается раз в 5 минут (AUTOMATION_TICK_MS=5*60_000),
+// поэтому строгое сравнение nowTimeLabel === '10:00' почти всегда промахивается.
+// Считаем, что target наступил в текущем тике, если он прошёл в пределах окна тика
+// (с небольшим запасом на дрейф). Идемпотентность гарантируется отдельно через
+// reminderMorningSentAt / lastOverdueReminderAt — повторно не пошлём.
+const HOMEWORK_TICK_WINDOW_MS = 5 * 60 * 1000 + 30 * 1000;
+
+const isTimeOfDayWithinCurrentTick = (now: Date, targetTimeOfDay: string, timeZone: string): boolean => {
+  if (!isValidTimeString(targetTimeOfDay)) return false;
+  const dateKey = formatInTimeZone(now, 'yyyy-MM-dd', { timeZone });
+  const targetUtc = toUtcDateFromTimeZone(dateKey, targetTimeOfDay, timeZone);
+  const diffMs = now.getTime() - targetUtc.getTime();
+  return diffMs >= 0 && diffMs < HOMEWORK_TICK_WINDOW_MS;
 };
 
 type CreateHomeworkV2ServiceDeps = {
@@ -128,10 +152,10 @@ export const createHomeworkV2Service = ({
 
   const ensureScheduledForIsFuture = (value: Date | null) => {
     if (!value) {
-      throw new Error('Укажите дату и время запланированной отправки');
+      throw createHttpError('Укажите дату и время запланированной отправки', 400);
     }
     if (value.getTime() <= Date.now()) {
-      throw new Error('Запланированная отправка должна быть в будущем');
+      throw createHttpError('Запланированная отправка должна быть в будущем', 400);
     }
     return value;
   };
@@ -217,7 +241,7 @@ export const createHomeworkV2Service = ({
   const createHomeworkGroupV2 = async (user: User, body: Record<string, unknown>) => {
     const teacher = await ensureTeacher(user);
     const title = normalizeHomeworkGroupTitle(body.title);
-    if (!title) throw new Error('Название группы обязательно');
+    if (!title) throw createHttpError('Название группы обязательно', 400);
     const description = normalizeHomeworkGroupDescription(body.description);
     const iconKey = normalizeHomeworkGroupIconKey(body.iconKey);
     const bgColor = normalizeHomeworkGroupBgColor(body.bgColor);
@@ -250,7 +274,7 @@ export const createHomeworkV2Service = ({
     const data: Record<string, unknown> = {};
     if ('title' in body) {
       const title = normalizeHomeworkGroupTitle(body.title);
-      if (!title) throw new Error('Название группы обязательно');
+      if (!title) throw createHttpError('Название группы обязательно', 400);
       data.title = title;
     }
     if ('description' in body) data.description = normalizeHomeworkGroupDescription(body.description);
@@ -401,7 +425,7 @@ export const createHomeworkV2Service = ({
       throw new RequestValidationError('Проверьте обязательные поля домашнего задания.', validationResult.issues);
     }
 
-    if (!title) throw new Error('Название домашнего задания обязательно');
+    if (!title) throw createHttpError('Название домашнего задания обязательно', 400);
     const template = await (prisma as any).homeworkTemplate.create({
       data: {
         teacherId: teacher.chatId,
@@ -427,13 +451,15 @@ export const createHomeworkV2Service = ({
   const updateHomeworkTemplateV2 = async (user: User, templateId: number, body: Record<string, unknown>) => {
     const teacher = await ensureTeacher(user);
     const template = await (prisma as any).homeworkTemplate.findUnique({ where: { id: templateId } });
-    if (!template || template.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+    if (!template || template.teacherId !== teacher.chatId) throw createHttpError('Домашнее задание не найдено', 404);
 
+    // TEA-273: SCHEDULED ещё не отправлен ученику — учителю нужно иметь возможность
+    // править контент шаблона до того, как он реально уйдёт в Telegram/PWA.
     const issuedAssignmentsCount = await (prisma as any).homeworkAssignment.count({
       where: {
         teacherId: teacher.chatId,
         templateId,
-        status: { not: 'DRAFT' },
+        status: { notIn: ['DRAFT', 'SCHEDULED'] },
       },
     });
 
@@ -477,7 +503,7 @@ export const createHomeworkV2Service = ({
 
     const data: Record<string, unknown> = {};
     if (hasTitleUpdate) {
-      if (!nextTitle) throw new Error('Название домашнего задания обязательно');
+      if (!nextTitle) throw createHttpError('Название домашнего задания обязательно', 400);
       data.title = nextTitle;
     }
     if ('tags' in body) data.tags = JSON.stringify(nextTags);
@@ -502,7 +528,7 @@ export const createHomeworkV2Service = ({
   const deleteHomeworkTemplateV2 = async (user: User, templateId: number) => {
     const teacher = await ensureTeacher(user);
     const template = await (prisma as any).homeworkTemplate.findUnique({ where: { id: templateId } });
-    if (!template || template.teacherId !== teacher.chatId) throw new Error('Домашнее задание не найдено');
+    if (!template || template.teacherId !== teacher.chatId) throw createHttpError('Домашнее задание не найдено', 404);
 
     const templateAccessMetaById = await loadHomeworkTemplateAccessMeta(teacher.chatId, [templateId]);
     const accessMeta = templateAccessMetaById.get(templateId);
@@ -823,7 +849,7 @@ export const createHomeworkV2Service = ({
   const createHomeworkAssignmentV2 = async (user: User, body: Record<string, unknown>) => {
     const teacher = await ensureTeacher(user);
     const studentId = Number(body.studentId);
-    if (!Number.isFinite(studentId)) throw new Error('studentId обязателен');
+    if (!Number.isFinite(studentId)) throw createHttpError('studentId обязателен', 400);
     await ensureTeacherStudentLinkV2(teacher.chatId, studentId);
 
     const templateId = Number(body.templateId);
@@ -833,13 +859,13 @@ export const createHomeworkV2Service = ({
           where: { id: templateId, teacherId: teacher.chatId },
         })
       : null;
-    if (hasTemplateId && !template) throw new Error('Домашнее задание не найдено');
+    if (hasTemplateId && !template) throw createHttpError('Домашнее задание не найдено', 404);
 
     const lessonIdRaw = Number(body.lessonId);
     const lessonId = Number.isFinite(lessonIdRaw) ? lessonIdRaw : null;
     if (lessonId !== null) {
       const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
-      if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+      if (!lesson || lesson.teacherId !== teacher.chatId) throw createHttpError('Урок не найден', 404);
     }
     const normalizedGroupId = normalizeHomeworkGroupIdInput(body.groupId);
     let groupId: number | null = null;
@@ -848,12 +874,23 @@ export const createHomeworkV2Service = ({
       groupId = group.id;
     }
 
+    // TEA-279: подтянем имя получателя, чтобы санация заголовка работала точечно.
+    const recipientStudent = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { username: true },
+    });
+    const recipientName = recipientStudent?.username ?? null;
+
     const resolvedTitle =
       (typeof body.title === 'string' && body.title.trim()) ||
-      (template?.title ? sanitizeTemplateTitleForAssignment(String(template.title)) : '') ||
+      (template?.title ? sanitizeTemplateTitleForAssignment(String(template.title), recipientName) : '') ||
       'Домашнее задание';
     const snapshot = normalizeHomeworkBlocks(body.contentSnapshot ?? template?.blocks ?? []);
     const sendMode = normalizeAssignmentSendModeInput(body.sendMode);
+    // TEA-267: режим «после урока» бесполезен без привязки к уроку — иначе assign никогда не отправится.
+    if (sendMode === 'AUTO_AFTER_LESSON_DONE' && lessonId === null) {
+      throw createHttpError('Для режима «после урока» обязательно указать урок.', 400);
+    }
     const scheduledFor =
       sendMode === 'SCHEDULED' ? ensureScheduledForIsFuture(resolveScheduledForInput(body.scheduledFor)) : null;
     const resolvedStatus = sendMode === 'MANUAL' ? 'DRAFT' : 'SCHEDULED';
@@ -864,16 +901,16 @@ export const createHomeworkV2Service = ({
     // TEA-24: Идемпотентность создания черновика из шаблона.
     // Если для (teacher, student, template) уже есть неотправленный DRAFT — переиспользуем его,
     // чтобы не плодить дубликатов (частый сценарий: открыли «Выдать из шаблона» дважды).
-    if (resolvedStatus === 'DRAFT') {
-      const baseDraftWhere = {
-        teacherId: teacher.chatId,
-        studentId,
-        status: 'DRAFT' as const,
-      };
+    // TEA-272: идемпотентность работает ТОЛЬКО при наличии templateId. Без шаблона нельзя
+    // полагаться на title (он автогенерируется в "Домашнее задание" и склеит разные кастомные ДЗ).
+    if (resolvedStatus === 'DRAFT' && template?.id) {
       const existingDraft = await (prisma as any).homeworkAssignment.findFirst({
-        where: template?.id
-          ? { ...baseDraftWhere, templateId: template.id }
-          : { ...baseDraftWhere, title: resolvedTitle },
+        where: {
+          teacherId: teacher.chatId,
+          studentId,
+          status: 'DRAFT' as const,
+          templateId: template.id,
+        },
         orderBy: { updatedAt: 'desc' },
       });
       if (existingDraft) {
@@ -969,7 +1006,7 @@ export const createHomeworkV2Service = ({
     const data: Record<string, unknown> = {};
     if (typeof body.title === 'string') {
       const title = body.title.trim();
-      if (!title) throw new Error('Название обязательно');
+      if (!title) throw createHttpError('Название обязательно', 400);
       data.title = title;
     }
     if ('sendMode' in body) data.sendMode = normalizeAssignmentSendModeInput(body.sendMode);
@@ -979,10 +1016,10 @@ export const createHomeworkV2Service = ({
         data.lessonId = null;
       } else if (Number.isFinite(lessonIdRaw)) {
         const lesson = await prisma.lesson.findUnique({ where: { id: lessonIdRaw } });
-        if (!lesson || lesson.teacherId !== teacher.chatId) throw new Error('Урок не найден');
+        if (!lesson || lesson.teacherId !== teacher.chatId) throw createHttpError('Урок не найден', 404);
         data.lessonId = lessonIdRaw;
       } else {
-        throw new Error('Некорректный lessonId');
+        throw createHttpError('Некорректный lessonId', 400);
       }
     }
     if ('templateId' in body) {
@@ -993,10 +1030,10 @@ export const createHomeworkV2Service = ({
         const template = await (prisma as any).homeworkTemplate.findFirst({
           where: { id: templateIdRaw, teacherId: teacher.chatId },
         });
-        if (!template) throw new Error('Домашнее задание не найдено');
+        if (!template) throw createHttpError('Домашнее задание не найдено', 404);
         data.templateId = templateIdRaw;
       } else {
-        throw new Error('Некорректный templateId');
+        throw createHttpError('Некорректный templateId', 400);
       }
     }
     if ('groupId' in body) {
@@ -1253,6 +1290,16 @@ export const createHomeworkV2Service = ({
     });
     if (!existing) throw createHttpError('Домашка не найдена', 404);
     if (existing.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
+    // TEA-274: разрешаем удалять только то, что ещё не выдано или только запланировано.
+    // Уже выданные (SENT/SUBMITTED/IN_REVIEW/RETURNED/REVIEWED/OVERDUE) удалять нельзя —
+    // иначе теряется история ответов ученика. Для возврата в DRAFT — отдельный «Отменить выдачу».
+    const existingWorkflow = resolveHomeworkAssignmentWorkflow(existing);
+    if (existingWorkflow.persistedStatus !== 'DRAFT' && existingWorkflow.persistedStatus !== 'SCHEDULED') {
+      throw createHttpError(
+        'Удалить можно только черновик или запланированную домашку. Уже выданные нужно сначала отменить через «Отменить выдачу».',
+        409,
+      );
+    }
     await (prisma as any).homeworkAssignment.delete({ where: { id: assignmentId } });
 
     await safeLogActivityEvent({
@@ -1277,14 +1324,14 @@ export const createHomeworkV2Service = ({
           new Set(body.ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)),
         )
       : [];
-    if (!ids.length) throw new Error('ids обязательны');
+    if (!ids.length) throw createHttpError('ids обязательны', 400);
 
     const actionRaw = typeof body.action === 'string' ? body.action.toUpperCase() : '';
     const action =
       actionRaw === 'SEND_NOW' || actionRaw === 'REMIND' || actionRaw === 'CANCEL_ISSUE' || actionRaw === 'DELETE'
         ? actionRaw
         : null;
-    if (!action) throw new Error('Некорректное действие');
+    if (!action) throw createHttpError('Некорректное действие', 400);
 
     const assignments = await (prisma as any).homeworkAssignment.findMany({
       where: {
@@ -1311,7 +1358,9 @@ export const createHomeworkV2Service = ({
         } else if (action === 'CANCEL_ISSUE') {
           await cancelHomeworkAssignmentIssueV2(user, id);
         } else if (action === 'DELETE') {
-          await (prisma as any).homeworkAssignment.delete({ where: { id } });
+          // TEA-274: проходим через deleteHomeworkAssignmentV2, чтобы сработал guard
+          // на статус (DRAFT/SCHEDULED only), а не сырое prisma.delete.
+          await deleteHomeworkAssignmentV2(user, id);
         }
 
         successCount += 1;
@@ -1336,7 +1385,7 @@ export const createHomeworkV2Service = ({
     const assignment = await (prisma as any).homeworkAssignment.findFirst({
       where: { id: assignmentId, teacherId: teacher.chatId },
     });
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
     const items = await (prisma as any).homeworkSubmission.findMany({
       where: { assignmentId },
       orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
@@ -1364,7 +1413,7 @@ export const createHomeworkV2Service = ({
       });
 
     let assignment = await loadAssignment();
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
 
     if (normalizeHomeworkAssignmentStatus(assignment.status) === 'SUBMITTED') {
       await (prisma as any).homeworkAssignment.update({
@@ -1375,7 +1424,7 @@ export const createHomeworkV2Service = ({
         },
       });
       assignment = await loadAssignment();
-      if (!assignment) throw new Error('Домашка не найдена');
+      if (!assignment) throw createHttpError('Домашка не найдена', 404);
     }
 
     const [assignmentWithSubmissionMeta] = await attachLatestSubmissionMetaToAssignments([assignment]);
@@ -1412,7 +1461,7 @@ export const createHomeworkV2Service = ({
         },
       },
     });
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
 
     const submissionId = Number(body.submissionId);
     const submission =
@@ -1425,17 +1474,17 @@ export const createHomeworkV2Service = ({
             where: { assignmentId },
             orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
           });
-    if (!submission) throw new Error('Попытка не найдена');
+    if (!submission) throw createHttpError('Попытка не найдена', 404);
 
     const hasDraftField = Object.prototype.hasOwnProperty.call(body, 'draft');
     const rawDraft = hasDraftField ? body.draft : null;
     if (rawDraft !== null && rawDraft !== undefined && (typeof rawDraft !== 'object' || Array.isArray(rawDraft))) {
-      throw new Error('Некорректный формат черновика проверки');
+      throw createHttpError('Некорректный формат черновика проверки', 400);
     }
 
     const normalizedDraft = rawDraft ? normalizeHomeworkReviewDraftV2(rawDraft) : null;
     if (rawDraft && !normalizedDraft) {
-      throw new Error('Некорректный формат черновика проверки');
+      throw createHttpError('Некорректный формат черновика проверки', 400);
     }
     const draftToStore = normalizedDraft
       ? {
@@ -1498,7 +1547,7 @@ export const createHomeworkV2Service = ({
     let assignment = await (prisma as any).homeworkAssignment.findUnique({
       where: { id: assignmentId },
     });
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
 
     let studentId: number;
     if (role === 'STUDENT') {
@@ -1507,12 +1556,12 @@ export const createHomeworkV2Service = ({
         assignment.studentId !== studentContext.active.studentId ||
         Number(assignment.teacherId) !== Number(studentContext.active.teacherId)
       ) {
-        throw new Error('forbidden');
+        throw createHttpError('forbidden', 403);
       }
       studentId = studentContext.active.studentId;
     } else {
       const teacher = await ensureTeacher(user);
-      if (assignment.teacherId !== teacher.chatId) throw new Error('forbidden');
+      if (assignment.teacherId !== teacher.chatId) throw createHttpError('forbidden', 403);
       studentId = assignment.studentId;
     }
 
@@ -1568,7 +1617,10 @@ export const createHomeworkV2Service = ({
         workflow.persistedStatus !== 'RETURNED';
 
       if (!canRetryAutoCheckedAttempt && !isReissueAttempt && workflow.persistedStatus !== 'RETURNED') {
-        throw new Error('Домашка уже сдана. Новая попытка доступна после возврата на доработку или переоткрытия.');
+        throw createHttpError(
+          'Домашка уже сдана. Новая попытка доступна после возврата на доработку или переоткрытия.',
+          409,
+        );
       }
       targetAttempt = latest.attemptNo + 1;
       mode = 'create';
@@ -1659,13 +1711,13 @@ export const createHomeworkV2Service = ({
     const assignment = await (prisma as any).homeworkAssignment.findFirst({
       where: { id: assignmentId, teacherId: teacher.chatId },
     });
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
     if (!resolveHomeworkAssignmentWorkflow(assignment).canTeacherReview) {
       throw createHttpError('Домашка сейчас не находится в состоянии проверки.', 409);
     }
 
     const action = body.action === 'RETURNED' ? 'RETURNED' : body.action === 'REVIEWED' ? 'REVIEWED' : null;
-    if (!action) throw new Error('Некорректное действие проверки');
+    if (!action) throw createHttpError('Некорректное действие проверки', 400);
 
     const submissionId = Number(body.submissionId);
     const submission = Number.isFinite(submissionId)
@@ -1674,7 +1726,7 @@ export const createHomeworkV2Service = ({
           where: { assignmentId },
           orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
         });
-    if (!submission) throw new Error('Попытка не найдена');
+    if (!submission) throw createHttpError('Попытка не найдена', 404);
     if (normalizeHomeworkSubmissionStatus(submission.status) !== 'SUBMITTED') {
       throw createHttpError('Проверять можно только отправленную попытку.', 409);
     }
@@ -1695,7 +1747,7 @@ export const createHomeworkV2Service = ({
     });
     const hasReviewItemComment = Object.values(reviewResult.items).some((item) => Boolean(item.comment));
     if (action === 'RETURNED' && !teacherComment && !hasReviewItemComment) {
-      throw new Error('Комментарий обязателен при возврате на доработку');
+      throw createHttpError('Комментарий обязателен при возврате на доработку', 400);
     }
 
     const updatedSubmission = await (prisma as any).homeworkSubmission.update({
@@ -1796,7 +1848,7 @@ export const createHomeworkV2Service = ({
         studentId: active.studentId,
       },
     });
-    if (!assignment) throw new Error('Домашка не найдена');
+    if (!assignment) throw createHttpError('Домашка не найдена', 404);
     if (!isHomeworkAssignmentVisibleToStudent(normalizeHomeworkAssignmentStatus(assignment.status))) {
       throw createHttpError('Домашка не найдена', 404);
     }
@@ -1885,6 +1937,13 @@ export const createHomeworkV2Service = ({
   };
 
   const dispatchScheduledHomeworkAssignmentsForLesson = async (lessonId: number) => {
+    // TEA-278: AUTO_AFTER_LESSON_DONE отправляется только когда урок реально DONE.
+    // Без этого guard'а assigns могут уйти при любом изменении урока (заметка, время и т.п.).
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { status: true },
+    });
+    if (!lesson || lesson.status !== 'DONE') return;
     const scheduledAssignments = await (prisma as any).homeworkAssignment.findMany({
       where: { lessonId, status: 'SCHEDULED', sendMode: 'AUTO_AFTER_LESSON_DONE' },
       include: { teacher: true },
@@ -1956,7 +2015,6 @@ export const createHomeworkV2Service = ({
 
     for (const assignment of assignments) {
       const studentTimeZone = resolveTimeZone(assignment.student?.timezone ?? teacher.timezone);
-      const nowTimeLabel = formatInTimeZone(now, 'HH:mm', { timeZone: studentTimeZone });
       const deadlineAt = toValidDate(assignment.deadlineAt);
       if (
         deadlineAt &&
@@ -2023,7 +2081,7 @@ export const createHomeworkV2Service = ({
         teacher.homeworkReminderMorningEnabled &&
         !assignment.reminderMorningSentAt &&
         deadlineDateKey === nowDateKey &&
-        nowTimeLabel === reminderMorningTime
+        isTimeOfDayWithinCurrentTick(now, reminderMorningTime, studentTimeZone)
       ) {
         const result = await sendHomeworkNotificationToStudent({
           teacherId: assignment.teacherId,
@@ -2044,7 +2102,7 @@ export const createHomeworkV2Service = ({
       if (
         teacher.homeworkOverdueRemindersEnabled &&
         assignment.status === 'OVERDUE' &&
-        nowTimeLabel === overdueReminderTime &&
+        isTimeOfDayWithinCurrentTick(now, overdueReminderTime, studentTimeZone) &&
         Number(assignment.overdueReminderCount ?? 0) < overdueMaxCount
       ) {
         const lastOverdueDateKey = assignment.lastOverdueReminderAt

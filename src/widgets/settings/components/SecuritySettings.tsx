@@ -8,6 +8,8 @@ import {
 } from '../../../icons/MaterialIcons';
 import { SessionSummary, api } from '../../../shared/api/client';
 import { useToast } from '../../../shared/lib/toast';
+import { DialogModal } from '../../../shared/ui/Modal/DialogModal';
+import { useLogout } from '../../../features/auth/session';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../SettingsSection.module.css';
 
@@ -116,6 +118,59 @@ export const SecuritySettings: FC = () => {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  type SecurityAlertsState = {
+    enabled: boolean;
+    newDevice: boolean;
+    logout: boolean;
+    sessionRevoke: boolean;
+  };
+  const [alerts, setAlerts] = useState<SecurityAlertsState | null>(null);
+  const [alertsBusy, setAlertsBusy] = useState<keyof SecurityAlertsState | null>(null);
+  const { logout, isLoggingOut } = useLogout();
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getSettings()
+      .then((response) => {
+        if (cancelled) return;
+        setAlerts({
+          enabled: Boolean(response.settings.securityAlertsEnabled),
+          newDevice: Boolean(response.settings.securityAlertNewDevice ?? true),
+          logout: Boolean(response.settings.securityAlertLogout ?? true),
+          sessionRevoke: Boolean(response.settings.securityAlertSessionRevoke ?? true),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAlerts({ enabled: true, newDevice: true, logout: true, sessionRevoke: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updateAlertFlag = async (key: keyof SecurityAlertsState, next: boolean) => {
+    if (!alerts || alertsBusy) return;
+    const previous = alerts;
+    setAlerts({ ...alerts, [key]: next });
+    setAlertsBusy(key);
+    try {
+      const fieldMap: Record<keyof SecurityAlertsState, string> = {
+        enabled: 'securityAlertsEnabled',
+        newDevice: 'securityAlertNewDevice',
+        logout: 'securityAlertLogout',
+        sessionRevoke: 'securityAlertSessionRevoke',
+      };
+      await api.updateSettings({ [fieldMap[key]]: next } as Record<string, boolean>);
+    } catch (_error) {
+      setAlerts(previous);
+      showToast({ message: 'Не удалось сохранить настройку', variant: 'error' });
+    } finally {
+      setAlertsBusy(null);
+    }
+  };
 
   const handleExportData = async () => {
     if (exporting) return;
@@ -201,6 +256,100 @@ export const SecuritySettings: FC = () => {
 
   return (
     <div className={styles.moduleStack}>
+      <section className={styles.settingsCard}>
+        <div className={styles.sectionHeaderBetween}>
+          <div className={styles.sectionHeaderCompact}>
+            <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
+              <SettingsIcon width={20} height={20} />
+            </div>
+            <div className={styles.sectionHeaderCopy}>
+              <h2 className={styles.sectionHeading}>Уведомления безопасности</h2>
+              <p className={styles.sectionDescription}>
+                Бот напишет в Telegram, если с аккаунтом произойдёт что-то важное. В сообщении появится кнопка «Это был
+                не я» — закроет все сессии одним нажатием.
+              </p>
+            </div>
+          </div>
+          <label className={`${controls.switch} ${styles.switchControl}`}>
+            <input
+              type="checkbox"
+              checked={Boolean(alerts?.enabled)}
+              disabled={!alerts || alertsBusy === 'enabled'}
+              onChange={(event) => {
+                void updateAlertFlag('enabled', event.target.checked);
+              }}
+            />
+            <span className={controls.slider} />
+          </label>
+        </div>
+
+        <div className={styles.cardStack}>
+          <div className={styles.infoRow}>
+            <div>
+              <div className={styles.infoRowTitle}>Вход с нового устройства</div>
+              <div className={styles.infoRowDescription}>
+                Получать сообщение, когда в аккаунт зашли с нового браузера или приложения.
+              </div>
+            </div>
+            <label className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(alerts?.newDevice)}
+                disabled={!alerts?.enabled || alertsBusy === 'newDevice'}
+                onChange={(event) => {
+                  void updateAlertFlag('newDevice', event.target.checked);
+                }}
+              />
+              <span className={controls.slider} />
+            </label>
+          </div>
+
+          <div className={styles.infoRow}>
+            <div>
+              <div className={styles.infoRowTitle}>Выход из аккаунта</div>
+              <div className={styles.infoRowDescription}>
+                Уведомление при нажатии «Выйти» — поможет понять, если кнопку нажал не вы.
+              </div>
+            </div>
+            <label className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(alerts?.logout)}
+                disabled={!alerts?.enabled || alertsBusy === 'logout'}
+                onChange={(event) => {
+                  void updateAlertFlag('logout', event.target.checked);
+                }}
+              />
+              <span className={controls.slider} />
+            </label>
+          </div>
+
+          <div className={styles.infoRow}>
+            <div>
+              <div className={styles.infoRowTitle}>Завершение сессий на других устройствах</div>
+              <div className={styles.infoRowDescription}>
+                Подтверждение, когда вы нажимаете «Завершить все другие сессии» в этом разделе.
+              </div>
+            </div>
+            <label className={`${controls.switch} ${styles.switchControl}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(alerts?.sessionRevoke)}
+                disabled={!alerts?.enabled || alertsBusy === 'sessionRevoke'}
+                onChange={(event) => {
+                  void updateAlertFlag('sessionRevoke', event.target.checked);
+                }}
+              />
+              <span className={controls.slider} />
+            </label>
+          </div>
+        </div>
+
+        <div className={styles.helperText}>
+          В сообщении бот показывает примерное местоположение по IP. Список активных устройств — в разделе ниже.
+        </div>
+      </section>
+
       <section className={styles.settingsCard}>
         <div className={styles.sectionHeaderCompact}>
           <div className={`${styles.sectionIcon} ${styles.sectionIconPurple}`}>
@@ -341,20 +490,25 @@ export const SecuritySettings: FC = () => {
         <button
           className={`${controls.secondaryButton} ${styles.dangerActionButton}`}
           type="button"
-          onClick={async () => {
-            if (!window.confirm('Выйти из аккаунта на этом устройстве?')) return;
-            try {
-              await api.logout();
-            } catch (error) {
-              console.error('Failed to logout', error);
-            } finally {
-              window.location.replace('/');
-            }
-          }}
+          onClick={() => setLogoutDialogOpen(true)}
+          disabled={isLoggingOut}
         >
-          Выйти из аккаунта
+          {isLoggingOut ? 'Выходим…' : 'Выйти из аккаунта'}
         </button>
       </section>
+
+      <DialogModal
+        open={logoutDialogOpen}
+        title="Выйти из аккаунта?"
+        description="Сессия завершится на этом устройстве. Чтобы вернуться, нужно будет заново войти через Telegram."
+        confirmText="Выйти"
+        cancelText="Остаться"
+        onClose={() => setLogoutDialogOpen(false)}
+        onCancel={() => setLogoutDialogOpen(false)}
+        onConfirm={async () => {
+          await logout();
+        }}
+      />
     </div>
   );
 };

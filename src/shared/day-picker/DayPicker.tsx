@@ -12,9 +12,9 @@ import {
   startOfDay,
   startOfMonth,
   startOfWeek,
+  ru,
 } from 'date-fns';
 import type { Locale } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './day-picker.module.css';
 import { useTimeZone } from '../lib/timezoneContext';
@@ -46,35 +46,37 @@ type ClassNames = {
 
 type DateRange = { from?: Date; to?: Date };
 
-type DayPickerProps = {
-  mode?: 'single';
-  selected?: Date;
-  onSelect?: (date?: Date) => void;
-  weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  locale?: Locale;
-  className?: string;
-  classNames?: Partial<ClassNames>;
-  numberOfMonths?: number;
-  defaultMonth?: Date;
-  minDate?: Date;
-  maxDate?: Date;
-  disabled?: (date: Date) => boolean;
-  disabledReason?: (date: Date) => ReactNode | undefined;
-} | {
-  mode: 'range';
-  selected?: DateRange;
-  onSelect?: (range?: DateRange) => void;
-  weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  locale?: Locale;
-  className?: string;
-  classNames?: Partial<ClassNames>;
-  numberOfMonths?: number;
-  defaultMonth?: Date;
-  minDate?: Date;
-  maxDate?: Date;
-  disabled?: (date: Date) => boolean;
-  disabledReason?: (date: Date) => ReactNode | undefined;
-};
+type DayPickerProps =
+  | {
+      mode?: 'single';
+      selected?: Date;
+      onSelect?: (date?: Date) => void;
+      weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      locale?: Locale;
+      className?: string;
+      classNames?: Partial<ClassNames>;
+      numberOfMonths?: number;
+      defaultMonth?: Date;
+      minDate?: Date;
+      maxDate?: Date;
+      disabled?: (date: Date) => boolean;
+      disabledReason?: (date: Date) => ReactNode | undefined;
+    }
+  | {
+      mode: 'range';
+      selected?: DateRange;
+      onSelect?: (range?: DateRange) => void;
+      weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      locale?: Locale;
+      className?: string;
+      classNames?: Partial<ClassNames>;
+      numberOfMonths?: number;
+      defaultMonth?: Date;
+      minDate?: Date;
+      maxDate?: Date;
+      disabled?: (date: Date) => boolean;
+      disabledReason?: (date: Date) => ReactNode | undefined;
+    };
 
 const mergeClassName = (base: string, override?: string) => `${base}${override ? ` ${override}` : ''}`;
 
@@ -124,14 +126,12 @@ export const DayPicker: React.FC<DayPickerProps> = ({
 
   const weekdays = useMemo(() => {
     const base = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-    const rotated = base.slice(weekStartsOn).concat(base.slice(0, weekStartsOn));
-    return rotated;
+    const startIndex = (weekStartsOn + 6) % 7;
+    return base.slice(startIndex).concat(base.slice(0, startIndex));
   }, [weekStartsOn]);
 
   const monthNames = useMemo(() => {
-    return Array.from({ length: 12 }, (_, index) =>
-      format(new Date(2020, index, 1), 'LLL', { locale }),
-    );
+    return Array.from({ length: 12 }, (_, index) => format(new Date(2020, index, 1), 'LLL', { locale }));
   }, [locale]);
 
   const yearRangeStart = useMemo(() => {
@@ -296,9 +296,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
         <div className={styles.months}>
           {monthDays.map(({ month: monthDate, days }) => (
             <div key={monthDate.toISOString()} className={styles.month}>
-              {showMonthTitles && (
-                <div className={styles.monthTitle}>{format(monthDate, 'LLLL yyyy', { locale })}</div>
-              )}
+              {showMonthTitles && <div className={styles.monthTitle}>{format(monthDate, 'LLLL yyyy', { locale })}</div>}
               <div className={mergeClassName(styles.weekdays, classNames?.weekdays)}>
                 {weekdays.map((weekday) => (
                   <div key={weekday} className={mergeClassName('', classNames?.weekday)}>
@@ -310,6 +308,7 @@ export const DayPicker: React.FC<DayPickerProps> = ({
               <div className={mergeClassName(styles.grid, classNames?.grid)}>
                 {days.map(({ date, outside }) => {
                   const isDisabled =
+                    outside ||
                     (minBoundary ? isBefore(date, minBoundary) : false) ||
                     (maxBoundary ? isAfter(date, maxBoundary) : false) ||
                     Boolean(disabled?.(date));

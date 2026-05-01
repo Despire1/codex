@@ -199,6 +199,7 @@ export const AppModals: FC<AppModalsProps> = ({
         open={rescheduleModalOpen}
         lesson={rescheduleLesson}
         weekendWeekdays={weekendWeekdays}
+        linkedStudents={linkedStudents}
         draft={rescheduleDraft}
         onDraftChange={setRescheduleDraft}
         onClose={closeRescheduleModal}

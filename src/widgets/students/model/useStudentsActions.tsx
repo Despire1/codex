@@ -233,20 +233,11 @@ export const useStudentsActionsInternal = ({
 
   const handleAddStudent = useCallback(async () => {
     if (isStudentSubmitting) return;
-    if (!newStudentDraft.customName.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
-      return;
-    }
+    if (!newStudentDraft.customName.trim()) return;
     const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
-    if (pricePerLesson === null) {
-      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
-      return;
-    }
+    if (pricePerLesson === null || pricePerLesson <= 0) return;
     const normalizedEmail = normalizeEmail(newStudentDraft.email);
-    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
-      showInfoDialog('Некорректный email', 'Проверьте формат email ученика.');
-      return;
-    }
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) return;
 
     const isOnboardingSource = studentModalSource.startsWith('onboarding');
     onStudentCreateStarted?.(studentModalSource);
@@ -314,7 +305,6 @@ export const useStudentsActionsInternal = ({
     setLinks,
     setSelectedStudentId,
     setStudents,
-    showInfoDialog,
     showToast,
     studentModalSource,
     triggerStudentsListReload,
@@ -323,20 +313,11 @@ export const useStudentsActionsInternal = ({
   const handleUpdateStudent = useCallback(async () => {
     if (isStudentSubmitting) return;
     if (!editingStudentId) return;
-    if (!newStudentDraft.customName.trim()) {
-      showInfoDialog('Заполните все поля', 'Укажите имя ученика.');
-      return;
-    }
+    if (!newStudentDraft.customName.trim()) return;
     const pricePerLesson = parseStudentPrice(newStudentDraft.pricePerLesson);
-    if (pricePerLesson === null) {
-      showInfoDialog('Заполните все поля', 'Укажите цену занятия для ученика.');
-      return;
-    }
+    if (pricePerLesson === null || pricePerLesson <= 0) return;
     const normalizedEmail = normalizeEmail(newStudentDraft.email);
-    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
-      showInfoDialog('Некорректный email', 'Проверьте формат email ученика.');
-      return;
-    }
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) return;
     setIsStudentSubmitting(true);
     try {
       const existingLink = links.find((entry) => entry.studentId === editingStudentId && !entry.isArchived) ?? null;
@@ -360,8 +341,10 @@ export const useStudentsActionsInternal = ({
       resetStudentDraft();
       closeStudentModal();
       triggerStudentsListReload();
+      showToast({ message: 'Изменения сохранены', variant: 'success' });
     } catch (error) {
       console.error('Failed to update student', error);
+      showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
     } finally {
       setIsStudentSubmitting(false);
     }
@@ -381,7 +364,7 @@ export const useStudentsActionsInternal = ({
     resetStudentDraft,
     setLinks,
     setStudents,
-    showInfoDialog,
+    showToast,
     triggerStudentsListReload,
   ]);
 

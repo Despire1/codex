@@ -49,15 +49,14 @@ const InfoCircleIcon = ({ className = '' }: { className?: string }) => (
 
 const resolveNoteTone = (noteType: ScheduleNoteType) => (noteType === 'INFO' ? 'info' : 'warning');
 
-const formatNoteMeta = (note: StudentProfileNote, timeZone: string) => {
-  if (note.source === 'primary') {
-    return 'Из карточки ученика';
+const formatNoteMeta = (note: StudentProfileNote, timeZone: string, fallbackTimestamp: string | null) => {
+  const timestamp = note.updatedAt ?? note.createdAt ?? (note.source === 'primary' ? fallbackTimestamp : null);
+
+  if (timestamp) {
+    return formatInTimeZone(timestamp, 'd MMMM yyyy • HH:mm', { locale: ru, timeZone });
   }
 
-  return formatInTimeZone(note.updatedAt ?? note.createdAt ?? new Date().toISOString(), 'd MMMM yyyy • HH:mm', {
-    locale: ru,
-    timeZone,
-  });
+  return 'Из карточки ученика';
 };
 
 export const StudentProfileNotesPanel: FC<StudentProfileNotesPanelProps> = ({
@@ -175,7 +174,9 @@ export const StudentProfileNotesPanel: FC<StudentProfileNotesPanelProps> = ({
                   </div>
                 </div>
 
-                <p className={styles.noteMeta}>{formatNoteMeta(note, timeZone)}</p>
+                <p className={styles.noteMeta}>
+                  {formatNoteMeta(note, timeZone, studentEntry.student.createdAt ?? null)}
+                </p>
               </article>
             );
           })}

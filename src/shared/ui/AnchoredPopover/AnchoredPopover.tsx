@@ -21,6 +21,7 @@ interface AnchoredPopoverProps {
 const DEFAULT_OFFSET = 8;
 const VIEWPORT_PADDING = 8;
 const TRANSITION_DURATION_MS = 180;
+const ARROW_EDGE_PADDING = 18;
 
 const getOppositeSide = (side: PopoverSide): PopoverSide => {
   switch (side) {
@@ -51,10 +52,18 @@ export const AnchoredPopover = ({
   preventCloseOnOtherPopoverClick = false,
 }: AnchoredPopoverProps) => {
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number; maxHeight: number | null }>({
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number | null;
+    arrowX: number;
+    arrowY: number;
+  }>({
     top: 0,
     left: 0,
     maxHeight: null,
+    arrowX: 0,
+    arrowY: 0,
   });
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(isOpen);
@@ -188,7 +197,20 @@ export const AnchoredPopover = ({
 
     popoverRef.current.dataset.side = resolvedSide;
 
-    setPosition({ ...clamped, maxHeight });
+    const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+    const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+    const arrowX = clampPosition(
+      anchorCenterX - clamped.left,
+      ARROW_EDGE_PADDING,
+      Math.max(ARROW_EDGE_PADDING, popoverRect.width - ARROW_EDGE_PADDING),
+    );
+    const arrowY = clampPosition(
+      anchorCenterY - clamped.top,
+      ARROW_EDGE_PADDING,
+      Math.max(ARROW_EDGE_PADDING, popoverRect.height - ARROW_EDGE_PADDING),
+    );
+
+    setPosition({ ...clamped, maxHeight, arrowX, arrowY });
   };
 
   useLayoutEffect(() => {
@@ -245,21 +267,24 @@ export const AnchoredPopover = ({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
     };
 
     const handleReposition = () => updatePosition();
 
     document.addEventListener('mousedown', handleOutside);
     document.addEventListener('touchstart', handleOutside);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('resize', handleReposition);
     window.addEventListener('scroll', handleReposition, true);
 
     return () => {
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('touchstart', handleOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
     };
@@ -278,9 +303,9 @@ export const AnchoredPopover = ({
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
-        ...(position.maxHeight !== null
-          ? { maxHeight: `${position.maxHeight}px`, overflowY: 'auto' as const }
-          : null),
+        ['--anchor-arrow-x' as string]: `${position.arrowX}px`,
+        ['--anchor-arrow-y' as string]: `${position.arrowY}px`,
+        ...(position.maxHeight !== null ? { maxHeight: `${position.maxHeight}px`, overflowY: 'auto' as const } : null),
       }}
     >
       {children}

@@ -137,6 +137,18 @@
   grid-column: 1 / -1;
 }
 
+.fieldInvalid .input,
+.fieldInvalid .textarea {
+  border-color: var(--color-red-500);
+  background: var(--color-red-50, #fef2f2);
+}
+
+.fieldInvalid .input:focus,
+.fieldInvalid .textarea:focus {
+  border-color: var(--color-red-500);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
 .label {
   font-size: 14px;
   line-height: 1.4;
@@ -159,6 +171,17 @@
   font-size: 12px;
   line-height: 1.4;
   color: var(--text-muted);
+  margin: 0;
+}
+
+.fieldHintWarning {
+  color: var(--color-amber-700, #b45309);
+}
+
+.fieldError {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-red-600, #dc2626);
   margin: 0;
 }
 

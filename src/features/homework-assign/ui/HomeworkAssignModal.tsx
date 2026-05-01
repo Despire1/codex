@@ -306,8 +306,23 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
   );
   const requiresLesson = draft.sendMode === 'AUTO_AFTER_LESSON_DONE';
   const hasValidLesson = !requiresLesson || Boolean(draft.lessonId);
-  const hasValidSchedule = draft.sendMode !== 'SCHEDULED' || Boolean(scheduledFor);
-  const isFormDisabled = submitting || loading;
+  // TEA-270: scheduledFor должен быть и непустой, и в будущем — иначе сервер вернёт 500.
+  const hasValidSchedule =
+    draft.sendMode !== 'SCHEDULED' ||
+    (Boolean(scheduledFor) && new Date(scheduledFor as string).getTime() > Date.now());
+  // TEA-269: локальный in-flight, чтобы заблокировать кнопку до прихода ответа от сервера —
+  // submitting (пропс родителя) обновляется только после первого setState родителя.
+  const [isSubmitInflight, setIsSubmitInflight] = useState(false);
+  // TEA-280: показываем сообщение об ошибке внутри модалки и даём «Повторить»,
+  // чтобы пользователь не закрывал и не терял настройки выдачи.
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // Сбрасываем баннер ошибки, как только пользователь меняет любую настройку выдачи —
+  // иначе он висит после успешной правки и сбивает с толку.
+  useEffect(() => {
+    if (submitError) setSubmitError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.studentId, draft.sendMode, draft.lessonId, draft.scheduledLocal, draft.deadlineLocal, draft.templateId]);
+  const isFormDisabled = submitting || loading || isSubmitInflight;
   const canSubmit =
     hasStudents &&
     Boolean(draft.studentId) &&
@@ -534,32 +549,58 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
     setTemplateVisibleCount((prev) => Math.min(prev + TEMPLATE_PAGE_STEP, availableTemplates.length));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!draft.studentId || !canSubmit) return;
+  const submitDraft = async () => {
+    if (!draft.studentId) return;
+    setIsSubmitInflight(true);
+    setSubmitError(null);
+    try {
+      const success = await onSubmit({
+        studentId: draft.studentId,
+        lessonId: draft.sendMode === 'AUTO_AFTER_LESSON_DONE' ? draft.lessonId : null,
+        templateId: draft.templateId,
+        groupId: draft.groupId,
+        sendMode: draft.sendMode,
+        scheduledFor: draft.sendMode === 'SCHEDULED' ? scheduledFor : null,
+        deadlineAt,
+      });
 
-    const success = await onSubmit({
-      studentId: draft.studentId,
-      lessonId: draft.sendMode === 'AUTO_AFTER_LESSON_DONE' ? draft.lessonId : null,
-      templateId: draft.templateId,
-      groupId: draft.groupId,
-      sendMode: draft.sendMode,
-      scheduledFor: draft.sendMode === 'SCHEDULED' ? scheduledFor : null,
-      deadlineAt,
-    });
-
-    if (success) {
-      onClose();
+      if (success) {
+        onClose();
+      } else {
+        // TEA-280: success=false без брошенной ошибки — родитель уже показал свою ошибку,
+        // но мы тоже даём пользователю понятный повод нажать «Повторить».
+        setSubmitError('Не удалось выдать задание. Попробуйте ещё раз.');
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message ? error.message : 'Не удалось выдать задание. Попробуйте ещё раз.';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitInflight(false);
     }
   };
 
-  const submitLabel = submitting
-    ? 'Выдаю…'
-    : loading
-      ? 'Загружаю…'
-      : draft.sendMode === 'MANUAL'
-        ? 'Выдать сейчас'
-        : 'Запланировать выдачу';
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft.studentId || !canSubmit) return;
+    // TEA-269: если уже идёт запрос, проглатываем повторный submit без побочных эффектов.
+    if (isSubmitInflight) return;
+    await submitDraft();
+  };
+
+  const handleRetrySubmit = async () => {
+    if (!canSubmit || isSubmitInflight) return;
+    await submitDraft();
+  };
+
+  const submitLabel =
+    submitting || isSubmitInflight
+      ? 'Выдаю…'
+      : loading
+        ? 'Загружаю…'
+        : draft.sendMode === 'MANUAL'
+          ? 'Выдать сейчас'
+          : 'Запланировать выдачу';
 
   const content = (
     <div
@@ -912,11 +953,24 @@ export const HomeworkAssignModal: FC<HomeworkAssignModalProps> = ({
           </section>
         </div>
 
+        {submitError ? (
+          <div className={styles.submitErrorBanner} role="alert">
+            <span className={styles.submitErrorMessage}>{submitError}</span>
+            <button
+              type="button"
+              className={styles.submitErrorRetryButton}
+              onClick={handleRetrySubmit}
+              disabled={!canSubmit || isSubmitInflight}
+            >
+              Повторить
+            </button>
+          </div>
+        ) : null}
         <div className={styles.footer}>
-          <button type="button" className={styles.cancelButton} onClick={closeRequest} disabled={submitting}>
+          <button type="button" className={styles.cancelButton} onClick={closeRequest} disabled={isFormDisabled}>
             Отмена
           </button>
-          <button type="submit" className={styles.submitButton} disabled={!canSubmit}>
+          <button type="submit" className={styles.submitButton} disabled={!canSubmit || isSubmitInflight}>
             {submitLabel}
           </button>
         </div>

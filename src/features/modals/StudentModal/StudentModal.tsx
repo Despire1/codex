@@ -1,8 +1,15 @@
-import { type FC, type SVGProps, useEffect, useId, useRef, useState } from 'react';
+import { type FC, type SVGProps, useEffect, useId, useMemo, useRef, useState } from 'react';
 import styles from './StudentModal.module.css';
 import modalStyles from '../modal.module.css';
 import { BottomSheet } from '../../../shared/ui/BottomSheet/BottomSheet';
+import { isValidEmail, normalizeEmail } from '../../../shared/lib/email';
 import { type StudentModalFocusField } from './types';
+
+type StudentModalErrors = {
+  customName?: string;
+  pricePerLesson?: string;
+  email?: string;
+};
 
 interface StudentModalDraft {
   customName: string;
@@ -107,25 +114,86 @@ export const StudentModal: FC<StudentModalProps> = ({
   variant = 'modal',
 }) => {
   const emailSuggestionsId = useId();
+  const customNameInputRef = useRef<HTMLInputElement | null>(null);
   const priceInputRef = useRef<HTMLInputElement | null>(null);
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const levelInputRef = useRef<HTMLInputElement | null>(null);
   const [highlightedField, setHighlightedField] = useState<StudentModalFocusField | null>(null);
+  const [usernameSanitizedNotice, setUsernameSanitizedNotice] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
-    if (!open || focusField !== 'price' || isSubmitting) {
+    if (!open) {
+      setSubmitAttempted(false);
+      setUsernameSanitizedNotice(false);
+    }
+  }, [open]);
+
+  const validationErrors = useMemo<StudentModalErrors>(() => {
+    const errors: StudentModalErrors = {};
+    if (!draft.customName.trim()) {
+      errors.customName = 'Укажите имя ученика';
+    }
+    const trimmedPrice = draft.pricePerLesson.trim();
+    if (!trimmedPrice) {
+      errors.pricePerLesson = 'Укажите цену занятия';
+    } else {
+      const numericPrice = Number(trimmedPrice);
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+        errors.pricePerLesson = 'Цена должна быть положительной';
+      }
+    }
+    const normalizedEmail = normalizeEmail(draft.email);
+    if (normalizedEmail && !isValidEmail(normalizedEmail)) {
+      errors.email = 'Введите корректный email';
+    }
+    return errors;
+  }, [draft.customName, draft.email, draft.pricePerLesson]);
+
+  const showError = (field: keyof StudentModalErrors) => submitAttempted && Boolean(validationErrors[field]);
+
+  const handleFormSubmit = () => {
+    setSubmitAttempted(true);
+    if (Object.keys(validationErrors).length > 0) {
+      const fieldOrder: Array<keyof StudentModalErrors> = ['customName', 'pricePerLesson', 'email'];
+      const firstInvalid = fieldOrder.find((field) => validationErrors[field]);
+      if (firstInvalid === 'customName') {
+        customNameInputRef.current?.focus();
+      } else if (firstInvalid === 'pricePerLesson') {
+        priceInputRef.current?.focus();
+      } else if (firstInvalid === 'email') {
+        emailInputRef.current?.focus();
+      }
+      return;
+    }
+    onSubmit();
+  };
+
+  useEffect(() => {
+    if (!open || !focusField || isSubmitting) {
       return;
     }
 
+    const refByField: Record<StudentModalFocusField, typeof priceInputRef> = {
+      price: priceInputRef,
+      email: emailInputRef,
+      phone: phoneInputRef,
+      level: levelInputRef,
+    };
+    const targetRef = refByField[focusField];
+
     const focusTimer = window.setTimeout(() => {
-      const input = priceInputRef.current;
+      const input = targetRef.current;
       if (!input) return;
       input.focus();
       input.select();
       input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHighlightedField('price');
+      setHighlightedField(focusField);
     }, 80);
 
     const highlightTimer = window.setTimeout(() => {
-      setHighlightedField((current) => (current === 'price' ? null : current));
+      setHighlightedField((current) => (current === focusField ? null : current));
     }, 2200);
 
     return () => {
@@ -169,25 +237,33 @@ export const StudentModal: FC<StudentModalProps> = ({
         className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit();
+          handleFormSubmit();
         }}
+        noValidate
       >
         <div className={styles.mainGrid}>
-          <div className={`${styles.field} ${styles.fieldFull}`}>
+          <div className={`${styles.field} ${styles.fieldFull} ${showError('customName') ? styles.fieldInvalid : ''}`}>
             <label className={styles.label} htmlFor="student-custom-name">
               Имя <span className={styles.requiredMark}>*</span>
             </label>
             <input
               id="student-custom-name"
+              ref={customNameInputRef}
               className={styles.input}
               type="text"
-              required
               autoComplete="name"
               placeholder="Введите имя ученика"
               value={draft.customName}
               disabled={isSubmitting}
+              aria-invalid={showError('customName') || undefined}
+              aria-describedby={showError('customName') ? 'student-custom-name-error' : undefined}
               onChange={(event) => onDraftChange({ ...draft, customName: event.target.value })}
             />
+            {showError('customName') ? (
+              <p id="student-custom-name-error" className={styles.fieldError}>
+                {validationErrors.customName}
+              </p>
+            ) : null}
           </div>
 
           <div className={styles.field}>
@@ -210,18 +286,32 @@ export const StudentModal: FC<StudentModalProps> = ({
                 placeholder="username (необязательно)"
                 value={draft.username}
                 disabled={isSubmitting}
-                onChange={(event) =>
-                  onDraftChange({
-                    ...draft,
-                    username: sanitizeTelegramUsername(event.target.value),
-                  })
-                }
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  const sanitized = sanitizeTelegramUsername(raw);
+                  if (sanitized.length < raw.replace(/^@+/, '').length && raw.replace(/^@+/, '').length > 0) {
+                    setUsernameSanitizedNotice(true);
+                  } else if (!sanitized) {
+                    setUsernameSanitizedNotice(false);
+                  }
+                  onDraftChange({ ...draft, username: sanitized });
+                }}
               />
             </div>
-            <p className={styles.fieldHint}>Необязательно. Используется для Telegram-уведомлений.</p>
+            {usernameSanitizedNotice ? (
+              <p className={`${styles.fieldHint} ${styles.fieldHintWarning}`}>
+                Пробелы и спецсимволы недопустимы — удалены автоматически.
+              </p>
+            ) : (
+              <p className={styles.fieldHint}>Необязательно. Используется для Telegram-уведомлений.</p>
+            )}
           </div>
 
-          <div className={`${styles.field} ${highlightedField === 'price' ? styles.fieldHighlighted : ''}`}>
+          <div
+            className={`${styles.field} ${highlightedField === 'price' ? styles.fieldHighlighted : ''} ${
+              showError('pricePerLesson') ? styles.fieldInvalid : ''
+            }`}
+          >
             <label className={styles.label} htmlFor="student-price">
               Цена занятия <span className={styles.requiredMark}>*</span>
             </label>
@@ -235,13 +325,19 @@ export const StudentModal: FC<StudentModalProps> = ({
                 className={`${styles.input} ${styles.inputWithLeadingIcon}`}
                 type="number"
                 min={0}
-                required
                 placeholder="например, 1500"
                 value={draft.pricePerLesson}
                 disabled={isSubmitting}
+                aria-invalid={showError('pricePerLesson') || undefined}
+                aria-describedby={showError('pricePerLesson') ? 'student-price-error' : undefined}
                 onChange={(event) => onDraftChange({ ...draft, pricePerLesson: event.target.value })}
               />
             </div>
+            {showError('pricePerLesson') ? (
+              <p id="student-price-error" className={styles.fieldError}>
+                {validationErrors.pricePerLesson}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -249,7 +345,11 @@ export const StudentModal: FC<StudentModalProps> = ({
           <h3 className={styles.additionalTitle}>Дополнительная информация</h3>
 
           <div className={styles.additionalFields}>
-            <div className={styles.field}>
+            <div
+              className={`${styles.field} ${highlightedField === 'email' ? styles.fieldHighlighted : ''} ${
+                showError('email') ? styles.fieldInvalid : ''
+              }`}
+            >
               <label className={styles.secondaryLabel} htmlFor="student-email">
                 Email
               </label>
@@ -259,6 +359,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 </span>
                 <input
                   id="student-email"
+                  ref={emailInputRef}
                   className={`${styles.input} ${styles.inputWithLeadingIcon}`}
                   type="email"
                   autoComplete="email"
@@ -267,6 +368,8 @@ export const StudentModal: FC<StudentModalProps> = ({
                   list={emailSuggestions.length > 0 ? emailSuggestionsId : undefined}
                   value={draft.email}
                   disabled={isSubmitting}
+                  aria-invalid={showError('email') || undefined}
+                  aria-describedby={showError('email') ? 'student-email-error' : undefined}
                   onChange={(event) => onDraftChange({ ...draft, email: event.target.value })}
                 />
                 {emailSuggestions.length > 0 ? (
@@ -277,9 +380,14 @@ export const StudentModal: FC<StudentModalProps> = ({
                   </datalist>
                 ) : null}
               </div>
+              {showError('email') ? (
+                <p id="student-email-error" className={styles.fieldError}>
+                  {validationErrors.email}
+                </p>
+              ) : null}
             </div>
 
-            <div className={styles.field}>
+            <div className={`${styles.field} ${highlightedField === 'phone' ? styles.fieldHighlighted : ''}`}>
               <label className={styles.secondaryLabel} htmlFor="student-phone">
                 Телефон
               </label>
@@ -289,6 +397,7 @@ export const StudentModal: FC<StudentModalProps> = ({
                 </span>
                 <input
                   id="student-phone"
+                  ref={phoneInputRef}
                   className={`${styles.input} ${styles.inputWithLeadingIcon}`}
                   type="tel"
                   autoComplete="tel"
@@ -301,12 +410,13 @@ export const StudentModal: FC<StudentModalProps> = ({
               </div>
             </div>
 
-            <div className={styles.field}>
+            <div className={`${styles.field} ${highlightedField === 'level' ? styles.fieldHighlighted : ''}`}>
               <label className={styles.secondaryLabel} htmlFor="student-level">
                 Уровень ученика
               </label>
               <input
                 id="student-level"
+                ref={levelInputRef}
                 className={styles.input}
                 type="text"
                 placeholder="Пока не указан"

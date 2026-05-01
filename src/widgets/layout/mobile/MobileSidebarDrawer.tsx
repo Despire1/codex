@@ -1,6 +1,7 @@
 import { type FC, useEffect } from 'react';
 import type { TabId } from '@/app/tabs';
-import { CloseIcon, RobotIcon, SettingsIcon } from '@/icons/MaterialIcons';
+import { CloseIcon, SettingsIcon } from '@/icons/MaterialIcons';
+import { BrandLogo } from '@/shared/ui/BrandLogo';
 import type { MobileNavItem } from './model/mobileNavigation';
 import styles from './MobileSidebarDrawer.module.css';
 
@@ -61,12 +62,29 @@ export const MobileSidebarDrawer: FC<MobileSidebarDrawerProps> = ({
       <aside className={`${styles.drawer} ${isOpen ? styles.drawerOpen : ''}`} aria-label="Мобильная навигация">
         <div className={styles.drawerInner}>
           <div className={styles.header}>
-            <div className={styles.brand}>
-              <div className={styles.brandIcon} aria-hidden>
-                <RobotIcon width={20} height={20} />
-              </div>
-              <span className={styles.brandText}>TeacherBot</span>
-            </div>
+            {(() => {
+              const dashboardItem = items.find((item) => item.id === 'dashboard');
+              const brandContent = (
+                <>
+                  <span className={styles.brandIcon} aria-hidden>
+                    <BrandLogo width={28} height={28} />
+                  </span>
+                  <span className={styles.brandText}>TeacherBot</span>
+                </>
+              );
+              return dashboardItem ? (
+                <button
+                  type="button"
+                  className={styles.brand}
+                  onClick={() => onNavigate(dashboardItem)}
+                  aria-label="На главную"
+                >
+                  {brandContent}
+                </button>
+              ) : (
+                <div className={styles.brand}>{brandContent}</div>
+              );
+            })()}
 
             <button type="button" className={styles.closeButton} aria-label="Закрыть" onClick={onClose}>
               <CloseIcon width={20} height={20} />

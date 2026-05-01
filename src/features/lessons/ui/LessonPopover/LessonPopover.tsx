@@ -73,7 +73,11 @@ export const LessonPopover = ({
   const ParticipantIcon = participants.length > 1 ? PeopleIcon : PersonOutlineIcon;
 
   return (
-    <div className={styles.root}>
+    <div
+      className={styles.root}
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
       <div className={styles.toolbar}>
         <Tooltip content="Цвет занятия">
           <div

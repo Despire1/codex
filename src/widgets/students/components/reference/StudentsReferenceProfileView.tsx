@@ -77,6 +77,7 @@ import {
 import { StudentDebtPopoverContent } from '../StudentDebtPopoverContent';
 import { StudentProfileLearningGoalPanel } from './StudentProfileLearningGoalPanel';
 import { StudentProfileNotesPanel } from './StudentProfileNotesPanel';
+import type { StudentModalFocusField } from '@/features/modals/StudentModal/types';
 import styles from './StudentsReferenceProfileView.module.css';
 
 type ProfileTabId = 'homework' | 'lessons' | 'payments';
@@ -107,11 +108,12 @@ interface StudentsReferenceProfileViewProps {
     payload: { content: string; noteType: 'IMPORTANT' | 'INFO' },
   ) => Promise<void>;
   onDeleteStudentNote: (studentEntry: StudentListItem, noteId: string) => Promise<void>;
+  onSaveLearningGoal?: (studentEntry: StudentListItem, value: string) => Promise<void>;
   activeTab: ProfileTabId;
   onTabChange: (tab: ProfileTabId) => void;
   onBack: () => void;
   onScheduleLesson: () => void;
-  onEditStudent: (options?: { focusField?: 'price' }) => void;
+  onEditStudent: (options?: { focusField?: StudentModalFocusField }) => void;
   onOpenBalanceTopup: () => void;
   onRequestDeleteStudent: () => void;
   onTogglePaymentReminders: (enabled: boolean) => void;
@@ -252,6 +254,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   onCreateStudentNote,
   onUpdateStudentNote,
   onDeleteStudentNote,
+  onSaveLearningGoal,
   activeTab,
   onTabChange,
   onBack,
@@ -787,6 +790,10 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   const memberSinceLabel = studentEntry.student.createdAt
     ? formatInTimeZone(studentEntry.student.createdAt, 'd MMMM yyyy', { locale: ru, timeZone })
     : '—';
+  const formatStatCount = (value: number) => (value > 0 ? value.toString() : '—');
+  const lessonsConductedLabel = formatStatCount(profileStats.lessonsConducted);
+  const completedHomeworksLabel = formatStatCount(profileStats.completedHomeworks);
+  const averageScoreLabel = profileStats.averageScore > 0 ? profileStats.averageScore.toFixed(1) : '—';
 
   const handleMenuAction = (action: () => void) => {
     setIsActionsMenuOpen(false);
@@ -998,7 +1005,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       {showActivationBadge ? (
                         <>
                           <Tooltip content={activationHint} side="bottom" align="center">
-                            <span className={styles.heroInactiveBadge}>Telegram не привязан</span>
+                            <span className={styles.heroInactiveBadge}>Не активирован</span>
                           </Tooltip>
                           {botUsername ? (
                             <Tooltip content="Скопировать ссылку-приглашение для ученика" side="bottom" align="center">
@@ -1106,7 +1113,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
 
             <div className={styles.heroStatsGrid}>
               <div>
-                <div className={styles.heroStatValue}>{profileStats.lessonsConducted}</div>
+                <div className={styles.heroStatValue}>{lessonsConductedLabel}</div>
                 <div className={styles.heroStatLabel}>Уроков проведено</div>
               </div>
               {priceEditState.id === studentEntry.student.id ? (
@@ -1183,7 +1190,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </AdaptivePopover>
               ) : (
                 <div>
-                  <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{profileStats.averageScore}</div>
+                  <div className={`${styles.heroStatValue} ${styles.heroStatBlue}`}>{averageScoreLabel}</div>
                   <div className={styles.heroStatLabel}>Средний балл</div>
                 </div>
               )}
@@ -1205,9 +1212,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                 </button>
               </Tooltip>
               <div>
-                <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>
-                  {profileStats.completedHomeworks}
-                </div>
+                <div className={`${styles.heroStatValue} ${styles.heroStatViolet}`}>{completedHomeworksLabel}</div>
                 <div className={styles.heroStatLabel}>Домашек сдано</div>
               </div>
             </div>
@@ -1286,7 +1291,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
 
           <div className={styles.bodyGrid}>
             <div className={styles.mainColumn}>
-              <section className={styles.tabsCard}>
+              <section className={styles.tabsCard} data-hint="student-tabs">
                 <div className={styles.tabsHeader}>
                   <div className={styles.tabsRow}>
                     {profileTabs.map((tab) => (
@@ -1308,7 +1313,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
             </div>
 
             <div className={styles.sideColumn}>
-              <StudentProfileLearningGoalPanel studentEntry={studentEntry} />
+              <StudentProfileLearningGoalPanel studentEntry={studentEntry} onSaveGoal={onSaveLearningGoal} />
 
               <StudentProfileNotesPanel
                 studentEntry={studentEntry}
@@ -1346,19 +1351,52 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                       <FontAwesomeIcon icon={faPhone} />
                       <a href={`tel:${phoneLabel.replace(/[^+\d]/g, '')}`}>{phoneLabel}</a>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div>
+                      <FontAwesomeIcon icon={faPhone} />
+                      <button
+                        type="button"
+                        className={styles.contactPlaceholderButton}
+                        onClick={() => onEditStudent({ focusField: 'phone' })}
+                      >
+                        + Добавить телефон
+                      </button>
+                    </div>
+                  )}
                   {emailLabel ? (
                     <div>
                       <FontAwesomeIcon icon={faEnvelope} />
                       <a href={`mailto:${emailLabel}`}>{emailLabel}</a>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div>
+                      <FontAwesomeIcon icon={faEnvelope} />
+                      <button
+                        type="button"
+                        className={styles.contactPlaceholderButton}
+                        onClick={() => onEditStudent({ focusField: 'email' })}
+                      >
+                        + Добавить email
+                      </button>
+                    </div>
+                  )}
                   {studentLevelLabel ? (
                     <div>
                       <FontAwesomeIcon icon={faStar} />
                       <span>{studentLevelLabel}</span>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div>
+                      <FontAwesomeIcon icon={faStar} />
+                      <button
+                        type="button"
+                        className={styles.contactPlaceholderButton}
+                        onClick={() => onEditStudent({ focusField: 'level' })}
+                      >
+                        + Указать уровень
+                      </button>
+                    </div>
+                  )}
                   <div>
                     <FontAwesomeIcon icon={faCalendar} />
                     <span>С нами с {memberSinceLabel}</span>

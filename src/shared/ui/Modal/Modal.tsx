@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './Modal.module.css';
 
 interface ModalProps {
@@ -21,8 +22,9 @@ export const Modal = ({ open, title, titleActions, headerActions, onClose, child
   }, [open, onClose]);
 
   if (!open) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className={styles.backdrop} onClick={onClose}>
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
@@ -39,6 +41,7 @@ export const Modal = ({ open, title, titleActions, headerActions, onClose, child
         </div>
         <div className={styles.body}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

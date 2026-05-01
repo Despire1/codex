@@ -20,6 +20,7 @@ interface TopbarCreateMenuProps {
   triggerHiddenClassName?: string;
   iconAccentClassName?: string;
   disabled?: boolean;
+  triggerDataTour?: string;
 }
 
 export const TopbarCreateMenu: FC<TopbarCreateMenuProps> = ({
@@ -29,6 +30,7 @@ export const TopbarCreateMenu: FC<TopbarCreateMenuProps> = ({
   triggerHiddenClassName = '',
   iconAccentClassName,
   disabled = false,
+  triggerDataTour,
 }) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
@@ -58,6 +60,7 @@ export const TopbarCreateMenu: FC<TopbarCreateMenuProps> = ({
           disabled={disabled}
           aria-haspopup="menu"
           aria-expanded={open}
+          data-tour={triggerDataTour}
         >
           <AddOutlinedIcon width={18} height={18} className={iconAccentClassName} />
           <span>{label}</span>

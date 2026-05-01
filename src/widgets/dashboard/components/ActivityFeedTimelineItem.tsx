@@ -16,13 +16,15 @@ const renderHighlightedMessage = (message: string, highlight?: string | null) =>
   if (!normalizedHighlight) return message;
   const index = message.indexOf(normalizedHighlight);
   if (index === -1) return message;
-  const before = message.slice(0, index);
-  const after = message.slice(index + normalizedHighlight.length);
+  let endIndex = index + normalizedHighlight.length;
+  while (endIndex < message.length && /[\p{L}]/u.test(message[endIndex])) {
+    endIndex += 1;
+  }
   return (
     <>
-      {before}
-      <strong>{normalizedHighlight}</strong>
-      {after}
+      {message.slice(0, index)}
+      <strong>{message.slice(index, endIndex)}</strong>
+      {message.slice(endIndex)}
     </>
   );
 };

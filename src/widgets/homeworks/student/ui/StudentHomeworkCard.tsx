@@ -90,25 +90,35 @@ export const StudentHomeworkCard: FC<StudentHomeworkCardProps> = ({ assignment, 
       onClick={() => onOpen(assignment)}
       onKeyDown={(event) => onCardKeyDown(event, assignment, onOpen)}
       aria-label={`${assignment.title}. ${actionLabel}`}
+      data-hint="student-homework-card"
     >
       <div className={styles.body}>
         <div className={styles.headerRow}>
           <div className={styles.headMain}>
             <div className={styles.badgesRow}>
-              <span className={`${styles.statusBadge} ${styles[`statusBadge_${kind}`]}`}>
+              <span
+                className={`${styles.statusBadge} ${styles[`statusBadge_${kind}`]}`}
+                data-hint="student-homework-status"
+              >
                 <FontAwesomeIcon icon={resolveStatusIcon(kind)} className={styles.statusIcon} />
                 {resolveStudentHomeworkStatusLabel(kind)}
               </span>
               <span className={styles.subjectBadge}>{subject}</span>
-              {scoreValue !== null ? <span className={styles.scoreBadge}>{formatStudentHomeworkScore(scoreValue)}</span> : null}
+              {scoreValue !== null ? (
+                <span className={styles.scoreBadge}>{formatStudentHomeworkScore(scoreValue)}</span>
+              ) : null}
             </div>
             <h3 className={styles.title}>{assignment.title}</h3>
             <p className={styles.description}>{description}</p>
           </div>
 
           <div className={styles.deadlineWrap}>
-            <div className={`${styles.deadlinePrimary} ${styles[`deadlinePrimary_${deadline.tone}`]}`}>{deadline.primary}</div>
-            <div className={`${styles.deadlineSecondary} ${styles[`deadlineSecondary_${deadline.tone}`]}`}>{deadline.secondary}</div>
+            <div className={`${styles.deadlinePrimary} ${styles[`deadlinePrimary_${deadline.tone}`]}`}>
+              {deadline.primary}
+            </div>
+            <div className={`${styles.deadlineSecondary} ${styles[`deadlineSecondary_${deadline.tone}`]}`}>
+              {deadline.secondary}
+            </div>
           </div>
         </div>
 
@@ -126,10 +136,12 @@ export const StudentHomeworkCard: FC<StudentHomeworkCardProps> = ({ assignment, 
           </div>
         ) : null}
 
-        {infoNote ? <div className={`${styles.infoCard} ${styles[`infoCard_${infoNote.tone}`]}`}>
-          <div className={styles.infoTitle}>{infoNote.title}</div>
-          <div className={styles.infoText}>{infoNote.text}</div>
-        </div> : null}
+        {infoNote ? (
+          <div className={`${styles.infoCard} ${styles[`infoCard_${infoNote.tone}`]}`}>
+            <div className={styles.infoTitle}>{infoNote.title}</div>
+            <div className={styles.infoText}>{infoNote.text}</div>
+          </div>
+        ) : null}
 
         <div className={styles.footerRow}>
           <div className={styles.metaRow}>

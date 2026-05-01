@@ -174,18 +174,20 @@
   height: 36px;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--color-slate-700);
   cursor: pointer;
   transition:
     transform 0.18s ease,
     background 0.18s ease,
-    color 0.18s ease;
+    color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .noteActionButton:hover {
   transform: translateY(-1px);
-  background: var(--surface-card-muted);
+  background: var(--surface-card);
+  border-color: var(--color-slate-300);
   color: var(--text-primary);
 }
 

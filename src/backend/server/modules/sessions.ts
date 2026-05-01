@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import type { User } from '@prisma/client';
 import prisma from '../../prismaClient';
+import { notifyAllOtherSessionsRevoked } from './securityAlerts';
 
 type SessionServiceDeps = {
   getSessionTokenHash: (req: IncomingMessage) => string | null;
@@ -9,9 +10,8 @@ type SessionServiceDeps = {
 export const createSessionService = ({ getSessionTokenHash }: SessionServiceDeps) => {
   const listSessions = async (user: User, req: IncomingMessage) => {
     const tokenHash = getSessionTokenHash(req);
-    const now = new Date();
     const sessions = await prisma.session.findMany({
-      where: { userId: user.id, revokedAt: null, expiresAt: { gt: now } },
+      where: { userId: user.id, revokedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -49,6 +49,20 @@ export const createSessionService = ({ getSessionTokenHash }: SessionServiceDeps
       },
       data: { revokedAt: new Date() },
     });
+    if (result.count > 0) {
+      void notifyAllOtherSessionsRevoked({
+        user: {
+          id: user.id,
+          telegramUserId: user.telegramUserId,
+          securityAlertsEnabled: user.securityAlertsEnabled,
+          securityAlertNewDevice: user.securityAlertNewDevice,
+          securityAlertLogout: user.securityAlertLogout,
+          securityAlertSessionRevoke: user.securityAlertSessionRevoke,
+        },
+      }).catch((error) => {
+        console.warn('Failed to dispatch revoke alert', error);
+      });
+    }
     return { status: 'ok', revoked: result.count };
   };
 

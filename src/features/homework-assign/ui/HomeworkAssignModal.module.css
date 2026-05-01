@@ -679,6 +679,48 @@
   background: var(--surface-card);
 }
 
+/* TEA-280: inline-баннер с retry над футером модалки выдачи */
+.submitErrorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 28px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.submitErrorMessage {
+  flex: 1 1 auto;
+}
+
+.submitErrorRetryButton {
+  flex: 0 0 auto;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: #fff;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.submitErrorRetryButton:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.submitErrorRetryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .cancelButton {
   border: none;
   background: transparent;

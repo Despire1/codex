@@ -7,8 +7,7 @@ import { Badge } from '@/shared/ui/Badge/Badge';
 import { AttentionCard, AttentionItem } from './components/AttentionCard';
 import { UnpaidLessonsPopoverContent } from './components/UnpaidLessonsPopoverContent';
 import { ActivityFeedCard } from './components/ActivityFeedCard';
-import { ActivityFeedFullscreen } from './components/ActivityFeedFullscreen';
-import { ActivityFeedFiltersControl } from './components/ActivityFeedFiltersControl';
+import { useActivityFeedDrawer } from './model/ActivityFeedDrawerContext';
 import { DashboardQuickActionsReferenceCard } from './components/DashboardQuickActionsReferenceCard';
 import styles from './DashboardSection.module.css';
 import { WeeklyCalendarReference } from './components/WeeklyCalendarReference/WeeklyCalendarReference';
@@ -18,8 +17,7 @@ import { formatInTimeZone, toZonedDate } from '@/shared/lib/timezoneDates';
 import { useIsMobile } from '@/shared/lib/useIsMobile';
 import { useLessonActions } from '../../features/lessons/model/useLessonActions';
 import { useDashboardState } from './model/useDashboardState';
-import { DashboardActivityFilters, useDashboardActivityFeed } from './model/useDashboardActivityFeed';
-import { useDashboardActivityUnread } from './model/useDashboardActivityUnread';
+import type { DashboardActivityFilters } from './model/useDashboardActivityFeed';
 import type { DashboardSummary } from '../../shared/api/client';
 import { MobileDashboard } from './components/mobile/MobileDashboard';
 
@@ -66,30 +64,21 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   } = useLessonActions();
   const { unpaidEntries, setWeekRange, isWeekLessonsLoading } = useDashboardState();
   const isDashboardMobile = useIsMobile(1023);
-  const [isMobileActivityRequested, setIsMobileActivityRequested] = useState(false);
-  const activityFeedEnabled = !isDashboardMobile || isMobileActivityRequested;
   const {
     items: activityItems,
     loading: activityLoading,
-    loadingMore: activityLoadingMore,
-    hasMore: activityHasMore,
     filters: activityFilters,
-    setFilters: setActivityFilters,
-    loadMore: loadMoreActivity,
+    applyFilters: applyActivityFilters,
+    resetFilters: resetActivityFiltersFromCtx,
     refresh: refreshActivity,
-  } = useDashboardActivityFeed(timeZone, {
-    pageSize: isDashboardMobile ? 10 : 20,
-    enabled: activityFeedEnabled,
-  });
-  const {
+    open: openActivityDrawer,
     hasUnread: hasUnreadActivity,
-    refresh: refreshUnreadActivity,
+    refreshUnread: refreshUnreadActivity,
     markSeen: markActivityAsSeen,
-  } = useDashboardActivityUnread(isDashboardMobile);
+  } = useActivityFeedDrawer();
   const todayZoned = toZonedDate(new Date(), timeZone);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const showWeeklyCalendar = !isDashboardMobile;
 
   const attentionItems: AttentionItem[] = useMemo(() => {
@@ -159,17 +148,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   const shouldPlaceActivityInUnpaidArea = !isDashboardMobile && !hasUnpaidLessons;
   const activityAreaClassName = shouldPlaceActivityInUnpaidArea ? styles.unpaidArea : styles.activityArea;
 
-  const activityStudents = useMemo(() => {
-    const map = new Map<number, string>();
-    linkedStudents.forEach((student) => {
-      const name = student.link.customName?.trim() || student.username?.trim() || `Ученик #${student.id}`;
-      map.set(student.id, name);
-    });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  }, [linkedStudents]);
-
   const handleRemindLessonPayment = useCallback(
     async (lessonId: number, studentId?: number) => {
       const result = await remindLessonPayment(lessonId, studentId);
@@ -181,18 +159,14 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   );
 
   const handleRequestMobileActivityFeed = useCallback(() => {
-    if (isMobileActivityRequested) {
-      void refreshActivity();
-      return;
-    }
-    setIsMobileActivityRequested(true);
-  }, [isMobileActivityRequested, refreshActivity]);
+    void refreshActivity();
+  }, [refreshActivity]);
 
   const handleApplyActivityFilters = useCallback(
     (next: DashboardActivityFilters) => {
-      setActivityFilters(next);
+      applyActivityFilters(next);
     },
-    [setActivityFilters],
+    [applyActivityFilters],
   );
 
   const activityFiltersCount = useMemo(() => {
@@ -205,13 +179,8 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
   }, [activityFilters.categories.length, activityFilters.from, activityFilters.studentId, activityFilters.to]);
 
   const handleResetActivityFilters = useCallback(() => {
-    setActivityFilters({
-      categories: [],
-      studentId: null,
-      from: '',
-      to: '',
-    });
-  }, [setActivityFilters]);
+    resetActivityFiltersFromCtx();
+  }, [resetActivityFiltersFromCtx]);
 
   useEffect(() => {
     if (attentionItems.length === 0) {
@@ -243,17 +212,10 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
         hasUnreadActivity={hasUnreadActivity}
         activityItems={activityItems}
         activityLoading={activityLoading}
-        activityLoadingMore={activityLoadingMore}
-        activityHasMore={activityHasMore}
-        activityFilters={activityFilters}
-        activityStudents={activityStudents}
-        activityFeedRequested={isMobileActivityRequested}
         onRequestActivityFeed={handleRequestMobileActivityFeed}
         onRefreshActivity={refreshActivity}
         onRefreshUnreadActivity={refreshUnreadActivity}
         onMarkActivityAsSeen={markActivityAsSeen}
-        onLoadMoreActivity={loadMoreActivity}
-        onApplyActivityFilters={handleApplyActivityFilters}
       />
     );
   }
@@ -324,7 +286,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           loading={activityLoading}
           activeFiltersCount={activityFiltersCount}
           onResetFilters={handleResetActivityFilters}
-          onOpen={() => setIsActivityOpen(true)}
+          onOpen={openActivityDrawer}
         />
       </div>
 
@@ -366,30 +328,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
             </div>
           )}
         </div>
-      )}
-
-      {!isDashboardMobile && (
-        <Modal
-          open={isActivityOpen}
-          onClose={() => setIsActivityOpen(false)}
-          title="Лента активности"
-          titleActions={
-            <ActivityFeedFiltersControl
-              filters={activityFilters}
-              students={activityStudents}
-              onApplyFilters={handleApplyActivityFilters}
-              popoverAlign="start"
-            />
-          }
-        >
-          <ActivityFeedFullscreen
-            items={activityItems}
-            loading={activityLoading}
-            loadingMore={activityLoadingMore}
-            hasMore={activityHasMore}
-            onLoadMore={loadMoreActivity}
-          />
-        </Modal>
       )}
 
       <BottomSheet
@@ -434,31 +372,6 @@ export const DashboardSection: FC<DashboardSectionProps> = ({
           />
         </Modal>
       )}
-
-      <BottomSheet
-        isOpen={isDashboardMobile && isActivityOpen}
-        onClose={() => setIsActivityOpen(false)}
-        className={styles.activityBottomSheet}
-        contentScrollable={false}
-      >
-        <ActivityFeedFullscreen
-          items={activityItems}
-          loading={activityLoading}
-          loadingMore={activityLoadingMore}
-          hasMore={activityHasMore}
-          onLoadMore={loadMoreActivity}
-          headerTitle="Лента активности"
-          headerAction={
-            <ActivityFeedFiltersControl
-              filters={activityFilters}
-              students={activityStudents}
-              onApplyFilters={handleApplyActivityFilters}
-              popoverAlign="end"
-            />
-          }
-          fitContainer
-        />
-      </BottomSheet>
     </section>
   );
 };

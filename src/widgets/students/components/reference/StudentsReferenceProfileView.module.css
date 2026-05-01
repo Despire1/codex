@@ -1497,6 +1497,25 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.contactPlaceholderButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+
+.contactPlaceholderButton:hover,
+.contactPlaceholderButton:focus-visible {
+  color: var(--accent-primary);
+  outline: none;
+}
+
 @media (max-width: 1280px) {
   .heroStatsGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

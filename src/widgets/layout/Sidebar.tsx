@@ -1,5 +1,6 @@
 import { type FC, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, RobotIcon } from '../../icons/MaterialIcons';
+import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/MaterialIcons';
+import { BrandLogo } from '../../shared/ui/BrandLogo';
 import { HomeworkCircleInfoIcon } from '../../shared/ui/icons/HomeworkFaIcons';
 import { sidebarNavItems, type SidebarNavItem } from './model/navigation';
 import styles from './Sidebar.module.css';
@@ -59,6 +60,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const isHoverPreview = manualCollapsed && hoverExpanded;
   const primaryItems = useMemo(() => items.filter((item) => item.section === 'primary'), [items]);
   const settingsItems = useMemo(() => items.filter((item) => item.section === 'settings'), [items]);
+  const dashboardItem = useMemo(() => items.find((item) => item.id === 'dashboard'), [items]);
 
   const clearExpandTimer = useCallback(() => {
     if (expandTimerRef.current === null) return;
@@ -86,6 +88,16 @@ export const Sidebar: FC<SidebarProps> = ({
     setHoverExpanded(false);
   }, [clearCollapseTimer, clearExpandTimer, manualCollapsed]);
 
+  useEffect(() => {
+    if (!hoverExpanded) return;
+    clearExpandTimer();
+    clearCollapseTimer();
+    setHoverExpanded(false);
+    onHoverPreviewChange?.(false);
+    // intentionally only depending on pathname so that any route change collapses the preview overlay
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   const onItemClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>, item: SidebarNavItem) => {
       if (isModifiedNavigationEvent(event)) return;
@@ -93,6 +105,16 @@ export const Sidebar: FC<SidebarProps> = ({
       onNavigate(item);
     },
     [onNavigate],
+  );
+
+  const onBrandClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!dashboardItem) return;
+      if (isModifiedNavigationEvent(event)) return;
+      event.preventDefault();
+      onNavigate(dashboardItem);
+    },
+    [dashboardItem, onNavigate],
   );
 
   const onMouseEnterSidebar = useCallback(() => {
@@ -183,15 +205,21 @@ export const Sidebar: FC<SidebarProps> = ({
       <aside
         className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}
         aria-label="Навигация по разделам"
+        data-tour="sidebar"
         onMouseEnter={onMouseEnterSidebar}
         onMouseLeave={onMouseLeaveSidebar}
       >
-        <div className={styles.brand}>
+        <a
+          className={styles.brand}
+          href={dashboardItem?.href ?? '/dashboard'}
+          onClick={onBrandClick}
+          aria-label="На главную"
+        >
           <span className={styles.brandLogo} aria-hidden>
-            <RobotIcon width={20} height={20} />
+            <BrandLogo width={28} height={28} />
           </span>
           <span className={styles.brandText}>TeacherBot</span>
-        </div>
+        </a>
 
         <div className={styles.navScroll}>
           <nav className={styles.navSection} aria-label="Основная навигация">
@@ -231,6 +259,7 @@ export const Sidebar: FC<SidebarProps> = ({
             className={styles.toggleButton}
             onClick={onToggle}
             aria-label={manualCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            title={manualCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
           >
             <span className={styles.toggleIcon} aria-hidden>
               {manualCollapsed ? (

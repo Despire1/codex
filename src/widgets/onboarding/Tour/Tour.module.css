@@ -1,0 +1,145 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  z-index: 1400;
+}
+
+.overlayPanel {
+  position: fixed;
+  background: rgba(15, 23, 42, 0.6);
+  transition:
+    top 0.18s ease,
+    left 0.18s ease,
+    width 0.18s ease,
+    height 0.18s ease;
+}
+
+.overlayFull {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.cutoutFrame {
+  position: fixed;
+  border: 2px solid var(--accent-primary);
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 4px rgba(163, 230, 53, 0.25);
+  transition:
+    top 0.18s ease,
+    left 0.18s ease,
+    width 0.18s ease,
+    height 0.18s ease;
+}
+
+.tooltip {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface-card);
+  color: var(--text);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px -8px rgba(15, 23, 42, 0.25);
+  padding: 18px 20px 16px;
+  z-index: 1410;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tooltipCenter {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 380px;
+  max-width: calc(100vw - 32px);
+}
+
+.tooltipTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.tooltipBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tooltipFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.tooltipProgress {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.tooltipActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltipBack,
+.tooltipSkip {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.tooltipBack:hover,
+.tooltipSkip:hover {
+  color: var(--text);
+  background: var(--bg-subtle, rgba(148, 163, 184, 0.12));
+}
+
+.tooltipNext {
+  background: var(--accent-primary);
+  color: #111827;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tooltipNext:hover {
+  background: #94d82d;
+}
+
+.tooltipSkipRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+@media (max-width: 767px) {
+  .tooltip {
+    width: calc(100vw - 24px);
+    border-radius: 16px;
+  }
+
+  .tooltipCenter {
+    width: calc(100vw - 24px);
+  }
+}

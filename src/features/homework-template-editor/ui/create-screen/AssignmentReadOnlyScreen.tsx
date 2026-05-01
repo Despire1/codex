@@ -14,7 +14,8 @@ import { formatInTimeZone } from '../../../../shared/lib/timezoneDates';
 import { useTimeZone } from '../../../../shared/lib/timezoneContext';
 import { resolveHomeworkStorageUrl } from '../../../homework-submit/model/upload';
 import type { HomeworkEditorDraft } from '../../model/types';
-import { extractEstimatedMinutes, getQuestionKind } from '../../model/lib/createTemplateScreen';
+import { getQuestionKind } from '../../model/lib/createTemplateScreen';
+import { resolveHomeworkDurationMinutes } from '../../../../entities/homework-template/model/lib/duration';
 import {
   HomeworkAlignLeftIcon,
   HomeworkBookOpenIcon,
@@ -283,7 +284,9 @@ export const AssignmentReadOnlyScreen: FC<AssignmentReadOnlyScreenProps> = ({
     assignment?.templateTitle ??
     templates.find((item) => item.id === draft.assignment.sourceTemplateId)?.title ??
     'Без базовой домашки';
-  const estimatedMinutes = extractEstimatedMinutes(draft.template.level);
+  // TEA-277: время оцениваем автоматически по структуре blocks, а не парсингом draft.template.level
+  // (level ≠ minutes, см. обсуждение в TEA-277).
+  const estimatedMinutes = resolveHomeworkDurationMinutes(draft.blocks, null);
   const blocks = draft.blocks;
   const testBlock = blocks.find((block): block is HomeworkBlockTest => block.type === 'TEST') ?? null;
   const mediaBlock = blocks.find((block): block is HomeworkBlockMedia => block.type === 'MEDIA') ?? null;

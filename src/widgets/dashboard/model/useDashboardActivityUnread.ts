@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ActivityFeedUnreadStatus } from '../../../entities/types';
 import { api } from '../../../shared/api/client';
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 15_000;
 
 const defaultStatus: ActivityFeedUnreadStatus = {
   hasUnread: false,
@@ -26,7 +26,6 @@ export const useDashboardActivityUnread = (enabled: boolean) => {
       if (requestIdRef.current !== requestId) return;
       setStatus(nextStatus);
     } catch (error) {
-       
       console.error('Failed to load activity feed unread status', error);
       if (requestIdRef.current === requestId) {
         setStatus(defaultStatus);
@@ -51,7 +50,6 @@ export const useDashboardActivityUnread = (enabled: boolean) => {
         );
         setStatus(nextStatus);
       } catch (error) {
-         
         console.error('Failed to mark activity feed as seen', error);
       }
     },

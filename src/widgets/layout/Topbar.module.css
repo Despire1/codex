@@ -140,7 +140,6 @@
   background: var(--surface-card);
   border-radius: 999px;
   padding: 3px;
-  box-shadow: var(--shadow-card-strong);
 }
 
 .viewToggleButton {
@@ -190,11 +189,6 @@
     transform 0.22s ease,
     background-color 0.2s ease;
   will-change: transform;
-}
-
-.topbarHomeworks .iconButton {
-  border-radius: 999px;
-  box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.06);
 }
 
 .iconButton:hover {
@@ -375,6 +369,14 @@
   width: auto;
   flex: 0 0 auto;
   pointer-events: auto;
+}
+
+.helpSlot {
+  display: inline-flex;
+  align-items: center;
+  transform: translate3d(var(--bell-shift, 0px), 0, 0);
+  transition: transform 0.22s ease;
+  will-change: transform;
 }
 
 .createButtonSlotHidden {

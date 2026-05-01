@@ -10,12 +10,20 @@ type AuthSessionHandlers = {
   handleTelegramWebapp: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
 };
 
+type TelegramDeepLinkHandlersShape = {
+  handleStart: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
+  handlePoll: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
+  handleCancel: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
+  handleConfig: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>;
+};
+
 type TryHandleAuthRoutesPayload = {
   req: IncomingMessage;
   res: ServerResponse;
   pathname: string;
   resolveSessionUser: ResolveSessionUser;
   authSessionHandlers: AuthSessionHandlers;
+  telegramDeepLinkHandlers?: TelegramDeepLinkHandlersShape;
 };
 
 export const tryHandleAuthRoutes = async ({
@@ -24,6 +32,7 @@ export const tryHandleAuthRoutes = async ({
   pathname,
   resolveSessionUser,
   authSessionHandlers,
+  telegramDeepLinkHandlers,
 }: TryHandleAuthRoutesPayload) => {
   if (req.method === 'GET' && pathname === '/auth/session') {
     const user = await resolveSessionUser(req, res);
@@ -48,6 +57,25 @@ export const tryHandleAuthRoutes = async ({
   if (req.method === 'GET' && pathname === '/auth/telegram/browser-login') {
     await authSessionHandlers.handleTelegramBrowserLogin(req, res);
     return true;
+  }
+
+  if (telegramDeepLinkHandlers) {
+    if (req.method === 'GET' && pathname === '/auth/telegram/deep-link/config') {
+      await telegramDeepLinkHandlers.handleConfig(req, res);
+      return true;
+    }
+    if (req.method === 'POST' && pathname === '/auth/telegram/deep-link/start') {
+      await telegramDeepLinkHandlers.handleStart(req, res);
+      return true;
+    }
+    if (req.method === 'GET' && pathname === '/auth/telegram/deep-link/poll') {
+      await telegramDeepLinkHandlers.handlePoll(req, res);
+      return true;
+    }
+    if (req.method === 'POST' && pathname === '/auth/telegram/deep-link/cancel') {
+      await telegramDeepLinkHandlers.handleCancel(req, res);
+      return true;
+    }
   }
 
   if (req.method === 'POST' && pathname === '/auth/logout') {

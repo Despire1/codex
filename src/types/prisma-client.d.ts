@@ -139,6 +139,10 @@ declare module '@prisma/client' {
     lastOnboardingNudgeAt: Date | null;
     termsAccepted: boolean;
     termsAcceptedAt: Date | null;
+    securityAlertsEnabled: boolean;
+    securityAlertNewDevice: boolean;
+    securityAlertLogout: boolean;
+    securityAlertSessionRevoke: boolean;
     createdAt: Date;
     updatedAt: Date;
   };

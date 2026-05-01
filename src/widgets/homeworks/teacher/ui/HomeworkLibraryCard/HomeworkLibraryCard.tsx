@@ -102,57 +102,54 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
   const actionLabel = template.isArchived ? 'Вернуть' : 'Выдать';
   const actionAriaLabel = template.isArchived ? 'Вернуть задание в библиотеку' : 'Выдать домашнее задание';
 
-  const menuItems = useMemo(
-    () => {
-      const items: Array<HomeworkTemplateMenuAction | null> = [
-        canEdit
-          ? {
-              id: 'edit',
-              label: 'Редактировать',
-              icon: <HomeworkPenIcon size={12} />,
-              onSelect: () => onEdit(template),
-            }
-          : null,
-        {
-          id: 'duplicate',
-          label: 'Дублировать',
-          icon: <HomeworkCopyIcon size={12} />,
-          onSelect: () => onDuplicate(template),
-        },
-        {
-          id: 'collection',
-          label: 'В коллекцию',
-          icon: <HomeworkFolderIcon size={12} />,
-          onSelect: () => onCreateCollection(template),
-        },
-        template.isArchived
-          ? {
-              id: 'restore',
-              label: 'Вернуть из архива',
-              icon: <HomeworkRotateRightIcon size={12} />,
-              onSelect: () => onRestore(template),
-            }
-          : {
-              id: 'archive',
-              label: 'Архивировать',
-              icon: <HomeworkFolderIcon size={12} />,
-              onSelect: () => onArchive(template),
-            },
-        canDelete
-          ? {
-              id: 'delete',
-              label: 'Удалить',
-              icon: <HomeworkTrashIcon size={12} />,
-              danger: true,
-              onSelect: () => onDelete(template),
-            }
-          : null,
-      ];
+  const menuItems = useMemo(() => {
+    const items: Array<HomeworkTemplateMenuAction | null> = [
+      canEdit
+        ? {
+            id: 'edit',
+            label: 'Редактировать',
+            icon: <HomeworkPenIcon size={12} />,
+            onSelect: () => onEdit(template),
+          }
+        : null,
+      {
+        id: 'duplicate',
+        label: 'Дублировать',
+        icon: <HomeworkCopyIcon size={12} />,
+        onSelect: () => onDuplicate(template),
+      },
+      {
+        id: 'collection',
+        label: 'В коллекцию',
+        icon: <HomeworkFolderIcon size={12} />,
+        onSelect: () => onCreateCollection(template),
+      },
+      template.isArchived
+        ? {
+            id: 'restore',
+            label: 'Вернуть из архива',
+            icon: <HomeworkRotateRightIcon size={12} />,
+            onSelect: () => onRestore(template),
+          }
+        : {
+            id: 'archive',
+            label: 'Архивировать',
+            icon: <HomeworkFolderIcon size={12} />,
+            onSelect: () => onArchive(template),
+          },
+      canDelete
+        ? {
+            id: 'delete',
+            label: 'Удалить',
+            icon: <HomeworkTrashIcon size={12} />,
+            danger: true,
+            onSelect: () => onDelete(template),
+          }
+        : null,
+    ];
 
-      return items.filter((item): item is HomeworkTemplateMenuAction => item !== null);
-    },
-    [canDelete, canEdit, onArchive, onCreateCollection, onDelete, onDuplicate, onEdit, onRestore, template],
-  );
+    return items.filter((item): item is HomeworkTemplateMenuAction => item !== null);
+  }, [canDelete, canEdit, onArchive, onCreateCollection, onDelete, onDuplicate, onEdit, onRestore, template]);
 
   const handleOpen = () => {
     onOpen(template);
@@ -191,11 +188,14 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
       onClick={handleOpen}
       onKeyDown={handleKeyDown}
       aria-label={`Открыть задание "${template.title}"`}
+      data-hint="homework-template-card"
     >
       <div className={styles.cardBody}>
         <div className={styles.head}>
           <div className={styles.headLeft}>
-            <span className={`${styles.categoryBadge} ${styles[`categoryBadge${categoryTone[0].toUpperCase()}${categoryTone.slice(1)}`]}`}>
+            <span
+              className={`${styles.categoryBadge} ${styles[`categoryBadge${categoryTone[0].toUpperCase()}${categoryTone.slice(1)}`]}`}
+            >
               {categoryLabel}
             </span>
             <button
@@ -257,7 +257,9 @@ export const HomeworkLibraryCard: FC<HomeworkLibraryCardProps> = ({
         </div>
 
         <div className={styles.footer}>
-          <span className={styles.updatedLabel} title={updatedTooltip}>{updatedLabel}</span>
+          <span className={styles.updatedLabel} title={updatedTooltip}>
+            {updatedLabel}
+          </span>
           <span className={styles.issuedMeta}>
             <UserGroupIcon width={12} height={12} />
             <span>{issuedCount}</span>

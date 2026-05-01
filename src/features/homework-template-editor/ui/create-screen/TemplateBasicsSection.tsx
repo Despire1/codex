@@ -112,10 +112,7 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
 }) => {
   const [pendingTag, setPendingTag] = useState('');
 
-  const resolvedCategory = useMemo(
-    () => (category && CATEGORY_OPTIONS.includes(category) ? category : ''),
-    [category],
-  );
+  const resolvedCategory = useMemo(() => (category && CATEGORY_OPTIONS.includes(category) ? category : ''), [category]);
   const categoryOptions = useMemo(
     () => [
       { value: '', label: 'Без категории' },
@@ -191,7 +188,9 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                   value={assignmentTemplateId}
                   options={assignmentTemplateOptions}
                   placeholder={
-                    assignmentTemplateOptions.length > 0 ? 'Выберите домашнее задание…' : 'Нет доступных домашних заданий'
+                    assignmentTemplateOptions.length > 0
+                      ? 'Выберите домашнее задание…'
+                      : 'Нет доступных домашних заданий'
                   }
                   ariaLabel="Выбор домашнего задания"
                   compact
@@ -255,17 +254,15 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
               <label className={styles.fieldLabel}>
                 Примерное время
                 <span className={styles.minutesInputWrap}>
+                  {/* TEA-277: read-only авто-расчёт. Override через отдельное поле БД будет
+                      сделан в Варианте B (требует Prisma migration). */}
                   <input
                     type="number"
                     className={styles.input}
-                    min={1}
-                    max={240}
-                    placeholder="15"
                     value={estimatedMinutes ?? ''}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      onEstimatedMinutesChange(event.target.value ? Number(event.target.value) : null)
-                    }
+                    readOnly
+                    disabled
+                    aria-readonly
                   />
                   <span className={styles.minutesSuffix}>мин</span>
                 </span>
@@ -301,7 +298,12 @@ export const TemplateBasicsSection: FC<TemplateBasicsSectionProps> = ({
                       onKeyDown={handlePendingTagKeydown}
                       placeholder="Новый тег"
                     />
-                    <button type="button" className={styles.tagAddButton} onClick={submitPendingTag} disabled={disabled}>
+                    <button
+                      type="button"
+                      className={styles.tagAddButton}
+                      onClick={submitPendingTag}
+                      disabled={disabled}
+                    >
                       <HomeworkPlusIcon size={11} />
                       Добавить
                     </button>

@@ -1,5 +1,4 @@
-import { addDays, isSameDay } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addDays, isSameDay, ru } from 'date-fns';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -37,9 +36,7 @@ import {
   type MobileDashboardCloseLesson,
 } from '../../model/mobileDashboardPresentation';
 import { UnpaidLessonsPopoverContent } from '../UnpaidLessonsPopoverContent';
-import { ActivityFeedFullscreen } from '../ActivityFeedFullscreen';
-import { ActivityFeedFiltersControl } from '../ActivityFeedFiltersControl';
-import type { DashboardActivityFilters } from '../../model/useDashboardActivityFeed';
+import { useActivityFeedDrawer } from '../../model/ActivityFeedDrawerContext';
 import styles from './MobileDashboard.module.css';
 
 interface MobileDashboardProps {
@@ -67,17 +64,10 @@ interface MobileDashboardProps {
   hasUnreadActivity: boolean;
   activityItems: ActivityFeedItem[];
   activityLoading: boolean;
-  activityLoadingMore: boolean;
-  activityHasMore: boolean;
-  activityFilters: DashboardActivityFilters;
-  activityStudents: Array<{ id: number; name: string }>;
-  activityFeedRequested: boolean;
   onRequestActivityFeed: () => void;
-  onRefreshActivity: () => Promise<void>;
-  onRefreshUnreadActivity: () => Promise<void>;
+  onRefreshActivity: () => Promise<void> | void;
+  onRefreshUnreadActivity: () => Promise<void> | void;
   onMarkActivityAsSeen: (seenThrough?: string) => Promise<void> | void;
-  onLoadMoreActivity: () => Promise<void> | void;
-  onApplyActivityFilters: (next: DashboardActivityFilters) => void;
 }
 
 const capitalizeFirst = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -135,12 +125,10 @@ const resolveParticipantName = (studentId: number, linkedStudents: LinkedStudent
   linkedStudents.find((student) => student.id === studentId)?.username ??
   'Ученик';
 
-type ParticipantActionState =
-  | {
-      lesson: Lesson;
-      action: 'togglePaid' | 'assignHomework';
-    }
-  | null;
+type ParticipantActionState = {
+  lesson: Lesson;
+  action: 'togglePaid' | 'assignHomework';
+} | null;
 
 export const MobileDashboard: FC<MobileDashboardProps> = ({
   lessons,
@@ -164,21 +152,14 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   hasUnreadActivity,
   activityItems,
   activityLoading,
-  activityLoadingMore,
-  activityHasMore,
-  activityFilters,
-  activityStudents,
-  activityFeedRequested,
   onRequestActivityFeed,
   onRefreshActivity,
   onRefreshUnreadActivity,
   onMarkActivityAsSeen,
-  onLoadMoreActivity,
-  onApplyActivityFilters,
 }) => {
   const timeZone = useTimeZone();
+  const { open: openActivityDrawer, isOpen: isActivityOpen } = useActivityFeedDrawer();
   const [isUnpaidOpen, setIsUnpaidOpen] = useState(false);
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [actionsLesson, setActionsLesson] = useState<Lesson | null>(null);
   const [participantActionState, setParticipantActionState] = useState<ParticipantActionState>(null);
   const activitySeenRef = useRef<string | null>(null);
@@ -390,11 +371,9 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
   }, [presentation.nextLesson, timeZone, todayZoned, tomorrowZoned]);
 
   const openActivityFeed = () => {
-    setIsActivityOpen(true);
+    openActivityDrawer();
     onRequestActivityFeed();
-    if (activityFeedRequested) {
-      void onRefreshActivity();
-    }
+    void onRefreshActivity();
     void onRefreshUnreadActivity();
   };
 
@@ -409,7 +388,6 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
         void onRefreshUnreadActivity();
       })
       .catch((error) => {
-         
         console.error('Failed to mark activity feed as seen in mobile dashboard', error);
         activitySeenRef.current = null;
       });
@@ -420,7 +398,9 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
       <section className={styles.welcomeSection}>
         <div className={styles.welcomeTextBlock}>
           <h1 className={styles.welcomeTitle}>Добро пожаловать, {teacherFirstName}! 👋</h1>
-          <p className={styles.welcomeDate}>Сегодня, {formatInTimeZone(now, 'd MMMM yyyy', { locale: ru, timeZone })}</p>
+          <p className={styles.welcomeDate}>
+            Сегодня, {formatInTimeZone(now, 'd MMMM yyyy', { locale: ru, timeZone })}
+          </p>
         </div>
 
         <div className={styles.heroCard}>
@@ -478,11 +458,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
       <section className={styles.quickActionsSection}>
         <h2 className={styles.sectionTitle}>Быстрые действия</h2>
         <div className={styles.quickGrid}>
-          <button
-            type="button"
-            className={styles.quickAction}
-            onClick={onCreateHomeworkTemplate}
-          >
+          <button type="button" className={styles.quickAction} onClick={onCreateHomeworkTemplate}>
             <span className={`${styles.quickActionIcon} ${styles.quickActionPrimary}`} aria-hidden>
               <FontAwesomeIcon icon={faFileInvoice} />
             </span>
@@ -536,7 +512,11 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                 <h3>{pluralizeLessons(needsCompletionCount)} нужно закрыть</h3>
                 <p>Уроки завершились, но не отмечены как проведенные</p>
                 {presentation.closeLesson ? (
-                  <button type="button" className={styles.attentionAction} onClick={() => setActionsLesson(presentation.closeLesson?.lesson ?? null)}>
+                  <button
+                    type="button"
+                    className={styles.attentionAction}
+                    onClick={() => setActionsLesson(presentation.closeLesson?.lesson ?? null)}
+                  >
                     Закрыть урок
                   </button>
                 ) : null}
@@ -614,7 +594,10 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                         className={styles.weekLessonItem}
                         onClick={() => onOpenLesson(item.lesson)}
                       >
-                        <span className={`${styles.weekLessonStripe} ${styles[`weekLessonStripe${index}`]}`} aria-hidden />
+                        <span
+                          className={`${styles.weekLessonStripe} ${styles[`weekLessonStripe${index}`]}`}
+                          aria-hidden
+                        />
                         <span className={styles.weekLessonText}>
                           <strong>
                             {item.startTimeLabel} - {item.studentLabel}
@@ -741,36 +724,10 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
       </BottomSheet>
 
       <BottomSheet
-        isOpen={isActivityOpen}
-        onClose={() => setIsActivityOpen(false)}
-        className={styles.activitySheet}
-        contentScrollable={false}
+        isOpen={Boolean(actionsLesson)}
+        onClose={() => setActionsLesson(null)}
+        className={styles.lessonSheet}
       >
-        <div className={styles.activitySheetContent}>
-          <ActivityFeedFullscreen
-            items={activityItems}
-            loading={activityLoading}
-            loadingMore={activityLoadingMore}
-            hasMore={activityHasMore}
-            onLoadMore={() => {
-              void onLoadMoreActivity();
-            }}
-            headerTitle="Лента активности"
-            headerAction={
-              <ActivityFeedFiltersControl
-                filters={activityFilters}
-                students={activityStudents}
-                onApplyFilters={onApplyActivityFilters}
-                popoverAlign="end"
-              />
-            }
-            fitContainer
-            autoLoadMoreOnScroll
-          />
-        </div>
-      </BottomSheet>
-
-      <BottomSheet isOpen={Boolean(actionsLesson)} onClose={() => setActionsLesson(null)} className={styles.lessonSheet}>
         {actionsLesson ? (
           <div className={styles.lessonSheetContent}>
             <div className={styles.lessonSheetHeader}>
@@ -911,11 +868,7 @@ export const MobileDashboard: FC<MobileDashboardProps> = ({
                   {participantActionState.action === 'togglePaid' && participant.isPaid ? ' • уже оплачено' : ''}
                 </button>
               ))}
-              <button
-                type="button"
-                className={styles.sheetCancel}
-                onClick={() => setParticipantActionState(null)}
-              >
+              <button type="button" className={styles.sheetCancel} onClick={() => setParticipantActionState(null)}>
                 Отмена
               </button>
             </div>

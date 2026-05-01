@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { User } from '@prisma/client';
 import prisma from '../../prismaClient';
 import { buildCookie, getRequestIp, isLocalhostRequest, isSecureRequest, parseCookies } from '../lib/http';
+import { notifyLoginFromNewDevice } from './securityAlerts';
 
 type LocalDevUserConfig = {
   telegramUserId: bigint;
@@ -19,13 +20,11 @@ type AuthServiceConfig = {
   localDevUser: LocalDevUserConfig;
 };
 
-type VerifyTelegramInitDataResult =
-  | { ok: true; params: URLSearchParams }
-  | { ok: false; reason: 'signature_invalid' };
+export const SIGNED_OUT_COOKIE_NAME = 'tb_signed_out';
 
-type VerifyTelegramLoginDataResult =
-  | { ok: true; params: URLSearchParams }
-  | { ok: false; reason: 'signature_invalid' };
+type VerifyTelegramInitDataResult = { ok: true; params: URLSearchParams } | { ok: false; reason: 'signature_invalid' };
+
+type VerifyTelegramLoginDataResult = { ok: true; params: URLSearchParams } | { ok: false; reason: 'signature_invalid' };
 
 type SyncTelegramAuthUserPayload = {
   telegramUserId: bigint;
@@ -45,9 +44,10 @@ export const hashToken = (token: string) => crypto.createHash('sha256').update(t
 
 export const randomToken = (lengthBytes = 32) => crypto.randomBytes(lengthBytes).toString('base64url');
 
-const DEFAULT_SESSION_TTL_MINUTES = 43_200;
+// Сессия живёт пока пользователь сам не нажмёт «Выйти» (~10 лет cookie/DB).
+const DEFAULT_SESSION_TTL_MINUTES = 5_256_000;
 const MIN_SESSION_TTL_MINUTES = 10_080;
-const MAX_SESSION_TTL_MINUTES = 129_600;
+const MAX_SESSION_TTL_MINUTES = 5_256_000;
 const DEFAULT_SESSION_RENEW_THRESHOLD_MINUTES = 10_080;
 const MIN_SESSION_RENEW_THRESHOLD_MINUTES = 1_440;
 
@@ -75,10 +75,7 @@ const normalizeSessionRenewThresholdMinutes = (rawMinutes: number, sessionTtlMin
   }
 
   const normalized = Math.trunc(rawMinutes);
-  return Math.min(
-    Math.max(normalized, MIN_SESSION_RENEW_THRESHOLD_MINUTES),
-    Math.max(60, sessionTtlMinutes - 60),
-  );
+  return Math.min(Math.max(normalized, MIN_SESSION_RENEW_THRESHOLD_MINUTES), Math.max(60, sessionTtlMinutes - 60));
 };
 
 export const verifyTelegramInitData = (initData: string, botToken: string): VerifyTelegramInitDataResult => {
@@ -246,10 +243,26 @@ export const createAuthService = (config: AuthServiceConfig) => {
     );
   };
 
+  const clearSignedOutCookie = (req: IncomingMessage, res: ServerResponse) => {
+    appendSetCookie(
+      res,
+      buildCookie(SIGNED_OUT_COOKIE_NAME, '', {
+        maxAgeSeconds: 0,
+        expiresAt: new Date(0),
+        secure: isSecureRequest(req),
+      }),
+    );
+  };
+
+  const hasSignedOutCookie = (req: IncomingMessage) => {
+    const cookies = parseCookies(req.headers.cookie);
+    return cookies[SIGNED_OUT_COOKIE_NAME] === '1';
+  };
+
   const findActiveSession = async (tokenHash: string) => {
-    const now = new Date();
+    // Сессия активна пока её явно не отозвали через logout.
     return prisma.session.findFirst({
-      where: { tokenHash, revokedAt: null, expiresAt: { gt: now } },
+      where: { tokenHash, revokedAt: null },
       include: { user: true },
     });
   };
@@ -260,22 +273,27 @@ export const createAuthService = (config: AuthServiceConfig) => {
     token: string,
     session: SessionWithUser,
   ) => {
+    // Cookie всегда переустанавливаем со свежим max-age, чтобы у пользователя
+    // сессия не «протухла» из-за старого TTL.
+    const cookieExpiresAt = new Date(Date.now() + sessionTtlMinutes * 60_000);
+    setSessionCookie(req, res, token, cookieExpiresAt);
+
+    // В БД expiresAt бампим только когда исходное значение близко к концу —
+    // чтобы не делать UPDATE на каждый запрос.
     const remainingMs = session.expiresAt.getTime() - Date.now();
     if (remainingMs > sessionRenewThresholdMinutes * 60_000) {
       return session;
     }
 
-    const expiresAt = new Date(Date.now() + sessionTtlMinutes * 60_000);
     const renewedSession = await prisma.session.update({
       where: { id: session.id },
       data: {
-        expiresAt,
+        expiresAt: cookieExpiresAt,
         ip: getRequestIp(req) || session.ip,
         userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : session.userAgent,
       },
       include: { user: true },
     });
-    setSessionCookie(req, res, token, expiresAt);
     return renewedSession;
   };
 
@@ -283,16 +301,41 @@ export const createAuthService = (config: AuthServiceConfig) => {
     const token = randomToken(32);
     const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + sessionTtlMinutes * 60_000);
-    await prisma.session.create({
+    const ip = getRequestIp(req) || null;
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+    const session = await prisma.session.create({
       data: {
         userId,
         tokenHash,
         expiresAt,
-        ip: getRequestIp(req) || null,
-        userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
+        ip,
+        userAgent,
       },
     });
     setSessionCookie(req, res, token, expiresAt);
+    clearSignedOutCookie(req, res);
+
+    // Не блокируем ответ — уведомление о новом устройстве уходит в фон.
+    void prisma.user
+      .findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          telegramUserId: true,
+          securityAlertsEnabled: true,
+          securityAlertNewDevice: true,
+          securityAlertLogout: true,
+          securityAlertSessionRevoke: true,
+        },
+      })
+      .then((user) => {
+        if (!user) return;
+        return notifyLoginFromNewDevice({ user, sessionId: session.id, ip, userAgent });
+      })
+      .catch((error) => {
+        console.warn('Failed to evaluate new-device alert', error);
+      });
+
     return { expiresAt };
   };
 
@@ -323,7 +366,6 @@ export const createAuthService = (config: AuthServiceConfig) => {
               data: { lastSeenAt: new Date() },
             })
             .catch((error) => {
-
               console.warn('Failed to update session lastSeenAt', error);
             });
         }
@@ -342,6 +384,7 @@ export const createAuthService = (config: AuthServiceConfig) => {
       clearSessionCookie(req, res);
     }
     if (!config.localAuthBypass || !isLocalhostRequest(req)) return null;
+    if (hasSignedOutCookie(req)) return null;
     const localUser = await ensureLocalDevUser(config.localDevUser);
     await createSession(localUser.id, req, res);
     return localUser;

@@ -20,9 +20,11 @@ export type OnboardingStateValue = {
   createdStudent: CreatedStudent | null;
   createdLesson: Lesson | null;
   reminderSent: boolean;
+  welcomeSeen: boolean;
   setCreatedStudent: Dispatch<SetStateAction<CreatedStudent | null>>;
   setCreatedLesson: Dispatch<SetStateAction<Lesson | null>>;
   setReminderSent: Dispatch<SetStateAction<boolean>>;
+  setWelcomeSeen: Dispatch<SetStateAction<boolean>>;
 };
 
 export type OnboardingStateConfig = {
@@ -42,6 +44,7 @@ type PersistedOnboardingState = {
   reminderSent: boolean;
   createdStudent: CreatedStudent | null;
   createdLesson: Lesson | null;
+  welcomeSeen?: boolean;
 };
 
 const ONBOARDING_STORAGE_PREFIX = 'teacherbot_onboarding_state_v1';
@@ -76,11 +79,7 @@ const pickActiveStudent = (links: TeacherStudent[], students: Student[]) => {
   return { student, link };
 };
 
-const resolveCreatedStudent = (
-  current: CreatedStudent | null,
-  links: TeacherStudent[],
-  students: Student[],
-) => {
+const resolveCreatedStudent = (current: CreatedStudent | null, links: TeacherStudent[], students: Student[]) => {
   if (current) {
     const link = links.find((item) => item.studentId === current.student.id && !item.isArchived);
     const student = students.find((item) => item.id === current.student.id);
@@ -142,10 +141,7 @@ const shouldUpdateCreatedLesson = (current: Lesson | null, next: Lesson | null) 
   return current.id !== next.id || current.startAt !== next.startAt || current.studentId !== next.studentId;
 };
 
-export const OnboardingStateProvider = ({
-  children,
-  value,
-}: PropsWithChildren<{ value: OnboardingStateValue }>) => {
+export const OnboardingStateProvider = ({ children, value }: PropsWithChildren<{ value: OnboardingStateValue }>) => {
   return <OnboardingStateContext.Provider value={value}>{children}</OnboardingStateContext.Provider>;
 };
 
@@ -170,6 +166,7 @@ export const useOnboardingStateInternal = ({
   const [createdLesson, setCreatedLesson] = useState<Lesson | null>(null);
   const [reminderSent, setReminderSent] = useState(false);
   const [started, setStarted] = useState(false);
+  const [welcomeSeen, setWelcomeSeen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const storageKey = useMemo(() => (teacherId ? buildStorageKey(teacherId) : null), [teacherId]);
   const prevStorageKeyRef = useRef<string | null>(null);
@@ -180,6 +177,7 @@ export const useOnboardingStateInternal = ({
       setCreatedLesson(null);
       setReminderSent(false);
       setStarted(false);
+      setWelcomeSeen(false);
       setHydrated(false);
       prevStorageKeyRef.current = null;
       return;
@@ -190,6 +188,9 @@ export const useOnboardingStateInternal = ({
     setCreatedLesson((prev) => stored?.createdLesson ?? (isFirstKey ? prev : null));
     setReminderSent((prev) => (stored ? Boolean(stored.reminderSent) : isFirstKey ? prev : false));
     setStarted((prev) => (stored ? Boolean(stored.started) : isFirstKey ? prev : false));
+    setWelcomeSeen((prev) =>
+      stored?.welcomeSeen !== undefined ? Boolean(stored.welcomeSeen) : isFirstKey ? prev : false,
+    );
     setHydrated(true);
     prevStorageKeyRef.current = storageKey;
   }, [storageKey]);
@@ -212,8 +213,9 @@ export const useOnboardingStateInternal = ({
       reminderSent,
       createdStudent,
       createdLesson,
+      welcomeSeen,
     });
-  }, [createdLesson, createdStudent, hydrated, reminderSent, started, storageKey]);
+  }, [createdLesson, createdStudent, hydrated, reminderSent, started, storageKey, welcomeSeen]);
 
   useEffect(() => {
     if (!started || !hydrated) return;
@@ -239,17 +241,7 @@ export const useOnboardingStateInternal = ({
     if (shouldUpdateCreatedLesson(createdLesson, nextLesson)) {
       setCreatedLesson(nextLesson);
     }
-  }, [
-    createdLesson,
-    createdStudent,
-    hydrated,
-    lessons,
-    lessonsCount,
-    links,
-    started,
-    students,
-    studentsCount,
-  ]);
+  }, [createdLesson, createdStudent, hydrated, lessons, lessonsCount, links, started, students, studentsCount]);
 
   const isActive = started && !reminderSent;
 
@@ -261,17 +253,12 @@ export const useOnboardingStateInternal = ({
       createdStudent,
       createdLesson,
       reminderSent,
+      welcomeSeen,
       setCreatedStudent,
       setCreatedLesson,
       setReminderSent,
+      setWelcomeSeen,
     }),
-    [
-      createdLesson,
-      createdStudent,
-      isActive,
-      reminderSent,
-      started,
-      teacherId,
-    ],
+    [createdLesson, createdStudent, isActive, reminderSent, started, teacherId, welcomeSeen],
   );
 };

@@ -78,7 +78,11 @@ export const createAutomationService = ({
     new Date(lesson.startAt).getTime() + lesson.durationMinutes * 60_000;
 
   const formatDedupeTimeKey = (date: Date, timeZone?: string | null) =>
-    new Intl.DateTimeFormat('sv-SE', { timeZone, dateStyle: 'short', timeStyle: 'short' }).format(date);
+    new Intl.DateTimeFormat('sv-SE', {
+      timeZone: timeZone && timeZone.trim() ? timeZone : 'UTC',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(date);
 
   const shouldSendLessonReminder = (scheduledFor: Date, now: Date) => {
     const nowMs = now.getTime();
@@ -408,14 +412,17 @@ export const createAutomationService = ({
         console.error('Не удалось очистить логи уведомлений', error);
       });
 
-      setInterval(() => {
-        cleanupSessions().catch((error) => {
-          console.error('Не удалось очистить сессии', error);
-        });
-        cleanupNotificationLogs().catch((error) => {
-          console.error('Не удалось очистить логи уведомлений', error);
-        });
-      }, 24 * 60 * 60 * 1000);
+      setInterval(
+        () => {
+          cleanupSessions().catch((error) => {
+            console.error('Не удалось очистить сессии', error);
+          });
+          cleanupNotificationLogs().catch((error) => {
+            console.error('Не удалось очистить логи уведомлений', error);
+          });
+        },
+        24 * 60 * 60 * 1000,
+      );
     }, delayMs);
   };
 

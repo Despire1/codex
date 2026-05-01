@@ -62,6 +62,7 @@ import { createActivityFeedService, parseActivityCategories, parseQueryDate } fr
 import { createStudentsService, normalizeTelegramUsername } from './server/modules/students';
 import { createSettingsService } from './server/modules/settings';
 import { createOverviewService } from './server/modules/overview';
+import { createGlobalSearchService } from './server/modules/globalSearch';
 import { createScheduleNotesService } from './server/modules/scheduleNotes';
 import { createLegacyHomeworkService } from './server/modules/legacyHomework';
 import { createUploadsService } from './server/modules/uploads';
@@ -84,6 +85,8 @@ import {
 import { clampNumber, isValidTimeString } from './server/lib/runtimeLimits';
 import { createAuthSessionHandlers } from './server/routes/authSession';
 import { tryHandleAuthRoutes } from './server/routes/authRoutes';
+import { createTelegramDeepLinkAuthService } from './server/modules/telegramDeepLinkAuth';
+import { createTelegramDeepLinkHandlers } from './server/routes/telegramDeepLinkSession';
 import { tryHandleBillingRoutes } from './server/routes/billingRoutes';
 import { tryHandleStudentV2Routes } from './server/routes/studentRoutesV2';
 import { tryHandleHomeworkRoutesV2 } from './server/routes/homeworkRoutesV2';
@@ -93,6 +96,7 @@ import { tryHandleSessionRoutes } from './server/routes/sessionRoutes';
 import { tryHandleAccountRoutes } from './server/routes/accountRoutes';
 import { tryHandleActivityFeedRoutes } from './server/routes/activityFeedRoutes';
 import { tryHandleStudentRoutes } from './server/routes/studentRoutes';
+import { tryHandleSearchRoutes } from './server/routes/searchRoutes';
 import { tryHandleHomeworkRoutes } from './server/routes/homeworkRoutes';
 import { tryHandleLessonRoutes } from './server/routes/lessonRoutes';
 import { tryHandleScheduleNoteRoutes } from './server/routes/scheduleNoteRoutes';
@@ -142,6 +146,9 @@ const TELEGRAM_BROWSER_REDIRECT_URL = process.env.TELEGRAM_BROWSER_REDIRECT_URL 
 const SESSION_COOKIE_NAME = 'session_id';
 const RATE_LIMIT_WEBAPP_PER_MIN = Number(process.env.RATE_LIMIT_WEBAPP_PER_MIN ?? 30);
 const RATE_LIMIT_BROWSER_LOGIN_PER_MIN = Number(process.env.RATE_LIMIT_BROWSER_LOGIN_PER_MIN ?? 20);
+const TELEGRAM_DEEP_LINK_TTL_SEC = Number(process.env.TELEGRAM_DEEP_LINK_TTL_SEC ?? 600);
+const RATE_LIMIT_DEEP_LINK_PER_MIN = Number(process.env.RATE_LIMIT_DEEP_LINK_PER_MIN ?? 20);
+const TELEGRAM_DEEP_LINK_COOKIE_NAME = 'tb_telegram_login';
 const NOTIFICATION_TICK_MS = 60_000;
 const AUTOMATION_TICK_MS = 5 * 60_000;
 const ONBOARDING_NUDGE_TICK_MS = 15 * 60_000;
@@ -177,6 +184,17 @@ const authSessionHandlers = createAuthSessionHandlers({
   telegramBrowserRedirectUrl: TELEGRAM_BROWSER_REDIRECT_URL,
   rateLimitWebappPerMin: RATE_LIMIT_WEBAPP_PER_MIN,
   rateLimitBrowserLoginPerMin: RATE_LIMIT_BROWSER_LOGIN_PER_MIN,
+});
+const telegramDeepLinkAuthService = createTelegramDeepLinkAuthService({
+  ttlSeconds: TELEGRAM_DEEP_LINK_TTL_SEC,
+});
+const telegramDeepLinkHandlers = createTelegramDeepLinkHandlers({
+  service: telegramDeepLinkAuthService,
+  createSession,
+  telegramBotUsername: TELEGRAM_BOT_USERNAME,
+  pendingCookieName: TELEGRAM_DEEP_LINK_COOKIE_NAME,
+  pendingCookieTtlSec: TELEGRAM_DEEP_LINK_TTL_SEC,
+  ratePerMin: RATE_LIMIT_DEEP_LINK_PER_MIN,
 });
 const uploadsService = createUploadsService({
   clampNumber,
@@ -607,6 +625,9 @@ const {
   listUnpaidLessons,
 } = overviewService;
 
+const globalSearchService = createGlobalSearchService({ prisma, ensureTeacher });
+const { globalSearch } = globalSearchService;
+
 const homeworkV2Service = createHomeworkV2Service({
   defaultPageSize: DEFAULT_PAGE_SIZE,
   maxPageSize: MAX_PAGE_SIZE,
@@ -864,6 +885,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         pathname,
         resolveSessionUser,
         authSessionHandlers,
+        telegramDeepLinkHandlers,
       })
     ) {
       return;
@@ -1108,6 +1130,20 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           markActivityFeedSeen,
           listActivityFeed,
         },
+      })
+    ) {
+      return;
+    }
+
+    if (
+      await tryHandleSearchRoutes({
+        req,
+        res,
+        pathname,
+        url,
+        role,
+        requireApiUser,
+        handlers: { globalSearch },
       })
     ) {
       return;

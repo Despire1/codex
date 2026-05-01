@@ -14,6 +14,7 @@ import { pluralizeRu } from '../../shared/lib/pluralizeRu';
 import { formatTimeZoneLabel, getResolvedTimeZone, getTimeZoneOptions } from '../../shared/lib/timezones';
 import { useToast } from '../../shared/lib/toast';
 import { useIsMobile } from '../../shared/lib/useIsMobile';
+import { useUnsavedChanges } from '../../shared/lib/unsavedChanges';
 import controls from '../../shared/styles/controls.module.css';
 import { DialogModal } from '../../shared/ui/Modal/DialogModal';
 import { SETTINGS_TABS, SettingsTabId, VISIBLE_SETTINGS_TABS } from './constants';
@@ -67,6 +68,38 @@ type SettingsPatch = Partial<
   >
 >;
 
+// Поля которые редактируются через общий Save/Cancel (исключены: шаблоны — у них свой UX,
+// security alerts — мгновенный API в SecuritySettings, тема — Redux only).
+const GLOBAL_DRAFT_FIELDS: ReadonlyArray<keyof SettingsPatch> = [
+  'name',
+  'timezone',
+  'receiptEmail',
+  'defaultLessonDuration',
+  'autoConfirmLessons',
+  'weekendWeekdays',
+  'lessonReminderEnabled',
+  'lessonReminderMinutes',
+  'dailySummaryEnabled',
+  'dailySummaryTime',
+  'tomorrowSummaryEnabled',
+  'tomorrowSummaryTime',
+  'studentNotificationsEnabled',
+  'globalPaymentRemindersEnabled',
+  'paymentReminderDelayHours',
+  'paymentReminderRepeatHours',
+  'paymentReminderMaxCount',
+  'notifyTeacherOnAutoPaymentReminder',
+  'notifyTeacherOnManualPaymentReminder',
+  'homeworkNotifyOnAssign',
+  'homeworkReminder24hEnabled',
+  'homeworkReminderMorningEnabled',
+  'homeworkReminderMorningTime',
+  'homeworkReminder3hEnabled',
+  'homeworkOverdueRemindersEnabled',
+  'homeworkOverdueReminderTime',
+  'homeworkOverdueReminderMaxCount',
+];
+
 type TabMeta = {
   icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
   badge?: string;
@@ -92,7 +125,6 @@ const SETTINGS_TAB_META: Record<SettingsTabId, TabMeta> = {
 
 const isSettingsTab = (value: string | null): value is SettingsTabId => SETTINGS_TABS.some((tab) => tab.id === value);
 
-const hasPatchValues = (patch: SettingsPatch) => Object.keys(patch).length > 0;
 const isWeekendConflictResponse = (
   response: Awaited<ReturnType<typeof api.updateSettings>>,
 ): response is Extract<Awaited<ReturnType<typeof api.updateSettings>>, { requiresWeekendConflictConfirmation: true }> =>
@@ -157,6 +189,63 @@ const getTeacherInitials = (teacher: Teacher) => {
     .join('');
 };
 
+const DEFAULT_PRICE_STORAGE_KEY = 'tb_default_student_price';
+
+const readSavedDefaultPrice = () => {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(DEFAULT_PRICE_STORAGE_KEY) ?? '';
+};
+
+const validateDefaultPrice = (value: string): string | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 'Введите неотрицательное число';
+  }
+  return null;
+};
+
+const persistDefaultPrice = (value: string) => {
+  if (typeof window === 'undefined') return;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    window.localStorage.removeItem(DEFAULT_PRICE_STORAGE_KEY);
+    return;
+  }
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric) || numeric < 0) return;
+  window.localStorage.setItem(DEFAULT_PRICE_STORAGE_KEY, String(Math.round(numeric)));
+};
+
+const isWeekendListEqual = (left: number[], right: number[]) => {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+};
+
+const computeDraftPatch = (draft: Teacher, base: Teacher): SettingsPatch => {
+  const patch: SettingsPatch = {};
+  for (const field of GLOBAL_DRAFT_FIELDS) {
+    const draftValue = draft[field];
+    const baseValue = base[field];
+    if (field === 'weekendWeekdays') {
+      const draftWeekends = (draftValue as number[]) ?? [];
+      const baseWeekends = (baseValue as number[]) ?? [];
+      if (!isWeekendListEqual(draftWeekends, baseWeekends)) {
+        (patch as Record<string, unknown>)[field] = draftWeekends;
+      }
+      continue;
+    }
+    if (draftValue !== baseValue) {
+      (patch as Record<string, unknown>)[field] = draftValue;
+    }
+  }
+  return patch;
+};
+
 export const SettingsSection: FC<SettingsSectionProps> = ({
   teacher,
   onTeacherChange,
@@ -169,37 +258,86 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   const location = useLocation();
   const { showToast } = useToast();
   const isMobile = useIsMobile(720);
+  const { setEntry, clearEntry } = useUnsavedChanges();
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [draft, setDraft] = useState<Teacher>(teacher);
+  const draftRef = useRef(draft);
   const teacherRef = useRef(teacher);
-  const pendingPatchRef = useRef<SettingsPatch>({});
-  const saveTimerRef = useRef<number | null>(null);
   const autoTimeZoneRef = useRef(false);
+  const [savedDefaultPrice, setSavedDefaultPrice] = useState<string>(readSavedDefaultPrice);
+  const [defaultPriceDraft, setDefaultPriceDraft] = useState<string>(savedDefaultPrice);
+  const defaultPriceDraftRef = useRef(defaultPriceDraft);
+  const defaultPriceError = useMemo(() => validateDefaultPrice(defaultPriceDraft), [defaultPriceDraft]);
+  const isDefaultPriceDirty = defaultPriceDraft.trim() !== savedDefaultPrice.trim();
+  // true если юзер сам что-то редактировал — иначе разрешаем перезаписывать draft
+  // при обновлении teacher извне (bootstrap, refresh из других секций приложения).
+  const userDidEditRef = useRef(false);
   const [weekendConflict, setWeekendConflict] = useState<WeekendConflictPreview | null>(null);
-  const [pendingWeekendWeekdays, setPendingWeekendWeekdays] = useState<number[] | null>(null);
+  const pendingConflictPatchRef = useRef<SettingsPatch | null>(null);
+  const [isFormValid, setIsFormValid] = useState(true);
+  const validationErrorsRef = useRef<Record<string, string | null>>({});
 
   useEffect(() => {
     teacherRef.current = teacher;
   }, [teacher]);
 
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    defaultPriceDraftRef.current = defaultPriceDraft;
+  }, [defaultPriceDraft]);
+
+  // Если юзер ещё ничего не редактировал — синхронизируем draft с teacher.
+  // Это покрывает: bootstrap из AppPage, обновления teacher из других экранов.
+  // После первого редактирования (userDidEditRef=true) draft трогать нельзя —
+  // иначе пользователь потеряет введённые значения; sync делаем явно в save/cancel.
+  useEffect(() => {
+    if (userDidEditRef.current) return;
+    setDraft(teacher);
+  }, [teacher]);
+
   const timeZoneOptions = useMemo(() => {
     const options = getTimeZoneOptions();
-    if (teacher.timezone && !options.some((option) => option.value === teacher.timezone)) {
-      return [{ value: teacher.timezone, label: formatTimeZoneLabel(teacher.timezone) }, ...options];
+    if (draft.timezone && !options.some((option) => option.value === draft.timezone)) {
+      return [{ value: draft.timezone, label: formatTimeZoneLabel(draft.timezone) }, ...options];
     }
     return options;
-  }, [teacher.timezone]);
+  }, [draft.timezone]);
 
-  const applyTeacherPatch = useCallback(
-    (patch: SettingsPatch) => {
-      onTeacherChange({ ...teacherRef.current, ...patch });
-    },
-    [onTeacherChange],
-  );
+  const draftPatch = useMemo(() => computeDraftPatch(draft, teacher), [draft, teacher]);
+  const isDirty = Object.keys(draftPatch).length > 0 || isDefaultPriceDirty;
+  const formHasErrors = !isFormValid || Boolean(defaultPriceError);
+
+  const handleDraftChange = useCallback((partial: Partial<Teacher>) => {
+    userDidEditRef.current = true;
+    setDraft((prev) => ({ ...prev, ...partial }));
+  }, []);
+
+  const handleDefaultPriceChange = useCallback((value: string) => {
+    userDidEditRef.current = true;
+    setDefaultPriceDraft(value);
+  }, []);
+
+  const handleValidationChange = useCallback((key: string, error: string | null) => {
+    const prevErrors = validationErrorsRef.current;
+    if ((prevErrors[key] ?? null) === error) return;
+    const nextErrors = { ...prevErrors, [key]: error };
+    validationErrorsRef.current = nextErrors;
+    const hasErrors = Object.values(nextErrors).some((value) => Boolean(value));
+    setIsFormValid(!hasErrors);
+  }, []);
 
   const applySettingsSuccess = useCallback(
     (data: UpdateSettingsSuccessResponse, successMessage = 'Сохранено') => {
-      applyTeacherPatch(data.settings);
+      // Бэк возвращает не все поля (например, name отсутствует в data.settings),
+      // поэтому накатываем сначала draft (что отправил пользователь), затем серверный ответ —
+      // чтобы серверные значения перебили клиентские, но клиентские не пропали.
+      const nextTeacher: Teacher = { ...teacherRef.current, ...draftRef.current, ...data.settings };
+      onTeacherChange(nextTeacher);
+      setDraft(nextTeacher);
       if (data.links && data.links.length > 0) {
         onLinksPatched?.(data.links);
       }
@@ -207,153 +345,149 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         onLessonsRemoved?.(data.removedLessonIds);
       }
       setWeekendConflict(null);
-      setPendingWeekendWeekdays(null);
+      pendingConflictPatchRef.current = null;
+      userDidEditRef.current = false;
       setSaveStatus('idle');
       showToast({ message: successMessage, variant: 'success' });
     },
-    [applyTeacherPatch, onLessonsRemoved, onLinksPatched, showToast],
+    [onLessonsRemoved, onLinksPatched, onTeacherChange, showToast],
   );
 
-  const savePendingPatch = useCallback(async () => {
-    const patch = pendingPatchRef.current;
-    pendingPatchRef.current = {};
-    if (!hasPatchValues(patch)) {
-      return { ok: true } as const;
-    }
-    setSaveStatus('saving');
-    try {
-      const data = await api.updateSettings(patch);
-      if (isWeekendConflictResponse(data)) {
-        setSaveStatus('idle');
-        setWeekendConflict(data.conflict);
-        return { ok: false, error: 'weekend_confirmation_required' } as const;
-      }
-      applySettingsSuccess(data);
-      return { ok: true } as const;
-    } catch (_error) {
-      setSaveStatus('error');
-      showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
-      return { ok: false, error: 'save_failed' } as const;
-    }
-  }, [applySettingsSuccess, showToast]);
-
-  const scheduleSave = useCallback(
-    (patch: SettingsPatch) => {
-      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-      }
-      saveTimerRef.current = window.setTimeout(() => {
-        savePendingPatch();
-      }, 600);
-    },
-    [savePendingPatch],
-  );
-
-  const saveSettingsNow = useCallback(
-    async (patch: SettingsPatch) => {
-      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-      const nextPatch = pendingPatchRef.current;
-      pendingPatchRef.current = {};
-      if (!hasPatchValues(nextPatch)) {
-        return { ok: true } as const;
+  const executeSavePatch = useCallback(
+    async (
+      patch: SettingsPatch,
+      options?: { confirmWeekendConflicts?: boolean; successMessage?: string },
+    ): Promise<{ ok: true } | { ok: false; reason: 'conflict' | 'failed' }> => {
+      if (Object.keys(patch).length === 0) {
+        return { ok: true };
       }
       setSaveStatus('saving');
       try {
-        const data = await api.updateSettings(nextPatch);
+        const data = await api.updateSettings({
+          ...patch,
+          ...(options?.confirmWeekendConflicts ? { confirmWeekendConflicts: true } : {}),
+        });
         if (isWeekendConflictResponse(data)) {
           setSaveStatus('idle');
           setWeekendConflict(data.conflict);
-          return { ok: false, error: 'weekend_confirmation_required' } as const;
+          pendingConflictPatchRef.current = patch;
+          return { ok: false, reason: 'conflict' };
         }
-        applySettingsSuccess(data);
-        return { ok: true } as const;
+        const successMessage =
+          options?.successMessage ??
+          (data.removedLessonIds && data.removedLessonIds.length > 0
+            ? `Сохранено. Отменено ${pluralizeRu(data.removedLessonIds.length, {
+                one: 'занятие',
+                few: 'занятия',
+                many: 'занятий',
+              })}.`
+            : 'Настройки сохранены');
+        applySettingsSuccess(data, successMessage);
+        return { ok: true };
       } catch (_error) {
         setSaveStatus('error');
         showToast({ message: 'Не удалось сохранить изменения', variant: 'error' });
-        return { ok: false, error: 'save_failed' } as const;
+        return { ok: false, reason: 'failed' };
       }
     },
     [applySettingsSuccess, showToast],
   );
 
-  useEffect(
-    () => () => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    const priceError = validateDefaultPrice(defaultPriceDraftRef.current);
+    if (!isFormValid || priceError) {
+      showToast({ message: 'Исправьте ошибки в форме перед сохранением', variant: 'error' });
+      return false;
+    }
+    const patch = computeDraftPatch(draftRef.current, teacherRef.current);
+    const priceDirty = defaultPriceDraftRef.current.trim() !== savedDefaultPrice.trim();
+    if (Object.keys(patch).length > 0) {
+      const result = await executeSavePatch(patch);
+      if (!result.ok) return false;
+    }
+    if (priceDirty) {
+      persistDefaultPrice(defaultPriceDraftRef.current);
+      setSavedDefaultPrice(defaultPriceDraftRef.current);
+      // Если был только локальный patch (бэк не дёргали) — нужен свой toast и сброс userDidEdit.
+      if (Object.keys(patch).length === 0) {
+        showToast({ message: 'Цена по умолчанию сохранена', variant: 'success' });
+        userDidEditRef.current = false;
       }
-    },
-    [],
-  );
+    }
+    return true;
+  }, [executeSavePatch, isFormValid, savedDefaultPrice, showToast]);
 
-  const handleSettingsChange = useCallback(
-    (patch: SettingsPatch) => {
-      applyTeacherPatch(patch);
-      scheduleSave(patch);
-    },
-    [applyTeacherPatch, scheduleSave],
-  );
+  const handleCancel = useCallback(() => {
+    setDraft(teacherRef.current);
+    setDefaultPriceDraft(savedDefaultPrice);
+    userDidEditRef.current = false;
+    setSaveStatus('idle');
+  }, [savedDefaultPrice]);
 
-  const saveWeekendWeekdays = useCallback(
-    async (weekendWeekdays: number[], confirmWeekendConflicts = false) => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
+  // Шаблоны (StudentNotificationTemplates) сохраняются отдельно через свой механизм
+  // и не входят в общий draft — оставляем им маленький helper.
+  const saveTemplatesPatch = useCallback(
+    async (patch: SettingsPatch): Promise<{ ok: boolean; error?: string }> => {
+      if (Object.keys(patch).length === 0) {
+        return { ok: true };
       }
-
-      const pendingSaveResult = await savePendingPatch();
-      if (!pendingSaveResult.ok) {
-        return false;
-      }
-
       setSaveStatus('saving');
       try {
-        const data = await api.updateSettings({ weekendWeekdays, confirmWeekendConflicts });
+        const data = await api.updateSettings(patch);
         if (isWeekendConflictResponse(data)) {
-          setWeekendConflict(data.conflict);
-          setPendingWeekendWeekdays(weekendWeekdays);
           setSaveStatus('idle');
-          return false;
+          return { ok: false, error: 'weekend_confirmation_required' };
         }
-
-        const successMessage =
-          data.removedLessonIds && data.removedLessonIds.length > 0
-            ? `Выходные сохранены. Отменено ${pluralizeRu(data.removedLessonIds.length, {
-                one: 'занятие',
-                few: 'занятия',
-                many: 'занятий',
-              })}.`
-            : 'Выходные сохранены';
-        applySettingsSuccess(data, successMessage);
-        return true;
+        applySettingsSuccess(data, 'Шаблон сохранён');
+        return { ok: true };
       } catch (_error) {
         setSaveStatus('error');
-        showToast({ message: 'Не удалось сохранить выходные дни', variant: 'error' });
-        return false;
+        showToast({ message: 'Не удалось сохранить шаблон', variant: 'error' });
+        return { ok: false, error: 'save_failed' };
       }
     },
-    [applySettingsSuccess, savePendingPatch, showToast],
+    [applySettingsSuccess, showToast],
   );
+
+  // Регистрируем единый form-guard в UnsavedChangesProvider —
+  // блокировка навигации и beforeunload будут срабатывать автоматически.
+  useEffect(() => {
+    if (!isDirty) {
+      clearEntry('settings-form');
+      return undefined;
+    }
+    setEntry('settings-form', {
+      isDirty: true,
+      onSave: handleSave,
+      onDiscard: handleCancel,
+      title: 'Несохранённые изменения',
+      message: 'Вы изменили настройки, но не нажали «Сохранить». Сохранить перед выходом?',
+      confirmText: 'Сохранить',
+      cancelText: 'Выйти без сохранения',
+      onSaveErrorMessage: 'Не удалось сохранить настройки',
+    });
+    return () => clearEntry('settings-form');
+  }, [clearEntry, handleCancel, handleSave, isDirty, setEntry]);
 
   const loadSettings = useCallback(async () => {
     setLoadStatus('loading');
     try {
       const data = await api.getSettings();
-      applyTeacherPatch(data.settings);
+      const next: Teacher = { ...teacherRef.current, ...data.settings };
+      onTeacherChange(next);
+      setDraft(next);
       setLoadStatus('ready');
     } catch (_error) {
       setLoadStatus('error');
     }
-  }, [applyTeacherPatch]);
+  }, [onTeacherChange]);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
+  // Автодетект таймзоны при первой загрузке — пишем напрямую на сервер,
+  // минуя draft, чтобы не заставлять юзера видеть dirty-форму без явного действия.
   useEffect(() => {
     if (loadStatus !== 'ready') return;
     if (autoTimeZoneRef.current) return;
@@ -361,8 +495,18 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     const resolved = getResolvedTimeZone();
     if (!resolved) return;
     autoTimeZoneRef.current = true;
-    handleSettingsChange({ timezone: resolved });
-  }, [handleSettingsChange, loadStatus, teacher.timezone]);
+    api
+      .updateSettings({ timezone: resolved })
+      .then((data) => {
+        if (isWeekendConflictResponse(data)) return;
+        const next: Teacher = { ...teacherRef.current, ...data.settings };
+        onTeacherChange(next);
+        setDraft(next);
+      })
+      .catch(() => {
+        autoTimeZoneRef.current = false;
+      });
+  }, [loadStatus, onTeacherChange, teacher.timezone]);
 
   const tabFromQuery = new URLSearchParams(location.search).get('tab');
   const pathSegments = location.pathname.split('/').filter(Boolean);
@@ -374,6 +518,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       : 'profile';
 
   const showMobileList = isMobile && !tabFromPath && !tabFromQuery;
+  const showFormFooter = isDirty || saveStatus === 'saving' || saveStatus === 'error';
 
   const renderModule = () => {
     if (loadStatus === 'loading') {
@@ -398,26 +543,36 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
       case 'profile':
         return (
           <ProfileSettings
-            teacher={teacher}
-            onChange={handleSettingsChange}
+            teacher={draft}
+            onChange={handleDraftChange}
+            onValidationChange={handleValidationChange}
             timeZoneOptions={timeZoneOptions}
-            initials={getTeacherInitials(teacher)}
-            saveStatus={saveStatus}
+            initials={getTeacherInitials(draft)}
+            disabled={saveStatus === 'saving'}
           />
         );
       case 'schedule':
         return (
           <ScheduleSettings
-            teacher={teacher}
-            onChange={handleSettingsChange}
-            onSaveNow={saveSettingsNow}
-            onSaveWeekendWeekdays={saveWeekendWeekdays}
-            isWeekendSaving={saveStatus === 'saving'}
+            teacher={draft}
+            onChange={handleDraftChange}
+            defaultPriceDraft={defaultPriceDraft}
+            onDefaultPriceChange={handleDefaultPriceChange}
+            defaultPriceError={defaultPriceError}
+            disabled={saveStatus === 'saving'}
             onComingSoonClick={() => showToast({ message: 'Скоро, в следующих обновлениях', variant: 'success' })}
           />
         );
       case 'notifications':
-        return <NotificationsSettings teacher={teacher} onChange={handleSettingsChange} onSaveNow={saveSettingsNow} />;
+        return (
+          <NotificationsSettings
+            teacher={draft}
+            savedTeacher={teacher}
+            onChange={handleDraftChange}
+            onSaveTemplates={saveTemplatesPatch}
+            disabled={saveStatus === 'saving'}
+          />
+        );
       case 'appearance':
         return <AppearanceSettings />;
       case 'security':
@@ -476,8 +631,13 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     </>
   );
 
+  // Tabs без редактируемых полей (appearance, security) не должны показывать общий footer:
+  // в Appearance тема применяется мгновенно и draft там пуст, а в Security всё через свой API.
+  const tabsWithGlobalForm: SettingsTabId[] = ['profile', 'schedule', 'notifications'];
+  const footerVisible = showFormFooter && tabsWithGlobalForm.includes(activeTab);
+
   return (
-    <section className={styles.page}>
+    <section className={`${styles.page} ${footerVisible ? styles.pageWithFooter : ''}`}>
       {showMobileList ? (
         <div className={styles.mobileOverview}>
           <div className={styles.mobileSidebarCard}>{sidebarNav}</div>
@@ -525,6 +685,41 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         </div>
       )}
 
+      {footerVisible ? (
+        <div className={styles.formFooter} role="region" aria-label="Несохранённые изменения настроек">
+          <div className={styles.formFooterInner}>
+            <div className={styles.formFooterStatus} aria-live="polite">
+              {saveStatus === 'saving'
+                ? 'Сохраняем…'
+                : saveStatus === 'error'
+                  ? 'Не удалось сохранить — проверьте подключение и попробуйте ещё раз.'
+                  : formHasErrors
+                    ? 'Есть ошибки в полях — исправьте их перед сохранением.'
+                    : 'Есть несохранённые изменения.'}
+            </div>
+            <div className={styles.formFooterActions}>
+              <button
+                type="button"
+                className={styles.formFooterCancel}
+                onClick={handleCancel}
+                disabled={saveStatus === 'saving' || !isDirty}
+              >
+                Отменить
+              </button>
+              <button
+                type="button"
+                className={styles.formFooterSave}
+                onClick={() => void handleSave()}
+                disabled={!isDirty || formHasErrors || saveStatus === 'saving'}
+              >
+                <CheckCircleOutlineIcon width={18} height={18} />
+                <span>{saveStatus === 'saving' ? 'Сохраняем…' : 'Сохранить'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <DialogModal
         open={Boolean(weekendConflict)}
         title="Подтвердите выходные дни"
@@ -534,15 +729,16 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         onClose={() => {
           if (saveStatus === 'saving') return;
           setWeekendConflict(null);
-          setPendingWeekendWeekdays(null);
+          pendingConflictPatchRef.current = null;
         }}
         onCancel={() => {
           setWeekendConflict(null);
-          setPendingWeekendWeekdays(null);
+          pendingConflictPatchRef.current = null;
         }}
         onConfirm={async () => {
-          if (!pendingWeekendWeekdays) return;
-          await saveWeekendWeekdays(pendingWeekendWeekdays, true);
+          const pendingPatch = pendingConflictPatchRef.current;
+          if (!pendingPatch) return;
+          await executeSavePatch(pendingPatch, { confirmWeekendConflicts: true });
         }}
       />
     </section>

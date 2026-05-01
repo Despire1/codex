@@ -142,7 +142,12 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
       }
 
       if (sortBy === 'score') {
-        return b.presentation.averageScore - a.presentation.averageScore;
+        const aAttendance = a.entry.stats.attendanceRate ?? -1;
+        const bAttendance = b.entry.stats.attendanceRate ?? -1;
+        if (bAttendance !== aAttendance) {
+          return bAttendance - aAttendance;
+        }
+        return b.entry.stats.completedLessons - a.entry.stats.completedLessons;
       }
 
       const aNext = a.presentation.nextLessonAt
@@ -204,9 +209,18 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                   options={sortOptions}
                 />
 
-                <button type="button" className={styles.iconControlButton} aria-label="Дополнительные фильтры">
-                  <FontAwesomeIcon icon={faFilter} />
-                </button>
+                <Tooltip content="Дополнительные фильтры скоро появятся" side="top" align="center">
+                  <span>
+                    <button
+                      type="button"
+                      className={styles.iconControlButton}
+                      aria-label="Дополнительные фильтры (в разработке)"
+                      disabled
+                    >
+                      <FontAwesomeIcon icon={faFilter} />
+                    </button>
+                  </span>
+                </Tooltip>
 
                 <div className={styles.viewModeGroup} role="group" aria-label="Режим карточек учеников">
                   {viewModeOptions.map((option) => (

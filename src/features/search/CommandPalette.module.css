@@ -19,83 +19,290 @@
 
 .panel {
   position: relative;
-  width: min(560px, 100%);
+  width: min(640px, 100%);
   max-height: calc(100vh - 96px);
   display: flex;
   flex-direction: column;
   background: var(--surface-card);
   border-radius: 16px;
-  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.25);
   overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
 }
 
 .input {
   border: none;
   outline: none;
-  padding: 18px 20px;
+  padding: 18px 20px 14px;
   font-size: 16px;
+  background: transparent;
+  color: var(--color-slate-900, #0f172a);
+  box-shadow: none;
+}
+
+.input::placeholder {
+  color: var(--color-slate-400, #94a3b8);
+}
+
+.input:focus,
+.input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--color-slate-100, #f1f5f9);
 }
 
-.input:focus-visible {
-  outline: 2px solid var(--accent-primary, #a3e635);
-  outline-offset: -2px;
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-slate-600, #475569);
+  cursor: pointer;
+  transition:
+    background 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--color-slate-50, #f8fafc);
+  color: var(--color-slate-900, #0f172a);
+}
+
+.tabActive,
+.tabActive:hover {
+  background: var(--accent-primary, #a3e635);
+  color: var(--color-slate-900, #0f172a);
+  border-color: var(--accent-primary, #a3e635);
+}
+
+.tabCount {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: inherit;
+}
+
+.tabActive .tabCount {
+  background: rgba(15, 23, 42, 0.18);
 }
 
 .resultsList {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 400px;
+  max-height: 460px;
+  padding: 4px 0 8px;
 }
 
 .empty {
-  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 32px 20px;
   color: var(--color-slate-500, #64748b);
   font-size: 14px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-slate-900, #0f172a);
+}
+
+.emptyHint {
+  font-size: 13px;
+  color: var(--color-slate-500, #64748b);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-slate-500, #64748b);
+}
+
+.groupCount {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-700, #334155);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .resultItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 12px 20px;
+  padding: 10px 20px;
   border: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  position: relative;
+  border-left: 3px solid transparent;
+  transition: background 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.resultItemActive {
+.resultItem:hover {
   background: var(--color-slate-50, #f8fafc);
+}
+
+.resultItemActive,
+.resultItemActive:hover {
+  background: var(--accent-primary-soft, #f7fee7);
+  border-left-color: var(--accent-primary, #a3e635);
+}
+
+.resultIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-700, #334155);
+  letter-spacing: 0.02em;
+}
+
+.resultIcon[data-kind='student'] {
+  background: rgba(163, 230, 53, 0.18);
+  color: #4d7c0f;
+}
+
+.resultIcon[data-kind='lesson'] {
+  background: rgba(56, 189, 248, 0.18);
+  color: #075985;
+}
+
+.resultIcon[data-kind='homework'] {
+  background: rgba(244, 114, 182, 0.18);
+  color: #9d174d;
+}
+
+.resultIcon[data-kind='template'] {
+  background: rgba(168, 85, 247, 0.16);
+  color: #6b21a8;
+}
+
+.resultBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .resultName {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-slate-900, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .resultMeta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   font-size: 12px;
   color: var(--color-slate-500, #64748b);
 }
 
-.resultLevel {
-  padding: 2px 8px;
+.resultBadge {
+  padding: 1px 7px;
   border-radius: 999px;
   background: var(--color-slate-100, #f1f5f9);
   color: var(--color-slate-700, #334155);
   font-weight: 600;
+  font-size: 11px;
+}
+
+.resultBadge[data-kind='lesson'] {
+  background: rgba(56, 189, 248, 0.18);
+  color: #075985;
+}
+
+.resultBadge[data-kind='homework'] {
+  background: rgba(244, 114, 182, 0.18);
+  color: #9d174d;
+}
+
+.resultBadge[data-kind='template'] {
+  background: rgba(168, 85, 247, 0.16);
+  color: #6b21a8;
+}
+
+.resultLevel {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-700, #334155);
+  font-weight: 600;
+  font-size: 11px;
 }
 
 .resultUsername {
   color: var(--color-slate-500, #64748b);
+}
+
+.resultPaid {
+  color: #047857;
+  font-weight: 600;
+}
+
+.resultName mark,
+.resultMeta mark {
+  background: rgba(163, 230, 53, 0.45);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-weight: 700;
 }
 
 .footer {
@@ -106,4 +313,5 @@
   background: var(--color-slate-50, #f8fafc);
   color: var(--color-slate-500, #64748b);
   font-size: 12px;
+  flex-wrap: wrap;
 }

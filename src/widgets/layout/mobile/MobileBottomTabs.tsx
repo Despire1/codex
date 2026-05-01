@@ -15,7 +15,7 @@ export const MobileBottomTabs: FC<MobileBottomTabsProps> = ({ activeTab, items, 
   } as CSSProperties;
 
   return (
-    <nav className={styles.root} aria-label="Нижняя навигация">
+    <nav className={styles.root} aria-label="Нижняя навигация" data-tour="mobile-tabs">
       <div className={styles.inner} style={tabsStyle}>
         {items.map((item) => {
           const isActive = activeTab === item.id;

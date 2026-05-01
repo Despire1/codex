@@ -1,28 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type FC } from 'react';
-import {
-  canTeacherDeleteHomeworkTemplate,
-} from '../../../../../entities/homework-template/model/lib/workflow';
+import { canTeacherDeleteHomeworkTemplate } from '../../../../../entities/homework-template/model/lib/workflow';
 import { HomeworkAssignment, HomeworkTemplate } from '../../../../../entities/types';
 import { BottomSheet } from '../../../../../shared/ui/BottomSheet/BottomSheet';
-import {
-  HomeworkMagnifyingGlassIcon,
-  HomeworkSlidersIcon,
-} from '../../../../../shared/ui/icons/HomeworkFaIcons';
-import {
-  AddOutlinedIcon,
-  BarsIcon,
-  CloseIcon,
-  NotificationsNoneOutlinedIcon,
-} from '../../../../../icons/MaterialIcons';
+import { HomeworkMagnifyingGlassIcon, HomeworkSlidersIcon } from '../../../../../shared/ui/icons/HomeworkFaIcons';
+import { AddOutlinedIcon, BarsIcon, CloseIcon } from '../../../../../icons/MaterialIcons';
+import { ActivityFeedTrigger } from '../../../../dashboard/components/ActivityFeedTrigger';
 import { canCancelHomeworkAssignmentIssue } from '../../../../../entities/homework-assignment/model/lib/assignmentIssuance';
 import {
   canReissueHomeworkAssignment,
   canTeacherEditHomeworkAssignment,
   resolveHomeworkAssignmentWorkflow,
 } from '../../../../../entities/homework-assignment/model/lib/workflow';
-import {
-  isHomeworkTemplateFavorite,
-} from '../../model/lib/templatePresentation';
+import { isHomeworkTemplateFavorite } from '../../model/lib/templatePresentation';
 import {
   MobileLibraryScope,
   MobileLibrarySort,
@@ -69,9 +58,7 @@ interface TeacherHomeworksMobileScreenProps {
   hasMoreAssignments: boolean;
   templatesError: string | null;
   assignmentsError: string | null;
-  homeworkActivityHasUnread: boolean;
   onOpenMobileSidebar?: () => void;
-  onOpenActivity: () => void;
   onWorkspaceModeChange: (mode: 'list' | 'drafts' | 'groups' | 'templates') => void;
   onSearchChange: (value: string) => void;
   onTabChange: (tab: TeacherHomeworkListFilter) => void;
@@ -183,9 +170,7 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
   hasMoreAssignments,
   templatesError,
   assignmentsError,
-  homeworkActivityHasUnread,
   onOpenMobileSidebar,
-  onOpenActivity,
   onWorkspaceModeChange,
   onSearchChange,
   onTabChange,
@@ -230,7 +215,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
     studentId: selectedStudentId,
     problemFilters,
   });
-  const [selectedUrgency, setSelectedUrgency] = useState<MobileUrgencyFilter>(() => deriveUrgencyFilter(activeTab, problemFilters));
+  const [selectedUrgency, setSelectedUrgency] = useState<MobileUrgencyFilter>(() =>
+    deriveUrgencyFilter(activeTab, problemFilters),
+  );
   const [isCreateSheetOpen, setCreateSheetOpen] = useState(false);
   const [isLibraryFilterSheetOpen, setLibraryFilterSheetOpen] = useState(false);
   const [isAssignmentFilterSheetOpen, setAssignmentFilterSheetOpen] = useState(false);
@@ -297,19 +284,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
     () => activeTemplates.filter((template) => isHomeworkTemplateFavorite(template)).length,
     [activeTemplates],
   );
-  const archivedTemplatesCount = useMemo(
-    () => templates.filter((template) => template.isArchived).length,
-    [templates],
-  );
+  const archivedTemplatesCount = useMemo(() => templates.filter((template) => template.isArchived).length, [templates]);
 
   const availableThemes = useMemo(
     () =>
       Array.from(
-        new Set(
-          activeTemplates
-            .map((template) => resolveMobileTemplateCategory(template))
-            .filter(Boolean),
-        ),
+        new Set(activeTemplates.map((template) => resolveMobileTemplateCategory(template)).filter(Boolean)),
       ).sort((left, right) => left.localeCompare(right, 'ru')),
     [activeTemplates],
   );
@@ -438,15 +418,26 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
       });
     });
     return items;
-  }, [onSelectedStudentIdChange, onSortChange, onToggleProblemFilter, problemFilters, selectedStudentId, sortBy, students]);
+  }, [
+    onSelectedStudentIdChange,
+    onSortChange,
+    onToggleProblemFilter,
+    problemFilters,
+    selectedStudentId,
+    sortBy,
+    students,
+  ]);
 
   const libraryFilterCount = libraryAppliedFilters.length;
-  const assignmentFilterCount =
-    assignmentAppliedFilters.length + (activeTab !== 'all' ? 1 : 0);
+  const assignmentFilterCount = assignmentAppliedFilters.length + (activeTab !== 'all' ? 1 : 0);
 
   const urgencyChips = useMemo(
     () => [
-      { id: 'all' as const, label: 'Все', count: Math.max(summary.totalCount - (summary.draftCount + summary.scheduledCount), 0) },
+      {
+        id: 'all' as const,
+        label: 'Все',
+        count: Math.max(summary.totalCount - (summary.draftCount + summary.scheduledCount), 0),
+      },
       { id: 'overdue' as const, label: 'Просрочено', count: summary.overdueCount },
       { id: 'review' as const, label: 'На проверке', count: summary.reviewCount },
       { id: 'closed' as const, label: 'Проверено', count: summary.closedCount },
@@ -580,15 +571,7 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           </div>
 
           <div className={styles.topbarActions}>
-            <button
-              type="button"
-              className={styles.iconButton}
-              onClick={onOpenActivity}
-              aria-label="События"
-            >
-              <NotificationsNoneOutlinedIcon width={20} height={20} />
-              {homeworkActivityHasUnread ? <span className={styles.notificationDot} aria-hidden /> : null}
-            </button>
+            <ActivityFeedTrigger className={styles.iconButton} />
 
             <button type="button" className={styles.addButton} onClick={() => setCreateSheetOpen(true)}>
               <AddOutlinedIcon width={16} height={16} />
@@ -686,7 +669,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
                         onClick={() => setLibraryScope('favorites')}
                       >
                         <span>Избранное</span>
-                        {favoriteTemplatesCount > 0 ? <span className={styles.scopeCount}>{favoriteTemplatesCount}</span> : null}
+                        {favoriteTemplatesCount > 0 ? (
+                          <span className={styles.scopeCount}>{favoriteTemplatesCount}</span>
+                        ) : null}
                       </button>
                       <button
                         type="button"
@@ -694,7 +679,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
                         onClick={() => setLibraryScope('archived')}
                       >
                         <span>Архив</span>
-                        {archivedTemplatesCount > 0 ? <span className={styles.scopeCount}>{archivedTemplatesCount}</span> : null}
+                        {archivedTemplatesCount > 0 ? (
+                          <span className={styles.scopeCount}>{archivedTemplatesCount}</span>
+                        ) : null}
                       </button>
                     </div>
 
@@ -768,7 +755,10 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
               {loadingTemplates ? (
                 <div className={styles.cardsList}>
                   {Array.from({ length: 3 }, (_, index) => (
-                    <div key={`template_skeleton_${index}`} className={`${styles.skeletonCard} ${styles.skeletonLibraryCard}`} />
+                    <div
+                      key={`template_skeleton_${index}`}
+                      className={`${styles.skeletonCard} ${styles.skeletonLibraryCard}`}
+                    />
                   ))}
                 </div>
               ) : null}
@@ -887,7 +877,10 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
               {loadingAssignments ? (
                 <div className={styles.cardsList}>
                   {Array.from({ length: 4 }, (_, index) => (
-                    <div key={`assignment_skeleton_${index}`} className={`${styles.skeletonCard} ${styles.skeletonAssignmentCard}`} />
+                    <div
+                      key={`assignment_skeleton_${index}`}
+                      className={`${styles.skeletonCard} ${styles.skeletonAssignmentCard}`}
+                    />
                   ))}
                 </div>
               ) : null}
@@ -915,7 +908,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
 
               {hasMoreAssignments && !loadingAssignments ? (
                 <div className={styles.loadMoreRow}>
-                  <button type="button" className={styles.loadMoreButton} onClick={onLoadMoreAssignments} disabled={loadingMoreAssignments}>
+                  <button
+                    type="button"
+                    className={styles.loadMoreButton}
+                    onClick={onLoadMoreAssignments}
+                    disabled={loadingMoreAssignments}
+                  >
                     {loadingMoreAssignments ? 'Загрузка...' : 'Показать ещё'}
                   </button>
                 </div>
@@ -940,7 +938,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
                 onOpenCreateTemplateScreen();
               }}
             >
-              <span className={styles.sheetRowIcon}><AddOutlinedIcon width={20} height={20} /></span>
+              <span className={styles.sheetRowIcon}>
+                <AddOutlinedIcon width={20} height={20} />
+              </span>
               <span className={styles.sheetRowText}>Новое задание</span>
             </button>
             <button
@@ -951,7 +951,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
                 onOpenAssignModal();
               }}
             >
-              <span className={styles.sheetRowIcon}><AddOutlinedIcon width={20} height={20} /></span>
+              <span className={styles.sheetRowIcon}>
+                <AddOutlinedIcon width={20} height={20} />
+              </span>
               <span className={styles.sheetRowText}>Выдать существующее</span>
             </button>
             <button
@@ -962,7 +964,9 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
                 onCreateCollection();
               }}
             >
-              <span className={styles.sheetRowIcon}><AddOutlinedIcon width={20} height={20} /></span>
+              <span className={styles.sheetRowIcon}>
+                <AddOutlinedIcon width={20} height={20} />
+              </span>
               <span className={styles.sheetRowText}>Создать коллекцию</span>
             </button>
           </div>
@@ -973,15 +977,28 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
         <div className={styles.sheet}>
           <div className={styles.sheetHeader}>
             <h3 className={styles.sheetTitle}>Фильтры</h3>
-            <button type="button" className={styles.sheetReset} onClick={resetLibraryFilters}>Сбросить</button>
+            <button type="button" className={styles.sheetReset} onClick={resetLibraryFilters}>
+              Сбросить
+            </button>
           </div>
 
           <div className={styles.sheetSection}>
             <div className={styles.sheetSectionTitle}>Тема</div>
             <div className={styles.sheetList}>
-              <button type="button" className={`${styles.optionRow} ${libraryDraft.theme === 'all' ? styles.optionRowActive : ''}`} onClick={() => setLibraryDraft((prev) => ({ ...prev, theme: 'all' }))}>Все темы</button>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${libraryDraft.theme === 'all' ? styles.optionRowActive : ''}`}
+                onClick={() => setLibraryDraft((prev) => ({ ...prev, theme: 'all' }))}
+              >
+                Все темы
+              </button>
               {availableThemes.map((theme) => (
-                <button key={theme} type="button" className={`${styles.optionRow} ${libraryDraft.theme === theme ? styles.optionRowActive : ''}`} onClick={() => setLibraryDraft((prev) => ({ ...prev, theme }))}>
+                <button
+                  key={theme}
+                  type="button"
+                  className={`${styles.optionRow} ${libraryDraft.theme === theme ? styles.optionRowActive : ''}`}
+                  onClick={() => setLibraryDraft((prev) => ({ ...prev, theme }))}
+                >
                   {theme}
                 </button>
               ))}
@@ -991,9 +1008,20 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           <div className={styles.sheetSection}>
             <div className={styles.sheetSectionTitle}>Коллекция</div>
             <div className={styles.sheetList}>
-              <button type="button" className={`${styles.optionRow} ${libraryDraft.collection === 'all' ? styles.optionRowActive : ''}`} onClick={() => setLibraryDraft((prev) => ({ ...prev, collection: 'all' }))}>Все коллекции</button>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${libraryDraft.collection === 'all' ? styles.optionRowActive : ''}`}
+                onClick={() => setLibraryDraft((prev) => ({ ...prev, collection: 'all' }))}
+              >
+                Все коллекции
+              </button>
               {availableCollections.map((collection) => (
-                <button key={collection} type="button" className={`${styles.optionRow} ${libraryDraft.collection === collection ? styles.optionRowActive : ''}`} onClick={() => setLibraryDraft((prev) => ({ ...prev, collection }))}>
+                <button
+                  key={collection}
+                  type="button"
+                  className={`${styles.optionRow} ${libraryDraft.collection === collection ? styles.optionRowActive : ''}`}
+                  onClick={() => setLibraryDraft((prev) => ({ ...prev, collection }))}
+                >
                   {collection}
                 </button>
               ))}
@@ -1004,7 +1032,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
             <div className={styles.sheetSectionTitle}>Сортировка</div>
             <div className={styles.sheetList}>
               {LIBRARY_SORT_OPTIONS.map((option) => (
-                <button key={option.id} type="button" className={`${styles.optionRow} ${libraryDraft.sort === option.id ? styles.optionRowActive : ''}`} onClick={() => setLibraryDraft((prev) => ({ ...prev, sort: option.id }))}>
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`${styles.optionRow} ${libraryDraft.sort === option.id ? styles.optionRowActive : ''}`}
+                  onClick={() => setLibraryDraft((prev) => ({ ...prev, sort: option.id }))}
+                >
                   {option.label}
                 </button>
               ))}
@@ -1012,8 +1045,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           </div>
 
           <div className={styles.sheetActionBar}>
-            <button type="button" className={styles.sheetSecondaryButton} onClick={resetLibraryFilters}>Сбросить</button>
-            <button type="button" className={styles.sheetPrimaryButton} onClick={applyLibraryFilters}>Применить</button>
+            <button type="button" className={styles.sheetSecondaryButton} onClick={resetLibraryFilters}>
+              Сбросить
+            </button>
+            <button type="button" className={styles.sheetPrimaryButton} onClick={applyLibraryFilters}>
+              Применить
+            </button>
           </div>
         </div>
       </BottomSheet>
@@ -1022,14 +1059,21 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
         <div className={styles.sheet}>
           <div className={styles.sheetHeader}>
             <h3 className={styles.sheetTitle}>Фильтры</h3>
-            <button type="button" className={styles.sheetReset} onClick={resetAssignmentFilters}>Сбросить</button>
+            <button type="button" className={styles.sheetReset} onClick={resetAssignmentFilters}>
+              Сбросить
+            </button>
           </div>
 
           <div className={styles.sheetSection}>
             <div className={styles.sheetSectionTitle}>Статус</div>
             <div className={styles.sheetList}>
               {STATUS_OPTIONS.map((option) => (
-                <button key={option.id} type="button" className={`${styles.optionRow} ${assignmentDraft.tab === option.id ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, tab: option.id }))}>
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`${styles.optionRow} ${assignmentDraft.tab === option.id ? styles.optionRowActive : ''}`}
+                  onClick={() => setAssignmentDraft((prev) => ({ ...prev, tab: option.id }))}
+                >
                   {option.label}
                 </button>
               ))}
@@ -1039,11 +1083,20 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           <div className={styles.sheetSection}>
             <div className={styles.sheetSectionTitle}>Ученик</div>
             <div className={styles.sheetList}>
-              <button type="button" className={`${styles.optionRow} ${assignmentDraft.studentId === null ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, studentId: null }))}>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${assignmentDraft.studentId === null ? styles.optionRowActive : ''}`}
+                onClick={() => setAssignmentDraft((prev) => ({ ...prev, studentId: null }))}
+              >
                 Все ученики
               </button>
               {students.map((student) => (
-                <button key={student.id} type="button" className={`${styles.optionRow} ${assignmentDraft.studentId === student.id ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, studentId: student.id }))}>
+                <button
+                  key={student.id}
+                  type="button"
+                  className={`${styles.optionRow} ${assignmentDraft.studentId === student.id ? styles.optionRowActive : ''}`}
+                  onClick={() => setAssignmentDraft((prev) => ({ ...prev, studentId: student.id }))}
+                >
                   {student.name}
                 </button>
               ))}
@@ -1053,13 +1106,40 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           <div className={styles.sheetSection}>
             <div className={styles.sheetSectionTitle}>Особые случаи</div>
             <div className={styles.sheetList}>
-              <button type="button" className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('overdue') ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, problemFilters: toggleProblemFilter(prev.problemFilters, 'overdue') }))}>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('overdue') ? styles.optionRowActive : ''}`}
+                onClick={() =>
+                  setAssignmentDraft((prev) => ({
+                    ...prev,
+                    problemFilters: toggleProblemFilter(prev.problemFilters, 'overdue'),
+                  }))
+                }
+              >
                 Просрочено
               </button>
-              <button type="button" className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('returned') ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, problemFilters: toggleProblemFilter(prev.problemFilters, 'returned') }))}>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('returned') ? styles.optionRowActive : ''}`}
+                onClick={() =>
+                  setAssignmentDraft((prev) => ({
+                    ...prev,
+                    problemFilters: toggleProblemFilter(prev.problemFilters, 'returned'),
+                  }))
+                }
+              >
                 На доработке
               </button>
-              <button type="button" className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('config_error') ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, problemFilters: toggleProblemFilter(prev.problemFilters, 'config_error') }))}>
+              <button
+                type="button"
+                className={`${styles.optionRow} ${assignmentDraft.problemFilters.includes('config_error') ? styles.optionRowActive : ''}`}
+                onClick={() =>
+                  setAssignmentDraft((prev) => ({
+                    ...prev,
+                    problemFilters: toggleProblemFilter(prev.problemFilters, 'config_error'),
+                  }))
+                }
+              >
                 Ошибки
               </button>
             </div>
@@ -1069,7 +1149,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
             <div className={styles.sheetSectionTitle}>Сортировка</div>
             <div className={styles.sheetList}>
               {ASSIGNMENT_SORT_OPTIONS.map((option) => (
-                <button key={option.id} type="button" className={`${styles.optionRow} ${assignmentDraft.sortBy === option.id ? styles.optionRowActive : ''}`} onClick={() => setAssignmentDraft((prev) => ({ ...prev, sortBy: option.id }))}>
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`${styles.optionRow} ${assignmentDraft.sortBy === option.id ? styles.optionRowActive : ''}`}
+                  onClick={() => setAssignmentDraft((prev) => ({ ...prev, sortBy: option.id }))}
+                >
                   {option.label}
                 </button>
               ))}
@@ -1077,8 +1162,12 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
           </div>
 
           <div className={styles.sheetActionBar}>
-            <button type="button" className={styles.sheetSecondaryButton} onClick={resetAssignmentFilters}>Сбросить</button>
-            <button type="button" className={styles.sheetPrimaryButton} onClick={applyAssignmentFilters}>Применить</button>
+            <button type="button" className={styles.sheetSecondaryButton} onClick={resetAssignmentFilters}>
+              Сбросить
+            </button>
+            <button type="button" className={styles.sheetPrimaryButton} onClick={applyAssignmentFilters}>
+              Применить
+            </button>
           </div>
         </div>
       </BottomSheet>
@@ -1087,67 +1176,101 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
         <div className={styles.sheet}>
           {activeMenu?.kind === 'template' ? (
             <div className={styles.sheetList}>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onOpenTemplate(template);
-              }}>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  onOpenTemplate(template);
+                }}
+              >
                 <span className={styles.sheetRowText}>Открыть</span>
               </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onEditTemplate(template);
-              }}>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  onEditTemplate(template);
+                }}
+              >
                 <span className={styles.sheetRowText}>Редактировать</span>
               </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onIssueTemplate(template);
-              }}>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  onIssueTemplate(template);
+                }}
+              >
                 <span className={styles.sheetRowText}>Выдать</span>
               </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onToggleFavorite(template);
-              }}>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  onToggleFavorite(template);
+                }}
+              >
                 <span className={styles.sheetRowText}>
                   {isHomeworkTemplateFavorite(activeMenu.template) ? 'Убрать из избранного' : 'В избранное'}
                 </span>
               </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onDuplicateTemplate(template);
-              }}>
-                <span className={styles.sheetRowText}>Дублировать</span>
-              </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                onCreateCollection(template);
-              }}>
-                <span className={styles.sheetRowText}>В коллекцию</span>
-              </button>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { template } = activeMenu;
-                setActiveMenu(null);
-                if (template.isArchived) {
-                  onRestoreTemplate(template);
-                } else {
-                  onArchiveTemplate(template);
-                }
-              }}>
-                <span className={styles.sheetRowText}>{activeMenu.template.isArchived ? 'Вернуть из архива' : 'Архивировать'}</span>
-              </button>
-              {canTeacherDeleteHomeworkTemplate(activeMenu.template) ? (
-                <button type="button" className={`${styles.sheetRow} ${styles.sheetRowDanger}`} onClick={() => {
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
                   const { template } = activeMenu;
                   setActiveMenu(null);
-                  onDeleteTemplate(template);
-                }}>
+                  onDuplicateTemplate(template);
+                }}
+              >
+                <span className={styles.sheetRowText}>Дублировать</span>
+              </button>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  onCreateCollection(template);
+                }}
+              >
+                <span className={styles.sheetRowText}>В коллекцию</span>
+              </button>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { template } = activeMenu;
+                  setActiveMenu(null);
+                  if (template.isArchived) {
+                    onRestoreTemplate(template);
+                  } else {
+                    onArchiveTemplate(template);
+                  }
+                }}
+              >
+                <span className={styles.sheetRowText}>
+                  {activeMenu.template.isArchived ? 'Вернуть из архива' : 'Архивировать'}
+                </span>
+              </button>
+              {canTeacherDeleteHomeworkTemplate(activeMenu.template) ? (
+                <button
+                  type="button"
+                  className={`${styles.sheetRow} ${styles.sheetRowDanger}`}
+                  onClick={() => {
+                    const { template } = activeMenu;
+                    setActiveMenu(null);
+                    onDeleteTemplate(template);
+                  }}
+                >
                   <span className={styles.sheetRowText}>Удалить</span>
                 </button>
               ) : null}
@@ -1156,27 +1279,39 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
 
           {activeMenu?.kind === 'draft' ? (
             <div className={styles.sheetList}>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { assignment } = activeMenu;
-                setActiveMenu(null);
-                onOpenAssignment(assignment);
-              }}>
-                <span className={styles.sheetRowText}>Продолжить</span>
-              </button>
-              {(activeMenu.assignment.status === 'DRAFT' || activeMenu.assignment.status === 'SCHEDULED') ? (
-                <button type="button" className={styles.sheetRow} onClick={() => {
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
                   const { assignment } = activeMenu;
                   setActiveMenu(null);
-                  onSendAssignmentNow(assignment);
-                }}>
+                  onOpenAssignment(assignment);
+                }}
+              >
+                <span className={styles.sheetRowText}>Продолжить</span>
+              </button>
+              {activeMenu.assignment.status === 'DRAFT' || activeMenu.assignment.status === 'SCHEDULED' ? (
+                <button
+                  type="button"
+                  className={styles.sheetRow}
+                  onClick={() => {
+                    const { assignment } = activeMenu;
+                    setActiveMenu(null);
+                    onSendAssignmentNow(assignment);
+                  }}
+                >
                   <span className={styles.sheetRowText}>Выдать сейчас</span>
                 </button>
               ) : null}
-              <button type="button" className={`${styles.sheetRow} ${styles.sheetRowDanger}`} onClick={() => {
-                const { assignment } = activeMenu;
-                setActiveMenu(null);
-                onDeleteAssignment(assignment);
-              }}>
+              <button
+                type="button"
+                className={`${styles.sheetRow} ${styles.sheetRowDanger}`}
+                onClick={() => {
+                  const { assignment } = activeMenu;
+                  setActiveMenu(null);
+                  onDeleteAssignment(assignment);
+                }}
+              >
                 <span className={styles.sheetRowText}>Удалить</span>
               </button>
             </div>
@@ -1184,45 +1319,67 @@ export const TeacherHomeworksMobileScreen: FC<TeacherHomeworksMobileScreenProps>
 
           {activeMenu?.kind === 'assignment' ? (
             <div className={styles.sheetList}>
-              <button type="button" className={styles.sheetRow} onClick={() => {
-                const { assignment } = activeMenu;
-                setActiveMenu(null);
-                onOpenAssignment(assignment);
-              }}>
+              <button
+                type="button"
+                className={styles.sheetRow}
+                onClick={() => {
+                  const { assignment } = activeMenu;
+                  setActiveMenu(null);
+                  onOpenAssignment(assignment);
+                }}
+              >
                 <span className={styles.sheetRowText}>Открыть</span>
               </button>
               {canCancelHomeworkAssignmentIssue(activeMenu.assignment) ? (
-                <button type="button" className={styles.sheetRow} onClick={() => {
-                  const { assignment } = activeMenu;
-                  setActiveMenu(null);
-                  onCancelAssignmentIssue(assignment);
-                }}>
+                <button
+                  type="button"
+                  className={styles.sheetRow}
+                  onClick={() => {
+                    const { assignment } = activeMenu;
+                    setActiveMenu(null);
+                    onCancelAssignmentIssue(assignment);
+                  }}
+                >
                   <span className={styles.sheetRowText}>Отменить выдачу</span>
                 </button>
               ) : null}
-              {(activeMenu.assignment.status === 'SENT' || activeMenu.assignment.status === 'RETURNED' || activeMenu.assignment.isOverdue) ? (
-                <button type="button" className={styles.sheetRow} onClick={() => {
-                  const { assignment } = activeMenu;
-                  setActiveMenu(null);
-                  onRemindAssignment(assignment);
-                }}>
+              {activeMenu.assignment.status === 'SENT' ||
+              activeMenu.assignment.status === 'RETURNED' ||
+              activeMenu.assignment.isOverdue ? (
+                <button
+                  type="button"
+                  className={styles.sheetRow}
+                  onClick={() => {
+                    const { assignment } = activeMenu;
+                    setActiveMenu(null);
+                    onRemindAssignment(assignment);
+                  }}
+                >
                   <span className={styles.sheetRowText}>Напомнить</span>
                 </button>
               ) : null}
               {canReissueHomeworkAssignment(activeMenu.assignment) ? (
-                <button type="button" className={styles.sheetRow} onClick={() => {
-                  const { assignment } = activeMenu;
-                  setActiveMenu(null);
-                  onReissueAssignment(assignment);
-                }}>
+                <button
+                  type="button"
+                  className={styles.sheetRow}
+                  onClick={() => {
+                    const { assignment } = activeMenu;
+                    setActiveMenu(null);
+                    onReissueAssignment(assignment);
+                  }}
+                >
                   <span className={styles.sheetRowText}>Переоткрыть</span>
                 </button>
               ) : null}
-              <button type="button" className={`${styles.sheetRow} ${styles.sheetRowDanger}`} onClick={() => {
-                const { assignment } = activeMenu;
-                setActiveMenu(null);
-                onDeleteAssignment(assignment);
-              }}>
+              <button
+                type="button"
+                className={`${styles.sheetRow} ${styles.sheetRowDanger}`}
+                onClick={() => {
+                  const { assignment } = activeMenu;
+                  setActiveMenu(null);
+                  onDeleteAssignment(assignment);
+                }}
+              >
                 <span className={styles.sheetRowText}>Удалить</span>
               </button>
             </div>

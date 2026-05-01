@@ -42,6 +42,7 @@ interface TopbarProps {
   editorPrimarySubmittingLabel?: string;
   onOpenNotifications: () => void;
   renderNotificationBell?: (triggerClassName: string) => ReactNode;
+  renderSearchButton?: (triggerClassName: string) => ReactNode;
   onCreateLesson: () => void;
   profilePhotoUrl?: string | null;
   showScheduleViewToggle?: boolean;
@@ -53,6 +54,7 @@ interface TopbarProps {
   onPrintAction?: () => void;
   notificationDotVisible?: boolean;
   showProfile?: boolean;
+  helpButton?: ReactNode;
 }
 
 export type { TopbarCreateMenuItem } from './ui/TopbarCreateMenu/TopbarCreateMenu';
@@ -82,6 +84,7 @@ export const Topbar: FC<TopbarProps> = ({
   editorPrimarySubmittingLabel = 'Сохраняю…',
   onOpenNotifications,
   renderNotificationBell,
+  renderSearchButton,
   onCreateLesson,
   profilePhotoUrl,
   showScheduleViewToggle = false,
@@ -93,6 +96,7 @@ export const Topbar: FC<TopbarProps> = ({
   onPrintAction,
   notificationDotVisible = true,
   showProfile = true,
+  helpButton,
 }) => {
   const fallbackText = teacher.name || teacher.username || 'П';
   const teacherDisplayName = teacher.name ?? teacher.username ?? 'Преподаватель';
@@ -131,7 +135,12 @@ export const Topbar: FC<TopbarProps> = ({
         }`}
       >
         {showScheduleViewToggle ? (
-          <div className={styles.viewToggleGroup} role="tablist" aria-label="Вид календаря">
+          <div
+            className={styles.viewToggleGroup}
+            role="tablist"
+            aria-label="Вид календаря"
+            data-hint="schedule-view-toggle"
+          >
             <button
               type="button"
               className={`${styles.viewToggleButton} ${scheduleView === 'month' ? styles.toggleActive : ''}`}
@@ -167,6 +176,8 @@ export const Topbar: FC<TopbarProps> = ({
 
         {showEditorActions ? (
           <>
+            {renderSearchButton ? renderSearchButton(styles.iconButton) : null}
+
             {renderNotificationBell ? (
               renderNotificationBell(styles.iconButton)
             ) : (
@@ -180,6 +191,8 @@ export const Topbar: FC<TopbarProps> = ({
                 {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
               </button>
             )}
+
+            {helpButton ? <div className={styles.helpSlot}>{helpButton}</div> : null}
 
             {showEditorSecondaryAction ? (
               <button
@@ -222,6 +235,8 @@ export const Topbar: FC<TopbarProps> = ({
               </span>
             ) : null}
 
+            {renderSearchButton ? renderSearchButton(styles.iconButton) : null}
+
             {renderNotificationBell ? (
               renderNotificationBell(styles.iconButton)
             ) : (
@@ -235,6 +250,8 @@ export const Topbar: FC<TopbarProps> = ({
                 {notificationDotVisible ? <span className={styles.notificationDot} aria-hidden /> : null}
               </button>
             )}
+
+            {helpButton ? <div className={styles.helpSlot}>{helpButton}</div> : null}
 
             {showPrintAction ? (
               <button type="button" className={styles.printButton} onClick={onPrintAction}>
@@ -258,6 +275,7 @@ export const Topbar: FC<TopbarProps> = ({
                   triggerHiddenClassName={styles.createButtonHidden}
                   iconAccentClassName={createButtonIconAccent ? styles.createButtonIconAccent : undefined}
                   disabled={!showCreateLesson}
+                  triggerDataTour="create-menu"
                 />
               ) : (
                 <button
@@ -267,6 +285,7 @@ export const Topbar: FC<TopbarProps> = ({
                   disabled={!showCreateLesson}
                   tabIndex={showCreateLesson ? undefined : -1}
                   aria-hidden={!showCreateLesson}
+                  data-tour="create-menu"
                 >
                   <AddOutlinedIcon
                     width={18}

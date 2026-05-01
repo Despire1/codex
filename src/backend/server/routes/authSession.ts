@@ -1,21 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import prisma from '../../prismaClient';
-import {
-  badRequest,
-  buildCookie,
-  getRequestIp,
-  isSecureRequest,
-  parseCookies,
-  readBody,
-  sendJson,
-} from '../lib/http';
+import { badRequest, buildCookie, getRequestIp, isSecureRequest, parseCookies, readBody, sendJson } from '../lib/http';
 import { isRateLimited } from '../lib/runtimeLimits';
 import {
   hashToken,
+  SIGNED_OUT_COOKIE_NAME,
   syncTelegramAuthUser,
   verifyTelegramInitData,
   verifyTelegramLoginData,
 } from '../modules/auth';
+import { notifyLogout } from '../modules/securityAlerts';
 
 type CreateSession = (userId: number, req: IncomingMessage, res: ServerResponse) => Promise<{ expiresAt: Date }>;
 
@@ -228,19 +222,55 @@ export const createAuthSessionHandlers = (config: AuthSessionHandlersConfig) => 
     const cookies = parseCookies(req.headers.cookie);
     const token = cookies[config.sessionCookieName];
     if (token) {
+      const tokenHash = hashToken(token);
+      const session = await prisma.session.findFirst({
+        where: { tokenHash, revokedAt: null },
+        include: {
+          user: {
+            select: {
+              id: true,
+              telegramUserId: true,
+              securityAlertsEnabled: true,
+              securityAlertNewDevice: true,
+              securityAlertLogout: true,
+              securityAlertSessionRevoke: true,
+            },
+          },
+        },
+      });
       await prisma.session.updateMany({
-        where: { tokenHash: hashToken(token), revokedAt: null },
+        where: { tokenHash, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      if (session) {
+        // Чистим Web Push подписки этого пользователя — после logout
+        // устройство больше не должно получать уведомления, пока человек
+        // не залогинится снова.
+        await prisma.webPushSubscription.deleteMany({ where: { userId: session.userId } }).catch((error) => {
+          console.warn('Failed to wipe web push subscriptions on logout', error);
+        });
+        // Уведомление в Telegram «вы вышли с устройства» — асинхронно.
+        const ip = getRequestIp(req) || session.ip;
+        const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : session.userAgent;
+        void notifyLogout({ user: session.user, ip, userAgent }).catch((error) => {
+          console.warn('Failed to dispatch logout alert', error);
+        });
+      }
     }
-    res.setHeader(
-      'Set-Cookie',
+    const secure = isSecureRequest(req);
+    const signedOutTtlSec = 60 * 60 * 24 * 365;
+    res.setHeader('Set-Cookie', [
       buildCookie(config.sessionCookieName, '', {
         maxAgeSeconds: 0,
         expiresAt: new Date(0),
-        secure: isSecureRequest(req),
+        secure,
       }),
-    );
+      buildCookie(SIGNED_OUT_COOKIE_NAME, '1', {
+        maxAgeSeconds: signedOutTtlSec,
+        expiresAt: new Date(Date.now() + signedOutTtlSec * 1000),
+        secure,
+      }),
+    ]);
     return sendJson(res, 200, { status: 'ok' });
   };
 

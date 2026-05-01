@@ -563,12 +563,15 @@ export const buildTemplateCreateStats = (
       return sum + points;
     }, 0);
 
-  const explicitMinutes = extractEstimatedMinutes(draft.level);
-
+  // TEA-277 (Вариант A): больше не парсим draft.level как «минуты» — это поле
+  // семантически про уровень знаний (B1/B2 и т.п.), смешение его с числом минут
+  // ломало и фильтры по уровню в библиотеке, и расчёт времени.
+  // Оценка времени теперь считается автоматически по структуре blocks; кастомный
+  // override остаётся как TODO до решения по Prisma migration (см. TEA-277).
   return {
     questionCount,
     totalPoints,
-    estimatedMinutes: resolveHomeworkDurationMinutes(draft.blocks, explicitMinutes),
+    estimatedMinutes: resolveHomeworkDurationMinutes(draft.blocks, null),
     autoCheckEnabled: settings.autoCheckEnabled && questionCount > 0,
   };
 };

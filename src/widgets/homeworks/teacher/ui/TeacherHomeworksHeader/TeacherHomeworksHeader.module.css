@@ -68,15 +68,14 @@
   position: relative;
   width: 40px;
   height: 40px;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
   background: var(--surface-card);
-  color: #667085;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.06);
 }
 
 .iconButton:hover {

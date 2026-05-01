@@ -939,9 +939,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
           hasMoreAssignments={hasMoreAssignments}
           templatesError={templatesError}
           assignmentsError={assignmentsError}
-          homeworkActivityHasUnread={homeworkActivityHasUnread}
           onOpenMobileSidebar={onOpenMobileSidebar}
-          onOpenActivity={handleOpenActivity}
           onWorkspaceModeChange={setWorkspaceMode}
           onSearchChange={onSearchChange}
           onTabChange={onTabChange}
@@ -998,9 +996,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             title="Домашние задания"
             subtitle={headerSubtitle}
             workspaceMode={workspaceMode === 'groups' ? 'templates' : workspaceMode}
-            hasUnreadActivity={homeworkActivityHasUnread}
             createMenuItems={createMenuItems}
-            onOpenActivity={handleOpenActivity}
             onWorkspaceModeChange={setWorkspaceMode}
           />
 

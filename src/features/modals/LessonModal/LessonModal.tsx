@@ -106,7 +106,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   const deleteDisabledReason = editingLesson ? resolveLessonDeleteDisabledReason(editingLesson) : null;
   const recurrenceToggleDisabled = recurrenceLocked;
   const recurrenceControlsDisabled = false;
-  const dateButtonRef = useRef<HTMLButtonElement>(null);
+  const dateButtonRef = useRef<HTMLInputElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
   const selectedColor = draft.color ?? DEFAULT_LESSON_COLOR;
   const startAt = useMemo(
@@ -140,6 +140,18 @@ export const LessonModal: FC<LessonModalProps> = ({
         : null,
     [draft.isRecurring, draft.repeatWeekdays, normalizedWeekendWeekdays],
   );
+
+  useEffect(() => {
+    if (!open || isSheet) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (isSubmitting) return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, isSheet, isSubmitting, onClose]);
 
   const handleRecurringToggle = (checked: boolean) => {
     if (recurrenceControlsDisabled) return;
@@ -411,30 +423,29 @@ export const LessonModal: FC<LessonModalProps> = ({
           <div className={modalStyles.field}>
             <span className={modalStyles.fieldLabel}>Начало</span>
             <TextField
-              type="time"
+              type="text"
               value={draft.time}
               onChange={(e) => handleStartTimeChange(e.target.value)}
               onBlur={handleStartTimeBlur}
               fullWidth
               sx={textFieldSx}
               inputRef={startTimeRef}
-              inputProps={{ step: 60 }}
+              placeholder="ЧЧ:ММ"
+              inputProps={{ inputMode: 'numeric', maxLength: 5, autoComplete: 'off' }}
             />
           </div>
           <span className={`${modalStyles.timeDivider} ${isSheet ? sheetStyles.sheetTimeDivider : ''}`}>—</span>
           <div className={modalStyles.field}>
             <span className={modalStyles.fieldLabel}>Конец</span>
             <TextField
-              type="time"
+              type="text"
               value={draft.endTime}
               onChange={(e) => handleEndTimeChange(e.target.value)}
               onBlur={handleEndTimeBlur}
               fullWidth
               sx={textFieldSx}
-              inputProps={{
-                step: 60,
-                min: parseTimeToMinutes(draft.time) !== null ? normalizeTimeInput(draft.time) : '00:00',
-              }}
+              placeholder="ЧЧ:ММ"
+              inputProps={{ inputMode: 'numeric', maxLength: 5, autoComplete: 'off' }}
             />
           </div>
         </div>
@@ -562,6 +573,26 @@ export const LessonModal: FC<LessonModalProps> = ({
             <span className={modalStyles.settingsTitle}>Дополнительные настройки</span>
           </AccordionSummary>
           <AccordionDetails className={modalStyles.settingsDetails}>
+            {draft.studentIds.length > 0 && (
+              <div className={modalStyles.field}>
+                <span className={modalStyles.fieldLabel}>Условия от карточки ученика</span>
+                <ul className={modalStyles.studentTermsList}>
+                  {draft.studentIds.map((id) => {
+                    const linked = linkedStudents.find((s) => s.id === id);
+                    if (!linked) return null;
+                    const price = linked.link?.pricePerLesson;
+                    const priceLabel =
+                      typeof price === 'number' && price > 0 ? `${Math.round(price)} ₽ за урок` : 'Цена не задана';
+                    return (
+                      <li key={id} className={modalStyles.studentTermsItem}>
+                        <span className={modalStyles.studentTermsName}>{linked.link?.customName ?? 'Ученик'}</span>
+                        <span className={modalStyles.studentTermsValue}>{priceLabel}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             <div className={modalStyles.field}>
               <span className={modalStyles.fieldLabel}>Цвет занятия</span>
               <div className={modalStyles.colorPicker} role="radiogroup" aria-label="Цвет занятия">

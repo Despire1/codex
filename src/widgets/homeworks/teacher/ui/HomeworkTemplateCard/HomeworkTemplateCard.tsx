@@ -65,9 +65,12 @@ export const HomeworkTemplateCard: FC<HomeworkTemplateCardProps> = ({
       tabIndex={0}
       role="button"
       aria-label={`Открыть домашнее задание "${template.title}"`}
+      data-hint="homework-template-card"
     >
       <div className={styles.head}>
-        <span className={`${styles.category} ${categoryTone === 'purple' ? styles.categoryPurple : styles.categoryBlue}`}>
+        <span
+          className={`${styles.category} ${categoryTone === 'purple' ? styles.categoryPurple : styles.categoryBlue}`}
+        >
           {category}
         </span>
         <button

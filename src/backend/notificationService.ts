@@ -71,21 +71,33 @@ const callTelegram = async <T>(method: string, payload?: Record<string, unknown>
 };
 
 type TelegramWebAppButton = { label: string; url: string };
+type TelegramInlineButton = { text: string; callback_data: string } | { text: string; url: string };
+
+type SendTelegramMessageOptions = {
+  webAppButton?: TelegramWebAppButton | null;
+  inlineKeyboard?: TelegramInlineButton[][] | null;
+  parseMode?: 'HTML' | 'MarkdownV2' | null;
+};
 
 export const sendTelegramMessage = async (
   chatId: bigint | number,
   text: string,
-  options?: { webAppButton?: TelegramWebAppButton | null },
+  options?: SendTelegramMessageOptions,
 ) => {
   const payload: Record<string, unknown> = {
     chat_id: typeof chatId === 'bigint' ? Number(chatId) : chatId,
     text,
   };
+  if (options?.parseMode) {
+    payload.parse_mode = options.parseMode;
+  }
   const button = options?.webAppButton;
   if (button?.url) {
     payload.reply_markup = {
       inline_keyboard: [[{ text: button.label, web_app: { url: button.url } }]],
     };
+  } else if (options?.inlineKeyboard?.length) {
+    payload.reply_markup = { inline_keyboard: options.inlineKeyboard };
   }
   await callTelegram('sendMessage', payload);
 };

@@ -482,7 +482,7 @@ export const createStudentsService = ({
     visibleLessons.forEach((lesson) => {
       if (lesson.status === 'CANCELED') return;
       const lessonDate = new Date(lesson.startAt);
-      const isPastOrCompleted = lesson.status === 'COMPLETED' || lessonDate.getTime() <= now.getTime();
+      const isCompleted = lesson.status === 'COMPLETED';
       const isUpcoming = lesson.status === 'SCHEDULED' && lessonDate.getTime() > now.getTime();
       const isInCurrentWeek = lessonDate.getTime() >= weekStart.getTime() && lessonDate.getTime() <= weekEnd.getTime();
       const isToday = lessonDate.getTime() >= todayStart.getTime() && lessonDate.getTime() <= todayEnd.getTime();
@@ -500,7 +500,7 @@ export const createStudentsService = ({
 
         stats.totalLessons += 1;
         stats.totalLessonMinutes += Math.max(0, lesson.durationMinutes || 0);
-        if (isPastOrCompleted) {
+        if (isCompleted) {
           stats.completedLessons += 1;
         }
         if (isInCurrentWeek) {
@@ -512,7 +512,7 @@ export const createStudentsService = ({
         if (isUpcoming && (!stats.nextLessonAt || lessonDate.getTime() < stats.nextLessonAt.getTime())) {
           stats.nextLessonAt = lessonDate;
         }
-        if (isPastOrCompleted && (!stats.lastLessonAt || lessonDate.getTime() > stats.lastLessonAt.getTime())) {
+        if (isCompleted && (!stats.lastLessonAt || lessonDate.getTime() > stats.lastLessonAt.getTime())) {
           stats.lastLessonAt = lessonDate;
         }
 

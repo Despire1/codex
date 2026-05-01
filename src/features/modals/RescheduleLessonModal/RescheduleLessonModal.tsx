@@ -1,9 +1,9 @@
-import { addMinutes, format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { addMinutes, format, ru } from 'date-fns';
 import { type FC, useRef } from 'react';
 import { TextField } from '@mui/material';
-import type { Lesson } from '../../../entities/types';
+import type { Lesson, LinkedStudent } from '../../../entities/types';
 import { DatePickerField } from '../../../shared/ui/DatePickerField';
+import { LessonDayTimeline } from '../LessonModal/LessonDayTimeline';
 import { useTimeZone } from '../../../shared/lib/timezoneContext';
 import { toUtcDateFromTimeZone, toZonedDate } from '../../../shared/lib/timezoneDates';
 import { isDateInWeekdayList, normalizeWeekdayList } from '../../../shared/lib/weekdays';
@@ -22,6 +22,7 @@ interface RescheduleLessonModalProps {
   open: boolean;
   lesson: Lesson | null;
   weekendWeekdays: number[];
+  linkedStudents: LinkedStudent[];
   draft: RescheduleDraft;
   onDraftChange: (draft: RescheduleDraft) => void;
   onClose: () => void;
@@ -33,6 +34,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   open,
   lesson,
   weekendWeekdays,
+  linkedStudents,
   draft,
   onDraftChange,
   onClose,
@@ -46,10 +48,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   const endDate = startDate && lesson ? addMinutes(startDate, lesson.durationMinutes) : null;
   const subtitle =
     startDate && endDate
-      ? `${format(startDate, 'd MMMM', { locale: ru })} • ${format(startDate, 'HH:mm')} - ${format(
-          endDate,
-          'HH:mm',
-        )}`
+      ? `${format(startDate, 'd MMMM', { locale: ru })} • ${format(startDate, 'HH:mm')} - ${format(endDate, 'HH:mm')}`
       : '';
 
   const textFieldSx = {
@@ -90,9 +89,7 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
     const previousDuration = diffTimeMinutes(draft.time, draft.endTime) ?? lesson.durationMinutes;
     const durationMinutes = previousDuration > 0 ? previousDuration : lesson.durationMinutes;
     const nextEndTime =
-      parseTimeToMinutes(nextValue) !== null
-        ? addMinutesToTime(nextValue, durationMinutes)
-        : draft.endTime;
+      parseTimeToMinutes(nextValue) !== null ? addMinutesToTime(nextValue, durationMinutes) : draft.endTime;
     onDraftChange({ ...draft, time: nextValue, endTime: nextEndTime });
   };
 
@@ -133,7 +130,10 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
   const startAt = toZonedDate(toUtcDateFromTimeZone(draft.date || '', draft.time || '00:00', timeZone), timeZone);
   const durationMinutes = diffTimeMinutes(draft.time, draft.endTime) ?? lesson.durationMinutes;
   const dateSelectionError = draft.date
-    ? isDateInWeekdayList(toZonedDate(toUtcDateFromTimeZone(draft.date, '00:00', timeZone), timeZone), normalizedWeekendWeekdays)
+    ? isDateInWeekdayList(
+        toZonedDate(toUtcDateFromTimeZone(draft.date, '00:00', timeZone), timeZone),
+        normalizedWeekendWeekdays,
+      )
       ? 'Это выходной день. На него нельзя перенести занятие.'
       : null
     : null;
@@ -154,13 +154,14 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
         <div className={styles.field}>
           <span className={styles.label}>Начало</span>
           <TextField
-            type="time"
+            type="text"
             value={draft.time}
             onChange={(e) => handleStartTimeChange(e.target.value)}
             onBlur={handleStartTimeBlur}
             fullWidth
             sx={textFieldSx}
-            inputProps={{ step: 60 }}
+            placeholder="ЧЧ:ММ"
+            inputProps={{ inputMode: 'numeric', maxLength: 5, autoComplete: 'off' }}
             inputRef={startTimeRef}
             disabled={isSubmitting}
           />
@@ -168,21 +169,27 @@ export const RescheduleLessonModal: FC<RescheduleLessonModalProps> = ({
         <div className={styles.field}>
           <span className={styles.label}>Конец</span>
           <TextField
-            type="time"
+            type="text"
             value={draft.endTime}
             onChange={(e) => handleEndTimeChange(e.target.value)}
             onBlur={handleEndTimeBlur}
             fullWidth
             sx={textFieldSx}
-            inputProps={{
-              step: 60,
-              min: parseTimeToMinutes(draft.time) !== null ? normalizeTimeInput(draft.time) : '00:00',
-            }}
+            placeholder="ЧЧ:ММ"
+            inputProps={{ inputMode: 'numeric', maxLength: 5, autoComplete: 'off' }}
             disabled={isSubmitting}
           />
         </div>
       </div>
       {dateSelectionError && <div className={controls.error}>{dateSelectionError}</div>}
+      <LessonDayTimeline
+        date={draft.date}
+        startTime={draft.time}
+        endTime={draft.endTime}
+        timeZone={timeZone}
+        excludeLessonId={lesson.id}
+        linkedStudents={linkedStudents}
+      />
       <div className={styles.preview}>
         {format(startAt, 'd MMMM', { locale: ru })} • {format(startAt, 'HH:mm')} -{' '}
         {format(addMinutes(startAt, durationMinutes), 'HH:mm')}

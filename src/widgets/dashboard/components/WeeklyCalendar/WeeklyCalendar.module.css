@@ -118,6 +118,7 @@
 
 .lessonList {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--lesson-row-gap, 8px);
   min-height: var(--lesson-list-min-height, 0);
   grid-auto-rows: var(--lesson-row-height, auto);

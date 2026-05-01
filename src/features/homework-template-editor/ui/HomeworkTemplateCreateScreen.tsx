@@ -7,13 +7,11 @@ import {
   detectCreateTemplateType,
   ensurePrimaryMediaBlock,
   ensurePrimaryTestBlock,
-  extractEstimatedMinutes,
   getPrimaryMediaBlockEntry,
   getPrimaryTestBlockEntry,
   getPrimaryTextContent,
   parseTagsText,
   readTemplateQuizSettings,
-  serializeEstimatedMinutes,
   setPrimaryTextContent,
   stringifyTags,
   writeTemplateQuizSettings,
@@ -31,11 +29,13 @@ import {
   publishHomeworkTemplateCreateTopbarState,
   subscribeHomeworkTemplateCreateTopbarCommand,
 } from '../model/lib/createTemplateTopbarBridge';
+import { hasHomeworkEditorContent } from '../model/lib/homeworkEditorDirty';
 import { validateTemplateDraft } from '../model/lib/templateValidation';
 import { filterIssuesBySeverity, isPathPrefix, pathToKey } from '../../../shared/lib/form-validation/path';
 import { FormValidationIssue, FormValidationPath } from '../../../shared/lib/form-validation/types';
 import { useValidationSession } from '../../../shared/lib/form-validation/useValidationSession';
 import { useIsDesktop } from '../../../shared/lib/useIsDesktop';
+import { useToast } from '../../../shared/lib/toast';
 import { CreateTemplateHeader } from './create-screen/CreateTemplateHeader';
 import { TemplateBasicsSection } from './create-screen/TemplateBasicsSection';
 import { TemplateQuestionsSection } from './create-screen/TemplateQuestionsSection';
@@ -116,6 +116,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
 }) => {
   const hasSkippedTemplateAutoSaveRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { showToast } = useToast();
   const [activeSubmitAction, setActiveSubmitAction] = useState<'save' | 'submit' | null>(null);
   const [quizSettings, setQuizSettings] = useState<TemplateQuizSettings>(() => readTemplateQuizSettings(draft.blocks));
   const [draftSavedAtLabel, setDraftSavedAtLabel] = useState<string | null>(null);
@@ -206,8 +207,10 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
   const hasAssignmentValidationErrors = assignmentValidationIssues.length > 0;
   const showAssignmentValidationErrors = submitAttempted && hasAssignmentValidationErrors;
   const tags = useMemo(() => parseTagsText(templateDraft.tagsText), [templateDraft.tagsText]);
-  const estimatedMinutes = useMemo(() => extractEstimatedMinutes(templateDraft.level), [templateDraft.level]);
   const stats = useMemo(() => buildTemplateCreateStats(templateDraft, quizSettings), [quizSettings, templateDraft]);
+  // TEA-277: input «Примерное время» теперь read-only и показывает авто-расчёт
+  // по структуре blocks. Раньше парковалось в draft.level и ломало фильтр по уровню.
+  const estimatedMinutes = stats.estimatedMinutes;
   const quizCapabilities = useMemo(() => resolveHomeworkQuizCapabilities(draft.blocks), [draft.blocks]);
   const primaryTestEntry = useMemo(() => getPrimaryTestBlockEntry(draft.blocks), [draft.blocks]);
   const primaryMediaEntry = useMemo(() => getPrimaryMediaBlockEntry(draft.blocks), [draft.blocks]);
@@ -384,16 +387,46 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     };
   }, [mode, quizSettings, templateDraft, variant]);
 
+  // TEA-276: предупреждаем при закрытии вкладки/навигации, если есть несохранённый контент.
+  // Auto-save в localStorage идёт с debounce 500ms — последние правки могут не успеть.
+  useEffect(() => {
+    if (readOnly) return;
+    if (activeSubmitAction !== null) return; // во время сабмита prompt не нужен
+    if (!hasHomeworkEditorContent(draft)) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [activeSubmitAction, draft, readOnly]);
+
   const runValidatedAction = useCallback(
     async (action: 'save' | 'submit') => {
+      // TEA-269: блокируем повторный submit, пока крутится предыдущий —
+      // иначе двойной клик создаёт дубль шаблона/assign'а и двойную нотификацию ученику.
+      if (activeSubmitAction !== null || submitting) return;
+
       markSubmitAttempt();
 
       if (hasAssignmentValidationErrors) {
+        // TEA-275: тихая ошибка валидации фрустрирует — даём явный feedback toast'ом.
+        showToast({
+          variant: 'error',
+          message: 'Не получилось сохранить — заполните выделенные поля.',
+        });
         window.requestAnimationFrame(() => focusPathInput(assignmentValidationIssues[0]?.path));
         return;
       }
 
       if (validationErrorIssues.length > 0) {
+        showToast({
+          variant: 'error',
+          message:
+            validationErrorIssues.length === 1
+              ? 'Не получилось сохранить — заполните выделенное поле.'
+              : `Не получилось сохранить — есть ${validationErrorIssues.length} ошибок в форме.`,
+        });
         const firstErrorPath = validationErrorIssues[0]?.path;
         window.requestAnimationFrame(() => focusPathInput(firstErrorPath));
         return;
@@ -431,8 +464,16 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
             setServerIssues(nextServerIssues);
             const firstServerError = nextServerIssues.find((issue) => issue.severity === 'error');
             if (firstServerError) {
+              showToast({ variant: 'error', message: firstServerError.message });
               window.requestAnimationFrame(() => focusPathInput(firstServerError.path));
             }
+          } else {
+            // TEA-275: сервер вернул отказ без issues — показываем хотя бы общий toast,
+            // иначе пользователь ничего не увидит вообще.
+            showToast({
+              variant: 'error',
+              message: 'Не удалось сохранить. Попробуйте ещё раз.',
+            });
           }
           return;
         }
@@ -443,6 +484,14 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
           clearStoredCreateTemplateDraft();
           setDraftSavedAtLabel(null);
         }
+        // TEA-275: success-feedback, чтобы учитель не сомневался, что действие прошло.
+        const successMessage =
+          variant === 'assignment' && !assignmentPrimarySavesHomework && action === 'submit'
+            ? 'Задание выдано ученику.'
+            : mode === 'create'
+              ? 'Шаблон создан.'
+              : 'Изменения сохранены.';
+        showToast({ variant: 'success', message: successMessage });
         if (result.closeOnSuccess ?? true) {
           onBack();
         }
@@ -451,6 +500,7 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       }
     },
     [
+      activeSubmitAction,
       assignmentValidationIssues,
       assignmentPrimarySavesHomework,
       draft.assignment.deadlineAt,
@@ -462,6 +512,8 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
       onSaveAsTemplate,
       onSubmit,
       resetValidationSession,
+      showToast,
+      submitting,
       validationErrorIssues,
       variant,
     ],
@@ -898,11 +950,8 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
                     subject: value,
                   })
                 }
-                onEstimatedMinutesChange={(value) =>
-                  updateTemplateContext({
-                    level: serializeEstimatedMinutes(value),
-                  })
-                }
+                // TEA-277: больше не пишем minutes в level. Поле read-only до миграции.
+                onEstimatedMinutesChange={() => {}}
                 onTagAdd={(value) => {
                   if (tags.includes(value)) return;
                   const nextTags = [...tags, value];

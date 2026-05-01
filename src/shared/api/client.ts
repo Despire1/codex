@@ -75,6 +75,10 @@ type SettingsPayload = Pick<
   | 'homeworkOverdueRemindersEnabled'
   | 'homeworkOverdueReminderTime'
   | 'homeworkOverdueReminderMaxCount'
+  | 'securityAlertsEnabled'
+  | 'securityAlertNewDevice'
+  | 'securityAlertLogout'
+  | 'securityAlertSessionRevoke'
 >;
 
 export type UpdateSettingsSuccessResponse = {
@@ -110,6 +114,75 @@ export type TelegramBrowserAuthConfig = {
   enabled: boolean;
   botUsername: string | null;
   reason?: 'missing_bot_token' | 'missing_bot_username';
+};
+
+export type TelegramDeepLinkConfig = {
+  enabled: boolean;
+  botUsername: string | null;
+};
+
+export type TelegramDeepLinkStartResponse = {
+  deepLink: string;
+  botUsername: string;
+  expiresAt: string;
+};
+
+export type TelegramDeepLinkPollResponse =
+  | { status: 'pending' }
+  | { status: 'claimed'; user: SessionUser }
+  | { status: 'expired' }
+  | { status: 'no_attempt' };
+
+export type GlobalSearchScope = 'all' | 'students' | 'lessons' | 'homework';
+
+export type GlobalSearchStudent = {
+  studentId: number;
+  name: string;
+  username: string | null;
+  level: string | null;
+};
+
+export type GlobalSearchLesson = {
+  lessonId: number;
+  title: string;
+  studentId: number;
+  studentName: string;
+  studentUsername: string | null;
+  startAt: string;
+  durationMinutes: number;
+  status: string;
+  isPaid: boolean;
+  meetingLink: string | null;
+};
+
+export type GlobalSearchHomework =
+  | {
+      kind: 'assignment';
+      assignmentId: number;
+      title: string;
+      studentId: number | null;
+      studentName: string | null;
+      status: string;
+      deadlineAt: string | null;
+      templateTitle: string | null;
+    }
+  | {
+      kind: 'template';
+      templateId: number;
+      title: string;
+      subject: string | null;
+      level: string | null;
+      tags: string[];
+      isArchived: boolean;
+    };
+
+export type GlobalSearchResponse = {
+  query: string;
+  scope: GlobalSearchScope;
+  totals: { students: number; lessons: number; homework: number };
+  students: GlobalSearchStudent[];
+  lessons: GlobalSearchLesson[];
+  homework: GlobalSearchHomework[];
 };
 
 export type DashboardSummary = {
@@ -309,6 +382,18 @@ const apiFetch = async <T>(path: string, options?: RequestInit): Promise<T> => {
 
 export const api = {
   getTelegramBrowserAuthConfig: () => apiFetch<TelegramBrowserAuthConfig>('/auth/telegram/browser-config'),
+  getTelegramDeepLinkConfig: () => apiFetch<TelegramDeepLinkConfig>('/auth/telegram/deep-link/config'),
+  startTelegramDeepLinkLogin: () =>
+    apiFetch<TelegramDeepLinkStartResponse>('/auth/telegram/deep-link/start', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  pollTelegramDeepLinkLogin: () => apiFetch<TelegramDeepLinkPollResponse>('/auth/telegram/deep-link/poll'),
+  cancelTelegramDeepLinkLogin: () =>
+    apiFetch<{ status: 'ok' }>('/auth/telegram/deep-link/cancel', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   telegramWebappAuth: (payload: { initData: string }) =>
     apiFetch<{ user: unknown; session?: { expiresAt: string }; isNewUser?: boolean }>('/auth/telegram/webapp', {
       method: 'POST',
@@ -658,6 +743,13 @@ export const api = {
     const path = suffix ? `/api/students/search?${suffix}` : '/api/students/search';
 
     return apiFetch<{ students: Student[]; links: TeacherStudent[]; homeworks: Homework[] }>(path);
+  },
+  globalSearch: (params: { query: string; scope?: GlobalSearchScope; limit?: number }) => {
+    const query = new URLSearchParams();
+    query.set('query', params.query);
+    if (params.scope && params.scope !== 'all') query.set('scope', params.scope);
+    if (typeof params.limit === 'number') query.set('limit', String(params.limit));
+    return apiFetch<GlobalSearchResponse>(`/api/search?${query.toString()}`);
   },
   listStudents: (params: {
     query?: string;

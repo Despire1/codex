@@ -40,12 +40,10 @@ export const getParticipantName = (
   linkedStudentsById: Map<number, LinkedStudent>,
 ) => {
   const linkedStudent = linkedStudentsById.get(participant?.studentId);
-  const participantStudent = participant?.student as { username?: string | null } | undefined;
-  return (
-    linkedStudent?.link?.customName ??
-    participantStudent?.username ??
-    'Ученик'
-  );
+  if (linkedStudent?.link?.customName) {
+    return linkedStudent.link.customName;
+  }
+  return 'Ученик удалён';
 };
 
 export const getLessonLabel = (

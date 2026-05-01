@@ -18,6 +18,7 @@ import { StudentTabId } from './types';
 import { StudentsReferenceListView } from './components/reference/StudentsReferenceListView';
 import { StudentsReferenceProfileView } from './components/reference/StudentsReferenceProfileView';
 import { BalanceTopupModal } from './components/BalanceTopupModal';
+import type { StudentModalFocusField } from '@/features/modals/StudentModal/types';
 import styles from './StudentsSectionReference.module.css';
 import { tabPathById } from '@/app/tabs';
 import { useToast } from '@/shared/lib/toast';
@@ -325,7 +326,11 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   ]);
 
   const loadMoreProfileHomeworkAssignments = useCallback(() => {
-    if (profileHomeworkAssignmentsLoading || profileHomeworkAssignmentsLoadingMore || !profileHomeworkAssignmentsHasMore) {
+    if (
+      profileHomeworkAssignmentsLoading ||
+      profileHomeworkAssignmentsLoadingMore ||
+      !profileHomeworkAssignmentsHasMore
+    ) {
       return;
     }
     if (typeof profileHomeworkAssignmentsNextOffset !== 'number') return;
@@ -357,17 +362,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     [showToast],
   );
 
-  const selectedStudentEntry = useMemo(
-    () => {
-      const targetStudentId = routeStudentId ?? selectedStudentId;
-      if (!targetStudentId) return null;
-      return (
-        studentListItems.find((item) => item.student.id === targetStudentId) ??
-        (routeStudentEntry?.student.id === targetStudentId ? routeStudentEntry : null)
-      );
-    },
-    [routeStudentEntry, routeStudentId, selectedStudentId, studentListItems],
-  );
+  const selectedStudentEntry = useMemo(() => {
+    const targetStudentId = routeStudentId ?? selectedStudentId;
+    if (!targetStudentId) return null;
+    return (
+      studentListItems.find((item) => item.student.id === targetStudentId) ??
+      (routeStudentEntry?.student.id === targetStudentId ? routeStudentEntry : null)
+    );
+  }, [routeStudentEntry, routeStudentId, selectedStudentId, studentListItems]);
 
   const handleOpenProfile = (studentId: number) => {
     setSelectedStudentId(studentId);
@@ -440,7 +442,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     window.location.href = `tg://resolve?domain=${normalized}`;
   };
 
-  const handleEditStudent = (options?: { focusField?: 'price' }) => {
+  const handleEditStudent = (options?: { focusField?: StudentModalFocusField }) => {
     const profileStudentId = selectedStudentEntry?.student.id ?? routeStudentId ?? selectedStudentId;
     if (!profileStudentId) return;
     setSelectedStudentId(profileStudentId);
@@ -524,6 +526,34 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     [saveStudentNotes],
   );
 
+  const handleSaveStudentLearningGoal = useCallback(
+    async (studentEntry: StudentListItem, value: string) => {
+      const trimmed = value.trim();
+      if ((studentEntry.link.learningGoal ?? '') === trimmed) return;
+      try {
+        const data = await api.updateStudent(studentEntry.student.id, {
+          customName: studentEntry.link.customName,
+          username: studentEntry.student.username ?? '',
+          pricePerLesson: studentEntry.link.pricePerLesson,
+          email: studentEntry.link.email ?? '',
+          phone: studentEntry.link.phone ?? '',
+          studentLevel: studentEntry.link.studentLevel ?? '',
+          learningGoal: trimmed,
+          notes: studentEntry.link.notes ?? '',
+        });
+        applyUpdatedStudentLink(studentEntry.student.id, data.link);
+        showToast({
+          message: trimmed ? 'Цель обновлена' : 'Цель удалена',
+          variant: 'success',
+        });
+      } catch (error) {
+        showToast({ message: 'Не удалось сохранить цель', variant: 'error' });
+        throw error;
+      }
+    },
+    [applyUpdatedStudentLink, showToast],
+  );
+
   const handleWriteToStudent = () => {
     const username = selectedStudentEntry?.student.username?.trim();
     if (!username) return;
@@ -570,18 +600,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
                 Возможно, ученик был удалён или вы перешли по устаревшей ссылке. Проверьте URL или вернитесь к списку.
               </p>
               <div className={styles.notFoundActions}>
-                <button
-                  type="button"
-                  className={styles.notFoundSecondaryButton}
-                  onClick={handleBackToList}
-                >
+                <button type="button" className={styles.notFoundSecondaryButton} onClick={handleBackToList}>
                   К списку учеников
                 </button>
-                <button
-                  type="button"
-                  className={styles.notFoundPrimaryButton}
-                  onClick={handleAddStudent}
-                >
+                <button type="button" className={styles.notFoundPrimaryButton} onClick={handleAddStudent}>
                   Добавить ученика
                 </button>
               </div>
@@ -608,6 +630,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onCreateStudentNote={handleCreateStudentNote}
           onUpdateStudentNote={handleUpdateStudentNote}
           onDeleteStudentNote={handleDeleteStudentNote}
+          onSaveLearningGoal={handleSaveStudentLearningGoal}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onBack={handleBackToList}

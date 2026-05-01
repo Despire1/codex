@@ -13,6 +13,14 @@ import { type StudentTabId } from '../../widgets/students/types';
 import { NotFoundSection } from '../../widgets/notFound/NotFoundSection';
 import { tabPathById } from '../tabs';
 import type { DashboardSummary } from '../../shared/api/client';
+import {
+  StudentHomeworksHints,
+  StudentSettingsHints,
+  TeacherHomeworksHints,
+  TeacherScheduleHints,
+  TeacherSettingsHints,
+  TeacherStudentsHints,
+} from '../../widgets/onboarding/screenHints';
 
 interface AppRoutesProps {
   isStudentRole: boolean;
@@ -66,6 +74,7 @@ interface AppRoutesProps {
   studentSettings: {
     activeTeacherName?: string | null;
   };
+  studentUserId?: number | null;
 }
 
 const LegacyHomeworkTemplateEditRedirect: FC = () => {
@@ -84,16 +93,49 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
   homeworks,
   studentDashboard,
   studentSettings,
+  studentUserId,
 }) => {
   if (isStudentRole) {
     return (
       <Routes>
         <Route path="/" element={<Navigate to={resolveLastVisitedPath()} replace />} />
         <Route path={tabPathById.dashboard} element={<StudentDashboardSection {...studentDashboard} />} />
-        <Route path={tabPathById.homeworks} element={<HomeworksSection {...homeworks} />} />
-        <Route path={`${tabPathById.homeworks}/:assignmentId`} element={<HomeworksSection {...homeworks} />} />
-        <Route path={tabPathById.settings} element={<StudentSettingsSection {...studentSettings} />} />
-        <Route path={`${tabPathById.settings}/*`} element={<StudentSettingsSection {...studentSettings} />} />
+        <Route
+          path={tabPathById.homeworks}
+          element={
+            <>
+              <HomeworksSection {...homeworks} />
+              <StudentHomeworksHints userId={studentUserId ?? null} />
+            </>
+          }
+        />
+        <Route
+          path={`${tabPathById.homeworks}/:assignmentId`}
+          element={
+            <>
+              <HomeworksSection {...homeworks} />
+              <StudentHomeworksHints userId={studentUserId ?? null} />
+            </>
+          }
+        />
+        <Route
+          path={tabPathById.settings}
+          element={
+            <>
+              <StudentSettingsSection {...studentSettings} />
+              <StudentSettingsHints userId={studentUserId ?? null} />
+            </>
+          }
+        />
+        <Route
+          path={`${tabPathById.settings}/*`}
+          element={
+            <>
+              <StudentSettingsSection {...studentSettings} />
+              <StudentSettingsHints userId={studentUserId ?? null} />
+            </>
+          }
+        />
         <Route path="*" element={<NotFoundSection homePath={tabPathById.dashboard} />} />
       </Routes>
     );
@@ -107,19 +149,63 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
         element={<DashboardHome {...dashboard} dashboardSummary={dashboardSummary} />}
       />
       <Route path={tabPathById.students} element={<StudentsSection {...students} />} />
-      <Route path={`${tabPathById.students}/:studentId`} element={<StudentsSection {...students} />} />
-      <Route path={tabPathById.schedule} element={<ScheduleSection {...schedule} />} />
+      <Route
+        path={`${tabPathById.students}/:studentId`}
+        element={
+          <>
+            <StudentsSection {...students} />
+            <TeacherStudentsHints />
+          </>
+        }
+      />
+      <Route
+        path={tabPathById.schedule}
+        element={
+          <>
+            <ScheduleSection {...schedule} />
+            <TeacherScheduleHints />
+          </>
+        }
+      />
       <Route path={`${tabPathById.homeworks}/new`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/assignments/:assignmentId`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/assignments/:assignmentId/edit`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={`${tabPathById.homeworks}/templates/new`} element={<Navigate to={`${tabPathById.homeworks}/new`} replace />} />
-      <Route path={`${tabPathById.homeworks}/templates/:templateId/edit`} element={<LegacyHomeworkTemplateEditRedirect />} />
+      <Route
+        path={`${tabPathById.homeworks}/assignments/:assignmentId`}
+        element={<HomeworksSection {...homeworks} />}
+      />
+      <Route
+        path={`${tabPathById.homeworks}/assignments/:assignmentId/edit`}
+        element={<HomeworksSection {...homeworks} />}
+      />
+      <Route
+        path={`${tabPathById.homeworks}/templates/new`}
+        element={<Navigate to={`${tabPathById.homeworks}/new`} replace />}
+      />
+      <Route
+        path={`${tabPathById.homeworks}/templates/:templateId/edit`}
+        element={<LegacyHomeworkTemplateEditRedirect />}
+      />
       <Route path={`${tabPathById.homeworks}/:templateId/edit`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/review/:assignmentId`} element={<HomeworksSection {...homeworks} />} />
       <Route path={`${tabPathById.homeworks}/:templateId`} element={<HomeworksSection {...homeworks} />} />
-      <Route path={tabPathById.homeworks} element={<HomeworksSection {...homeworks} />} />
+      <Route
+        path={tabPathById.homeworks}
+        element={
+          <>
+            <HomeworksSection {...homeworks} />
+            <TeacherHomeworksHints />
+          </>
+        }
+      />
       <Route path={tabPathById.analytics} element={<AnalyticsSection />} />
-      <Route path={`${tabPathById.settings}/*`} element={<SettingsSection {...settings} />} />
+      <Route
+        path={`${tabPathById.settings}/*`}
+        element={
+          <>
+            <SettingsSection {...settings} />
+            <TeacherSettingsHints />
+          </>
+        }
+      />
       <Route path="*" element={<NotFoundSection homePath={tabPathById.dashboard} />} />
     </Routes>
   );

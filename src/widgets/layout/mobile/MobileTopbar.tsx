@@ -1,5 +1,6 @@
 import { type FC, type ReactNode } from 'react';
-import { BarsIcon, ChevronLeftIcon, NotificationsNoneOutlinedIcon, RobotIcon } from '@/icons/MaterialIcons';
+import { BarsIcon, ChevronLeftIcon, NotificationsNoneOutlinedIcon } from '@/icons/MaterialIcons';
+import { BrandLogo } from '@/shared/ui/BrandLogo';
 import styles from './MobileTopbar.module.css';
 
 export interface MobileTopbarProps {
@@ -11,7 +12,9 @@ export interface MobileTopbarProps {
   onOpenSidebar: () => void;
   onOpenNotifications: () => void;
   renderNotificationBell?: (triggerClassName: string) => ReactNode;
+  renderSearchButton?: (triggerClassName: string) => ReactNode;
   onBack?: () => void;
+  onLogoClick?: () => void;
 }
 
 const resolveInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'T';
@@ -25,7 +28,9 @@ export const MobileTopbar: FC<MobileTopbarProps> = ({
   onOpenSidebar,
   onOpenNotifications,
   renderNotificationBell,
+  renderSearchButton,
   onBack,
+  onLogoClick,
 }) => {
   const isDefault = variant === 'default';
   const isBack = variant === 'back';
@@ -43,12 +48,21 @@ export const MobileTopbar: FC<MobileTopbarProps> = ({
         </button>
 
         {isDefault ? (
-          <>
-            <div className={styles.brandIcon} aria-hidden>
-              <RobotIcon width={20} height={20} />
-            </div>
-            <span className={styles.brandText}>TeacherBot</span>
-          </>
+          onLogoClick ? (
+            <button type="button" className={styles.brandLink} onClick={onLogoClick} aria-label="На главную">
+              <span className={styles.brandIcon} aria-hidden>
+                <BrandLogo width={28} height={28} />
+              </span>
+              <span className={styles.brandText}>TeacherBot</span>
+            </button>
+          ) : (
+            <>
+              <div className={styles.brandIcon} aria-hidden>
+                <BrandLogo width={28} height={28} />
+              </div>
+              <span className={styles.brandText}>TeacherBot</span>
+            </>
+          )
         ) : (
           <span className={styles.titleText}>{title}</span>
         )}
@@ -56,6 +70,8 @@ export const MobileTopbar: FC<MobileTopbarProps> = ({
 
       {isDefault ? (
         <div className={styles.right}>
+          {renderSearchButton ? renderSearchButton(styles.notificationButton) : null}
+
           {renderNotificationBell ? (
             renderNotificationBell(styles.notificationButton)
           ) : (

@@ -19,6 +19,7 @@ export default defineConfig({
       '^/auth/telegram/browser-config$': 'http://localhost:4000',
       '^/auth/telegram/browser-login$': 'http://localhost:4000',
       '^/auth/telegram/webapp$': 'http://localhost:4000',
+      '^/auth/telegram/deep-link/.*$': 'http://localhost:4000',
     },
     allowedHosts: ['.ngrok-free.app', '.ngrok-free.dev', '.politdev.ru'],
   },

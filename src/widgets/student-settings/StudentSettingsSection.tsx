@@ -114,7 +114,7 @@ export const StudentSettingsSection: FC<StudentSettingsSectionProps> = ({ active
             <div className={styles.helperText}>Используется для расчёта времени занятий.</div>
           </div>
 
-          <div className={styles.teacherCard}>
+          <div className={styles.teacherCard} data-hint="student-settings-teachers">
             <div className={styles.teacherCardTitle}>Активный преподаватель</div>
             <div className={styles.teacherInfo}>
               <div className={styles.teacherAvatar}>{teacherInitials}</div>

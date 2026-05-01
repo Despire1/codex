@@ -34,6 +34,10 @@ export interface Teacher {
   homeworkOverdueRemindersEnabled: boolean;
   homeworkOverdueReminderTime: string;
   homeworkOverdueReminderMaxCount: number;
+  securityAlertsEnabled: boolean;
+  securityAlertNewDevice: boolean;
+  securityAlertLogout: boolean;
+  securityAlertSessionRevoke: boolean;
 }
 
 export interface Student {
@@ -184,11 +188,7 @@ export interface HomeworkBlockStudentResponse {
   allowVoice: boolean;
 }
 
-export type HomeworkBlock =
-  | HomeworkBlockText
-  | HomeworkBlockMedia
-  | HomeworkBlockTest
-  | HomeworkBlockStudentResponse;
+export type HomeworkBlock = HomeworkBlockText | HomeworkBlockMedia | HomeworkBlockTest | HomeworkBlockStudentResponse;
 
 export interface HomeworkTemplate {
   id: number;

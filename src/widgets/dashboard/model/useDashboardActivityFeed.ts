@@ -15,6 +15,7 @@ export type DashboardActivityFilters = {
 type DashboardActivityFeedOptions = {
   pageSize?: number;
   enabled?: boolean;
+  pollIntervalMs?: number;
 };
 
 const defaultFilters: DashboardActivityFilters = {
@@ -33,10 +34,7 @@ const uniqueCategories = (categories: ActivityCategory[]) => {
   });
 };
 
-export const useDashboardActivityFeed = (
-  timeZone: string,
-  options: DashboardActivityFeedOptions = {},
-) => {
+export const useDashboardActivityFeed = (timeZone: string, options: DashboardActivityFeedOptions = {}) => {
   const enabled = options.enabled ?? true;
   const pageSize =
     typeof options.pageSize === 'number' && Number.isFinite(options.pageSize) && options.pageSize > 0
@@ -51,8 +49,7 @@ export const useDashboardActivityFeed = (
 
   const setFilters = useCallback((patch: Partial<DashboardActivityFilters>) => {
     setFiltersState((prev) => {
-      const nextCategories =
-        patch.categories !== undefined ? uniqueCategories(patch.categories) : prev.categories;
+      const nextCategories = patch.categories !== undefined ? uniqueCategories(patch.categories) : prev.categories;
       return {
         ...prev,
         ...patch,
@@ -61,40 +58,40 @@ export const useDashboardActivityFeed = (
     });
   }, []);
 
-  const loadInitial = useCallback(async (nextFilters?: DashboardActivityFilters) => {
-    if (!enabled) return;
-    const activeFilters = nextFilters ?? filters;
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    setLoading(true);
-    try {
-      const data = await api.listActivityFeed({
-        limit: pageSize,
-        categories: activeFilters.categories,
-        studentId: activeFilters.studentId ?? undefined,
-        from: activeFilters.from
-          ? toUtcDateFromTimeZone(activeFilters.from, '00:00', timeZone).toISOString()
-          : undefined,
-        to: activeFilters.to
-          ? toUtcDateFromTimeZone(activeFilters.to, '23:59', timeZone).toISOString()
-          : undefined,
-      });
-      if (requestIdRef.current !== requestId) return;
-      setItems(data.items);
-      setNextCursor(data.nextCursor);
-    } catch (error) {
-       
-      console.error('Failed to load activity feed', error);
-      if (requestIdRef.current === requestId) {
-        setItems([]);
-        setNextCursor(null);
+  const loadInitial = useCallback(
+    async (nextFilters?: DashboardActivityFilters) => {
+      if (!enabled) return;
+      const activeFilters = nextFilters ?? filters;
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setLoading(true);
+      try {
+        const data = await api.listActivityFeed({
+          limit: pageSize,
+          categories: activeFilters.categories,
+          studentId: activeFilters.studentId ?? undefined,
+          from: activeFilters.from
+            ? toUtcDateFromTimeZone(activeFilters.from, '00:00', timeZone).toISOString()
+            : undefined,
+          to: activeFilters.to ? toUtcDateFromTimeZone(activeFilters.to, '23:59', timeZone).toISOString() : undefined,
+        });
+        if (requestIdRef.current !== requestId) return;
+        setItems(data.items);
+        setNextCursor(data.nextCursor);
+      } catch (error) {
+        console.error('Failed to load activity feed', error);
+        if (requestIdRef.current === requestId) {
+          setItems([]);
+          setNextCursor(null);
+        }
+      } finally {
+        if (requestIdRef.current === requestId) {
+          setLoading(false);
+        }
       }
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setLoading(false);
-      }
-    }
-  }, [enabled, filters, pageSize, timeZone]);
+    },
+    [enabled, filters, pageSize, timeZone],
+  );
 
   const loadMore = useCallback(async () => {
     if (!enabled || !nextCursor || loadingMore || loading) return;
@@ -111,7 +108,6 @@ export const useDashboardActivityFeed = (
       setItems((prev) => [...prev, ...data.items]);
       setNextCursor(data.nextCursor);
     } catch (error) {
-       
       console.error('Failed to load more activity feed items', error);
     } finally {
       setLoadingMore(false);
@@ -122,6 +118,41 @@ export const useDashboardActivityFeed = (
     if (!enabled) return;
     await loadInitial(filters);
   }, [enabled, filters, loadInitial]);
+
+  const refreshHead = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const data = await api.listActivityFeed({
+        limit: pageSize,
+        categories: filters.categories,
+        studentId: filters.studentId ?? undefined,
+        from: filters.from ? toUtcDateFromTimeZone(filters.from, '00:00', timeZone).toISOString() : undefined,
+        to: filters.to ? toUtcDateFromTimeZone(filters.to, '23:59', timeZone).toISOString() : undefined,
+      });
+      setItems((prev) => {
+        if (prev.length === 0) {
+          return data.items;
+        }
+        const knownIds = new Set(prev.map((item) => item.id));
+        const merged: ActivityFeedItem[] = [];
+        for (const fresh of data.items) {
+          if (!knownIds.has(fresh.id)) merged.push(fresh);
+        }
+        if (merged.length === 0) {
+          return prev.map((existing) => {
+            const updated = data.items.find((fresh) => fresh.id === existing.id);
+            return updated ?? existing;
+          });
+        }
+        return [...merged, ...prev];
+      });
+      if (!nextCursor && data.nextCursor) {
+        setNextCursor(data.nextCursor);
+      }
+    } catch (error) {
+      console.error('Failed to refresh activity feed head', error);
+    }
+  }, [enabled, filters, nextCursor, pageSize, timeZone]);
 
   useEffect(() => {
     if (!enabled) {
@@ -135,6 +166,27 @@ export const useDashboardActivityFeed = (
     void loadInitial(filters);
   }, [enabled, filters, loadInitial]);
 
+  const pollIntervalMs = options.pollIntervalMs ?? 0;
+  useEffect(() => {
+    if (!enabled || pollIntervalMs <= 0 || typeof window === 'undefined') return;
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      void refreshHead();
+    };
+    const intervalId = window.setInterval(tick, pollIntervalMs);
+    return () => window.clearInterval(intervalId);
+  }, [enabled, pollIntervalMs, refreshHead]);
+
+  useEffect(() => {
+    if (!enabled || typeof document === 'undefined') return;
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      void refreshHead();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [enabled, refreshHead]);
+
   return useMemo(
     () => ({
       items,
@@ -147,7 +199,8 @@ export const useDashboardActivityFeed = (
       loadInitial,
       loadMore,
       refresh,
+      refreshHead,
     }),
-    [filters, items, loadInitial, loadMore, loading, loadingMore, nextCursor, refresh, setFilters],
+    [filters, items, loadInitial, loadMore, loading, loadingMore, nextCursor, refresh, refreshHead, setFilters],
   );
 };

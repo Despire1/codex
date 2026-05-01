@@ -441,6 +441,10 @@ model User {
   lastOnboardingNudgeAt       DateTime?
   termsAccepted  Boolean   @default(false)
   termsAcceptedAt DateTime?
+  securityAlertsEnabled Boolean @default(true)
+  securityAlertNewDevice Boolean @default(true)
+  securityAlertLogout Boolean @default(true)
+  securityAlertSessionRevoke Boolean @default(true)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @default(now()) @updatedAt
   sessions        Session[]
@@ -574,4 +578,21 @@ model TransferToken {
 
   @@index([userId])
   @@index([usedAt])
+}
+
+model TelegramLoginAttempt {
+  id              Int       @id @default(autoincrement())
+  nonce           String    @unique
+  secretHash      String
+  status          String    @default("pending")
+  telegramUserId  BigInt?
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+  expiresAt       DateTime
+  claimedAt       DateTime?
+  consumedAt      DateTime?
+
+  @@index([expiresAt])
+  @@index([status])
 }

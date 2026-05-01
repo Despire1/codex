@@ -1,7 +1,8 @@
 import { FC } from 'react';
-import { Tooltip } from '../../../../../shared/ui/Tooltip/Tooltip';
-import { HomeworkBellRegularIcon } from '../../../../../shared/ui/icons/HomeworkFaIcons';
+import { ActivityFeedTrigger } from '../../../../dashboard/components/ActivityFeedTrigger';
 import { TopbarCreateMenu, type TopbarCreateMenuItem } from '../../../../layout/ui/TopbarCreateMenu/TopbarCreateMenu';
+import { HelpMenu } from '../../../../layout/ui/HelpMenu/HelpMenu';
+import { useIsMobile } from '../../../../../shared/lib/useIsMobile';
 import styles from './TeacherHomeworksHeader.module.css';
 
 type WorkspaceMode = 'templates' | 'list' | 'drafts';
@@ -10,9 +11,7 @@ interface TeacherHomeworksHeaderProps {
   title: string;
   subtitle: string;
   workspaceMode: WorkspaceMode;
-  hasUnreadActivity: boolean;
   createMenuItems: TopbarCreateMenuItem[];
-  onOpenActivity: () => void;
   onWorkspaceModeChange: (mode: WorkspaceMode) => void;
 }
 
@@ -26,11 +25,11 @@ export const TeacherHomeworksHeader: FC<TeacherHomeworksHeaderProps> = ({
   title,
   subtitle,
   workspaceMode,
-  hasUnreadActivity,
   createMenuItems,
-  onOpenActivity,
   onWorkspaceModeChange,
 }) => {
+  const isMobile = useIsMobile(767);
+  const tourScenarioId = isMobile ? 'teacher-twa' : 'teacher-web';
   return (
     <header className={styles.header}>
       <div className={styles.topRow}>
@@ -58,23 +57,14 @@ export const TeacherHomeworksHeader: FC<TeacherHomeworksHeaderProps> = ({
         </div>
 
         <div className={styles.actions}>
-          <Tooltip content="События домашних заданий" side="bottom" align="end">
-            <button
-              type="button"
-              className={styles.iconButton}
-              onClick={onOpenActivity}
-              aria-label="Открыть события домашних заданий"
-            >
-              <HomeworkBellRegularIcon size={18} />
-              {hasUnreadActivity ? <span className={styles.notificationDot} aria-hidden /> : null}
-            </button>
-          </Tooltip>
-
+          <ActivityFeedTrigger className={styles.iconButton} data-tour="activity-feed" />
+          <HelpMenu tourScenarioId={tourScenarioId} triggerClassName={styles.iconButton} />
           <TopbarCreateMenu
             label="Добавить"
             items={createMenuItems}
             triggerClassName={styles.createButton}
             iconAccentClassName={styles.createButtonIconAccent}
+            triggerDataTour="create-menu"
           />
         </div>
       </div>

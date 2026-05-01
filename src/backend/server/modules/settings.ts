@@ -279,14 +279,9 @@ export const createSettingsService = ({
   const resolveNotificationTestVariables = (type: NotificationTestTemplateType) =>
     type === 'LESSON_REMINDER' ? STUDENT_LESSON_TEMPLATE_VARIABLES : STUDENT_PAYMENT_TEMPLATE_VARIABLES;
 
-  const resolveNotificationTestExamples = (
-    type: NotificationTestTemplateType,
-    source: NotificationTestDataSource,
-  ) => {
+  const resolveNotificationTestExamples = (type: NotificationTestTemplateType, source: NotificationTestDataSource) => {
     const key = source === 'PREVIEW_EXAMPLE_A' ? 'A' : 'B';
-    return type === 'LESSON_REMINDER'
-      ? STUDENT_LESSON_TEMPLATE_EXAMPLES[key]
-      : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[key];
+    return type === 'LESSON_REMINDER' ? STUDENT_LESSON_TEMPLATE_EXAMPLES[key] : STUDENT_PAYMENT_TEMPLATE_EXAMPLES[key];
   };
 
   const pickTeacherSettings = (teacher: any) => ({
@@ -472,7 +467,16 @@ export const createSettingsService = ({
 
   const getSettings = async (user: User) => {
     const teacher = await ensureTeacher(user);
-    return { settings: { ...pickTeacherSettings(teacher), receiptEmail: user.receiptEmail ?? null } };
+    return {
+      settings: {
+        ...pickTeacherSettings(teacher),
+        receiptEmail: user.receiptEmail ?? null,
+        securityAlertsEnabled: user.securityAlertsEnabled,
+        securityAlertNewDevice: user.securityAlertNewDevice,
+        securityAlertLogout: user.securityAlertLogout,
+        securityAlertSessionRevoke: user.securityAlertSessionRevoke,
+      },
+    };
   };
 
   const updateSettings = async (user: User, body: any) => {
@@ -566,7 +570,8 @@ export const createSettingsService = ({
     if (typeof body.homeworkReminderMorningTime === 'string' && isValidTimeString(body.homeworkReminderMorningTime)) {
       data.homeworkReminderMorningTime = body.homeworkReminderMorningTime;
     }
-    if (typeof body.homeworkReminder3hEnabled === 'boolean') data.homeworkReminder3hEnabled = body.homeworkReminder3hEnabled;
+    if (typeof body.homeworkReminder3hEnabled === 'boolean')
+      data.homeworkReminder3hEnabled = body.homeworkReminder3hEnabled;
     if (typeof body.homeworkOverdueRemindersEnabled === 'boolean') {
       data.homeworkOverdueRemindersEnabled = body.homeworkOverdueRemindersEnabled;
     }
@@ -588,6 +593,18 @@ export const createSettingsService = ({
       }
     } else if (body.receiptEmail === null) {
       userData.receiptEmail = null;
+    }
+    if (typeof body.securityAlertsEnabled === 'boolean') {
+      userData.securityAlertsEnabled = body.securityAlertsEnabled;
+    }
+    if (typeof body.securityAlertNewDevice === 'boolean') {
+      userData.securityAlertNewDevice = body.securityAlertNewDevice;
+    }
+    if (typeof body.securityAlertLogout === 'boolean') {
+      userData.securityAlertLogout = body.securityAlertLogout;
+    }
+    if (typeof body.securityAlertSessionRevoke === 'boolean') {
+      userData.securityAlertSessionRevoke = body.securityAlertSessionRevoke;
     }
 
     const shouldUpdateTeacher = Object.keys(data).length > 0;
@@ -669,7 +686,9 @@ export const createSettingsService = ({
     const changedTeacherKeys = Object.keys(data).filter(
       (key) => (teacher as any)[key] !== (result.updatedTeacher as any)[key],
     );
-    const changedUserKeys = Object.keys(userData).filter((key) => (user as any)[key] !== (result.updatedUser as any)[key]);
+    const changedUserKeys = Object.keys(userData).filter(
+      (key) => (user as any)[key] !== (result.updatedUser as any)[key],
+    );
     if (changedTeacherKeys.length > 0 || changedUserKeys.length > 0) {
       const details = buildSettingsChangeDetails(
         changedTeacherKeys,
@@ -697,7 +716,14 @@ export const createSettingsService = ({
     }
 
     return {
-      settings: { ...pickTeacherSettings(result.updatedTeacher), receiptEmail: result.updatedUser.receiptEmail ?? null },
+      settings: {
+        ...pickTeacherSettings(result.updatedTeacher),
+        receiptEmail: result.updatedUser.receiptEmail ?? null,
+        securityAlertsEnabled: result.updatedUser.securityAlertsEnabled,
+        securityAlertNewDevice: result.updatedUser.securityAlertNewDevice,
+        securityAlertLogout: result.updatedUser.securityAlertLogout,
+        securityAlertSessionRevoke: result.updatedUser.securityAlertSessionRevoke,
+      },
       links: result.links,
       removedLessonIds: result.removedLessonIds,
     };

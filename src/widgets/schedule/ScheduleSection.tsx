@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type FC,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -23,7 +24,12 @@ import { DayPicker } from 'react-day-picker';
 import { HomeworkAssignment, Lesson, LinkedStudent } from '../../entities/types';
 import { LESSON_COLOR_OPTIONS, getLessonColorVars } from '../../shared/lib/lessonColors';
 import { useTimeZone } from '../../shared/lib/timezoneContext';
-import { formatInTimeZone, toUtcDateFromDate, toZonedDate } from '../../shared/lib/timezoneDates';
+import {
+  formatInTimeZone,
+  toUtcDateFromDate,
+  toUtcDateFromTimeZone,
+  toZonedDate,
+} from '../../shared/lib/timezoneDates';
 import { Badge } from '../../shared/ui/Badge/Badge';
 import { Ellipsis } from '../../shared/ui/Ellipsis/Ellipsis';
 import { Tooltip } from '../../shared/ui/Tooltip/Tooltip';
@@ -137,7 +143,68 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
     requestDeleteLessonFromList,
     cancelLesson,
     restoreLesson,
+    shiftLessonTime,
   } = useLessonActions();
+  const draggedLessonRef = useRef<Lesson | null>(null);
+  const [dragTargetDayIso, setDragTargetDayIso] = useState<string | null>(null);
+
+  const computeMinutesFromEvent = (event: ReactDragEvent<HTMLDivElement>) => {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const offsetY = event.clientY - rect.top + container.scrollTop;
+    const minutesFromStart = DAY_START_MINUTE + (offsetY / HOUR_BLOCK_HEIGHT) * 60;
+    const clamped = Math.min(Math.max(minutesFromStart, DAY_START_MINUTE), LAST_MINUTE);
+    return Math.min(Math.round(clamped / 15) * 15, LAST_MINUTE);
+  };
+
+  const handleLessonDragStart = (lesson: Lesson) => (event: ReactDragEvent<HTMLDivElement>) => {
+    if (lesson.status === 'CANCELED') {
+      event.preventDefault();
+      return;
+    }
+    draggedLessonRef.current = lesson;
+    event.dataTransfer.effectAllowed = 'move';
+    try {
+      event.dataTransfer.setData('text/plain', String(lesson.id));
+    } catch {
+      // some browsers throw on invalid data type
+    }
+    closeLessonPopover();
+  };
+
+  const handleLessonDragEnd = () => {
+    draggedLessonRef.current = null;
+    setDragTargetDayIso(null);
+  };
+
+  const handleSlotDragOver = (dayIso: string) => (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!draggedLessonRef.current) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (dragTargetDayIso !== dayIso) setDragTargetDayIso(dayIso);
+  };
+
+  const handleSlotDragLeave = () => {
+    setDragTargetDayIso(null);
+  };
+
+  const handleSlotDrop = (dayIso: string) => (event: ReactDragEvent<HTMLDivElement>) => {
+    const lesson = draggedLessonRef.current;
+    draggedLessonRef.current = null;
+    setDragTargetDayIso(null);
+    if (!lesson) return;
+    event.preventDefault();
+    const minutes = computeMinutesFromEvent(event);
+    const hours = Math.floor(minutes / 60)
+      .toString()
+      .padStart(2, '0');
+    const mins = (minutes % 60).toString().padStart(2, '0');
+    const newStartAt = toUtcDateFromTimeZone(dayIso, `${hours}:${mins}`, timeZone);
+    const deltaMs = newStartAt.getTime() - new Date(lesson.startAt).getTime();
+    if (deltaMs === 0) return;
+    const deltaMinutes = Math.round(deltaMs / 60_000);
+    void shiftLessonTime(lesson, deltaMinutes, 'SINGLE');
+  };
   const {
     scheduleView,
     setScheduleView,
@@ -723,6 +790,9 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
           lesson.status === 'CANCELED' ? styles.canceledLesson : ''
         }`}
         style={{ ...layoutStyle, ...buildLessonColorStyle(lesson) }}
+        draggable={lesson.status !== 'CANCELED'}
+        onDragStart={handleLessonDragStart(lesson)}
+        onDragEnd={handleLessonDragEnd}
         onClick={(event) => {
           event.stopPropagation();
           setLessonPopover({ lesson, anchorEl: event.currentTarget });
@@ -834,10 +904,13 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
                   onMouseLeave={() => setHoverIndicator(null)}
                 >
                   <div
-                    className={styles.weekDayBody}
+                    className={`${styles.weekDayBody} ${dragTargetDayIso === day.iso ? styles.weekDayBodyDragOver : ''}`}
                     style={{ height: dayHeight }}
                     onClick={handleWeekSlotClick(day.iso)}
                     onMouseMove={(event) => handleTimeHover(event, day.iso)}
+                    onDragOver={handleSlotDragOver(day.iso)}
+                    onDragLeave={handleSlotDragLeave}
+                    onDrop={handleSlotDrop(day.iso)}
                   >
                     {hoverIndicator?.dayIso === day.iso && renderHoverIndicator(hoverIndicator.minutes)}
                     {isTodayColumn && (
@@ -935,11 +1008,14 @@ export const ScheduleSection: FC<ScheduleSectionProps> = ({
               ))}
             </div>
             <div
-              className={styles.dayColumn}
+              className={`${styles.dayColumn} ${dragTargetDayIso === dayIso ? styles.weekDayBodyDragOver : ''}`}
               style={{ height: dayHeight }}
               onClick={handleWeekSlotClick(dayIso)}
               onMouseMove={(event) => handleTimeHover(event, dayIso)}
               onMouseLeave={() => setHoverIndicator(null)}
+              onDragOver={handleSlotDragOver(dayIso)}
+              onDragLeave={handleSlotDragLeave}
+              onDrop={handleSlotDrop(dayIso)}
             >
               {hoverIndicator?.dayIso === dayIso && renderHoverIndicator(hoverIndicator.minutes)}
               {isSameDay(dayViewDate, todayZoned) && (

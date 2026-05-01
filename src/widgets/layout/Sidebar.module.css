@@ -73,17 +73,25 @@
   padding: 11px;
   border-bottom: 1px solid var(--divider);
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
   transition:
     padding var(--sidebar-motion-duration) var(--sidebar-motion-ease),
     gap var(--sidebar-motion-duration) var(--sidebar-motion-ease);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 .brandLogo {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: var(--color-slate-900);
-  color: var(--sidebar-accent);
+  background: var(--accent-primary);
+  color: var(--color-slate-900);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -320,7 +328,18 @@
 .toggleButton:hover {
   background: var(--surface-card-strong);
   color: var(--text-primary);
-  border-color: var(--border-strong);
+  border-color: var(--color-slate-300);
+  box-shadow: 0 1px 2px var(--shadow-slate-900-08);
+}
+
+.toggleButton:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.35);
+}
+
+.toggleButton:active {
+  background: var(--surface-card-muted);
 }
 
 .toggleIcon {

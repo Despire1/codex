@@ -1,6 +1,15 @@
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { ChangeEvent, type MutableRefObject, type ReactNode, type Ref, useMemo, useRef, useState } from 'react';
+import { format, ru } from 'date-fns';
+import {
+  ChangeEvent,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { CalendarMonthIcon } from '../../../icons/MaterialIcons';
 import { DayPicker } from '../../day-picker';
 import styles from './DatePickerField.module.css';
@@ -18,7 +27,7 @@ interface DatePickerFieldProps {
   className?: string;
   allowClear?: boolean;
   disabled?: boolean;
-  buttonRef?: Ref<HTMLButtonElement>;
+  buttonRef?: Ref<HTMLInputElement>;
   mode?: 'date' | 'datetime';
   minuteStep?: number;
   disabledDateReason?: (date: Date) => ReactNode | undefined;
@@ -64,7 +73,8 @@ export const DatePickerField = ({
 }: DatePickerFieldProps) => {
   const timeZone = useTimeZone();
   const [open, setOpen] = useState(false);
-  const controlRef = useRef<HTMLButtonElement>(null);
+  const controlRef = useRef<HTMLInputElement>(null);
+  const [inputDraft, setInputDraft] = useState<string | null>(null);
 
   const normalizedMinuteStep = useMemo(() => {
     const parsed = Math.trunc(minuteStep);
@@ -123,12 +133,7 @@ export const DatePickerField = ({
     [maxDate],
   );
 
-  const resolvedPlaceholder = placeholder ?? (mode === 'datetime' ? 'Выберите дату и время' : 'Выберите дату');
-  const displayValue = selectedDate
-    ? mode === 'datetime'
-      ? format(selectedDate, 'dd.MM.yyyy HH:mm')
-      : format(selectedDate, 'dd.MM.yyyy')
-    : resolvedPlaceholder;
+  const resolvedPlaceholder = placeholder ?? (mode === 'datetime' ? 'ДД.ММ.ГГГГ ЧЧ:ММ' : 'ДД.ММ.ГГГГ');
 
   const selectedTime = useMemo(() => {
     if (mode !== 'datetime') return null;
@@ -186,13 +191,90 @@ export const DatePickerField = ({
     emitDateTimeValue(selectedHour, event.target.value);
   };
 
-  const setControlRef = (node: HTMLButtonElement | null) => {
+  const setControlRef = (node: HTMLInputElement | null) => {
     controlRef.current = node;
     if (!buttonRef) return;
     if (typeof buttonRef === 'function') {
       buttonRef(node);
     } else {
-      (buttonRef as MutableRefObject<HTMLButtonElement | null>).current = node;
+      (buttonRef as MutableRefObject<HTMLInputElement | null>).current = node;
+    }
+  };
+
+  const dateOnlyDisplay = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : '';
+  const dateTimeDisplay = selectedDate ? format(selectedDate, 'dd.MM.yyyy HH:mm') : '';
+  const presentationValue = mode === 'datetime' ? dateTimeDisplay : dateOnlyDisplay;
+  const inputValue = inputDraft ?? presentationValue;
+
+  useEffect(() => {
+    setInputDraft(null);
+  }, [value]);
+
+  const parseManualInput = (raw: string): { iso: string } | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (mode === 'datetime') {
+      const match = trimmed.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})(?:[ T](\d{1,2}):(\d{1,2}))?$/);
+      if (!match) return null;
+      const [, dd, mm, yyyyRaw, hhRaw, miRaw] = match;
+      const yyyy = yyyyRaw.length === 2 ? `20${yyyyRaw}` : yyyyRaw;
+      const dateStr = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+      const timeStr = `${(hhRaw ?? selectedHour ?? '00').padStart(2, '0')}:${(miRaw ?? selectedMinute ?? '00').padStart(2, '0')}`;
+      const parsed = toUtcDateFromTimeZone(dateStr, timeStr, timeZone);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return { iso: `${dateStr}T${timeStr}` };
+    }
+    const match = trimmed.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})$/);
+    if (!match) return null;
+    const [, dd, mm, yyyyRaw] = match;
+    const yyyy = yyyyRaw.length === 2 ? `20${yyyyRaw}` : yyyyRaw;
+    const dateStr = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    const parsed = toUtcDateFromDate(dateStr, timeZone);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return { iso: dateStr };
+  };
+
+  const commitManualInput = (raw: string) => {
+    if (raw.trim() === '') {
+      if (allowClear) onChange(undefined);
+      setInputDraft(null);
+      return;
+    }
+    const result = parseManualInput(raw);
+    if (!result) {
+      setInputDraft(null);
+      return;
+    }
+    const parsedDate =
+      mode === 'datetime'
+        ? toUtcDateFromTimeZone(result.iso.split('T')[0], result.iso.split('T')[1] ?? '00:00', timeZone)
+        : toUtcDateFromDate(result.iso, timeZone);
+    const zonedDate = toZonedDate(parsedDate, timeZone);
+    if (isDateDisabled(zonedDate)) {
+      setInputDraft(null);
+      return;
+    }
+    onChange(result.iso);
+    setInputDraft(null);
+  };
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setInputDraft(event.target.value);
+  };
+
+  const handleInputBlur = () => {
+    if (inputDraft === null) return;
+    commitManualInput(inputDraft);
+  };
+
+  const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (inputDraft !== null) commitManualInput(inputDraft);
+      setOpen(false);
+    } else if (event.key === 'ArrowDown' && !open) {
+      event.preventDefault();
+      setOpen(true);
     }
   };
 
@@ -200,19 +282,34 @@ export const DatePickerField = ({
     <div className={`${styles.field} ${className ?? ''}`}>
       {label && <span className={styles.label}>{label}</span>}
       <div className={styles.controlRow}>
-        <button
-          type="button"
-          className={`${styles.control} ${selectedDate ? styles.filled : ''}`}
-          onClick={() => !disabled && setOpen((prev) => !prev)}
-          aria-label={label ? `${label}. ${displayValue}` : displayValue}
-          disabled={disabled}
-          ref={setControlRef}
+        <div
+          className={`${styles.control} ${disabled ? styles.controlDisabled : ''} ${selectedDate ? styles.filled : ''}`}
         >
-          <span className={styles.value}>{displayValue}</span>
-          <span aria-hidden className={styles.icon}>
+          <input
+            ref={setControlRef}
+            type="text"
+            className={styles.input}
+            value={inputValue}
+            placeholder={mode === 'datetime' ? 'ДД.ММ.ГГГГ ЧЧ:ММ' : (resolvedPlaceholder ?? 'ДД.ММ.ГГГГ')}
+            inputMode="numeric"
+            autoComplete="off"
+            disabled={disabled}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleInputKeyDown}
+            aria-label={label ?? (mode === 'datetime' ? 'Дата и время' : 'Дата')}
+          />
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => !disabled && setOpen((prev) => !prev)}
+            disabled={disabled}
+            aria-label={open ? 'Скрыть календарь' : 'Открыть календарь'}
+            tabIndex={-1}
+          >
             <CalendarMonthIcon width={18} height={18} />
-          </span>
-        </button>
+          </button>
+        </div>
         {allowClear && value && !disabled && (
           <button
             type="button"

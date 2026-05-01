@@ -1,0 +1,26 @@
+.arrow {
+  position: absolute;
+  background: var(--popover-arrow-bg, var(--surface-card));
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.side_top {
+  border-top: 1px solid var(--popover-arrow-border, var(--border));
+  border-left: 1px solid var(--popover-arrow-border, var(--border));
+}
+
+.side_bottom {
+  border-right: 1px solid var(--popover-arrow-border, var(--border));
+  border-bottom: 1px solid var(--popover-arrow-border, var(--border));
+}
+
+.side_left {
+  border-left: 1px solid var(--popover-arrow-border, var(--border));
+  border-bottom: 1px solid var(--popover-arrow-border, var(--border));
+}
+
+.side_right {
+  border-top: 1px solid var(--popover-arrow-border, var(--border));
+  border-right: 1px solid var(--popover-arrow-border, var(--border));
+}

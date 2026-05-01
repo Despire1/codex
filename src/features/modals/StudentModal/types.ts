@@ -1,1 +1,1 @@
-export type StudentModalFocusField = 'price';
+export type StudentModalFocusField = 'price' | 'email' | 'phone' | 'level';

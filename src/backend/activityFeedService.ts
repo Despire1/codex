@@ -40,6 +40,8 @@ type FeedItemInternal = ActivityFeedItem & {
 type FeedItemContext = {
   studentName?: string | null;
   lessonStartAt?: Date | null;
+  homeworkTitle?: string | null;
+  homeworkDeadlineAt?: Date | null;
 };
 
 type FeedCursor = {
@@ -93,7 +95,11 @@ const parseCursor = (value?: string | null): FeedCursor | null => {
     const raw = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as FeedCursor;
     if (!raw || typeof raw !== 'object') return null;
     if (typeof raw.occurredAt !== 'string') return null;
-    if (raw.sourceRecord !== 'ACTIVITY_EVENT' && raw.sourceRecord !== 'PAYMENT_EVENT' && raw.sourceRecord !== 'NOTIFICATION_LOG') {
+    if (
+      raw.sourceRecord !== 'ACTIVITY_EVENT' &&
+      raw.sourceRecord !== 'PAYMENT_EVENT' &&
+      raw.sourceRecord !== 'NOTIFICATION_LOG'
+    ) {
       return null;
     }
     if (!Number.isFinite(raw.sourceId)) return null;
@@ -129,11 +135,7 @@ const isOlderThanCursor = (item: FeedItemInternal, cursor: FeedCursor) => {
   return item._sourceId < cursor.sourceId;
 };
 
-const resolvePaymentTitle = (event: {
-  type: string;
-  lessonsDelta: number;
-  reason: string | null;
-}) => {
+const resolvePaymentTitle = (event: { type: string; lessonsDelta: number; reason: string | null }) => {
   switch (event.type) {
     case 'TOP_UP':
       return `Пополнение баланса: +${event.lessonsDelta} ур.`;
@@ -252,11 +254,21 @@ export const mapNotificationLogToFeedItem = (
     sentAt: Date | null;
     studentId: number | null;
     lessonId: number | null;
+    channel?: string | null;
   },
   context: FeedItemContext = {},
 ): FeedItemInternal => {
   const occurredAt = (event.sentAt ?? event.createdAt).toISOString();
   const source: ActivitySource = event.source === 'MANUAL' ? 'USER' : 'AUTO';
+  const basePayload: Record<string, unknown> = {
+    notificationType: event.type,
+    notificationSource: event.source,
+    channel: event.channel ?? null,
+  };
+  if (context.homeworkTitle) basePayload.homeworkTitle = context.homeworkTitle;
+  if (context.homeworkDeadlineAt) {
+    basePayload.homeworkDeadlineAt = context.homeworkDeadlineAt.toISOString();
+  }
   return {
     id: `notification_${event.id}`,
     sourceRecord: 'NOTIFICATION_LOG',
@@ -271,13 +283,7 @@ export const mapNotificationLogToFeedItem = (
     studentName: context.studentName ?? null,
     lessonId: event.lessonId,
     homeworkId: null,
-    payload: withLessonStartAt(
-      {
-        notificationType: event.type,
-        notificationSource: event.source,
-      },
-      context.lessonStartAt,
-    ),
+    payload: withLessonStartAt(basePayload, context.lessonStartAt),
     _sourceId: event.id,
     _occurredAtMs: new Date(occurredAt).getTime(),
   };
@@ -389,7 +395,9 @@ export const listActivityFeedForTeacher = async (
 ): Promise<{ items: ActivityFeedItem[]; nextCursor: string | null }> => {
   const limit = normalizeLimit(filters.limit);
   const cursor = parseCursor(filters.cursor);
-  const categories = (filters.categories ?? []).filter((item): item is ActivityCategory => Boolean(parseCategory(item)));
+  const categories = (filters.categories ?? []).filter((item): item is ActivityCategory =>
+    Boolean(parseCategory(item)),
+  );
   const categorySet = new Set(categories);
   const hasCategoryFilter = categorySet.size > 0;
 
@@ -450,9 +458,7 @@ export const listActivityFeedForTeacher = async (
   }
   if (cursorDate && !Number.isNaN(cursorDate.getTime())) {
     notificationWhere.createdAt = {
-      ...(typeof notificationWhere.createdAt === 'object'
-        ? (notificationWhere.createdAt as Record<string, Date>)
-        : {}),
+      ...(typeof notificationWhere.createdAt === 'object' ? (notificationWhere.createdAt as Record<string, Date>) : {}),
       lte: cursorDate,
     };
   }
@@ -500,7 +506,22 @@ export const listActivityFeedForTeacher = async (
     if (item.lessonId) lessonIds.add(item.lessonId);
   });
 
-  const [links, lessons] = await Promise.all([
+  const homeworkAssignmentIdByLogId = new Map<number, number>();
+  const homeworkAssignmentIds = new Set<number>();
+  notificationLogs.forEach((item: any) => {
+    if (typeof item.type !== 'string' || !item.type.startsWith('HOMEWORK_')) return;
+    const dedupeKey = typeof item.dedupeKey === 'string' ? item.dedupeKey : null;
+    if (!dedupeKey) return;
+    const segments = dedupeKey.split(':');
+    const assignmentId = segments
+      .map((segment) => Number(segment))
+      .find((value) => Number.isInteger(value) && value > 0);
+    if (!assignmentId) return;
+    homeworkAssignmentIdByLogId.set(item.id, assignmentId);
+    homeworkAssignmentIds.add(assignmentId);
+  });
+
+  const [links, lessons, homeworkAssignments] = await Promise.all([
     studentIds.size
       ? prisma.teacherStudent.findMany({
           where: {
@@ -522,6 +543,19 @@ export const listActivityFeedForTeacher = async (
           },
         })
       : Promise.resolve([]),
+    homeworkAssignmentIds.size
+      ? (prisma as any).homeworkAssignment.findMany({
+          where: {
+            teacherId,
+            id: { in: Array.from(homeworkAssignmentIds) },
+          },
+          select: {
+            id: true,
+            title: true,
+            deadlineAt: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
   const namesByStudentId = new Map<number, string>();
   links.forEach((link: any) => {
@@ -531,6 +565,13 @@ export const listActivityFeedForTeacher = async (
   const lessonStartsById = new Map<number, Date>();
   lessons.forEach((lesson: any) => {
     lessonStartsById.set(lesson.id, lesson.startAt);
+  });
+  const homeworkInfoById = new Map<number, { title: string | null; deadlineAt: Date | null }>();
+  (homeworkAssignments as any[]).forEach((assignment) => {
+    homeworkInfoById.set(assignment.id, {
+      title: typeof assignment.title === 'string' ? assignment.title : null,
+      deadlineAt: assignment.deadlineAt instanceof Date ? assignment.deadlineAt : null,
+    });
   });
 
   const internalItems: FeedItemInternal[] = [
@@ -546,12 +587,16 @@ export const listActivityFeedForTeacher = async (
         lessonStartAt: item.lessonId ? lessonStartsById.get(item.lessonId) : null,
       }),
     ),
-    ...notificationLogs.map((item) =>
-      mapNotificationLogToFeedItem(item as any, {
+    ...notificationLogs.map((item: any) => {
+      const assignmentId = homeworkAssignmentIdByLogId.get(item.id);
+      const homeworkInfo = assignmentId ? homeworkInfoById.get(assignmentId) : null;
+      return mapNotificationLogToFeedItem(item, {
         studentName: item.studentId ? namesByStudentId.get(item.studentId) : null,
         lessonStartAt: item.lessonId ? lessonStartsById.get(item.lessonId) : null,
-      }),
-    ),
+        homeworkTitle: homeworkInfo?.title ?? null,
+        homeworkDeadlineAt: homeworkInfo?.deadlineAt ?? null,
+      });
+    }),
   ];
 
   return mergeAndPaginateFeed(dedupeManualPaymentReminderItems(internalItems), limit, cursor);
