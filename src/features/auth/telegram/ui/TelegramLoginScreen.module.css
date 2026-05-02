@@ -13,7 +13,10 @@
   font-size: 14px;
   color: var(--color-slate-900, #0f172a);
   background: var(--color-slate-50, #f8fafc);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 }
@@ -471,10 +474,15 @@
 
 @media (max-width: 960px) {
   .root {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
   }
   .hero {
     min-height: auto;
+    flex: 0 0 auto;
+  }
+  .formColumn {
+    flex: 1 0 auto;
   }
 }
 

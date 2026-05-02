@@ -32,22 +32,56 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
 
   useEffect(() => {
     cancelledRef.current = false;
-    api
-      .getTelegramDeepLinkConfig()
-      .then((response) => {
-        if (cancelledRef.current) return;
-        setConfig(response);
-        setState(response.enabled ? 'idle' : 'unavailable');
-      })
-      .catch(() => {
+
+    const init = async () => {
+      let configResponse: TelegramDeepLinkConfig;
+      try {
+        configResponse = await api.getTelegramDeepLinkConfig();
+      } catch {
         if (cancelledRef.current) return;
         setState('error');
         setErrorMessage('Не удалось подготовить вход через Telegram. Обновите страницу.');
-      });
+        return;
+      }
+
+      if (cancelledRef.current) return;
+      setConfig(configResponse);
+
+      if (!configResponse.enabled) {
+        setState('unavailable');
+        return;
+      }
+
+      try {
+        const pollResponse = await api.pollTelegramDeepLinkLogin();
+        if (cancelledRef.current) return;
+
+        if (pollResponse.status === 'claimed') {
+          setState('success');
+          await onSuccess();
+          return;
+        }
+
+        if (pollResponse.status === 'pending') {
+          setState('awaiting');
+          if (tickTimer.current) clearInterval(tickTimer.current);
+          tickTimer.current = setInterval(() => setNow(Date.now()), 1000);
+          schedulePoll();
+          return;
+        }
+
+        setState('idle');
+      } catch {
+        if (!cancelledRef.current) setState('idle');
+      }
+    };
+
+    void init();
 
     return () => {
       cancelledRef.current = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopTimers = useCallback(() => {
@@ -112,11 +146,6 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
     setErrorMessage(null);
     setState('starting');
 
-    let popup: Window | null = null;
-    if (typeof window !== 'undefined') {
-      popup = window.open('about:blank', '_blank', 'noopener,noreferrer');
-    }
-
     try {
       const response = await api.startTelegramDeepLinkLogin();
       const expiresAtMs = new Date(response.expiresAt).getTime();
@@ -125,30 +154,14 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
       setNow(Date.now());
       setState('awaiting');
 
-      if (typeof window !== 'undefined') {
-        const popupAlive = popup && !popup.closed;
-        if (popupAlive) {
-          try {
-            popup!.location.href = response.deepLink;
-          } catch {
-            window.location.href = response.deepLink;
-          }
-        } else {
-          window.location.href = response.deepLink;
-        }
-      }
-
       stopTimers();
       tickTimer.current = setInterval(() => setNow(Date.now()), 1000);
       schedulePoll();
-    } catch (_error) {
-      if (popup && !popup.closed) {
-        try {
-          popup.close();
-        } catch {
-          // ignore
-        }
+
+      if (typeof window !== 'undefined') {
+        window.location.href = response.deepLink;
       }
+    } catch (_error) {
       setState('error');
       setErrorMessage('Не удалось запустить вход. Попробуйте ещё раз.');
     }
