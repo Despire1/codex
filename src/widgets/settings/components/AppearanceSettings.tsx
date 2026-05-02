@@ -1,27 +1,20 @@
-import { FC, SVGProps, useMemo } from 'react';
+import { FC, SVGProps } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../../app/providers/StoreProvider/config/store';
 import { setThemeMode } from '../../../entities/theme/model/themeSlice';
 import type { ThemeMode } from '../../../entities/theme/model/types';
-import { getMediaQueryColorScheme, getTelegramColorScheme } from '../../../entities/theme/lib/resolveSystemTheme';
-import { ContrastIcon, MoonIcon, PaletteIcon, SunIcon } from '../../../icons/MaterialIcons';
+import { MoonIcon, PaletteIcon, SunIcon } from '../../../icons/MaterialIcons';
 import styles from '../SettingsSection.module.css';
 import appearanceStyles from './AppearanceSettings.module.css';
 
 type Option = {
-  id: ThemeMode;
+  id: Exclude<ThemeMode, 'system'>;
   label: string;
   hint: string;
   Icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
 };
 
 const OPTIONS: Option[] = [
-  {
-    id: 'system',
-    label: 'Системная',
-    hint: 'Подстраивается под Telegram или ОС',
-    Icon: ContrastIcon,
-  },
   {
     id: 'light',
     label: 'Светлая',
@@ -36,18 +29,10 @@ const OPTIONS: Option[] = [
   },
 ];
 
-const formatSystemSourceLabel = () => {
-  const tg = getTelegramColorScheme();
-  if (tg) return `Telegram (${tg === 'dark' ? 'тёмная' : 'светлая'})`;
-  const media = getMediaQueryColorScheme();
-  return `ОС (${media === 'dark' ? 'тёмная' : 'светлая'})`;
-};
-
 export const AppearanceSettings: FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const mode = useSelector((state: RootState) => state.theme.mode);
-
-  const systemSource = useMemo(formatSystemSourceLabel, []);
+  const storedMode = useSelector((state: RootState) => state.theme.mode);
+  const mode: Exclude<ThemeMode, 'system'> = storedMode === 'dark' ? 'dark' : 'light';
 
   return (
     <div className={styles.moduleStack}>
@@ -58,9 +43,7 @@ export const AppearanceSettings: FC = () => {
           </div>
           <div className={styles.sectionHeaderCopy}>
             <h2 className={styles.sectionHeading}>Тема оформления</h2>
-            <p className={styles.sectionDescription}>
-              В Telegram Mini App тема синхронизируется с клиентом, в браузере — с системой.
-            </p>
+            <p className={styles.sectionDescription}>Выберите светлую или тёмную тему интерфейса.</p>
           </div>
         </div>
 
@@ -87,13 +70,6 @@ export const AppearanceSettings: FC = () => {
             );
           })}
         </div>
-
-        {mode === 'system' && (
-          <div className={appearanceStyles.statusRow}>
-            <span className={appearanceStyles.statusDot} aria-hidden />
-            <span>Сейчас источник: {systemSource}</span>
-          </div>
-        )}
       </section>
 
       <section className={styles.settingsCard}>
