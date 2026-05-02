@@ -1749,10 +1749,33 @@ export const useLessonActionsInternal = ({
       };
 
       if (inSeries) {
+        const oldWeekday = toZonedDate(lesson.startAt, timeZone).getDay();
+        const newWeekday = toZonedDate(newStartAt, timeZone).getDay();
+        const currentWeekdays = Array.isArray(lesson.recurrenceWeekdays) ? lesson.recurrenceWeekdays : [];
+
+        let nextWeekdays: number[] | undefined;
+        if (oldWeekday !== newWeekday) {
+          if (currentWeekdays.includes(newWeekday)) {
+            showInfoDialog(
+              'Перенос невозможен',
+              'В этот день у серии уже есть занятие — нельзя поставить второе занятие серии на тот же день недели.',
+            );
+            return;
+          }
+          const baseWeekdays = currentWeekdays.length > 0 ? currentWeekdays : [oldWeekday];
+          nextWeekdays = Array.from(new Set(baseWeekdays.filter((day) => day !== oldWeekday).concat(newWeekday))).sort(
+            (left, right) => left - right,
+          );
+        }
+
+        const seriesUpdatePayload: LessonUpdatePayload =
+          nextWeekdays !== undefined ? { ...updatePayload, repeatWeekdays: nextWeekdays } : updatePayload;
+
         try {
           const previews = await fetchSeriesScopePreviews(lesson, 'EDIT', {
             startAt: newStartAt,
             durationMinutes: lesson.durationMinutes,
+            repeatWeekdays: nextWeekdays,
           });
           setSeriesScopeDialogState({
             action: 'EDIT',
@@ -1761,7 +1784,7 @@ export const useLessonActionsInternal = ({
             lesson,
             defaultScope: 'SINGLE',
             previews,
-            request: { kind: 'update', payload: updatePayload },
+            request: { kind: 'update', payload: seriesUpdatePayload },
           });
         } catch (error) {
           showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
@@ -1813,7 +1836,15 @@ export const useLessonActionsInternal = ({
         },
       });
     },
-    [fetchSeriesScopePreviews, performLessonUpdate, requestLessonUpdateResolution, showToast, syncLessonsInRanges],
+    [
+      fetchSeriesScopePreviews,
+      performLessonUpdate,
+      requestLessonUpdateResolution,
+      showInfoDialog,
+      showToast,
+      syncLessonsInRanges,
+      timeZone,
+    ],
   );
 
   const rescheduleLessonByDrag = useCallback(
