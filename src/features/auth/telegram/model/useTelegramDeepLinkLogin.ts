@@ -13,6 +13,29 @@ export type DeepLinkLoginState =
 
 const POLL_INTERVAL_MS = 1500;
 
+const isMobileDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+};
+
+const buildTgAppLink = (botUsername: string | null | undefined, httpsDeepLink: string) => {
+  if (!botUsername) return null;
+  try {
+    const url = new URL(httpsDeepLink);
+    const startParam = url.searchParams.get('start');
+    if (!startParam) return null;
+    const handle = botUsername.replace(/^@+/, '');
+    return `tg://resolve?domain=${encodeURIComponent(handle)}&start=${encodeURIComponent(startParam)}`;
+  } catch {
+    return null;
+  }
+};
+
+const resolvePlatformDeepLink = (botUsername: string | null | undefined, httpsDeepLink: string) => {
+  if (!isMobileDevice()) return httpsDeepLink;
+  return buildTgAppLink(botUsername, httpsDeepLink) ?? httpsDeepLink;
+};
+
 type UseTelegramDeepLinkLoginOptions = {
   onSuccess: () => Promise<void> | void;
 };
@@ -149,7 +172,8 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
     try {
       const response = await api.startTelegramDeepLinkLogin();
       const expiresAtMs = new Date(response.expiresAt).getTime();
-      setDeepLink(response.deepLink);
+      const platformLink = resolvePlatformDeepLink(response.botUsername, response.deepLink);
+      setDeepLink(platformLink);
       setExpiresAt(Number.isFinite(expiresAtMs) ? expiresAtMs : null);
       setNow(Date.now());
       setState('awaiting');
@@ -159,7 +183,7 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
       schedulePoll();
 
       if (typeof window !== 'undefined') {
-        window.location.href = response.deepLink;
+        window.location.href = platformLink;
       }
     } catch (_error) {
       setState('error');
