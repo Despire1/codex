@@ -32,6 +32,8 @@ import {
   Teacher,
   TeacherStudent,
   UnpaidLessonEntry,
+  DashboardActionRequiredItem,
+  DashboardHomeworkReviewItem,
   WeekendConflictPreview,
 } from '../../entities/types';
 import { FormValidationIssue } from '../lib/form-validation/types';
@@ -458,6 +460,10 @@ export const api = {
       method: 'DELETE',
     }),
   listUnpaidLessons: () => apiFetch<{ entries: UnpaidLessonEntry[] }>('/api/lessons/unpaid'),
+  listDashboardActionRequired: () =>
+    apiFetch<{ items: DashboardActionRequiredItem[] }>('/api/dashboard/action-required'),
+  listDashboardHomeworkReview: () =>
+    apiFetch<{ items: DashboardHomeworkReviewItem[] }>('/api/dashboard/homework-review'),
   listActivityFeed: (params?: {
     limit?: number;
     cursor?: string | null;

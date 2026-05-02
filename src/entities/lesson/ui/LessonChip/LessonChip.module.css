@@ -11,7 +11,11 @@
   align-items: center;
   text-align: center;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
     color 0.2s ease;
   box-shadow: 0 2px 6px var(--lesson-shadow, rgba(15, 23, 42, 0.08));
 }
@@ -37,6 +41,31 @@
   transform: none;
   box-shadow: 0 4px 12px var(--lesson-shadow, rgba(15, 23, 42, 0.08));
   color: var(--lesson-text, var(--color-slate-700));
+}
+
+.chip[aria-roledescription='draggable']:not(.dragLocked) {
+  cursor: grab;
+  touch-action: none;
+}
+
+.chip[aria-roledescription='draggable']:not(.dragLocked):active {
+  cursor: grabbing;
+}
+
+.dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dragOverlayChip {
+  width: 100%;
+  transform: rotate(1.5deg) scale(1.04);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+  cursor: grabbing;
+}
+
+.dragLocked {
+  cursor: not-allowed;
 }
 
 .time {

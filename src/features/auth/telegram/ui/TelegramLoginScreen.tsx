@@ -1,4 +1,5 @@
 import { FC, ReactNode } from 'react';
+import { BrandLogo } from '@/shared/ui/BrandLogo';
 import { useTelegramDeepLinkLogin } from '../model/useTelegramDeepLinkLogin';
 import styles from './TelegramLoginScreen.module.css';
 
@@ -56,7 +57,7 @@ const WarnIcon: FC = () => (
 const Logo: FC = () => (
   <div className={styles.logoWrap}>
     <span className={styles.logoMark} aria-hidden="true">
-      К
+      <BrandLogo width={24} height={24} />
     </span>
     <span className={styles.logoText}>TeacherBot</span>
   </div>

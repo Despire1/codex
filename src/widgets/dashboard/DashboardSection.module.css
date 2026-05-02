@@ -2,140 +2,46 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
-}
-
-.gridWithAttention {
-  grid-template-areas:
-    'attention'
-    'today'
-    'quickActions'
-    'unpaid'
-    'activity';
-}
-
-.gridNoAttention {
-  grid-template-areas:
-    'today'
-    'quickActions'
-    'unpaid'
-    'activity';
+  align-items: stretch;
 }
 
 .gridWithCalendar {
   grid-template-areas:
     'calendar'
     'quickActions'
-    'unpaid'
-    'activity';
+    'middle'
+    'attention';
 }
 
 @media (min-width: 1024px) {
-  .gridWithAttention {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-    grid-template-areas:
-      'attention today'
-      'quickActions activity'
-      'quickActions unpaid';
-  }
-
-  .gridNoAttention {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-    grid-template-areas:
-      'quickActions today'
-      'quickActions activity'
-      'quickActions unpaid';
-  }
-
   .gridWithCalendar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
       'calendar calendar calendar'
-      'quickActions unpaid activity';
+      'quickActions middle attention';
   }
 }
 
-.card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: none;
-  min-height: 0;
+.calendarArea {
+  grid-area: calendar;
 }
 
-.cardHeader {
-  font-weight: 600;
-  margin-bottom: 8px;
+.quickActionsArea {
+  grid-area: quickActions;
+  align-self: start;
 }
 
-.attentionCard {
-  border-left: 4px solid var(--color-orange-200);
-  padding-left: 12px;
+.middleArea {
+  grid-area: middle;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
-.todaySummary {
-  display: grid;
-  gap: 4px;
-}
-
-.todayCount {
-  font-weight: 600;
-}
-
-.todayMeta {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.unpaidCard {
-  text-align: left;
-  cursor: default;
-  width: 100%;
-}
-
-.unpaidCardFull {
-  cursor: default;
-  padding: 18px;
-}
-
-.unpaidShowAllButton {
-  border: 1px solid var(--border-default);
-  background: var(--surface-page);
-  color: var(--text-secondary);
-  font-weight: 600;
-  cursor: pointer;
-  text-align: center;
-  padding: 8px 0;
-  width: 100%;
-  border-radius: 10px;
-  margin-top: 10px;
-}
-
-.unpaidCardWrapper {
-  width: 100%;
-}
-
-.unpaidPopoverRoot {
-  width: 100%;
-  display: block;
-}
-
-.unpaidTrigger {
-  width: 100%;
-  display: block;
-}
-
-.unpaidSummary {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.unpaidPopover {
-  width: min(360px, calc(100vw - 24px));
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: 16px;
-  box-shadow: none;
+.attentionArea {
+  grid-area: attention;
+  align-self: start;
 }
 
 .unpaidBottomSheet {
@@ -148,31 +54,11 @@
   max-height: 85vh;
 }
 
-.attentionArea {
-  grid-area: attention;
-}
-
-.todayArea {
-  grid-area: today;
-}
-
-.activityCardShell {
-  display: flex;
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: none;
   min-height: 0;
-}
-
-.activityArea {
-  grid-area: activity;
-}
-
-.unpaidArea {
-  grid-area: unpaid;
-}
-
-.quickActionsArea {
-  grid-area: quickActions;
-}
-
-.calendarArea {
-  grid-area: calendar;
 }

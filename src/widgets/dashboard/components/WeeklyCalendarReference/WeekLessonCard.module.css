@@ -26,6 +26,30 @@
   outline-offset: 2px;
 }
 
+.card[aria-roledescription='draggable']:not(.cardDragLocked) {
+  touch-action: none;
+}
+
+.card[aria-roledescription='draggable']:not(.cardDragLocked):active {
+  cursor: grabbing;
+}
+
+.cardDragging {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cardDragLocked {
+  cursor: not-allowed;
+}
+
+.cardDragOverlay {
+  width: 100%;
+  transform: rotate(1.5deg) scale(1.04);
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.22);
+  cursor: grabbing;
+}
+
 .cardCanceled {
   opacity: 0.55;
 }

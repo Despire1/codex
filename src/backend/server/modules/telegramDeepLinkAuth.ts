@@ -92,6 +92,30 @@ export const createTelegramDeepLinkAuthService = (config: CreateDeepLinkAuthServ
     return attempt;
   };
 
+  const peekPendingAttempt = async (nonce: string) => {
+    const attempt = await findValidPendingAttempt(nonce);
+    if (!attempt || attempt.status !== 'pending') return null;
+    return {
+      ip: attempt.ip,
+      userAgent: attempt.userAgent,
+      expiresAt: attempt.expiresAt,
+      createdAt: attempt.createdAt,
+    };
+  };
+
+  const rejectAttempt = async (nonce: string) => {
+    const attempt = await prisma.telegramLoginAttempt.findUnique({ where: { nonce } });
+    if (!attempt) return { ok: false as const, reason: 'attempt_not_found' as const };
+    if (attempt.status !== 'pending') {
+      return { ok: false as const, reason: 'attempt_not_pending' as const };
+    }
+    await prisma.telegramLoginAttempt.update({
+      where: { id: attempt.id },
+      data: { status: 'consumed', consumedAt: new Date() },
+    });
+    return { ok: true as const };
+  };
+
   const claimAttemptByBot = async (payload: {
     nonce: string;
     telegramUserId: bigint;
@@ -183,7 +207,9 @@ export const createTelegramDeepLinkAuthService = (config: CreateDeepLinkAuthServ
 
   return {
     startLoginAttempt,
+    peekPendingAttempt,
     claimAttemptByBot,
+    rejectAttempt,
     consumeClaimedAttempt,
     cancelAttempt,
   };

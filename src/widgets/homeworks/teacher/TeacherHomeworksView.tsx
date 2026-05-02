@@ -606,6 +606,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
   onLoadHomeworkActivity,
   onMarkHomeworkActivitySeen,
   onOpenMobileSidebar,
+  renderSearchButton,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -999,6 +1000,7 @@ export const TeacherHomeworksView: FC<TeacherHomeworksViewModel> = ({
             workspaceMode={workspaceMode === 'groups' ? 'templates' : workspaceMode}
             createMenuItems={createMenuItems}
             onWorkspaceModeChange={setWorkspaceMode}
+            renderSearchButton={renderSearchButton}
           />
 
           {workspaceMode === 'templates' ? (

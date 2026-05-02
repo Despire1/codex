@@ -1,5 +1,5 @@
 import { format, startOfMonth } from 'date-fns';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useBlockNavigation, useLocation, useNavigate } from 'react-router-dom';
 import { HomeworkGroupListItem, HomeworkTemplate, Lesson, Student, Teacher, TeacherStudent } from '../entities/types';
 import { useSelectedStudent } from '../entities/student/model/selectedStudent';
@@ -901,7 +901,7 @@ const AppPageContent = () => {
   const knownPaths = useMemo(() => new Set<string>(availableTabs.map((tab) => tab.path)), [availableTabs]);
 
   const openCreateLesson = useCallback(
-    (date?: Date) => {
+    (date?: Date, options?: { studentId?: number | null }) => {
       const lessonDate = date ?? new Date();
       let lessonIso = date
         ? format(lessonDate, 'yyyy-MM-dd')
@@ -941,9 +941,13 @@ const AppPageContent = () => {
         return `${String(slotHours).padStart(2, '0')}:${String(slotMinutes).padStart(2, '0')}`;
       })();
 
+      const studentIds =
+        typeof options?.studentId === 'number' && Number.isFinite(options.studentId) ? [options.studentId] : undefined;
+
       openLessonModal(lessonIso, roundedStartTime, undefined, {
         skipNavigation: true,
         variant: isDesktop ? 'modal' : 'sheet',
+        studentIds,
       });
     },
     [
@@ -1552,12 +1556,17 @@ const AppPageContent = () => {
     [guardedNavigate, handleSettingsLessonsRemoved, handleSettingsLinksPatched, teacher],
   );
 
-  const homeworksRouteProps = useMemo<{ mode: 'teacher' | 'student'; onOpenMobileSidebar?: () => void }>(
+  const homeworksRouteProps = useMemo<{
+    mode: 'teacher' | 'student';
+    onOpenMobileSidebar?: () => void;
+    renderSearchButton?: (className: string) => ReactNode;
+  }>(
     () => ({
       mode: isStudentRole ? 'student' : 'teacher',
       onOpenMobileSidebar: !isStudentRole ? () => setMobileSidebarOpen(true) : undefined,
+      renderSearchButton: isStudentRole ? undefined : renderSearchButton,
     }),
-    [isStudentRole],
+    [isStudentRole, renderSearchButton],
   );
 
   const studentDashboardRouteProps = useMemo(
@@ -1583,14 +1592,18 @@ const AppPageContent = () => {
     [dashboardSummary.isLoading, dashboardSummary.refresh, dashboardSummaryData],
   );
 
-  const LOGIN_PATH = '/auth/login';
-  const isLoginPath = location.pathname === LOGIN_PATH;
+  const LOGIN_PATH = '/login';
+  const isLoginPath = location.pathname === LOGIN_PATH || location.pathname === '/auth/login';
   const isCheckingSession = sessionState === 'checking' || (hasTelegramInitData && telegramState === 'pending');
 
   if (isLoginPath && sessionState === 'authenticated' && hasTelegramAccess) {
     const nextParam = new URLSearchParams(location.search).get('next');
     const safeNext =
-      nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/auth/')
+      nextParam &&
+      nextParam.startsWith('/') &&
+      !nextParam.startsWith('//') &&
+      !nextParam.startsWith('/auth/') &&
+      !nextParam.startsWith('/login')
         ? nextParam
         : tabPathById.dashboard;
     return <Navigate to={safeNext} replace />;
@@ -1603,7 +1616,9 @@ const AppPageContent = () => {
     if (!isLoginPath) {
       const fullPath = `${location.pathname}${location.search}`;
       const next =
-        fullPath && fullPath !== '/' && !fullPath.startsWith('/auth/') ? `?next=${encodeURIComponent(fullPath)}` : '';
+        fullPath && fullPath !== '/' && !fullPath.startsWith('/auth/') && !fullPath.startsWith('/login')
+          ? `?next=${encodeURIComponent(fullPath)}`
+          : '';
       return <Navigate to={`${LOGIN_PATH}${next}`} replace />;
     }
     return <SessionFallback state="unauthenticated" onAuthenticated={refreshSession} />;

@@ -111,6 +111,12 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
     if (state === 'starting' || state === 'awaiting') return;
     setErrorMessage(null);
     setState('starting');
+
+    let popup: Window | null = null;
+    if (typeof window !== 'undefined') {
+      popup = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    }
+
     try {
       const response = await api.startTelegramDeepLinkLogin();
       const expiresAtMs = new Date(response.expiresAt).getTime();
@@ -120,13 +126,29 @@ export const useTelegramDeepLinkLogin = ({ onSuccess }: UseTelegramDeepLinkLogin
       setState('awaiting');
 
       if (typeof window !== 'undefined') {
-        window.open(response.deepLink, '_blank', 'noopener,noreferrer');
+        const popupAlive = popup && !popup.closed;
+        if (popupAlive) {
+          try {
+            popup!.location.href = response.deepLink;
+          } catch {
+            window.location.href = response.deepLink;
+          }
+        } else {
+          window.location.href = response.deepLink;
+        }
       }
 
       stopTimers();
       tickTimer.current = setInterval(() => setNow(Date.now()), 1000);
       schedulePoll();
     } catch (_error) {
+      if (popup && !popup.closed) {
+        try {
+          popup.close();
+        } catch {
+          // ignore
+        }
+      }
       setState('error');
       setErrorMessage('Не удалось запустить вход. Попробуйте ещё раз.');
     }

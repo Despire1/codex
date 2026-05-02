@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, type ReactNode } from 'react';
 import { ActivityFeedTrigger } from '../../../../dashboard/components/ActivityFeedTrigger';
 import { TopbarCreateMenu, type TopbarCreateMenuItem } from '../../../../layout/ui/TopbarCreateMenu/TopbarCreateMenu';
 import { HelpMenu } from '../../../../layout/ui/HelpMenu/HelpMenu';
@@ -13,6 +13,7 @@ interface TeacherHomeworksHeaderProps {
   workspaceMode: WorkspaceMode;
   createMenuItems: TopbarCreateMenuItem[];
   onWorkspaceModeChange: (mode: WorkspaceMode) => void;
+  renderSearchButton?: (className: string) => ReactNode;
 }
 
 const WORKSPACE_TABS: Array<{ id: WorkspaceMode; label: string }> = [
@@ -27,6 +28,7 @@ export const TeacherHomeworksHeader: FC<TeacherHomeworksHeaderProps> = ({
   workspaceMode,
   createMenuItems,
   onWorkspaceModeChange,
+  renderSearchButton,
 }) => {
   const isMobile = useIsMobile(767);
   const tourScenarioId = isMobile ? 'teacher-twa' : 'teacher-web';
@@ -57,6 +59,7 @@ export const TeacherHomeworksHeader: FC<TeacherHomeworksHeaderProps> = ({
         </div>
 
         <div className={styles.actions}>
+          {renderSearchButton ? renderSearchButton(styles.iconButton) : null}
           <ActivityFeedTrigger className={styles.iconButton} data-tour="activity-feed" />
           <HelpMenu tourScenarioId={tourScenarioId} triggerClassName={styles.iconButton} />
           <TopbarCreateMenu

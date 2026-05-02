@@ -1,11 +1,19 @@
 import { addMinutes, format } from 'date-fns';
-import type { CSSProperties, FC, KeyboardEvent, MouseEvent } from 'react';
+import type { CSSProperties, FC, HTMLAttributes, KeyboardEvent, MouseEvent } from 'react';
 import { buildParticipants, getLessonLabel } from '@/entities/lesson/lib/lessonDetails';
 import type { Lesson, LinkedStudent } from '@/entities/types';
 import { getLessonColorTheme, getLessonColorVars } from '@/shared/lib/lessonColors';
 import { toZonedDate } from '@/shared/lib/timezoneDates';
-import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
 import styles from './WeekLessonCard.module.css';
+
+export interface WeekLessonCardDragHandle {
+  setNodeRef: (el: HTMLElement | null) => void;
+  attributes: HTMLAttributes<HTMLElement>;
+  listeners?: HTMLAttributes<HTMLElement>;
+  isDragging?: boolean;
+  dragLocked?: boolean;
+  asOverlay?: boolean;
+}
 
 const resolveStatusLabel = (lesson: Lesson) => {
   if (lesson.status === 'CANCELED') return 'Отменён';
@@ -28,6 +36,7 @@ interface WeekLessonCardProps {
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   onDoubleClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  dragHandle?: WeekLessonCardDragHandle;
 }
 
 export const WeekLessonCard: FC<WeekLessonCardProps> = ({
@@ -37,6 +46,7 @@ export const WeekLessonCard: FC<WeekLessonCardProps> = ({
   onClick,
   onDoubleClick,
   onKeyDown,
+  dragHandle,
 }) => {
   const participants = buildParticipants(lesson, linkedStudentsById);
   const lessonLabel = getLessonLabel(participants, linkedStudentsById);
@@ -55,47 +65,45 @@ export const WeekLessonCard: FC<WeekLessonCardProps> = ({
 
   const statusLabel = resolveStatusLabel(lesson);
   const paidLabel = resolvePaidLabel(lesson);
-  const tooltipContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 220 }}>
-      <strong>{lessonLabel}</strong>
-      <span>{timeLabel}</span>
-      <span>
-        {statusLabel} · {paidLabel}
-      </span>
-      {lesson.meetingLink ? <span style={{ wordBreak: 'break-all', opacity: 0.8 }}>{lesson.meetingLink}</span> : null}
-    </div>
-  );
 
   return (
-    <Tooltip content={tooltipContent} side="top" align="center">
-      <button
-        type="button"
-        className={[styles.card, isCanceled ? styles.cardCanceled : '', isCompleted ? styles.cardCompleted : '']
-          .filter(Boolean)
-          .join(' ')}
-        style={styleVars}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        onKeyDown={onKeyDown}
-        aria-label={`${lessonLabel}, ${timeLabel}, ${statusLabel}, ${paidLabel}`}
-      >
-        <span className={styles.time}>
-          {isCompleted ? (
-            <svg className={styles.completedIcon} viewBox="0 0 16 16" aria-hidden="true" width={12} height={12}>
-              <path
-                d="M3.5 8.5l2.8 2.8 6.2-6.2"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          ) : null}
-          {timeLabel}
-        </span>
-        <span className={styles.name}>{lessonLabel}</span>
-      </button>
-    </Tooltip>
+    <button
+      type="button"
+      ref={dragHandle?.setNodeRef}
+      {...(dragHandle?.attributes ?? {})}
+      {...(dragHandle?.listeners ?? {})}
+      className={[
+        styles.card,
+        isCanceled ? styles.cardCanceled : '',
+        isCompleted ? styles.cardCompleted : '',
+        dragHandle?.isDragging ? styles.cardDragging : '',
+        dragHandle?.dragLocked ? styles.cardDragLocked : '',
+        dragHandle?.asOverlay ? styles.cardDragOverlay : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={styleVars}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onKeyDown={onKeyDown}
+      aria-label={`${lessonLabel}, ${timeLabel}, ${statusLabel}, ${paidLabel}`}
+    >
+      <span className={styles.time}>
+        {isCompleted ? (
+          <svg className={styles.completedIcon} viewBox="0 0 16 16" aria-hidden="true" width={12} height={12}>
+            <path
+              d="M3.5 8.5l2.8 2.8 6.2-6.2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : null}
+        {timeLabel}
+      </span>
+      <span className={styles.name}>{lessonLabel}</span>
+    </button>
   );
 };

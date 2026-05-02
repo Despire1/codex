@@ -7,7 +7,6 @@ import { AppProviders } from './providers';
 import { store } from './providers/StoreProvider/config/store';
 import { applyTheme } from '@/entities/theme/lib/applyTheme';
 import { readStoredThemeMode } from '@/entities/theme/lib/initialTheme';
-import { resolveSystemTheme } from '@/entities/theme/lib/resolveSystemTheme';
 import './styles/global.css';
 import './styles/safe-area.css';
 
@@ -27,8 +26,8 @@ const applyAppTitle = () => {
 };
 
 const applyInitialTheme = () => {
-  const mode = readStoredThemeMode() ?? 'system';
-  const resolved = mode === 'system' ? resolveSystemTheme() : mode;
+  const mode = readStoredThemeMode();
+  const resolved = mode === 'dark' ? 'dark' : 'light';
   applyTheme(resolved);
 };
 

@@ -229,6 +229,7 @@ export type LessonActionsContextValue = {
     options?: { skipToast?: boolean },
   ) => Promise<void>;
   restoreLesson: (lesson: Lesson, scope: LessonSeriesScope, options?: { skipToast?: boolean }) => Promise<void>;
+  rescheduleLessonByDrag: (lesson: Lesson, newStartAt: string) => Promise<void>;
   seriesScopeDialogState: SeriesScopeDialogState | null;
   confirmSeriesScope: (scope: LessonSeriesScope) => void;
   cancelSeriesScope: () => void;
@@ -1739,6 +1740,113 @@ export const useLessonActionsInternal = ({
     }
   }, [seriesScopeDialogState]);
 
+  const runDragReschedulePipeline = useCallback(
+    async (lesson: Lesson, newStartAt: string) => {
+      const inSeries = Boolean(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId));
+      const updatePayload: LessonUpdatePayload = {
+        startAt: newStartAt,
+        durationMinutes: lesson.durationMinutes,
+      };
+
+      if (inSeries) {
+        try {
+          const previews = await fetchSeriesScopePreviews(lesson, 'EDIT', {
+            startAt: newStartAt,
+            durationMinutes: lesson.durationMinutes,
+          });
+          setSeriesScopeDialogState({
+            action: 'EDIT',
+            title: 'Перенести урок',
+            confirmText: 'Перенести',
+            lesson,
+            defaultScope: 'SINGLE',
+            previews,
+            request: { kind: 'update', payload: updatePayload },
+          });
+        } catch (error) {
+          showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
+          console.error('Failed to prepare drag reschedule for series', error);
+        }
+        return;
+      }
+
+      const originalStartAt = lesson.startAt;
+      const rollback = () => {
+        syncLessonsInRanges([{ ...lesson, startAt: originalStartAt }]);
+      };
+
+      syncLessonsInRanges([{ ...lesson, startAt: newStartAt }]);
+
+      let previewData: Awaited<ReturnType<typeof api.previewLessonMutation>>;
+      try {
+        previewData = await api.previewLessonMutation(lesson.id, {
+          action: 'EDIT',
+          scope: 'SINGLE',
+          startAt: newStartAt,
+          durationMinutes: lesson.durationMinutes,
+        });
+      } catch (error) {
+        rollback();
+        showToast({ message: 'Не удалось проверить изменение', variant: 'error' });
+        console.error('Failed to preview drag reschedule', error);
+        return;
+      }
+
+      if (previewData.preview.isBlocked) {
+        rollback();
+      }
+
+      requestLessonUpdateResolution({
+        preview: previewData.preview,
+        confirmText: 'Перенести',
+        onCancel: rollback,
+        onProceed: (meta) => {
+          void performLessonUpdate(lesson, { ...updatePayload, scope: 'SINGLE', ...meta }, 'SINGLE')
+            .then(() => {
+              showToast({ message: 'Урок перенесён', variant: 'success' });
+            })
+            .catch((error) => {
+              rollback();
+              showToast({ message: 'Не удалось перенести урок', variant: 'error' });
+              console.error('Failed to reschedule lesson by drag', error);
+            });
+        },
+      });
+    },
+    [fetchSeriesScopePreviews, performLessonUpdate, requestLessonUpdateResolution, showToast, syncLessonsInRanges],
+  );
+
+  const rescheduleLessonByDrag = useCallback(
+    async (lesson: Lesson, newStartAt: string) => {
+      if (lesson.status === 'COMPLETED') {
+        showInfoDialog(
+          'Урок уже проведён',
+          'Чтобы перенести его, сначала отмените статус «Проведён» в карточке урока.',
+        );
+        return;
+      }
+      if (lesson.status === 'CANCELED') {
+        showInfoDialog('Урок отменён', 'Сначала восстановите урок, потом перенесите его.');
+        return;
+      }
+      if (new Date(newStartAt).getTime() === new Date(lesson.startAt).getTime()) return;
+
+      const isPast = new Date(newStartAt).getTime() < Date.now();
+      if (isPast) {
+        openConfirmDialog({
+          title: 'Перенести в прошлое?',
+          message: 'Дата урока окажется в прошлом. Продолжить?',
+          confirmText: 'Перенести',
+          cancelText: 'Отмена',
+          onConfirm: () => runDragReschedulePipeline(lesson, newStartAt),
+        });
+        return;
+      }
+      void runDragReschedulePipeline(lesson, newStartAt);
+    },
+    [openConfirmDialog, runDragReschedulePipeline, showInfoDialog],
+  );
+
   const applyTogglePaid = useCallback(
     async (
       lessonId: number,
@@ -2022,6 +2130,7 @@ export const useLessonActionsInternal = ({
       shiftLessonTime,
       cancelLesson,
       restoreLesson,
+      rescheduleLessonByDrag,
       seriesScopeDialogState,
       confirmSeriesScope,
       cancelSeriesScope,
@@ -2058,6 +2167,7 @@ export const useLessonActionsInternal = ({
       shiftLessonTime,
       cancelLesson,
       restoreLesson,
+      rescheduleLessonByDrag,
       seriesScopeDialogState,
       confirmSeriesScope,
       cancelSeriesScope,

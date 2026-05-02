@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -21,7 +21,10 @@ import { useUnsavedChanges } from '../../shared/lib/unsavedChanges';
 import { useToast } from '../../shared/lib/toast';
 import { useTimeZone } from '../../shared/lib/timezoneContext';
 import { toZonedDate } from '../../shared/lib/timezoneDates';
-import { StudentHomeworkDetailView, StudentHomeworkSubmitPayload } from '../../features/homework-submit/ui/StudentHomeworkDetailView';
+import {
+  StudentHomeworkDetailView,
+  StudentHomeworkSubmitPayload,
+} from '../../features/homework-submit/ui/StudentHomeworkDetailView';
 import {
   createHomeworkEditorDraftFromAssignment,
   createHomeworkEditorDraftFromTemplate,
@@ -63,11 +66,15 @@ import {
   TeacherHomeworkStudentOption,
   TeacherTemplateUpsertPayload,
 } from './types';
-import { toggleHomeworkTemplateFavoriteTags, isHomeworkTemplateFavorite } from './teacher/model/lib/templatePresentation';
+import {
+  toggleHomeworkTemplateFavoriteTags,
+  isHomeworkTemplateFavorite,
+} from './teacher/model/lib/templatePresentation';
 
 interface HomeworksSectionProps {
   mode: 'teacher' | 'student';
   onOpenMobileSidebar?: () => void;
+  renderSearchButton?: (className: string) => ReactNode;
 }
 
 type HomeworksNavigationState = {
@@ -92,10 +99,7 @@ const saveReviewDraftToStorage = (assignmentId: number, draft: HomeworkReviewDra
   window.localStorage.setItem(buildReviewDraftStorageKey(assignmentId, draft.submissionId), JSON.stringify(draft));
 };
 
-const readReviewDraftFromStorage = (
-  assignmentId: number,
-  submissionId: number,
-): HomeworkReviewDraft | null => {
+const readReviewDraftFromStorage = (assignmentId: number, submissionId: number): HomeworkReviewDraft | null => {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(buildReviewDraftStorageKey(assignmentId, submissionId));
   if (!raw) return null;
@@ -221,7 +225,7 @@ const buildHomeworkCopyTitle = (title: string, existingTitles: string[]) => {
   return nextCopyIndex === 0 ? `${baseTitle} (копия)` : `${baseTitle} (копия ${nextCopyIndex})`;
 };
 
-export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobileSidebar }) => {
+export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobileSidebar, renderSearchButton }) => {
   const { showToast } = useToast();
   const { setEntry, clearEntry, requestNavigationBypass } = useUnsavedChanges();
   const navigate = useNavigate();
@@ -261,7 +265,8 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     typeof editingAssignmentId === 'number' &&
     Number.isFinite(editingAssignmentId) &&
     editingAssignmentId > 0;
-  const isTeacherAssignmentEditorRoute = isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute || hasTeacherAssignmentDetailId;
+  const isTeacherAssignmentEditorRoute =
+    isTeacherAssignmentCreateRoute || isTeacherAssignmentEditRoute || hasTeacherAssignmentDetailId;
   const activeTeacherAssignmentId = isTeacherAssignmentEditRoute
     ? editingAssignmentId
     : hasTeacherAssignmentDetailId
@@ -278,33 +283,38 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     editingTemplateId > 0;
   const isTeacherTemplateEditorRoute = isTeacherTemplateCreateRoute || isTeacherTemplateEditRoute;
   const teacherTemplateListPath = '/homeworks';
-  const navigateBackInHistory = useCallback((fallbackPath = '/homeworks') => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
+  const navigateBackInHistory = useCallback(
+    (fallbackPath = '/homeworks') => {
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        window.history.back();
+        return;
+      }
 
-    navigate(fallbackPath);
-  }, [navigate]);
-  const templateEditorDraftStorageKey = isTeacherTemplateEditRoute && editingTemplateId
-    ? buildHomeworkEditorDraftStorageKey({
-        variant: 'template',
-        mode: 'edit',
-        entityId: editingTemplateId,
-      })
-    : null;
-  const assignmentEditorDraftStorageKey = isTeacherAssignmentEditRoute && editingAssignmentId
-    ? buildHomeworkEditorDraftStorageKey({
-        variant: 'assignment',
-        mode: 'edit',
-        entityId: editingAssignmentId,
-      })
-    : isTeacherAssignmentCreateRoute
+      navigate(fallbackPath);
+    },
+    [navigate],
+  );
+  const templateEditorDraftStorageKey =
+    isTeacherTemplateEditRoute && editingTemplateId
       ? buildHomeworkEditorDraftStorageKey({
-          variant: 'assignment',
-          mode: 'create',
+          variant: 'template',
+          mode: 'edit',
+          entityId: editingTemplateId,
         })
       : null;
+  const assignmentEditorDraftStorageKey =
+    isTeacherAssignmentEditRoute && editingAssignmentId
+      ? buildHomeworkEditorDraftStorageKey({
+          variant: 'assignment',
+          mode: 'edit',
+          entityId: editingAssignmentId,
+        })
+      : isTeacherAssignmentCreateRoute
+        ? buildHomeworkEditorDraftStorageKey({
+            variant: 'assignment',
+            mode: 'create',
+          })
+        : null;
 
   const [templates, setTemplates] = useState<HomeworkTemplate[]>([]);
   const [groups, setGroups] = useState<HomeworkGroupListItem[]>([]);
@@ -374,21 +384,29 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   const [homeworkActivityLoading, setHomeworkActivityLoading] = useState(false);
   const [homeworkActivityHasUnread, setHomeworkActivityHasUnread] = useState(false);
 
-  const [templateEditorDraft, setTemplateEditorDraft] = useState<HomeworkEditorDraft>(createInitialHomeworkEditorDraft());
+  const [templateEditorDraft, setTemplateEditorDraft] = useState<HomeworkEditorDraft>(
+    createInitialHomeworkEditorDraft(),
+  );
   const [templateEditorInitialDraft, setTemplateEditorInitialDraft] = useState<HomeworkEditorDraft>(
     createInitialHomeworkEditorDraft(),
   );
   const [templateEditorTemplate, setTemplateEditorTemplate] = useState<HomeworkTemplate | null>(null);
   const [templateEditorLoading, setTemplateEditorLoading] = useState(false);
   const [templateEditorError, setTemplateEditorError] = useState<string | null>(null);
-  const [assignmentEditorDraft, setAssignmentEditorDraft] = useState<HomeworkEditorDraft>(createInitialHomeworkEditorDraft());
+  const [assignmentEditorDraft, setAssignmentEditorDraft] = useState<HomeworkEditorDraft>(
+    createInitialHomeworkEditorDraft(),
+  );
   const [assignmentEditorInitialDraft, setAssignmentEditorInitialDraft] = useState<HomeworkEditorDraft>(
     createInitialHomeworkEditorDraft(),
   );
   const [assignmentEditorLoading, setAssignmentEditorLoading] = useState(false);
   const [assignmentEditorError, setAssignmentEditorError] = useState<string | null>(null);
-  const [assignmentEditorOriginalStatus, setAssignmentEditorOriginalStatus] = useState<HomeworkAssignment['status'] | null>(null);
-  const [assignmentEditorServerAssignment, setAssignmentEditorServerAssignment] = useState<HomeworkAssignment | null>(null);
+  const [assignmentEditorOriginalStatus, setAssignmentEditorOriginalStatus] = useState<
+    HomeworkAssignment['status'] | null
+  >(null);
+  const [assignmentEditorServerAssignment, setAssignmentEditorServerAssignment] = useState<HomeworkAssignment | null>(
+    null,
+  );
   const [savingAssignmentAsTemplate, setSavingAssignmentAsTemplate] = useState(false);
   const [pendingAssignmentTemplate, setPendingAssignmentTemplate] = useState<HomeworkTemplate | null>(null);
   const [pendingTemplateEditCopy, setPendingTemplateEditCopy] = useState<{
@@ -414,7 +432,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
   const hasSkippedTemplateEditorAutoSaveRef = useRef(false);
   const hasSkippedAssignmentEditorAutoSaveRef = useRef(false);
   const templateEditorReadOnly = useMemo(
-    () => isTeacherTemplateEditRoute && templateEditorTemplate !== null && !canTeacherEditHomeworkTemplate(templateEditorTemplate),
+    () =>
+      isTeacherTemplateEditRoute &&
+      templateEditorTemplate !== null &&
+      !canTeacherEditHomeworkTemplate(templateEditorTemplate),
     [isTeacherTemplateEditRoute, templateEditorTemplate],
   );
   const templateEditorHasUnsavedChanges = useMemo(
@@ -423,7 +444,13 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       !templateEditorReadOnly &&
       templateEditorTemplate !== null &&
       !areHomeworkEditorDraftsEqual(templateEditorDraft, templateEditorInitialDraft),
-    [isTeacherTemplateEditRoute, templateEditorDraft, templateEditorInitialDraft, templateEditorReadOnly, templateEditorTemplate],
+    [
+      isTeacherTemplateEditRoute,
+      templateEditorDraft,
+      templateEditorInitialDraft,
+      templateEditorReadOnly,
+      templateEditorTemplate,
+    ],
   );
 
   useEffect(() => {
@@ -483,9 +510,10 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     const existingTemplate = templates.find((template) => template.id === editingTemplateId);
     if (existingTemplate) {
       const nextDraft = createHomeworkEditorDraftFromTemplate(existingTemplate);
-      const storedDraft = templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(existingTemplate)
-        ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
-        : null;
+      const storedDraft =
+        templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(existingTemplate)
+          ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
+          : null;
       const openedDraft = cloneHomeworkEditorDraft(resolveOpenedHomeworkEditorDraft(nextDraft, storedDraft?.draft));
       setTemplateEditorTemplate(existingTemplate);
       setTemplateEditorInitialDraft(cloneHomeworkEditorDraft(openedDraft));
@@ -510,16 +538,16 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           return;
         }
         const nextDraft = createHomeworkEditorDraftFromTemplate(targetTemplate);
-        const storedDraft = templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(targetTemplate)
-          ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
-          : null;
+        const storedDraft =
+          templateEditorDraftStorageKey && canTeacherEditHomeworkTemplate(targetTemplate)
+            ? loadStoredHomeworkEditorDraft(templateEditorDraftStorageKey)
+            : null;
         const openedDraft = cloneHomeworkEditorDraft(resolveOpenedHomeworkEditorDraft(nextDraft, storedDraft?.draft));
         setTemplateEditorTemplate(targetTemplate);
         setTemplateEditorInitialDraft(cloneHomeworkEditorDraft(openedDraft));
         setTemplateEditorDraft(openedDraft);
       })
       .catch((error) => {
-         
         console.error('Failed to load template for edit screen', error);
         if (isCancelled) return;
         setTemplateEditorTemplate(null);
@@ -558,13 +586,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         cancelPath,
       };
     });
-  }, [
-    isTeacherTemplateEditRoute,
-    mode,
-    templateEditorError,
-    templateEditorLoading,
-    templateEditorTemplate,
-  ]);
+  }, [isTeacherTemplateEditRoute, mode, templateEditorError, templateEditorLoading, templateEditorTemplate]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
@@ -603,7 +625,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         const assignment = response.assignment;
         let relatedTemplate =
           typeof assignment.templateId === 'number'
-            ? templates.find((template) => template.id === assignment.templateId) ?? null
+            ? (templates.find((template) => template.id === assignment.templateId) ?? null)
             : null;
 
         if (assignment.templateId && !relatedTemplate) {
@@ -625,7 +647,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         setAssignmentEditorServerAssignment(response.assignment);
       })
       .catch((error) => {
-         
         console.error('Failed to load assignment for editor screen', error);
         if (isCancelled) return;
         setAssignmentEditorError('Не удалось загрузить домашнее задание');
@@ -638,18 +659,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     return () => {
       isCancelled = true;
     };
-  }, [
-    assignmentEditorDraftStorageKey,
-    activeTeacherAssignmentId,
-    mode,
-    templates,
-  ]);
+  }, [assignmentEditorDraftStorageKey, activeTeacherAssignmentId, mode, templates]);
 
   useEffect(() => {
     const sourceTemplateId =
-      hasTeacherHomeworkSourceDetailId && Number.isFinite(templateId) && templateId > 0
-        ? templateId
-        : Number.NaN;
+      hasTeacherHomeworkSourceDetailId && Number.isFinite(templateId) && templateId > 0 ? templateId : Number.NaN;
 
     if (mode !== 'teacher') return;
     if (!Number.isFinite(sourceTemplateId) || sourceTemplateId <= 0) {
@@ -696,7 +710,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
     void loadHomeworkDetail()
       .catch((error) => {
-         
         console.error('Failed to load homework source detail', error);
         if (isCancelled) return;
         setHomeworkDetailTemplate(null);
@@ -764,11 +777,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       !assignmentEditorHasUnsavedChanges &&
       assignmentEditorServerAssignment !== null &&
       canCancelHomeworkAssignmentIssue(assignmentEditorServerAssignment),
-    [
-      assignmentEditorHasUnsavedChanges,
-      assignmentEditorServerAssignment,
-      isTeacherAssignmentEditRoute,
-    ],
+    [assignmentEditorHasUnsavedChanges, assignmentEditorServerAssignment, isTeacherAssignmentEditRoute],
   );
 
   const saveAssignmentEditorDraftLocally = useCallback(async () => {
@@ -860,7 +869,13 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [assignmentEditorDraft, assignmentEditorDraftStorageKey, assignmentEditorReadOnly, isTeacherAssignmentEditorRoute, mode]);
+  }, [
+    assignmentEditorDraft,
+    assignmentEditorDraftStorageKey,
+    assignmentEditorReadOnly,
+    isTeacherAssignmentEditorRoute,
+    mode,
+  ]);
 
   useEffect(() => {
     if (mode !== 'teacher') return;
@@ -872,8 +887,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       typeof state.lessonId === 'number' && Number.isFinite(state.lessonId) ? state.lessonId : null;
     const requestedTemplateId =
       typeof state.templateId === 'number' && Number.isFinite(state.templateId) ? state.templateId : null;
-    const requestedGroupId =
-      typeof state.groupId === 'number' && Number.isFinite(state.groupId) ? state.groupId : null;
+    const requestedGroupId = typeof state.groupId === 'number' && Number.isFinite(state.groupId) ? state.groupId : null;
 
     if (requestedStudentId !== null) {
       setSelectedStudentId(requestedStudentId);
@@ -912,7 +926,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
       setStudents(result);
     } catch (error) {
-       
       console.error('Failed to load homework students', error);
       setStudentsError('Не удалось загрузить список учеников');
     } finally {
@@ -927,7 +940,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.listHomeworkTemplatesV2({ includeArchived: true });
       setTemplates(response.items);
     } catch (error) {
-       
       console.error('Failed to load homework templates', error);
       setTemplatesError('Не удалось загрузить домашние задания');
     } finally {
@@ -942,7 +954,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.listHomeworkGroupsV2();
       setGroups(response.items);
     } catch (error) {
-       
       console.error('Failed to load homework groups', error);
       setGroups([]);
       setGroupsError('Не удалось загрузить группы');
@@ -958,79 +969,83 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     setGroupAssignmentsNextOffsetByKey({});
   }, []);
 
-  const loadTeacherSummary = useCallback(async (studentId = selectedStudentId) => {
-    setLoadingSummary(true);
-    setSummaryError(null);
-    try {
-      const response = await api.getHomeworkAssignmentsSummaryV2({ studentId: studentId ?? undefined });
-      setTeacherSummary(response);
-    } catch (error) {
-       
-      console.error('Failed to load homework summary', error);
-      setSummaryError('Не удалось загрузить сводку');
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, [selectedStudentId]);
-
-  const fetchTeacherAssignments = useCallback(async (options: {
-    offset: number;
-    append: boolean;
-    tab?: TeacherHomeworkListFilter;
-    studentId?: number | null;
-    search?: string;
-    sort?: TeacherHomeworkSort;
-    problemFilters?: TeacherHomeworkProblemFilter[];
-  }) => {
-    if (options.append) {
-      setLoadingMoreAssignments(true);
-    } else {
-      setLoadingAssignments(true);
-    }
-    setAssignmentsError(null);
-
-    const targetTab = options.tab ?? activeTab;
-    const targetStudentId = options.studentId ?? selectedStudentId;
-    const targetSearch = options.search ?? debouncedSearchQuery;
-    const targetSort = options.sort ?? sortBy;
-    const targetProblemFilters = options.problemFilters ?? problemFilters;
-    const queryConfig = resolveTeacherListQuery(targetTab);
-
-    try {
-      const response = await api.listHomeworkAssignmentsV2({
-        tab: queryConfig.tab,
-        bucket: queryConfig.bucket,
-        studentId: targetStudentId ?? undefined,
-        q: targetSearch || undefined,
-        sort: targetSort,
-        problemFilters: targetProblemFilters,
-        limit: TEACHER_PAGE_SIZE,
-        offset: options.offset,
-      });
-
-      setAssignments((prev) => (options.append ? [...prev, ...response.items] : response.items));
-      setAssignmentsNextOffset(response.nextOffset);
-      setHasMoreAssignments(response.nextOffset !== null);
-
-      return response.items;
-    } catch (error) {
-       
-      console.error('Failed to load homework assignments', error);
-      setAssignmentsError('Не удалось загрузить выданные домашки');
-      if (!options.append) {
-        setAssignments([]);
-        setAssignmentsNextOffset(null);
-        setHasMoreAssignments(false);
+  const loadTeacherSummary = useCallback(
+    async (studentId = selectedStudentId) => {
+      setLoadingSummary(true);
+      setSummaryError(null);
+      try {
+        const response = await api.getHomeworkAssignmentsSummaryV2({ studentId: studentId ?? undefined });
+        setTeacherSummary(response);
+      } catch (error) {
+        console.error('Failed to load homework summary', error);
+        setSummaryError('Не удалось загрузить сводку');
+      } finally {
+        setLoadingSummary(false);
       }
-      return [] as HomeworkAssignment[];
-    } finally {
+    },
+    [selectedStudentId],
+  );
+
+  const fetchTeacherAssignments = useCallback(
+    async (options: {
+      offset: number;
+      append: boolean;
+      tab?: TeacherHomeworkListFilter;
+      studentId?: number | null;
+      search?: string;
+      sort?: TeacherHomeworkSort;
+      problemFilters?: TeacherHomeworkProblemFilter[];
+    }) => {
       if (options.append) {
-        setLoadingMoreAssignments(false);
+        setLoadingMoreAssignments(true);
       } else {
-        setLoadingAssignments(false);
+        setLoadingAssignments(true);
       }
-    }
-  }, [activeTab, debouncedSearchQuery, problemFilters, selectedStudentId, sortBy]);
+      setAssignmentsError(null);
+
+      const targetTab = options.tab ?? activeTab;
+      const targetStudentId = options.studentId ?? selectedStudentId;
+      const targetSearch = options.search ?? debouncedSearchQuery;
+      const targetSort = options.sort ?? sortBy;
+      const targetProblemFilters = options.problemFilters ?? problemFilters;
+      const queryConfig = resolveTeacherListQuery(targetTab);
+
+      try {
+        const response = await api.listHomeworkAssignmentsV2({
+          tab: queryConfig.tab,
+          bucket: queryConfig.bucket,
+          studentId: targetStudentId ?? undefined,
+          q: targetSearch || undefined,
+          sort: targetSort,
+          problemFilters: targetProblemFilters,
+          limit: TEACHER_PAGE_SIZE,
+          offset: options.offset,
+        });
+
+        setAssignments((prev) => (options.append ? [...prev, ...response.items] : response.items));
+        setAssignmentsNextOffset(response.nextOffset);
+        setHasMoreAssignments(response.nextOffset !== null);
+
+        return response.items;
+      } catch (error) {
+        console.error('Failed to load homework assignments', error);
+        setAssignmentsError('Не удалось загрузить выданные домашки');
+        if (!options.append) {
+          setAssignments([]);
+          setAssignmentsNextOffset(null);
+          setHasMoreAssignments(false);
+        }
+        return [] as HomeworkAssignment[];
+      } finally {
+        if (options.append) {
+          setLoadingMoreAssignments(false);
+        } else {
+          setLoadingAssignments(false);
+        }
+      }
+    },
+    [activeTab, debouncedSearchQuery, problemFilters, selectedStudentId, sortBy],
+  );
 
   const loadTeacherAssignmentsByGroup = useCallback(
     async (groupKey: TeacherHomeworkGroupKey, options?: { append?: boolean }) => {
@@ -1049,7 +1064,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           tab: 'all',
           sort: 'urgency',
           limit: TEACHER_PAGE_SIZE,
-          offset: append ? nextOffset ?? 0 : 0,
+          offset: append ? (nextOffset ?? 0) : 0,
           groupId: isUngrouped ? undefined : groupId,
           ungrouped: isUngrouped || undefined,
         });
@@ -1059,7 +1074,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }));
         setGroupAssignmentsNextOffsetByKey((prev) => ({ ...prev, [groupKey]: response.nextOffset }));
       } catch (error) {
-         
         console.error('Failed to load homework assignments for group', error);
         setGroupAssignmentsErrorByKey((prev) => ({ ...prev, [groupKey]: 'Не удалось загрузить задания группы' }));
         if (!append) {
@@ -1078,7 +1092,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const unread = await api.getActivityFeedUnreadStatus();
       setHomeworkActivityHasUnread(unread.hasUnread);
     } catch (error) {
-       
       console.error('Failed to load homework unread status', error);
       setHomeworkActivityHasUnread(false);
     }
@@ -1093,7 +1106,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       });
       setHomeworkActivityItems(response.items);
     } catch (error) {
-       
       console.error('Failed to load homework activity feed', error);
       setHomeworkActivityItems([]);
     } finally {
@@ -1106,51 +1118,52 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const status = await api.markActivityFeedSeen(seenThrough ? { seenThrough } : undefined);
       setHomeworkActivityHasUnread(status.hasUnread);
     } catch (error) {
-       
       console.error('Failed to mark homework activity feed as seen', error);
     }
   }, []);
 
-  const loadStudentList = useCallback(async (options?: { append?: boolean }) => {
-    const append = options?.append ?? false;
-    const targetOffset = append ? (studentNextOffset ?? 0) : 0;
+  const loadStudentList = useCallback(
+    async (options?: { append?: boolean }) => {
+      const append = options?.append ?? false;
+      const targetOffset = append ? (studentNextOffset ?? 0) : 0;
 
-    if (append) {
-      setLoadingStudentListMore(true);
-    } else {
-      setLoadingStudentList(true);
-    }
-
-    try {
-      if (!append) {
-        const summaryData = await api.getStudentHomeworkSummaryV2();
-        setStudentSummary(summaryData);
-      }
-      const assignmentsData = await api.listStudentHomeworkAssignmentsV2({
-        filter: mapStudentHomeworkFilterToApiFilter(studentFilter),
-        limit: STUDENT_PAGE_SIZE,
-        offset: targetOffset,
-      });
-      setAssignments((prev) => (append ? [...prev, ...assignmentsData.items] : assignmentsData.items));
-      setStudentNextOffset(assignmentsData.nextOffset);
-      setStudentHasMore(assignmentsData.nextOffset !== null);
-    } catch (error) {
-       
-      console.error('Failed to load student homework list', error);
-      if (!append) {
-        setStudentSummary(emptySummary);
-        setAssignments([]);
-      }
-      setStudentNextOffset(null);
-      setStudentHasMore(false);
-    } finally {
       if (append) {
-        setLoadingStudentListMore(false);
+        setLoadingStudentListMore(true);
       } else {
-        setLoadingStudentList(false);
+        setLoadingStudentList(true);
       }
-    }
-  }, [studentFilter, studentNextOffset]);
+
+      try {
+        if (!append) {
+          const summaryData = await api.getStudentHomeworkSummaryV2();
+          setStudentSummary(summaryData);
+        }
+        const assignmentsData = await api.listStudentHomeworkAssignmentsV2({
+          filter: mapStudentHomeworkFilterToApiFilter(studentFilter),
+          limit: STUDENT_PAGE_SIZE,
+          offset: targetOffset,
+        });
+        setAssignments((prev) => (append ? [...prev, ...assignmentsData.items] : assignmentsData.items));
+        setStudentNextOffset(assignmentsData.nextOffset);
+        setStudentHasMore(assignmentsData.nextOffset !== null);
+      } catch (error) {
+        console.error('Failed to load student homework list', error);
+        if (!append) {
+          setStudentSummary(emptySummary);
+          setAssignments([]);
+        }
+        setStudentNextOffset(null);
+        setStudentHasMore(false);
+      } finally {
+        if (append) {
+          setLoadingStudentListMore(false);
+        } else {
+          setLoadingStudentList(false);
+        }
+      }
+    },
+    [studentFilter, studentNextOffset],
+  );
 
   const loadStudentDetail = useCallback(async () => {
     if (!hasStudentAssignmentId) return;
@@ -1161,7 +1174,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setStudentDetailAssignment(response.assignment);
       setStudentDetailSubmissions(response.submissions);
     } catch (error) {
-       
       console.error('Failed to load student homework detail', error);
       setStudentDetailAssignment(null);
       setStudentDetailSubmissions([]);
@@ -1178,8 +1190,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       const response = await api.startHomeworkReviewSessionV2(targetAssignmentId);
       const latestSubmission = getLatestSubmission(response.submissions);
       const initialDraft = latestSubmission
-        ? latestSubmission.reviewDraft ??
-          readReviewDraftFromStorage(targetAssignmentId, latestSubmission.id)
+        ? (latestSubmission.reviewDraft ?? readReviewDraftFromStorage(targetAssignmentId, latestSubmission.id))
         : null;
 
       setReviewAssignment(response.assignment);
@@ -1188,7 +1199,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setReviewCurrentDraft(initialDraft);
       setReviewHasUnsavedDraft(false);
     } catch (error) {
-       
       console.error('Failed to load review data', error);
       setReviewAssignment(null);
       setReviewSubmissions([]);
@@ -1314,7 +1324,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       setReviewHasUnsavedDraft(false);
       return true;
     } catch (error) {
-       
       console.error('Failed to persist homework review draft', error);
       try {
         saveReviewDraftToStorage(reviewAssignment.id, reviewCurrentDraft);
@@ -1352,39 +1361,25 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     return () => {
       clearEntry(REVIEW_UNSAVED_ENTRY_KEY);
     };
-  }, [
-    clearEntry,
-    hasTeacherReviewAssignmentId,
-    mode,
-    saveReviewDraft,
-    setEntry,
-  ]);
+  }, [clearEntry, hasTeacherReviewAssignmentId, mode, saveReviewDraft, setEntry]);
 
-  const buildTemplateUpsertPayload = useCallback(
-    (draftValue: HomeworkEditorDraft): TeacherTemplateUpsertPayload => {
-      const templateDraft = projectHomeworkEditorToTemplateDraft(draftValue);
-      return {
-        title: templateDraft.title,
-        tags: templateDraft.tagsText
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean),
-        subject: templateDraft.subject.trim() || null,
-        level: templateDraft.level.trim() || null,
-        blocks: templateDraft.blocks,
-      };
-    },
-    [],
-  );
+  const buildTemplateUpsertPayload = useCallback((draftValue: HomeworkEditorDraft): TeacherTemplateUpsertPayload => {
+    const templateDraft = projectHomeworkEditorToTemplateDraft(draftValue);
+    return {
+      title: templateDraft.title,
+      tags: templateDraft.tagsText
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+      subject: templateDraft.subject.trim() || null,
+      level: templateDraft.level.trim() || null,
+      blocks: templateDraft.blocks,
+    };
+  }, []);
 
   const resolveTemplateSubmitFailure = useCallback(
     (error: unknown): HomeworkTemplateCreateSubmitResult => {
-      if (
-        isApiRequestError(error) &&
-        error.status === 400 &&
-        Array.isArray(error.issues) &&
-        error.issues.length > 0
-      ) {
+      if (isApiRequestError(error) && error.status === 400 && Array.isArray(error.issues) && error.issues.length > 0) {
         return {
           success: false,
           issues: error.issues,
@@ -1392,9 +1387,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
 
       const fallbackMessage =
-        isApiRequestError(error) && error.message
-          ? error.message
-          : 'Не удалось сохранить домашнее задание';
+        isApiRequestError(error) && error.message ? error.message : 'Не удалось сохранить домашнее задание';
       showToast({ message: fallbackMessage, variant: 'error' });
       return { success: false };
     },
@@ -1450,7 +1443,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       requestNavigationBypass();
       navigate(`/homeworks/${copiedTemplate.id}/edit`, { replace: cancelPath !== null });
     } catch (error) {
-       
       console.error('Failed to create editable copy of homework template', error);
       showToast({ message: 'Не удалось создать копию домашнего задания', variant: 'error' });
     } finally {
@@ -1483,7 +1475,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await loadTeacherTemplates();
       return { success: true };
     } catch (error) {
-       
       console.error('Failed to create homework template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1514,7 +1505,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       await loadTeacherTemplates();
       return { success: true };
     } catch (error) {
-       
       console.error('Failed to update homework template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1599,7 +1589,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       navigate(`/homeworks/assignments/${finalAssignment.id}/edit`, { replace: true });
       return { success: true, closeOnSuccess: false };
     } catch (error) {
-       
       console.error('Failed to update homework template and issue assignment', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -1629,7 +1618,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         void loadTeacherTemplates();
         showToast({ message: 'Домашнее задание продублировано', variant: 'success' });
       } catch (error) {
-         
         console.error('Failed to duplicate homework template', error);
         showToast({ message: 'Не удалось продублировать домашнее задание', variant: 'error' });
       } finally {
@@ -1647,7 +1635,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Домашнее задание перенесено в архив', variant: 'success' });
         await loadTeacherTemplates();
       } catch (error) {
-         
         console.error('Failed to archive homework template', error);
         showToast({ message: 'Не удалось архивировать домашнее задание', variant: 'error' });
       } finally {
@@ -1665,7 +1652,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Домашнее задание восстановлено из архива', variant: 'success' });
         await loadTeacherTemplates();
       } catch (error) {
-         
         console.error('Failed to restore homework template', error);
         showToast({ message: 'Не удалось восстановить домашнее задание', variant: 'error' });
       } finally {
@@ -1707,13 +1693,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         navigate('/homeworks', { replace: true });
       }
     } catch (error) {
-       
       console.error('Failed to delete homework template', error);
       showToast({
-        message:
-          isApiRequestError(error) && error.message
-            ? error.message
-            : 'Не удалось удалить домашнее задание',
+        message: isApiRequestError(error) && error.message ? error.message : 'Не удалось удалить домашнее задание',
         variant: 'error',
       });
     }
@@ -1728,20 +1710,22 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     showToast,
   ]);
 
-  const handleToggleTemplateFavorite = useCallback(async (template: HomeworkTemplate) => {
-    setSubmittingTemplate(true);
-    try {
-      const nextTags = toggleHomeworkTemplateFavoriteTags(template.tags, !isHomeworkTemplateFavorite(template));
-      await api.updateHomeworkTemplateV2(template.id, { tags: nextTags });
-      await loadTeacherTemplates();
-    } catch (error) {
-       
-      console.error('Failed to toggle template favorite', error);
-      showToast({ message: 'Не удалось обновить избранное', variant: 'error' });
-    } finally {
-      setSubmittingTemplate(false);
-    }
-  }, [loadTeacherTemplates, showToast]);
+  const handleToggleTemplateFavorite = useCallback(
+    async (template: HomeworkTemplate) => {
+      setSubmittingTemplate(true);
+      try {
+        const nextTags = toggleHomeworkTemplateFavoriteTags(template.tags, !isHomeworkTemplateFavorite(template));
+        await api.updateHomeworkTemplateV2(template.id, { tags: nextTags });
+        await loadTeacherTemplates();
+      } catch (error) {
+        console.error('Failed to toggle template favorite', error);
+        showToast({ message: 'Не удалось обновить избранное', variant: 'error' });
+      } finally {
+        setSubmittingTemplate(false);
+      }
+    },
+    [loadTeacherTemplates, showToast],
+  );
 
   const handleCreateGroup = useCallback(
     async (payload: {
@@ -1758,7 +1742,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Группа создана', variant: 'success' });
         return response.group;
       } catch (error) {
-         
         console.error('Failed to create homework group', error);
         showToast({ message: 'Не удалось создать группу', variant: 'error' });
         return null;
@@ -1785,7 +1768,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         resetGroupAssignmentsState();
         showToast({ message: 'Группа обновлена', variant: 'success' });
       } catch (error) {
-         
         console.error('Failed to update homework group', error);
         showToast({ message: 'Не удалось обновить группу', variant: 'error' });
       }
@@ -1797,11 +1779,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     async (groupId: number) => {
       try {
         await api.deleteHomeworkGroupV2(groupId);
-        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        await Promise.all([
+          loadTeacherGroups(),
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+        ]);
         resetGroupAssignmentsState();
         showToast({ message: 'Группа удалена', variant: 'success' });
       } catch (error) {
-         
         console.error('Failed to delete homework group', error);
         showToast({ message: 'Не удалось удалить группу', variant: 'error' });
       }
@@ -1822,26 +1807,32 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
       try {
         await api.updateHomeworkAssignmentV2(assignmentId, { groupId });
-        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        await Promise.all([
+          loadTeacherGroups(),
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+        ]);
         resetGroupAssignmentsState();
         showToast({ message: 'Группа для домашки обновлена', variant: 'success' });
       } catch (error) {
-         
         console.error('Failed to rebind homework assignment group', error);
         showToast({ message: 'Не удалось обновить группу домашки', variant: 'error' });
       }
     },
-    [assignmentsById, fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+    [
+      assignmentsById,
+      fetchTeacherAssignments,
+      loadTeacherGroups,
+      loadTeacherSummary,
+      resetGroupAssignmentsState,
+      showToast,
+    ],
   );
 
   const handleRebindAssignmentsGroup = useCallback(
     async (assignmentIds: number[], groupId: number | null) => {
       const ids = Array.from(
-        new Set(
-          assignmentIds
-            .map((id) => Number(id))
-            .filter((id) => Number.isFinite(id) && id > 0),
-        ),
+        new Set(assignmentIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)),
       );
       if (!ids.length) return;
       const hasLockedAssignments = ids.some((id) => {
@@ -1858,22 +1849,30 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
       try {
         await Promise.all(ids.map((assignmentId) => api.updateHomeworkAssignmentV2(assignmentId, { groupId })));
-        await Promise.all([loadTeacherGroups(), fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
+        await Promise.all([
+          loadTeacherGroups(),
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+        ]);
         resetGroupAssignmentsState();
         showToast({
           message:
-            ids.length === 1
-              ? 'Группа для домашки обновлена'
-              : `Группа обновлена для ${ids.length} домашних заданий`,
+            ids.length === 1 ? 'Группа для домашки обновлена' : `Группа обновлена для ${ids.length} домашних заданий`,
           variant: 'success',
         });
       } catch (error) {
-         
         console.error('Failed to rebind homework assignment group in bulk', error);
         showToast({ message: 'Не удалось обновить группу домашних заданий', variant: 'error' });
       }
     },
-    [assignmentsById, fetchTeacherAssignments, loadTeacherGroups, loadTeacherSummary, resetGroupAssignmentsState, showToast],
+    [
+      assignmentsById,
+      fetchTeacherAssignments,
+      loadTeacherGroups,
+      loadTeacherSummary,
+      resetGroupAssignmentsState,
+      showToast,
+    ],
   );
 
   const handleCreateAssignment = useCallback(
@@ -1920,7 +1919,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         });
         return true;
       } catch (error) {
-         
         console.error('Failed to create homework assignment from side sheet', error);
         showToast({ message: 'Не удалось выдать домашнее задание', variant: 'error' });
         return false;
@@ -2067,7 +2065,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
                 ? 'Домашка сохранена и будет выдана после урока'
                 : assignmentEditorDraft.assignment.sendMode === 'SCHEDULED'
                   ? 'Домашка сохранена и будет выдана по расписанию'
-                : 'Изменения сохранены',
+                  : 'Изменения сохранены',
           variant: 'success',
         });
 
@@ -2090,7 +2088,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
         return { success: true, closeOnSuccess: false };
       } catch (error) {
-         
         console.error('Failed to save homework assignment from editor', error);
         showToast({ message: 'Не удалось сохранить домашку', variant: 'error' });
         return { success: false };
@@ -2145,7 +2142,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       }
       return { success: true, closeOnSuccess: false };
     } catch (error) {
-       
       console.error('Failed to save assignment as template', error);
       return resolveTemplateSubmitFailure(error);
     } finally {
@@ -2168,9 +2164,12 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       try {
         await api.sendHomeworkAssignmentV2(assignment.id);
         showToast({ message: 'Домашка отправлена ученику', variant: 'success' });
-        await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary(), loadTeacherTemplates()]);
+        await Promise.all([
+          fetchTeacherAssignments({ offset: 0, append: false }),
+          loadTeacherSummary(),
+          loadTeacherTemplates(),
+        ]);
       } catch (error) {
-         
         console.error('Failed to send assignment now', error);
         showToast({ message: 'Не удалось отправить домашку', variant: 'error' });
       }
@@ -2192,12 +2191,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     [fetchTeacherAssignments, loadTeacherSummary, showToast],
   );
 
-  const handleCancelAssignmentIssue = useCallback(
-    async (assignment: HomeworkAssignment) => {
-      setCancelIssueAssignment(assignment);
-    },
-    [],
-  );
+  const handleCancelAssignmentIssue = useCallback(async (assignment: HomeworkAssignment) => {
+    setCancelIssueAssignment(assignment);
+  }, []);
 
   const handleConfirmCancelAssignmentIssue = useCallback(async () => {
     if (!cancelIssueAssignment || cancelIssueSubmitting) return;
@@ -2218,7 +2214,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       ]);
       resetGroupAssignmentsState();
     } catch (error) {
-       
       console.error('Failed to cancel assignment issue', error);
       showToast({
         message:
@@ -2254,7 +2249,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherActivityUnread()]);
       } catch (error) {
-         
         console.error('Failed to remind assignment', error);
         showToast({ message: 'Не удалось отправить напоминание', variant: 'error' });
       }
@@ -2298,18 +2292,11 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: deadlineAt ? 'Дедлайн обновлён' : 'Дедлайн убран', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
-         
         console.error('Failed to update assignment deadline', error);
         showToast({ message: 'Не удалось обновить дедлайн', variant: 'error' });
       }
     },
-    [
-      editingAssignmentId,
-      fetchTeacherAssignments,
-      isTeacherAssignmentEditRoute,
-      loadTeacherSummary,
-      showToast,
-    ],
+    [editingAssignmentId, fetchTeacherAssignments, isTeacherAssignmentEditRoute, loadTeacherSummary, showToast],
   );
 
   const handleDeleteAssignment = useCallback(
@@ -2324,7 +2311,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         ]);
         resetGroupAssignmentsState();
       } catch (error) {
-         
         console.error('Failed to delete assignment', error);
         showToast({ message: 'Не удалось удалить домашку', variant: 'error' });
       }
@@ -2349,7 +2335,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         showToast({ message: 'Ошибка настройки исправлена', variant: 'success' });
         await Promise.all([fetchTeacherAssignments({ offset: 0, append: false }), loadTeacherSummary()]);
       } catch (error) {
-         
         console.error('Failed to fix assignment config', error);
         showToast({ message: 'Не удалось исправить конфигурацию', variant: 'error' });
       }
@@ -2381,7 +2366,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         ]);
         resetGroupAssignmentsState();
       } catch (error) {
-         
         console.error('Failed to run bulk action', error);
         showToast({ message: 'Не удалось выполнить массовое действие', variant: 'error' });
       }
@@ -2413,13 +2397,16 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
     [clearEntry, navigate],
   );
 
-  const handleOpenDetail = useCallback(async (assignment: HomeworkAssignment) => {
-    navigate(
-      canTeacherEditHomeworkAssignment(assignment)
-        ? `/homeworks/assignments/${assignment.id}/edit`
-        : `/homeworks/assignments/${assignment.id}`,
-    );
-  }, [navigate]);
+  const handleOpenDetail = useCallback(
+    async (assignment: HomeworkAssignment) => {
+      navigate(
+        canTeacherEditHomeworkAssignment(assignment)
+          ? `/homeworks/assignments/${assignment.id}/edit`
+          : `/homeworks/assignments/${assignment.id}`,
+      );
+    },
+    [navigate],
+  );
 
   const handleSubmitReview = useCallback(
     async (payload: {
@@ -2477,7 +2464,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }
         return true;
       } catch (error) {
-         
         console.error('Failed to review assignment', error);
         showToast({ message: 'Не удалось сохранить проверку', variant: 'error' });
         return false;
@@ -2542,7 +2528,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         });
         return true;
       } catch (error) {
-         
         console.error('Failed to submit homework payload', error);
         const fallbackMessage = payload.submit ? 'Не удалось отправить домашку' : 'Не удалось сохранить черновик';
         const errorMessage = isApiRequestError(error) && error.message ? error.message : fallbackMessage;
@@ -2569,7 +2554,6 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       });
       return true;
     } catch (error) {
-       
       console.error('Failed to start timed homework attempt', error);
       setStudentDetailError('Не удалось запустить таймер');
       return false;
@@ -2697,6 +2681,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         }}
         onMarkHomeworkActivitySeen={markTeacherActivitySeen}
         onOpenMobileSidebar={onOpenMobileSidebar}
+        renderSearchButton={renderSearchButton}
       />
     ),
     [
@@ -2759,6 +2744,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
       navigate,
       onOpenMobileSidebar,
       problemFilters,
+      renderSearchButton,
       resetGroupAssignmentsState,
       reviewAssignment,
       reviewLoading,

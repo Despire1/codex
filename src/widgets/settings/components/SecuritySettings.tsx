@@ -7,6 +7,7 @@ import {
   TelegramBrandIcon,
 } from '../../../icons/MaterialIcons';
 import { SessionSummary, api } from '../../../shared/api/client';
+import { formatDisplayIp } from '../../../shared/lib/sessionDisplay';
 import { useToast } from '../../../shared/lib/toast';
 import { DialogModal } from '../../../shared/ui/Modal/DialogModal';
 import { useLogout } from '../../../features/auth/session';
@@ -440,7 +441,10 @@ export const SecuritySettings: FC = () => {
                       </div>
 
                       <div className={styles.sessionMetaLine}>
-                        {session.ip ? `IP: ${session.ip}` : 'IP не определён'}
+                        {(() => {
+                          const displayIp = formatDisplayIp(session.ip);
+                          return displayIp ? `IP: ${displayIp}` : 'IP не определён';
+                        })()}
                       </div>
                       <div className={styles.sessionMetaSecondary}>
                         {formatSessionActivity(session.lastSeenAt ?? session.createdAt)}

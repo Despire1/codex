@@ -2,6 +2,7 @@ import type { IncomingMessage } from 'node:http';
 import type { User } from '@prisma/client';
 import prisma from '../../prismaClient';
 import { notifyAllOtherSessionsRevoked } from './securityAlerts';
+import { formatDisplayIp } from '../../../shared/lib/sessionDisplay';
 
 type SessionServiceDeps = {
   getSessionTokenHash: (req: IncomingMessage) => string | null;
@@ -20,7 +21,7 @@ export const createSessionService = ({ getSessionTokenHash }: SessionServiceDeps
         id: session.id,
         createdAt: session.createdAt,
         lastSeenAt: session.lastSeenAt ?? session.createdAt,
-        ip: session.ip,
+        ip: formatDisplayIp(session.ip),
         userAgent: session.userAgent,
         isCurrent: tokenHash ? session.tokenHash === tokenHash : false,
       })),

@@ -62,6 +62,7 @@ import { createActivityFeedService, parseActivityCategories, parseQueryDate } fr
 import { createStudentsService, normalizeTelegramUsername } from './server/modules/students';
 import { createSettingsService } from './server/modules/settings';
 import { createOverviewService } from './server/modules/overview';
+import { createDashboardActionsService } from './server/modules/dashboardActions';
 import { createGlobalSearchService } from './server/modules/globalSearch';
 import { createScheduleNotesService } from './server/modules/scheduleNotes';
 import { createLegacyHomeworkService } from './server/modules/legacyHomework';
@@ -625,6 +626,13 @@ const {
   listUnpaidLessons,
 } = overviewService;
 
+const dashboardActionsService = createDashboardActionsService({
+  prisma,
+  ensureTeacher,
+  filterSuppressedLessons,
+});
+const { listActionRequired, listHomeworkToReview } = dashboardActionsService;
+
 const globalSearchService = createGlobalSearchService({ prisma, ensureTeacher });
 const { globalSearch } = globalSearchService;
 
@@ -932,6 +940,16 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
 
     if (req.method === 'GET' && pathname === '/api/dashboard/summary') {
       const data = await getDashboardSummary(requireApiUser());
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/dashboard/action-required') {
+      const data = await listActionRequired(requireApiUser());
+      return sendJson(res, 200, data);
+    }
+
+    if (req.method === 'GET' && pathname === '/api/dashboard/homework-review') {
+      const data = await listHomeworkToReview(requireApiUser());
       return sendJson(res, 200, data);
     }
 

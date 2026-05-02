@@ -7,6 +7,7 @@ import {
   createTelegramDeepLinkAuthService,
   parseLoginNonceFromStartPayload,
 } from './server/modules/telegramDeepLinkAuth';
+import { describeUserAgent, formatDisplayIp } from '../shared/lib/sessionDisplay';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_WEBAPP_URL = process.env.TELEGRAM_WEBAPP_URL ?? '';
@@ -44,6 +45,7 @@ type TelegramUpdate = {
   message?: {
     message_id: number;
     chat: { id: number };
+    date?: number;
     from?: {
       id: number;
       username?: string;
@@ -64,6 +66,7 @@ type TelegramUpdate = {
     message?: {
       message_id?: number;
       chat: { id: number };
+      date?: number;
     };
   };
 };
@@ -740,6 +743,77 @@ const handleUpdate = async (update: TelegramUpdate) => {
   const chatId = update.message?.chat.id ?? update.callback_query?.message?.chat.id;
 
   if (update.callback_query?.data && chatId) {
+    if (update.callback_query.data.startsWith('tgl_c:') || update.callback_query.data.startsWith('tgl_r:')) {
+      const callbackId = update.callback_query.id;
+      const messageId = update.callback_query.message?.message_id;
+      const isConfirm = update.callback_query.data.startsWith('tgl_c:');
+      const nonceRaw = update.callback_query.data.slice('tgl_c:'.length);
+      const nonce = parseLoginNonceFromStartPayload(`login_${nonceRaw}`);
+      const from = update.callback_query.from;
+      const telegramUserId = from?.id ? BigInt(from.id) : null;
+
+      if (!nonce || !telegramUserId) {
+        await callTelegram('answerCallbackQuery', {
+          callback_query_id: callbackId,
+          text: 'Ссылка устарела',
+          show_alert: true,
+        });
+        return;
+      }
+
+      if (!isConfirm) {
+        await deepLinkAuthService.rejectAttempt(nonce);
+        await callTelegram('answerCallbackQuery', {
+          callback_query_id: callbackId,
+          text: 'Вход отклонён',
+        });
+        const noticeText =
+          '🚫 Вход отклонён. Если это были не вы — рекомендуем сменить устройства входа в TeacherBot и пройти проверку безопасности.';
+        if (messageId) {
+          await editMessage(chatId, messageId, noticeText);
+        } else {
+          await callTelegram('sendMessage', { chat_id: chatId, text: noticeText });
+        }
+        return;
+      }
+
+      const callbackAuthDate = update.callback_query.message?.date ?? Math.floor(Date.now() / 1000);
+      const claim = await deepLinkAuthService.claimAttemptByBot({
+        nonce,
+        telegramUserId,
+        username: from.username ?? null,
+        firstName: from.first_name ?? null,
+        lastName: from.last_name ?? null,
+        photoUrl: null,
+        authDate: callbackAuthDate,
+        replaySkewSec: TELEGRAM_REPLAY_SKEW_SEC,
+      });
+      if (!claim.ok) {
+        await callTelegram('answerCallbackQuery', {
+          callback_query_id: callbackId,
+          text: 'Срок входа истёк',
+          show_alert: true,
+        });
+        const expiredText = 'Срок входа истёк. Откройте сайт ещё раз и нажмите «Войти через Telegram».';
+        if (messageId) {
+          await editMessage(chatId, messageId, expiredText);
+        } else {
+          await callTelegram('sendMessage', { chat_id: chatId, text: expiredText });
+        }
+        return;
+      }
+
+      await callTelegram('answerCallbackQuery', { callback_query_id: callbackId });
+      const successText =
+        '✅ Вход выполнен. Можно вернуться в браузер — приложение откроется автоматически.\n\n' +
+        'Здесь же остаются настройки уведомлений и подписки.';
+      if (messageId) {
+        await editMessage(chatId, messageId, successText);
+      } else {
+        await callTelegram('sendMessage', { chat_id: chatId, text: successText });
+      }
+      return;
+    }
     if (update.callback_query.data.startsWith('security_revoke_')) {
       const callbackId = update.callback_query.id;
       const messageId = update.callback_query.message?.message_id;
@@ -966,31 +1040,38 @@ const handleUpdate = async (update: TelegramUpdate) => {
   if (startCommandMatch) {
     const startPayload = startCommandMatch[1] ?? null;
     const loginNonce = parseLoginNonceFromStartPayload(startPayload);
-    let claimedSuccessfully = false;
+    let confirmationPrompted = false;
     if (loginNonce && telegramUserId && from) {
-      const claim = await deepLinkAuthService.claimAttemptByBot({
-        nonce: loginNonce,
-        telegramUserId,
-        username: from.username ?? null,
-        firstName: from.first_name ?? null,
-        lastName: from.last_name ?? null,
-        photoUrl: null,
-        authDate: Math.floor(Date.now() / 1000),
-        replaySkewSec: TELEGRAM_REPLAY_SKEW_SEC,
-      });
-      if (claim.ok) {
-        claimedSuccessfully = true;
+      const attempt = await deepLinkAuthService.peekPendingAttempt(loginNonce);
+      if (attempt) {
+        const displayIp = formatDisplayIp(attempt.ip);
+        const ipLine = displayIp ? `IP: ${displayIp}` : null;
+        const uaLine = attempt.userAgent ? `Устройство: ${describeUserAgent(attempt.userAgent)}` : null;
+        const detailsBlock = [ipLine, uaLine].filter(Boolean).join('\n');
+        const promptText =
+          '🔐 Запрос на вход в TeacherBot.\n\n' +
+          (detailsBlock ? `${detailsBlock}\n\n` : '') +
+          'Если это вы — подтвердите вход. Если нет — отклоните, ' +
+          'тогда злоумышленник не получит доступ к вашему аккаунту.';
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text:
-            '✅ Вход выполнен. Можно вернуться в браузер — приложение откроется автоматически.\n\n' +
-            'Здесь же остаются настройки уведомлений и подписки.',
+          text: promptText,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Это я, подтверждаю вход', callback_data: `tgl_c:${loginNonce}` },
+                { text: '❌ Это не я', callback_data: `tgl_r:${loginNonce}` },
+              ],
+            ],
+          },
         });
+        confirmationPrompted = true;
       } else {
         await callTelegram('sendMessage', {
           chat_id: chatId,
           text: 'Срок входа истёк. Откройте сайт ещё раз и нажмите «Войти через Telegram».',
         });
+        confirmationPrompted = true;
       }
     }
 
@@ -1014,7 +1095,7 @@ const handleUpdate = async (update: TelegramUpdate) => {
         return;
       }
     }
-    if (claimedSuccessfully) {
+    if (confirmationPrompted) {
       return;
     }
     const messageId = await sendRoleSelectionMessage(chatId);

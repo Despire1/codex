@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import {
   ActivityFeedItem,
   HomeworkAssignment,
@@ -168,6 +169,7 @@ export interface TeacherHomeworksViewModel {
   onLoadHomeworkActivity: () => void;
   onMarkHomeworkActivitySeen: (seenThrough?: string) => Promise<void>;
   onOpenMobileSidebar?: () => void;
+  renderSearchButton?: (className: string) => ReactNode;
 }
 
 export interface StudentHomeworksViewModel {

@@ -453,6 +453,53 @@ export interface UnpaidLessonEntry {
   paymentRemindersEnabled: boolean;
 }
 
+export type DashboardActionKind =
+  | 'OVERDUE_LESSON_UNCOMPLETED'
+  | 'OVERDUE_LESSON_UNPAID_LONG'
+  | 'STUDENT_INACTIVE'
+  | 'NO_NEXT_LESSON'
+  | 'STUDENT_NOT_ACTIVATED_LONG';
+
+export type DashboardActionSeverity = 'critical' | 'warning' | 'info';
+
+export type DashboardActionType =
+  | 'mark_lesson_completed'
+  | 'mark_lesson_paid'
+  | 'remind_payment'
+  | 'open_student'
+  | 'create_lesson';
+
+export interface DashboardActionRequiredItem {
+  id: string;
+  kind: DashboardActionKind;
+  severity: DashboardActionSeverity;
+  tag: string;
+  title: string;
+  meta: string;
+  studentId: number | null;
+  lessonId: number | null;
+  occurredAt: string;
+  action: {
+    type: DashboardActionType;
+    label: string;
+  };
+}
+
+export interface DashboardHomeworkReviewItem {
+  assignmentId: number;
+  studentId: number;
+  studentName: string;
+  templateTitle: string | null;
+  title: string;
+  submittedAt: string | null;
+  attemptNo: number | null;
+  autoScore: number | null;
+  totalQuestions: number | null;
+  attachmentsCount: number;
+  voiceCount: number;
+  hasTextAnswer: boolean;
+}
+
 export type PaymentReminderSource = 'AUTO' | 'MANUAL';
 export type PaymentReminderStatus = 'SENT' | 'FAILED';
 

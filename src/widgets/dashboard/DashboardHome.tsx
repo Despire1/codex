@@ -9,7 +9,7 @@ interface DashboardHomeProps {
   linkedStudents: LinkedStudent[];
   teacher: Teacher;
   onAddStudent: () => void;
-  onCreateLesson: (date?: Date) => void;
+  onCreateLesson: (date?: Date, options?: { studentId?: number | null }) => void;
   onOpenSchedule: () => void;
   onOpenLesson: (lesson: Lesson) => void;
   onOpenLessonDay: (lesson: Lesson) => void;

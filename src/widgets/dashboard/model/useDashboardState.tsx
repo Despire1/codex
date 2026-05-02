@@ -1,15 +1,11 @@
-import {
-  type PropsWithChildren,
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { addDays, startOfWeek } from 'date-fns';
 import { api } from '../../../shared/api/client';
-import { type UnpaidLessonEntry } from '../../../entities/types';
+import {
+  type DashboardActionRequiredItem,
+  type DashboardHomeworkReviewItem,
+  type UnpaidLessonEntry,
+} from '../../../entities/types';
 import { toZonedDate } from '../../../shared/lib/timezoneDates';
 
 type LessonRange = {
@@ -34,14 +30,15 @@ export type DashboardStateValue = {
   isWeekLessonsLoading: boolean;
   unpaidEntries: UnpaidLessonEntry[];
   loadUnpaidLessons: () => Promise<void>;
+  actionRequiredItems: DashboardActionRequiredItem[];
+  loadActionRequired: () => Promise<void>;
+  homeworkReviewItems: DashboardHomeworkReviewItem[];
+  loadHomeworkReview: () => Promise<void>;
 };
 
 const DashboardStateContext = createContext<DashboardStateValue | null>(null);
 
-export const DashboardStateProvider = ({
-  children,
-  value,
-}: PropsWithChildren<{ value: DashboardStateValue }>) => {
+export const DashboardStateProvider = ({ children, value }: PropsWithChildren<{ value: DashboardStateValue }>) => {
   return <DashboardStateContext.Provider value={value}>{children}</DashboardStateContext.Provider>;
 };
 
@@ -67,6 +64,8 @@ export const useDashboardStateInternal = ({
   });
   const [isWeekLessonsLoading, setIsWeekLessonsLoading] = useState(false);
   const [unpaidEntries, setUnpaidEntries] = useState<UnpaidLessonEntry[]>([]);
+  const [actionRequiredItems, setActionRequiredItems] = useState<DashboardActionRequiredItem[]>([]);
+  const [homeworkReviewItems, setHomeworkReviewItems] = useState<DashboardHomeworkReviewItem[]>([]);
 
   const setWeekRange = useCallback((start: Date, end: Date) => {
     setIsWeekLessonsLoading(true);
@@ -79,15 +78,36 @@ export const useDashboardStateInternal = ({
       const data = await api.listUnpaidLessons();
       setUnpaidEntries(data.entries ?? []);
     } catch (error) {
-       
       console.error('Failed to load unpaid lessons', error);
+    }
+  }, [hasAccess]);
+
+  const loadActionRequired = useCallback(async () => {
+    if (!hasAccess) return;
+    try {
+      const data = await api.listDashboardActionRequired();
+      setActionRequiredItems(data.items ?? []);
+    } catch (error) {
+      console.error('Failed to load dashboard action required', error);
+    }
+  }, [hasAccess]);
+
+  const loadHomeworkReview = useCallback(async () => {
+    if (!hasAccess) return;
+    try {
+      const data = await api.listDashboardHomeworkReview();
+      setHomeworkReviewItems(data.items ?? []);
+    } catch (error) {
+      console.error('Failed to load homework review queue', error);
     }
   }, [hasAccess]);
 
   useEffect(() => {
     if (!hasAccess || !isActive) return;
     void loadUnpaidLessons();
-  }, [hasAccess, isActive, loadUnpaidLessons]);
+    void loadActionRequired();
+    void loadHomeworkReview();
+  }, [hasAccess, isActive, loadActionRequired, loadHomeworkReview, loadUnpaidLessons]);
 
   useEffect(() => {
     if (!hasAccess || !isActive || !weekRange) return;
@@ -115,7 +135,21 @@ export const useDashboardStateInternal = ({
       isWeekLessonsLoading,
       unpaidEntries,
       loadUnpaidLessons,
+      actionRequiredItems,
+      loadActionRequired,
+      homeworkReviewItems,
+      loadHomeworkReview,
     }),
-    [isWeekLessonsLoading, loadUnpaidLessons, unpaidEntries, setWeekRange, weekRange],
+    [
+      actionRequiredItems,
+      homeworkReviewItems,
+      isWeekLessonsLoading,
+      loadActionRequired,
+      loadHomeworkReview,
+      loadUnpaidLessons,
+      setWeekRange,
+      unpaidEntries,
+      weekRange,
+    ],
   );
 };

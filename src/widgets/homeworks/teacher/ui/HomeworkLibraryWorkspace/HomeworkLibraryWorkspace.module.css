@@ -34,12 +34,18 @@
 }
 
 .searchFieldCompact {
-  flex: 0 1 clamp(260px, 28vw, 380px);
+  flex: 0 0 auto;
+  width: clamp(200px, 22vw, 280px);
+  height: 40px;
+  padding: 0 14px;
+  gap: 8px;
+  border-radius: 14px;
 }
 
 .searchField:focus-within {
-  border-color: #dce2eb;
+  border-color: var(--accent-primary);
   background: var(--surface-card);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .searchIcon {
@@ -56,10 +62,24 @@
   font-size: 14px;
   line-height: 1.2;
   font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.searchInput:focus,
+.searchInput:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .searchInput::placeholder {
   color: #a4acbb;
+}
+
+.searchInput::-webkit-search-cancel-button,
+.searchInput::-webkit-search-decoration {
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .searchActions {
@@ -67,7 +87,7 @@
   align-items: center;
   gap: 10px;
   margin-left: auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   min-width: 0;
   flex: 0 1 auto;

@@ -1,10 +1,19 @@
 import { addMinutes, format } from 'date-fns';
-import type { CSSProperties, MouseEvent, KeyboardEvent } from 'react';
+import type { CSSProperties, MouseEvent, KeyboardEvent, HTMLAttributes } from 'react';
 import type { Lesson, LinkedStudent } from '@/entities/types';
 import { getLessonColorTheme, getLessonColorVars } from '@/shared/lib/lessonColors';
 import { toZonedDate } from '@/shared/lib/timezoneDates';
 import { buildParticipants, getLessonLabel } from '../../lib/lessonDetails';
 import styles from './LessonChip.module.css';
+
+export interface LessonChipDragHandle {
+  setNodeRef: (el: HTMLElement | null) => void;
+  attributes: HTMLAttributes<HTMLElement>;
+  listeners?: HTMLAttributes<HTMLElement>;
+  isDragging?: boolean;
+  dragLocked?: boolean;
+  asOverlay?: boolean;
+}
 
 interface LessonChipProps {
   lesson: Lesson;
@@ -14,6 +23,7 @@ interface LessonChipProps {
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   onDoubleClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  dragHandle?: LessonChipDragHandle;
 }
 
 export const LessonChip = ({
@@ -24,6 +34,7 @@ export const LessonChip = ({
   onClick,
   onDoubleClick,
   onKeyDown,
+  dragHandle,
 }: LessonChipProps) => {
   const participants = buildParticipants(lesson, linkedStudentsById);
   const lessonLabel = getLessonLabel(participants, linkedStudentsById);
@@ -40,7 +51,19 @@ export const LessonChip = ({
   return (
     <button
       type="button"
-      className={[styles.chip, isCanceled ? styles.canceled : '', className].filter(Boolean).join(' ')}
+      ref={dragHandle?.setNodeRef}
+      {...(dragHandle?.attributes ?? {})}
+      {...(dragHandle?.listeners ?? {})}
+      className={[
+        styles.chip,
+        isCanceled ? styles.canceled : '',
+        dragHandle?.isDragging ? styles.dragging : '',
+        dragHandle?.dragLocked ? styles.dragLocked : '',
+        dragHandle?.asOverlay ? styles.dragOverlayChip : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={styleVars}
       onClick={onClick}
       onDoubleClick={onDoubleClick}

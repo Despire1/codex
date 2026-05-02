@@ -1,1 +1,1 @@
-export const PASSWORD_LOGIN_ROUTE = '/auth/login';
+export const PASSWORD_LOGIN_ROUTE = '/login';

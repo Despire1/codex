@@ -34,7 +34,7 @@ type UseLogoutOptions = {
   onAfterLogout?: () => void;
 };
 
-export const useLogout = ({ redirectTo = '/auth/login', onAfterLogout }: UseLogoutOptions = {}) => {
+export const useLogout = ({ redirectTo = '/login', onAfterLogout }: UseLogoutOptions = {}) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const logout = useCallback(async () => {
