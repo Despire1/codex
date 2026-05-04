@@ -314,6 +314,13 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
       return;
     }
 
+    if (action === 'REVIEWED' && typeof window !== 'undefined') {
+      const confirmed = window.confirm(
+        'Опубликовать проверку ученику? После публикации он сразу увидит оценку и комментарии.',
+      );
+      if (!confirmed) return;
+    }
+
     const success = await onSubmitReview({
       action,
       submissionId: latestSubmission.id,
@@ -407,7 +414,7 @@ export const HomeworkReviewScreen: FC<HomeworkReviewScreenProps> = ({
             }}
           >
             <FontAwesomeIcon icon={faUpload} />
-            <span>{submitting ? 'Сохраняем...' : 'Завершить проверку'}</span>
+            <span>{submitting ? 'Публикуем...' : 'Опубликовать оценку'}</span>
           </button>
         </div>
       </header>

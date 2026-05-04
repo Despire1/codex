@@ -108,6 +108,7 @@ export const AppModals: FC<AppModalsProps> = ({
     lessonModalSubmitting,
     lessonModalVariant,
     lessonModalFocus,
+    lessonModalAllowWeekend,
     lessonDraft,
     editingLessonId,
     editingLesson,
@@ -157,6 +158,7 @@ export const AppModals: FC<AppModalsProps> = ({
         open={lessonModalOpen}
         variant={lessonModalVariant}
         focusTarget={lessonModalFocus}
+        allowWeekend={lessonModalAllowWeekend}
         onClose={closeLessonModal}
         editingLessonId={editingLessonId}
         editingLesson={editingLesson}
@@ -218,7 +220,13 @@ export const AppModals: FC<AppModalsProps> = ({
             description={dialogState.message}
             confirmText={dialogState.confirmText}
             cancelText={dialogState.type === 'confirm' ? dialogState.cancelText : undefined}
-            onClose={onCloseDialog}
+            onClose={() => {
+              if (dialogState.type === 'confirm' && dialogState.onCancel) {
+                dialogState.onCancel();
+              } else {
+                onCloseDialog();
+              }
+            }}
             onConfirm={() => {
               if (dialogState.type === 'confirm') {
                 dialogState.onConfirm();

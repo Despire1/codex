@@ -7,15 +7,19 @@ import styles from './StudentReferenceCardMenu.module.css';
 
 interface StudentReferenceCardMenuProps extends StudentReferenceCardQuickActions {
   studentId: number;
+  isCompleted: boolean;
   onEditStudent: (studentId: number) => void;
   onDeleteStudent: (studentId: number) => void;
+  onToggleCompletion: (studentId: number) => void;
   hasTelegram?: boolean;
 }
 
 export const StudentReferenceCardMenu: FC<StudentReferenceCardMenuProps> = ({
   studentId,
+  isCompleted,
   onEditStudent,
   onDeleteStudent,
+  onToggleCompletion,
   onScheduleLesson,
   onWriteStudent,
   onTopUpBalance,
@@ -38,7 +42,7 @@ export const StudentReferenceCardMenu: FC<StudentReferenceCardMenuProps> = ({
       align="end"
       offset={8}
       className={styles.popover}
-      trigger={(
+      trigger={
         <button
           type="button"
           className={styles.trigger}
@@ -50,7 +54,7 @@ export const StudentReferenceCardMenu: FC<StudentReferenceCardMenuProps> = ({
         >
           <FontAwesomeIcon icon={faEllipsis} />
         </button>
-      )}
+      }
     >
       <div className={styles.menu} role="menu" onClick={(event) => event.stopPropagation()}>
         {onScheduleLesson ? (
@@ -74,11 +78,11 @@ export const StudentReferenceCardMenu: FC<StudentReferenceCardMenuProps> = ({
           </button>
         ) : null}
         <div className={styles.separator} aria-hidden />
-        <button
-          type="button"
-          onClick={(event) => runAction(event, () => onEditStudent(studentId))}
-        >
+        <button type="button" onClick={(event) => runAction(event, () => onEditStudent(studentId))}>
           Редактировать
+        </button>
+        <button type="button" onClick={(event) => runAction(event, () => onToggleCompletion(studentId))}>
+          {isCompleted ? 'Возобновить обучение' : 'Завершить обучение'}
         </button>
         <button
           type="button"

@@ -3,6 +3,7 @@ import prisma from '../../prismaClient';
 import { sendTelegramMessage } from '../../notificationService';
 import { formatLocation, lookupIpLocation } from '../lib/geoIp';
 import { describeUserAgent, formatDisplayIp } from '../../../shared/lib/sessionDisplay';
+import { escapeHtml } from '../../../shared/lib/htmlEscape';
 
 const formatDateRu = (date: Date) =>
   date.toLocaleString('ru-RU', {
@@ -24,45 +25,49 @@ const buildLoginAlertText = (params: {
   location: string | null;
   userAgent: string | null;
   occurredAt: Date;
-}) =>
-  [
-    '🔐 <b>Новый вход в аккаунт</b>',
+}) => {
+  const ipDisplay = formatDisplayIp(params.ip);
+  return [
+    '<b>Новый вход в аккаунт</b>',
     '',
     `Время: ${formatDateRu(params.occurredAt)}`,
-    `Устройство: ${describeUserAgent(params.userAgent)}`,
-    params.location ? `Местоположение: ${params.location}` : null,
-    formatDisplayIp(params.ip) ? `IP: ${formatDisplayIp(params.ip)}` : null,
+    `Устройство: ${escapeHtml(describeUserAgent(params.userAgent))}`,
+    params.location ? `Местоположение: ${escapeHtml(params.location)}` : null,
+    ipDisplay ? `IP: ${escapeHtml(ipDisplay)}` : null,
     '',
-    'Если это были не вы — нажмите кнопку ниже, мы тут же завершим все ваши сессии.',
+    'Если это были не Вы — закройте все сессии.',
   ]
     .filter(Boolean)
     .join('\n');
+};
 
 const buildLogoutAlertText = (params: {
   ip: string | null;
   location: string | null;
   userAgent: string | null;
   occurredAt: Date;
-}) =>
-  [
-    '🚪 <b>Выход из аккаунта</b>',
+}) => {
+  const ipDisplay = formatDisplayIp(params.ip);
+  return [
+    '<b>Выход из аккаунта</b>',
     '',
     `Время: ${formatDateRu(params.occurredAt)}`,
-    `Устройство: ${describeUserAgent(params.userAgent)}`,
-    params.location ? `Местоположение: ${params.location}` : null,
-    formatDisplayIp(params.ip) ? `IP: ${formatDisplayIp(params.ip)}` : null,
+    `Устройство: ${escapeHtml(describeUserAgent(params.userAgent))}`,
+    params.location ? `Местоположение: ${escapeHtml(params.location)}` : null,
+    ipDisplay ? `IP: ${escapeHtml(ipDisplay)}` : null,
     '',
-    'Если выходили не вы — войдите снова и завершите все сессии в «Настройки → Безопасность».',
+    'Если выходили не Вы — войдите снова и закройте сессии в «Настройки → Безопасность».',
   ]
     .filter(Boolean)
     .join('\n');
+};
 
 const buildAllOtherSessionsRevokedText = (occurredAt: Date) =>
   [
-    '🛡 <b>Все остальные сессии завершены</b>',
+    '<b>Сессии завершены</b>',
     '',
     `Время: ${formatDateRu(occurredAt)}`,
-    'На текущем устройстве вы остаётесь в аккаунте, остальные были разлогинены.',
+    'На этом устройстве Вы остаётесь, остальные разлогинены.',
   ].join('\n');
 
 type AlertUser = Pick<
@@ -127,9 +132,7 @@ export const notifyLoginFromNewDevice = async (ctx: AlertContext & { sessionId: 
       occurredAt: new Date(),
     }),
     {
-      inlineKeyboard: [
-        [{ text: '⚠️ Это был не я — закрыть все сессии', callback_data: `security_revoke_${ctx.sessionId}` }],
-      ],
+      inlineKeyboard: [[{ text: 'Это не я — закрыть все сессии', callback_data: `security_revoke_${ctx.sessionId}` }]],
     },
   );
 };

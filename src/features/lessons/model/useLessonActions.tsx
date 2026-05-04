@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { addMinutes, addMonths, format } from 'date-fns';
 import ru from 'date-fns/locale/ru';
-import { api } from '../../../shared/api/client';
+import { api, isApiRequestError } from '../../../shared/api/client';
 import {
   isVisibleLesson,
   resolveLessonEditDisabledReason,
@@ -54,7 +54,7 @@ import { type ToastOptions } from '../../../shared/lib/toast';
 
 const VISIBLE_LESSON_SERIES_SCOPES: LessonSeriesScope[] = ['SINGLE', 'FOLLOWING'];
 
-type OpenConfirmDialogOptions = {
+export type OpenConfirmDialogOptions = {
   title: string;
   message: string;
   confirmText?: string;
@@ -79,6 +79,8 @@ export type OpenLessonModalOptions = {
   skipNavigation?: boolean;
   focus?: LessonModalFocus;
   studentIds?: number[];
+  /** Пользователь явно подтвердил создание на выходной — не сдвигаем дату и не блокируем сохранение. */
+  allowWeekend?: boolean;
 };
 
 type SeriesScopeDialogState = {
@@ -104,6 +106,8 @@ type LessonModalContext = {
   variant: ModalVariant;
   skipNavigation: boolean;
   focus: LessonModalFocus;
+  /** Пользователь явно подтвердил создание на выходной (см. OpenLessonModalOptions.allowWeekend). */
+  allowWeekend: boolean;
 };
 
 type LessonUpdatePayload = {
@@ -117,6 +121,7 @@ type LessonUpdatePayload = {
   repeatUntil?: string | null;
   acknowledgeRisk?: boolean;
   paymentHandling?: LessonPaymentHandling;
+  allowWeekend?: boolean;
 };
 
 export type LessonActionsConfig = {
@@ -178,6 +183,9 @@ export type LessonActionsContextValue = {
   lessonModalSubmitting: boolean;
   lessonModalVariant: ModalVariant;
   lessonModalFocus: LessonModalFocus;
+  lessonModalAllowWeekend: boolean;
+  /** Шарим во внешний мир общий confirm-dialog хост, который живёт в AppPage. */
+  openConfirmDialog: (options: OpenConfirmDialogOptions) => void;
   lessonDraft: LessonDraft;
   editingLessonId: number | null;
   editingLesson: Lesson | null;
@@ -376,6 +384,7 @@ export const useLessonActionsInternal = ({
     variant: 'modal',
     skipNavigation: false,
     focus: 'full',
+    allowWeekend: false,
   });
   const normalizedWeekendWeekdays = useMemo(
     () => normalizeWeekdayList(teacherWeekendWeekdays),
@@ -403,6 +412,7 @@ export const useLessonActionsInternal = ({
         variant: options?.variant ?? 'modal',
         skipNavigation: options?.skipNavigation ?? false,
         focus: options?.focus ?? 'full',
+        allowWeekend: options?.allowWeekend ?? false,
       };
       setLessonModalContext(nextContext);
       const startDate = existing ? toZonedDate(existing.startAt, timeZone) : undefined;
@@ -504,7 +514,13 @@ export const useLessonActionsInternal = ({
     setLessonModalSubmitting(false);
     setEditingLessonId(null);
     setEditingLessonOriginal(null);
-    setLessonModalContext({ source: 'default', variant: 'modal', skipNavigation: false, focus: 'full' });
+    setLessonModalContext({
+      source: 'default',
+      variant: 'modal',
+      skipNavigation: false,
+      focus: 'full',
+      allowWeekend: false,
+    });
     setLessonDraft(createNewLessonDraft({ timeZone, defaultDuration: teacherDefaultLessonDuration }));
   }, [teacherDefaultLessonDuration, timeZone]);
 
@@ -582,6 +598,7 @@ export const useLessonActionsInternal = ({
         studentIds?: number[];
         repeatWeekdays?: number[];
         repeatUntil?: string | null;
+        allowWeekend?: boolean;
       },
     ) => {
       const results = await Promise.all(
@@ -594,6 +611,7 @@ export const useLessonActionsInternal = ({
             studentIds: payload?.studentIds,
             repeatWeekdays: payload?.repeatWeekdays,
             repeatUntil: payload?.repeatUntil ?? null,
+            ...(payload?.allowWeekend ? { allowWeekend: true } : {}),
           });
           return [scope, data.preview] as const;
         }),
@@ -849,7 +867,7 @@ export const useLessonActionsInternal = ({
         return;
       }
       const selectedDate = toZonedDate(toUtcDateFromDate(lessonDraft.date, timeZone), timeZone);
-      if (isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
+      if (!lessonModalContext.allowWeekend && isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)) {
         showInfoDialog('Выбран выходной день', 'На выходной день нельзя поставить занятие');
         return;
       }
@@ -1086,6 +1104,7 @@ export const useLessonActionsInternal = ({
             durationMinutes,
             color: lessonDraft.color,
             meetingLink,
+            allowWeekend: lessonModalContext.allowWeekend,
           });
 
           const normalizedLesson = normalizeLesson(data.lesson);
@@ -1741,11 +1760,13 @@ export const useLessonActionsInternal = ({
   }, [seriesScopeDialogState]);
 
   const runDragReschedulePipeline = useCallback(
-    async (lesson: Lesson, newStartAt: string) => {
+    async (lesson: Lesson, newStartAt: string, options?: { allowWeekend?: boolean }) => {
+      const allowWeekend = options?.allowWeekend ?? false;
       const inSeries = Boolean(lesson.seriesId || (lesson.isRecurring && lesson.recurrenceGroupId));
       const updatePayload: LessonUpdatePayload = {
         startAt: newStartAt,
         durationMinutes: lesson.durationMinutes,
+        ...(allowWeekend ? { allowWeekend: true } : {}),
       };
 
       if (inSeries) {
@@ -1776,6 +1797,7 @@ export const useLessonActionsInternal = ({
             startAt: newStartAt,
             durationMinutes: lesson.durationMinutes,
             repeatWeekdays: nextWeekdays,
+            ...(allowWeekend ? { allowWeekend: true } : {}),
           });
           setSeriesScopeDialogState({
             action: 'EDIT',
@@ -1787,7 +1809,9 @@ export const useLessonActionsInternal = ({
             request: { kind: 'update', payload: seriesUpdatePayload },
           });
         } catch (error) {
-          showToast({ message: 'Не удалось подготовить перенос урока', variant: 'error' });
+          const fallback = 'Не удалось подготовить перенос урока';
+          const message = isApiRequestError(error) && error.message ? error.message : fallback;
+          showToast({ message, variant: 'error' });
           console.error('Failed to prepare drag reschedule for series', error);
         }
         return;
@@ -1807,10 +1831,13 @@ export const useLessonActionsInternal = ({
           scope: 'SINGLE',
           startAt: newStartAt,
           durationMinutes: lesson.durationMinutes,
+          ...(allowWeekend ? { allowWeekend: true } : {}),
         });
       } catch (error) {
         rollback();
-        showToast({ message: 'Не удалось проверить изменение', variant: 'error' });
+        const fallback = 'Не удалось проверить изменение';
+        const message = isApiRequestError(error) && error.message ? error.message : fallback;
+        showToast({ message, variant: 'error' });
         console.error('Failed to preview drag reschedule', error);
         return;
       }
@@ -1862,20 +1889,47 @@ export const useLessonActionsInternal = ({
       }
       if (new Date(newStartAt).getTime() === new Date(lesson.startAt).getTime()) return;
 
+      const targetZoned = toZonedDate(newStartAt, timeZone);
+      const isWeekendTarget = isDateInWeekdayList(targetZoned, normalizedWeekendWeekdays);
       const isPast = new Date(newStartAt).getTime() < Date.now();
-      if (isPast) {
+
+      const proceed = (allowWeekend: boolean) =>
+        runDragReschedulePipeline(lesson, newStartAt, allowWeekend ? { allowWeekend: true } : undefined);
+
+      const askWeekend = (then: () => void) => {
+        openConfirmDialog({
+          title: 'Перенести на выходной?',
+          message: 'Этот день настроен как выходной. Точно поставить на него занятие?',
+          confirmText: 'Перенести',
+          cancelText: 'Отмена',
+          onConfirm: then,
+        });
+      };
+      const askPast = (then: () => void) => {
         openConfirmDialog({
           title: 'Перенести в прошлое?',
           message: 'Дата урока окажется в прошлом. Продолжить?',
           confirmText: 'Перенести',
           cancelText: 'Отмена',
-          onConfirm: () => runDragReschedulePipeline(lesson, newStartAt),
+          onConfirm: then,
         });
+      };
+
+      if (isWeekendTarget && isPast) {
+        askWeekend(() => askPast(() => proceed(true)));
         return;
       }
-      void runDragReschedulePipeline(lesson, newStartAt);
+      if (isWeekendTarget) {
+        askWeekend(() => proceed(true));
+        return;
+      }
+      if (isPast) {
+        askPast(() => proceed(false));
+        return;
+      }
+      void proceed(false);
     },
-    [openConfirmDialog, runDragReschedulePipeline, showInfoDialog],
+    [normalizedWeekendWeekdays, openConfirmDialog, runDragReschedulePipeline, showInfoDialog, timeZone],
   );
 
   const applyTogglePaid = useCallback(
@@ -2132,6 +2186,8 @@ export const useLessonActionsInternal = ({
       lessonModalSubmitting,
       lessonModalVariant: lessonModalContext.variant,
       lessonModalFocus: lessonModalContext.focus,
+      lessonModalAllowWeekend: lessonModalContext.allowWeekend,
+      openConfirmDialog,
       lessonDraft,
       editingLessonId,
       editingLesson: editingLessonOriginal,
@@ -2176,7 +2232,9 @@ export const useLessonActionsInternal = ({
       lessonModalSubmitting,
       lessonModalContext.focus,
       lessonModalContext.variant,
+      lessonModalContext.allowWeekend,
       lessonModalOpen,
+      openConfirmDialog,
       openRescheduleModal,
       openCreateLessonForStudent,
       openLessonModal,

@@ -9,14 +9,7 @@ import {
   resolveHomeworkTemplatePreview,
 } from './templatePresentation';
 
-export type HomeworkLibraryCategoryTone =
-  | 'purple'
-  | 'blue'
-  | 'green'
-  | 'orange'
-  | 'indigo'
-  | 'pink'
-  | 'gray';
+export type HomeworkLibraryCategoryTone = 'purple' | 'blue' | 'green' | 'orange' | 'indigo' | 'pink' | 'gray';
 
 export type HomeworkLibraryMetricIcon = 'clock' | 'questions' | 'paperclip' | 'microphone' | 'file';
 
@@ -50,9 +43,7 @@ export const isHomeworkLibraryFavorite = (template: HomeworkTemplate) =>
   template.tags.some((tag) => normalize(tag) === HOMEWORK_TEMPLATE_FAVORITE_TAG);
 
 export const hasHomeworkLibraryVoiceFlow = (template: HomeworkTemplate) =>
-  template.blocks.some(
-    (block) => block.type === 'STUDENT_RESPONSE' && Boolean(block.allowVoice || block.allowAudio),
-  );
+  template.blocks.some((block) => block.type === 'STUDENT_RESPONSE' && Boolean(block.allowVoice || block.allowAudio));
 
 export const hasHomeworkLibraryMedia = (template: HomeworkTemplate) =>
   template.blocks.some((block) => block.type === 'MEDIA' && block.attachments.length > 0);
@@ -87,7 +78,8 @@ export const resolveHomeworkLibraryLevelTone = (template: HomeworkTemplate): Hom
 export const resolveHomeworkLibraryCategoryLabel = (template: HomeworkTemplate) =>
   resolveHomeworkTemplateCategory(template).toUpperCase();
 
-export const resolveHomeworkLibraryDescription = (template: HomeworkTemplate) => resolveHomeworkTemplatePreview(template);
+export const resolveHomeworkLibraryDescription = (template: HomeworkTemplate) =>
+  resolveHomeworkTemplatePreview(template);
 
 export const resolveHomeworkLibraryBadges = (template: HomeworkTemplate) => {
   const badges: Array<{ id: string; label: string; tone: HomeworkLibraryCategoryTone }> = [];
@@ -159,7 +151,11 @@ export const resolveHomeworkLibraryMetrics = (template: HomeworkTemplate): Homew
 export const resolveHomeworkLibraryUpdatedLabel = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Изм. недавно';
-  return `Изм. ${formatDistanceToNow(date, { addSuffix: true, locale: ru })}`;
+  // TEA-354: clamp future timestamps (clock skew) to "now" — иначе formatDistanceToNow
+  // может выдать «через 6 минут» или отрицательные значения.
+  const safeDate = date.getTime() > Date.now() ? new Date() : date;
+  if (Date.now() - safeDate.getTime() < 60_000) return 'Изм. только что';
+  return `Изм. ${formatDistanceToNow(safeDate, { addSuffix: true, locale: ru })}`;
 };
 
 export const resolveHomeworkLibraryUpdatedTooltip = (value: string) => {
@@ -190,13 +186,7 @@ export const resolveHomeworkLibraryCollections = (templates: HomeworkTemplate[])
 };
 
 export const resolveHomeworkLibrarySearchText = (template: HomeworkTemplate) =>
-  [
-    template.title,
-    template.subject,
-    template.level,
-    template.tags.join(' '),
-    resolveHomeworkTemplatePreview(template),
-  ]
+  [template.title, template.subject, template.level, template.tags.join(' '), resolveHomeworkTemplatePreview(template)]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();

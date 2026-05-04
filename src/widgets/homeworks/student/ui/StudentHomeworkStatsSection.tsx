@@ -13,6 +13,7 @@ import {
 import { HomeworkAssignment } from '../../../../entities/types';
 import { StudentHomeworkSummary } from '../../types';
 import { buildStudentHomeworkReferenceDashboardStats } from '../model/lib/referencePresentation';
+import { getPluralForm } from '../../../../shared/lib/pluralizeRu';
 import styles from './StudentHomeworkStatsSection.module.css';
 
 type StudentHomeworkStatsSectionProps = {
@@ -41,12 +42,21 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
               <FontAwesomeIcon icon={faClipboardList} />
             </div>
             <h3 className={styles.value}>{loading ? '—' : stats.activeCount}</h3>
-            <p className={styles.label}>Активных заданий</p>
+            <p className={styles.label}>
+              {loading
+                ? 'Активных заданий'
+                : getPluralForm(stats.activeCount, {
+                    one: 'Активное задание',
+                    few: 'Активных задания',
+                    many: 'Активных заданий',
+                  })}
+            </p>
             {!loading && stats.overdueCount > 0 ? (
               <div className={styles.metaRow}>
                 <span className={styles.urgentBadge}>
                   <FontAwesomeIcon icon={faCircle} />
-                  {stats.overdueCount} срочное
+                  {stats.overdueCount}{' '}
+                  {getPluralForm(stats.overdueCount, { one: 'срочное', few: 'срочных', many: 'срочных' })}
                 </span>
               </div>
             ) : null}
@@ -124,7 +134,15 @@ export const StudentHomeworkStatsSection: FC<StudentHomeworkStatsSectionProps> =
                       <FontAwesomeIcon icon={faFire} />
                     </span>
                   </div>
-                  <span className={styles.awardsText}>{loading ? '—' : `${stats.awardsCount} награды`}</span>
+                  <span className={styles.awardsText}>
+                    {loading
+                      ? '—'
+                      : `${stats.awardsCount} ${getPluralForm(stats.awardsCount, {
+                          one: 'награда',
+                          few: 'награды',
+                          many: 'наград',
+                        })}`}
+                  </span>
                 </div>
               ) : null}
             </div>

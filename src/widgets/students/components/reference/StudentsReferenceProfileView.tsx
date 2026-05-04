@@ -116,6 +116,7 @@ interface StudentsReferenceProfileViewProps {
   onEditStudent: (options?: { focusField?: StudentModalFocusField }) => void;
   onOpenBalanceTopup: () => void;
   onRequestDeleteStudent: () => void;
+  onRequestToggleCompletion: () => void;
   onTogglePaymentReminders: (enabled: boolean) => void;
   onWriteToStudent: () => void;
   onRemindLessonPayment: (
@@ -262,6 +263,7 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
   onEditStudent,
   onOpenBalanceTopup,
   onRequestDeleteStudent,
+  onRequestToggleCompletion,
   onTogglePaymentReminders,
   onWriteToStudent,
   onRemindLessonPayment,
@@ -1098,6 +1100,9 @@ export const StudentsReferenceProfileView: FC<StudentsReferenceProfileViewProps>
                   </button>
                   <button type="button" onClick={openReminderSettings}>
                     Настройки уведомлений
+                  </button>
+                  <button type="button" onClick={() => handleMenuAction(onRequestToggleCompletion)}>
+                    {studentEntry.link.completedAt ? 'Возобновить обучение' : 'Завершить обучение'}
                   </button>
                   <div className={styles.menuSeparator} aria-hidden />
                   <button

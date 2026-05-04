@@ -22,10 +22,7 @@ interface AssignmentMaterialsSectionProps {
   onMediaBlockChange: (nextBlock: HomeworkBlockMedia) => void;
 }
 
-export const AssignmentMaterialsSection: FC<AssignmentMaterialsSectionProps> = ({
-  mediaBlock,
-  onMediaBlockChange,
-}) => {
+export const AssignmentMaterialsSection: FC<AssignmentMaterialsSectionProps> = ({ mediaBlock, onMediaBlockChange }) => {
   const [pendingLink, setPendingLink] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +55,7 @@ export const AssignmentMaterialsSection: FC<AssignmentMaterialsSectionProps> = (
     if (!validFiles.length) {
       setError(
         oversizedFiles.length > 0
-          ? `Каждый файл должен быть до 50MB. Не подходят: ${oversizedFiles.map((file) => file.name).join(', ')}`
+          ? `Каждый файл должен быть до ${Math.round(MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES / (1024 * 1024))} МБ. Не подходят: ${oversizedFiles.map((file) => file.name).join(', ')}`
           : 'Выберите хотя бы один файл',
       );
       return;
@@ -68,7 +65,15 @@ export const AssignmentMaterialsSection: FC<AssignmentMaterialsSectionProps> = (
     setError(null);
 
     try {
-      const results = await Promise.allSettled(validFiles.map((file) => uploadFileToHomeworkStorage(file)));
+      const baseCount = attachments.length;
+      const results = await Promise.allSettled(
+        validFiles.map((file, idx) =>
+          uploadFileToHomeworkStorage(file, 'homework-student-attachment', {
+            kind: 'homeworkTemplate',
+            currentCount: baseCount + idx,
+          }),
+        ),
+      );
       const uploaded: HomeworkAttachment[] = [];
       const failedNames: string[] = [];
 
@@ -126,7 +131,13 @@ export const AssignmentMaterialsSection: FC<AssignmentMaterialsSectionProps> = (
 
       <div className={styles.content}>
         <label className={styles.uploadZone}>
-          <input type="file" multiple accept={TEMPLATE_MATERIAL_FILE_ACCEPT} className={styles.fileInput} onChange={handlePickFiles} />
+          <input
+            type="file"
+            multiple
+            accept={TEMPLATE_MATERIAL_FILE_ACCEPT}
+            className={styles.fileInput}
+            onChange={handlePickFiles}
+          />
           <span className={styles.uploadIcon}>
             <HomeworkCloudArrowUpIcon size={20} />
           </span>

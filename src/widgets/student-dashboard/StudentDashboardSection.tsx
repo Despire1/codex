@@ -110,7 +110,7 @@ export const StudentDashboardSection: FC<StudentDashboardSectionProps> = ({ acti
             <button
               type="button"
               className={styles.heroPrimaryAction}
-              onClick={() => navigate(`/homeworks/${nextAssignment.id}`)}
+              onClick={() => navigate(`/homeworks/assignments/${nextAssignment.id}`)}
             >
               Открыть задание
             </button>

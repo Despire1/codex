@@ -1,16 +1,11 @@
-import {
-  HomeworkReviewItemResult,
-  HomeworkReviewResult,
-  HomeworkSubmission,
-} from '../../../types';
+import { HomeworkReviewItemResult, HomeworkReviewResult, HomeworkSubmission } from '../../../types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const normalizeReviewItemResult = (value: unknown): HomeworkReviewItemResult | null => {
   if (!isRecord(value)) return null;
-  const decision =
-    value.decision === 'ACCEPTED' || value.decision === 'REWORK_REQUIRED' ? value.decision : null;
+  const decision = value.decision === 'ACCEPTED' || value.decision === 'REWORK_REQUIRED' ? value.decision : null;
   if (!decision) return null;
   const score = Number(value.score);
   if (!Number.isFinite(score)) return null;
@@ -30,8 +25,8 @@ export const normalizeHomeworkReviewResult = (value: unknown): HomeworkReviewRes
     }
   }
   if (!isRecord(value)) return null;
-  const submissionId = Number(value.submissionId);
-  if (!Number.isFinite(submissionId) || submissionId <= 0) return null;
+  const submissionIdRaw = Number(value.submissionId);
+  const submissionId = Number.isFinite(submissionIdRaw) && submissionIdRaw > 0 ? submissionIdRaw : 0;
   const rawItems = isRecord(value.items) ? value.items : null;
   if (!rawItems) return null;
   const items = Object.entries(rawItems).reduce<Record<string, HomeworkReviewItemResult>>((acc, [key, item]) => {
@@ -41,6 +36,7 @@ export const normalizeHomeworkReviewResult = (value: unknown): HomeworkReviewRes
     acc[key] = normalized;
     return acc;
   }, {});
+  if (Object.keys(items).length === 0 && typeof value.generalComment !== 'string') return null;
   return {
     submissionId,
     generalComment: typeof value.generalComment === 'string' ? value.generalComment : '',
@@ -51,7 +47,5 @@ export const normalizeHomeworkReviewResult = (value: unknown): HomeworkReviewRes
 export const getSubmissionReviewResult = (submission: Pick<HomeworkSubmission, 'reviewResult'>) =>
   normalizeHomeworkReviewResult(submission.reviewResult ?? null);
 
-export const isReviewItemAccepted = (
-  reviewResult: HomeworkReviewResult | null | undefined,
-  itemId: string,
-) => reviewResult?.items[itemId]?.decision === 'ACCEPTED';
+export const isReviewItemAccepted = (reviewResult: HomeworkReviewResult | null | undefined, itemId: string) =>
+  reviewResult?.items[itemId]?.decision === 'ACCEPTED';

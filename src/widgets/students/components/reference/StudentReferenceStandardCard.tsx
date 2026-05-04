@@ -16,6 +16,7 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
   onOpenStudent,
   onEditStudent,
   onDeleteStudent,
+  onToggleCompletion,
   onScheduleLesson,
   onWriteStudent,
   onTopUpBalance,
@@ -81,8 +82,10 @@ export const StudentReferenceStandardCard: FC<StudentReferenceCardProps> = ({
         </div>
         <StudentReferenceCardMenu
           studentId={item.student.id}
+          isCompleted={Boolean(item.link.completedAt)}
           onEditStudent={onEditStudent}
           onDeleteStudent={onDeleteStudent}
+          onToggleCompletion={onToggleCompletion}
           onScheduleLesson={onScheduleLesson}
           onWriteStudent={onWriteStudent}
           onTopUpBalance={onTopUpBalance}

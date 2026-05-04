@@ -77,11 +77,7 @@ export const resolveHomeworkAssignmentCardDescription = (assignment: HomeworkAss
     return preview;
   }
 
-  const studentLabel = assignment.studentName?.trim() || assignment.studentUsername?.trim();
-  if (studentLabel) {
-    return `Ученик: ${studentLabel}`;
-  }
-
+  // TEA-357: имя ученика уже выводится в badges — не дублируем его в description.
   if (assignment.templateTitle && assignment.templateTitle !== assignment.title) {
     return `Источник: ${assignment.templateTitle}`;
   }

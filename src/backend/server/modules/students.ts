@@ -32,6 +32,7 @@ type CreateStudentsServiceDeps = {
   safeLogActivityEvent: SafeLogActivityEvent;
   normalizeTeacherStatus: (status: any) => string;
   parseDateFilter: (value?: string | null) => Date | null;
+  notifyFirstStudentAdded?: (teacherId: bigint) => Promise<void>;
 };
 
 export const normalizeTelegramUsername = (username?: string | null) => {
@@ -136,6 +137,7 @@ export const createStudentsService = ({
   safeLogActivityEvent,
   normalizeTeacherStatus,
   parseDateFilter,
+  notifyFirstStudentAdded,
 }: CreateStudentsServiceDeps) => {
   const resolvePageParams = (url: URL) => {
     const limitRaw = Number(url.searchParams.get('limit') ?? defaultPageSize);
@@ -530,12 +532,14 @@ export const createStudentsService = ({
       });
     });
 
-    const resolveLifecycleStatus = (stats: ReturnType<typeof createEmptyLessonStats>) => {
+    const resolveLifecycleStatus = (
+      link: { completedAt: Date | null },
+      stats: ReturnType<typeof createEmptyLessonStats>,
+    ) => {
+      if (link.completedAt) return 'COMPLETED' as const;
       if (stats.nextLessonAt) return 'ACTIVE' as const;
       if (!stats.lastLessonAt) return 'ACTIVE' as const;
-      const daysSinceLastLesson = (now.getTime() - stats.lastLessonAt.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceLastLesson <= 30) return 'PAUSED' as const;
-      return 'COMPLETED' as const;
+      return 'PAUSED' as const;
     };
 
     type StudentListStats = ReturnType<typeof buildHomeworkStats> & {
@@ -575,7 +579,7 @@ export const createStudentsService = ({
         totalLessonMinutes: lessonStats.totalLessonMinutes,
         nextLessonAt: lessonStats.nextLessonAt?.toISOString() ?? null,
         lastLessonAt: lessonStats.lastLessonAt?.toISOString() ?? null,
-        lifecycleStatus: resolveLifecycleStatus(lessonStats),
+        lifecycleStatus: resolveLifecycleStatus(link, lessonStats),
       });
     });
 
@@ -1022,6 +1026,20 @@ export const createStudentsService = ({
       title: `Добавлен ученик: ${normalizedCustomName}`,
       details: normalizedUsername ? `username: @${normalizedUsername}` : null,
     });
+    if (notifyFirstStudentAdded) {
+      const otherActiveLinks = await prisma.teacherStudent.count({
+        where: {
+          teacherId: teacher.chatId,
+          isArchived: false,
+          NOT: { id: link.id },
+        },
+      });
+      if (otherActiveLinks === 0) {
+        await notifyFirstStudentAdded(teacher.chatId).catch((error) => {
+          console.error('Failed to send first-student milestone', error);
+        });
+      }
+    }
     return { student, link };
   };
 
@@ -1091,6 +1109,16 @@ export const createStudentsService = ({
     });
     if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
 
+    // TEA-386: фиксируем число активных ассайнментов в момент архивации,
+    // чтобы при последующем unarchive можно было оценить, что нужно восстановить.
+    const activeAssignmentsCount = await (prisma as any).homeworkAssignment.count({
+      where: {
+        teacherId: teacher.chatId,
+        studentId,
+        status: { in: ['SENT', 'IN_REVIEW', 'RETURNED', 'SUBMITTED'] },
+      },
+    });
+
     const updatedLink = await prisma.teacherStudent.update({
       where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
       data: { isArchived: true },
@@ -1102,7 +1130,33 @@ export const createStudentsService = ({
       action: 'ARCHIVE',
       status: 'SUCCESS',
       source: 'USER',
-      title: `Ученик отправлен в архив: ${link.customName}`,
+      title:
+        activeAssignmentsCount > 0
+          ? `Ученик отправлен в архив: ${link.customName} (активных ДЗ скрыто: ${activeAssignmentsCount})`
+          : `Ученик отправлен в архив: ${link.customName}`,
+    });
+    return updatedLink;
+  };
+
+  const setStudentCompletion = async (user: User, studentId: number, completed: boolean) => {
+    const teacher = await ensureTeacher(user);
+    const link = await prisma.teacherStudent.findUnique({
+      where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+    });
+    if (!link || link.isArchived) throw new Error('Ученик не найден у текущего преподавателя');
+
+    const updatedLink = await prisma.teacherStudent.update({
+      where: { teacherId_studentId: { teacherId: teacher.chatId, studentId } },
+      data: { completedAt: completed ? new Date() : null },
+    });
+    await safeLogActivityEvent({
+      teacherId: teacher.chatId,
+      studentId,
+      category: 'STUDENT',
+      action: completed ? 'COMPLETE_STUDIES' : 'RESUME_STUDIES',
+      status: 'SUCCESS',
+      source: 'USER',
+      title: completed ? `Обучение завершено: ${link.customName}` : `Обучение возобновлено: ${link.customName}`,
     });
     return updatedLink;
   };
@@ -1296,6 +1350,7 @@ export const createStudentsService = ({
     addStudent,
     updateStudent,
     archiveStudentLink,
+    setStudentCompletion,
     toggleAutoReminder,
     updateStudentPaymentReminders,
     updatePricePerLesson,

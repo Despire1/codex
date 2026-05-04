@@ -66,6 +66,7 @@ export const createSubscriptionService = ({
     await callTelegram('sendMessage', {
       chat_id: Number(chatId),
       text,
+      parse_mode: 'HTML',
     });
   };
 
@@ -140,7 +141,7 @@ export const createSubscriptionService = ({
       }
       await sendTelegramMessage(
         telegramUserId,
-        `✅ Оплата прошла успешно!\n🎉 Подписка активирована — полный доступ открыт.\n\n📅 Активна до: ${formatSubscriptionDate(nextEnd)}\n\n🧠 Меньше рутины — больше фокуса на занятиях.`,
+        `✅ <b>Оплата прошла</b>\n\nПодписка активна до ${formatSubscriptionDate(nextEnd)}.`,
       );
     } catch (error) {
       console.error('[yookassa] Failed to send subscription confirmation message', error);

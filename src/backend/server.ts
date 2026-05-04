@@ -36,6 +36,10 @@ import {
   sendTeacherDailySummary,
   sendTeacherOnboardingNudge,
   sendTeacherPaymentReminderNotice,
+  sendTeacherPostLessonPrompt,
+  sendTeacherPaymentPrompt,
+  sendTeacherTrialDigest,
+  sendTeacherFirstStudentMilestone,
 } from './notificationService';
 import { resolveStudentTelegramId } from './studentContacts';
 import {
@@ -65,15 +69,18 @@ import { createOverviewService } from './server/modules/overview';
 import { createDashboardActionsService } from './server/modules/dashboardActions';
 import { createGlobalSearchService } from './server/modules/globalSearch';
 import { createScheduleNotesService } from './server/modules/scheduleNotes';
+import { createScheduleV2Service } from './server/modules/scheduleV2';
 import { createLegacyHomeworkService } from './server/modules/legacyHomework';
 import { createUploadsService } from './server/modules/uploads';
 import { createAutomationService } from './server/modules/automation';
+import { runStorageCleanupTick } from './server/modules/storageCleanup';
 import { createLessonOperationsService } from './server/modules/lessonOperations';
 import { createLessonEditingService } from './server/modules/lessonEditing';
 import { createLessonSchedulingService } from './server/modules/lessonScheduling';
 import { createLessonSeriesService } from './server/modules/lessonSeries';
 import { createStudentAccessService } from './server/modules/studentAccess';
 import { createSubscriptionService } from './server/modules/subscription';
+import { handleDevSwitchRole, isDevToolsEnabled } from './server/modules/devTools';
 import {
   filterHomeworksForRole,
   getRequestedStudentId,
@@ -101,6 +108,7 @@ import { tryHandleSearchRoutes } from './server/routes/searchRoutes';
 import { tryHandleHomeworkRoutes } from './server/routes/homeworkRoutes';
 import { tryHandleLessonRoutes } from './server/routes/lessonRoutes';
 import { tryHandleScheduleNoteRoutes } from './server/routes/scheduleNoteRoutes';
+import { tryHandleScheduleV2Routes } from './server/routes/scheduleV2Routes';
 import { RequestValidationError } from './server/lib/requestValidationError';
 import { validateHomeworkTemplatePayload } from './server/modules/homeworkTemplateValidation';
 import { resolveHomeworkFallbackDeadline } from './server/modules/homeworkV2/shared';
@@ -171,7 +179,7 @@ const authService = createAuthService({
     lastName: LOCAL_DEV_LAST_NAME,
   },
 });
-const { createSession, getSessionTokenHash, resolveSessionUser } = authService;
+const { createSession, getSessionTokenHash, resolveSessionUser, loginAsLocalDev } = authService;
 const sessionService = createSessionService({ getSessionTokenHash });
 const { listSessions, revokeSession, revokeOtherSessions } = sessionService;
 const authSessionHandlers = createAuthSessionHandlers({
@@ -198,11 +206,13 @@ const telegramDeepLinkHandlers = createTelegramDeepLinkHandlers({
   ratePerMin: RATE_LIMIT_DEEP_LINK_PER_MIN,
 });
 const uploadsService = createUploadsService({
+  prisma,
   clampNumber,
   readRawBody,
   notFound,
 });
-const { createFilePresignUploadV2, handlePresignedUploadPutV2, handleUploadedFileObjectGetV2 } = uploadsService;
+const { createFilePresignUploadV2, handlePresignedUploadPutV2, handleUploadedFileObjectGetV2, getStorageQuotaV2 } =
+  uploadsService;
 const subscriptionService = createSubscriptionService({
   prisma,
   subscriptionMonthDays: SUBSCRIPTION_MONTH_DAYS,
@@ -428,12 +438,17 @@ const scheduleNotesService = createScheduleNotesService({
 });
 const { listScheduleNotes, createScheduleNote, updateScheduleNote, deleteScheduleNote } = scheduleNotesService;
 
+const scheduleV2Service = createScheduleV2Service({ prisma, ensureTeacher });
+
 const addStudent = async (user: User, body: any) => studentsService.addStudent(user, body);
 
 const updateStudent = async (user: User, studentId: number, body: any) =>
   studentsService.updateStudent(user, studentId, body);
 
 const archiveStudentLink = async (user: User, studentId: number) => studentsService.archiveStudentLink(user, studentId);
+
+const setStudentCompletion = async (user: User, studentId: number, completed: boolean) =>
+  studentsService.setStudentCompletion(user, studentId, completed);
 
 const toggleAutoReminder = async (user: User, studentId: number, value: boolean) =>
   studentsService.toggleAutoReminder(user, studentId, value);
@@ -463,6 +478,7 @@ const studentsService = createStudentsService({
   safeLogActivityEvent,
   normalizeTeacherStatus,
   parseDateFilter,
+  notifyFirstStudentAdded: sendTeacherFirstStudentMilestone,
 });
 
 const normalizeCancelBehavior = (value: any): PaymentCancelBehavior => (value === 'writeoff' ? 'writeoff' : 'refund');
@@ -788,6 +804,9 @@ const automationService = createAutomationService({
   sendTeacherLessonReminder,
   sendStudentLessonReminder,
   sendTeacherOnboardingNudge,
+  sendTeacherPostLessonPrompt,
+  sendTeacherPaymentPrompt,
+  sendTeacherTrialDigest,
   resolveTimeZone,
   toZonedDate,
   toUtcDateFromTimeZone,
@@ -805,6 +824,7 @@ const {
   runLessonAutomationTick,
   runNotificationTick,
   runOnboardingNudgeTick,
+  runTrialDigestTick,
   scheduleDailySessionCleanup: scheduleAutomationMaintenance,
 } = automationService;
 
@@ -862,6 +882,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
     const apiUser = sessionUser as User | null;
     const requireApiUser = () => apiUser as User;
+
+    if (req.method === 'POST' && pathname === '/api/_dev/switch-role') {
+      if (!isDevToolsEnabled(req)) {
+        return notFound(res);
+      }
+      if (!apiUser) {
+        return sendJson(res, 401, { message: 'unauthorized' });
+      }
+      await handleDevSwitchRole(req, res, apiUser);
+      return;
+    }
+
     if (pathname.startsWith('/api/') && apiUser && !hasActiveSubscription(apiUser)) {
       const actingAsStudent = role === 'STUDENT' && (await resolveStudentAccessLinks(apiUser)).length > 0;
       if (!actingAsStudent) {
@@ -897,6 +929,18 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
       })
     ) {
       return;
+    }
+
+    // Dev-only: вход под локальным учителем без Telegram-OAuth.
+    // loginAsLocalDev сам проверяет NODE_ENV !== 'production' и localhost,
+    // в проде или с внешнего IP вернёт false и эндпоинт ответит 404.
+    if (req.method === 'POST' && pathname === '/auth/local-dev-login') {
+      const ok = await loginAsLocalDev(req, res);
+      if (!ok) {
+        notFound(res);
+        return;
+      }
+      return sendJson(res, 200, { status: 'ok' });
     }
 
     if (req.method === 'GET' && pathname === '/api/bootstrap') {
@@ -1004,6 +1048,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
         },
         handlers: {
           createFilePresignUploadV2,
+          getStorageQuotaV2,
           listHomeworkGroupsV2: homeworkV2Service.listHomeworkGroupsV2,
           createHomeworkGroupV2: homeworkV2Service.createHomeworkGroupV2,
           updateHomeworkGroupV2: homeworkV2Service.updateHomeworkGroupV2,
@@ -1100,6 +1145,29 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     }
 
     if (
+      await tryHandleScheduleV2Routes({
+        req,
+        res,
+        pathname,
+        role,
+        requireApiUser,
+        handlers: {
+          getLessonV2: scheduleV2Service.getLessonV2,
+          updateLessonV2: scheduleV2Service.updateLessonV2,
+          updateSeriesPlan: scheduleV2Service.updateSeriesPlan,
+          addLessonAttachment: scheduleV2Service.addLessonAttachment,
+          removeLessonAttachment: scheduleV2Service.removeLessonAttachment,
+          addSeriesAttachment: scheduleV2Service.addSeriesAttachment,
+          removeSeriesAttachment: scheduleV2Service.removeSeriesAttachment,
+          listSeriesAttachments: scheduleV2Service.listSeriesAttachments,
+          listStudentTopics: scheduleV2Service.listStudentTopics,
+        },
+      })
+    ) {
+      return;
+    }
+
+    if (
       await tryHandleLessonRoutes({
         req,
         res,
@@ -1184,6 +1252,7 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
           addStudent,
           updateStudent,
           archiveStudentLink,
+          setStudentCompletion,
           listStudentHomeworks,
           listStudentLessons,
           listStudentUnpaidLessons,
@@ -1233,10 +1302,19 @@ const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const issues = Array.isArray((error as { issues?: unknown } | null)?.issues)
       ? (error as { issues: unknown[] }).issues
       : undefined;
-    if (statusCode && statusCode >= 400 && statusCode <= 599) {
-      return sendJson(res, statusCode, issues ? { message, issues } : { message });
+    const codeRaw = (error as { code?: unknown } | null)?.code;
+    const code = typeof codeRaw === 'string' ? codeRaw : undefined;
+    const effectiveStatus = statusCode && statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
+    if (effectiveStatus >= 500) {
+      console.error(
+        `[api] ${effectiveStatus} ${req.method ?? 'UNKNOWN'} ${req.url ?? pathname}`,
+        error instanceof Error ? (error.stack ?? error.message) : error,
+      );
     }
-    return issues ? sendJson(res, 400, { message, issues }) : badRequest(res, message);
+    const payload: Record<string, unknown> = { message };
+    if (issues) payload.issues = issues;
+    if (code) payload.code = code;
+    return sendJson(res, effectiveStatus, payload);
   }
 };
 
@@ -1266,10 +1344,60 @@ void runOnboardingNudgeTick().catch((error) => {
   console.error('Не удалось отправить напоминание по онбордингу', error);
 });
 
+const TRIAL_DIGEST_TICK_MS = 60 * 60 * 1000;
+setInterval(() => {
+  runTrialDigestTick().catch((error) => {
+    console.error('Не удалось отправить trial-дайджест', error);
+  });
+}, TRIAL_DIGEST_TICK_MS);
+
+const STORAGE_CLEANUP_TICK_MS = 24 * 60 * 60 * 1000;
+const STORAGE_CLEANUP_DRY_RUN = process.env.STORAGE_CLEANUP_ENABLED !== '1';
+const runStorageCleanup = async () => {
+  try {
+    const result = await runStorageCleanupTick({ prisma, dryRun: STORAGE_CLEANUP_DRY_RUN });
+    console.log(
+      `[storage-cleanup] ${result.dryRun ? 'dry-run' : 'live'}: scanned=${result.scannedFileObjects} orphans=${result.orphanFileObjects} deletedRecords=${result.deletedFileObjects} deletedDisk=${result.deletedDiskFiles} orphanDiskFiles=${result.orphanDiskFilesWithoutRecord}`,
+    );
+  } catch (error) {
+    console.error('Не удалось выполнить storage cleanup', error);
+  }
+};
+setInterval(() => {
+  void runStorageCleanup();
+}, STORAGE_CLEANUP_TICK_MS);
+void runStorageCleanup();
+
+void runTrialDigestTick().catch((error) => {
+  console.error('Не удалось отправить trial-дайджест', error);
+});
+
 scheduleAutomationMaintenance();
 
 const server = http.createServer((req, res) => {
-  handle(req, res);
+  Promise.resolve()
+    .then(() => handle(req, res))
+    .catch((error) => {
+      console.error(
+        `[api] unhandled ${req.method ?? 'UNKNOWN'} ${req.url ?? ''}`,
+        error instanceof Error ? (error.stack ?? error.message) : error,
+      );
+      if (!res.headersSent) {
+        try {
+          sendJson(res, 500, { message: 'internal_error' });
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      if (!res.writableEnded) {
+        try {
+          res.end();
+        } catch {
+          // ignore
+        }
+      }
+    });
 });
 server.requestTimeout = API_REQUEST_TIMEOUT_MS;
 server.headersTimeout = API_HEADERS_TIMEOUT_MS;

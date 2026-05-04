@@ -202,10 +202,13 @@ export const AdaptivePopover = ({
 
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const measurement = getPopoverMeasurement(popoverRef.current);
+    const effectiveMeasurement = matchTriggerWidth
+      ? { ...measurement, width: Math.max(measurement.width, Math.ceil(triggerRect.width)) }
+      : measurement;
 
     const layouts = candidates.map((candidate) => {
       const availableSpace = getAvailableSpace(candidate, triggerRect, offset);
-      const constrainedSize = resolveConstrainedSize(candidate, measurement, availableSpace);
+      const constrainedSize = resolveConstrainedSize(candidate, effectiveMeasurement, availableSpace);
       const candidatePosition = getPosition(candidate, triggerRect, constrainedSize);
       const maxLeft = Math.max(window.innerWidth - constrainedSize.width - VIEWPORT_PADDING, VIEWPORT_PADDING);
       const maxTop = Math.max(window.innerHeight - constrainedSize.height - VIEWPORT_PADDING, VIEWPORT_PADDING);

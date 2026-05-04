@@ -38,6 +38,7 @@ import { AppModals } from './components/AppModals';
 import { useTelegramWebAppAuth } from '../features/auth/telegram';
 import { SessionFallback, useSessionStatus } from '../features/auth/session';
 import { SubscriptionGate } from '../widgets/subscription/SubscriptionGate';
+import { DevRoleSwitcher } from '../widgets/dev-role-switcher/DevRoleSwitcher';
 import { HomeworkAssignModal } from '../features/homework-assign/ui/HomeworkAssignModal';
 import { type TeacherAssignmentEditorPrefill, type TeacherHomeworkStudentOption } from '../widgets/homeworks/types';
 import { type StudentTabId } from '../widgets/students/types';
@@ -63,6 +64,7 @@ import { useScheduleLessonsRangeInternal } from '../widgets/schedule/model/useSc
 import { ActiveUnsavedEntry, UnsavedChangesProvider, useUnsavedChanges } from '../shared/lib/unsavedChanges';
 import { useAppDialogs } from './model/useAppDialogs';
 import { useLinkedStudents } from './model/useLinkedStudents';
+import { SCHEDULE_V2_ENABLED } from './config/featureFlags';
 import {
   dispatchHomeworkTemplateCreateTopbarCommand,
   type HomeworkTemplateCreateTopbarState,
@@ -473,7 +475,7 @@ const AppPageContent = () => {
     const assignmentId = params.get('assignmentId');
     const lessonId = params.get('lessonId');
     if (assignmentId && /^\d+$/.test(assignmentId)) {
-      const target = isStudentRole ? `/homeworks/${assignmentId}` : `/homeworks/assignments/${assignmentId}`;
+      const target = `/homeworks/assignments/${assignmentId}`;
       navigate(target, { replace: true });
       return;
     }
@@ -1813,7 +1815,7 @@ const AppPageContent = () => {
                                     renderSearchButton={renderSearchButton}
                                     onCreateLesson={onTopbarCreateAction}
                                     profilePhotoUrl={sessionUser?.photoUrl ?? null}
-                                    showScheduleViewToggle={activeTab === 'schedule'}
+                                    showScheduleViewToggle={activeTab === 'schedule' && !SCHEDULE_V2_ENABLED}
                                     scheduleView={scheduleView}
                                     onScheduleViewChange={setScheduleView}
                                     statusBadgeLabel={homeworkDetailTopbarState?.statusLabel ?? null}
@@ -1935,6 +1937,12 @@ const AppPageContent = () => {
                         {showSubscriptionGate ? <SubscriptionGate /> : null}
                         {!isStudentRole ? (
                           <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+                        ) : null}
+                        {import.meta.env.DEV ? (
+                          <DevRoleSwitcher
+                            currentRole={isStudentRole ? 'STUDENT' : 'TEACHER'}
+                            onSwitched={refreshSession}
+                          />
                         ) : null}
                       </ActivityFeedDrawerProvider>
                     </TimeZoneProvider>

@@ -56,8 +56,14 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
   const timeZone = useTimeZone();
   const isMobile = useIsMobile(900);
   const { selectedStudentId, setSelectedStudentId } = useSelectedStudent();
-  const { openCreateStudentModal, openEditStudentModal, requestDeleteStudent, togglePaymentReminders, topupBalance } =
-    useStudentsActions();
+  const {
+    openCreateStudentModal,
+    openEditStudentModal,
+    requestDeleteStudent,
+    requestToggleCompletion,
+    togglePaymentReminders,
+    topupBalance,
+  } = useStudentsActions();
 
   const {
     studentLessons,
@@ -413,6 +419,10 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     requestDeleteStudent(studentId);
   };
 
+  const handleToggleCompletionFromList = (studentId: number) => {
+    requestToggleCompletion(studentId);
+  };
+
   const handleScheduleLessonFromList = (studentId: number) => {
     setSelectedStudentId(studentId);
     openCreateLessonForStudent(studentId, {
@@ -453,6 +463,12 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
     const profileStudentId = selectedStudentEntry?.student.id ?? routeStudentId ?? selectedStudentId;
     if (!profileStudentId) return;
     requestDeleteStudent(profileStudentId);
+  };
+
+  const handleToggleCompletionFromProfile = () => {
+    const profileStudentId = selectedStudentEntry?.student.id ?? routeStudentId ?? selectedStudentId;
+    if (!profileStudentId) return;
+    requestToggleCompletion(profileStudentId);
   };
 
   const handleOpenBalanceTopup = () => {
@@ -580,6 +596,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onAddStudent={handleAddStudent}
           onEditStudent={handleEditStudentFromList}
           onDeleteStudent={handleDeleteStudentFromList}
+          onToggleCompletion={handleToggleCompletionFromList}
           onScheduleLesson={handleScheduleLessonFromList}
           onTopUpBalance={handleTopUpBalanceFromList}
           onAssignHomework={onOpenHomeworkAssign ? handleAssignHomeworkFromList : undefined}
@@ -638,6 +655,7 @@ export const StudentsSection: FC<StudentsSectionProps> = ({
           onEditStudent={handleEditStudent}
           onOpenBalanceTopup={handleOpenBalanceTopup}
           onRequestDeleteStudent={handleDeleteStudent}
+          onRequestToggleCompletion={handleToggleCompletionFromProfile}
           onTogglePaymentReminders={handleToggleStudentPaymentReminders}
           onWriteToStudent={handleWriteToStudent}
           onRemindLessonPayment={remindLessonPayment}

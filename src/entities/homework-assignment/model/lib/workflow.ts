@@ -22,10 +22,7 @@ export type HomeworkAssignmentsTabId =
 
 export type HomeworkWorkflowSource = Pick<
   HomeworkAssignment,
-  | 'status'
-  | 'latestSubmissionStatus'
-  | 'latestSubmissionSubmittedAt'
-  | 'reviewedAt'
+  'status' | 'latestSubmissionStatus' | 'latestSubmissionSubmittedAt' | 'reviewedAt'
 > & {
   deadlineAt?: DateLike;
   sendMode?: HomeworkSendMode;
@@ -161,7 +158,7 @@ export const resolveHomeworkAssignmentWorkflow = (
     needsTeacherAction: baseStatus === 'SUBMITTED' || baseStatus === 'IN_REVIEW',
     canTeacherEditAssignment,
     canStudentEdit: needsStudentAction,
-    canTeacherReview: baseStatus === 'SUBMITTED' || baseStatus === 'IN_REVIEW',
+    canTeacherReview: baseStatus === 'SUBMITTED' || baseStatus === 'IN_REVIEW' || baseStatus === 'REVIEWED',
     canCancelIssueByStatus: persistedStatus === 'SCHEDULED' || needsStudentAction,
     canReissue: baseStatus === 'REVIEWED',
     isStudentVisible: STUDENT_VISIBLE_STATUSES.includes(status),
@@ -201,7 +198,9 @@ export const assignmentBelongsToTab = (
   if (tab === 'closed') return workflow.status === 'REVIEWED';
   if (tab === 'overdue') return workflow.isOverdue;
   if (tab === 'inbox') {
-    return workflow.needsTeacherAction || workflow.status === 'RETURNED' || workflow.isOverdue || workflow.hasConfigError;
+    return (
+      workflow.needsTeacherAction || workflow.status === 'RETURNED' || workflow.isOverdue || workflow.hasConfigError
+    );
   }
   return true;
 };

@@ -303,7 +303,18 @@ export const ActivityFeedDrawer: FC<ActivityFeedDrawerProps> = ({
                             </a>
                           ) : null}
                         </div>
-                        <span className={styles.time}>{timeLabel}</span>
+                        <span className={styles.time}>
+                          {timeLabel}
+                          {presentation.groupedCount ? (
+                            <span
+                              className={styles.groupedBadge}
+                              title={presentation.groupedRangeLabel ?? undefined}
+                              aria-label={`${presentation.groupedCount} обновлений${presentation.groupedRangeLabel ? `, ${presentation.groupedRangeLabel}` : ''}`}
+                            >
+                              ×{presentation.groupedCount}
+                            </span>
+                          ) : null}
+                        </span>
                       </div>
                     );
                   })}

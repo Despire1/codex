@@ -1,0 +1,1299 @@
+/* ==========================================================
+   Schedule v2 — токены и стили из макета /Downloads/Расписание.html
+   PixelPerfect-перенос: классы соответствуют разметке макета.
+   ========================================================== */
+
+.shell {
+  --sv2-surface-page: #f8fafc;
+  --sv2-surface-card: #ffffff;
+  --sv2-surface-card-strong: #f8fafc;
+  --sv2-surface-card-muted: #f1f5f9;
+
+  --sv2-text-primary: #111827;
+  --sv2-text-secondary: #475569;
+  --sv2-text-muted: #6b7280;
+  --sv2-text-faint: #94a3b8;
+
+  --sv2-border-subtle: #edf0f4;
+  --sv2-border-default: #e2e8f0;
+  --sv2-border-strong: #cbd5e1;
+
+  --sv2-accent-primary: #a3e635;
+  --sv2-accent-primary-hover: #94d82d;
+  --sv2-accent-primary-text: #111827;
+
+  --sv2-color-slate-50: #f8fafc;
+  --sv2-color-slate-100: #f1f5f9;
+  --sv2-color-slate-200: #e2e8f0;
+  --sv2-color-slate-300: #cbd5e1;
+  --sv2-color-slate-400: #94a3b8;
+  --sv2-color-slate-500: #64748b;
+  --sv2-color-slate-600: #475569;
+  --sv2-color-slate-700: #334155;
+  --sv2-color-slate-900: #0f172a;
+
+  --sv2-color-rose-600: #e11d48;
+  --sv2-color-emerald-600: #059669;
+
+  --sv2-shadow-card: 0 12px 24px -10px rgba(15, 23, 42, 0.12), 0 4px 10px -4px rgba(15, 23, 42, 0.05);
+  --sv2-focus-ring: rgba(163, 230, 53, 0.35);
+  --sv2-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --sv2-cell-min-h: 124px;
+  --sv2-row-h: 48px;
+  --sv2-chip-pad: 6px 8px;
+  --sv2-chip-fs: 12px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  color: var(--sv2-text-primary);
+}
+
+.shell button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.shell :is(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sv2-focus-ring);
+}
+
+/* === Toolbar === */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--sv2-surface-card);
+  border: 1px solid var(--sv2-border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--sv2-shadow-card);
+  flex-shrink: 0;
+}
+.tbLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.tbRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav {
+  display: inline-flex;
+  gap: 4px;
+}
+.navBtn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--sv2-border-default);
+  background: var(--sv2-surface-card);
+  color: var(--sv2-text-secondary);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.navBtn:hover {
+  background: var(--sv2-color-slate-50);
+  color: var(--sv2-text-primary);
+  border-color: var(--sv2-border-strong);
+}
+
+.todayBtn {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--sv2-border-default);
+  background: var(--sv2-surface-card);
+  color: var(--sv2-text-primary);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.todayBtn:hover {
+  background: var(--sv2-color-slate-50);
+  border-color: var(--sv2-border-strong);
+}
+
+.period {
+  margin: 0 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sv2-text-primary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+/* «Старый» pill-стиль из глобального Topbar — переехал в локальный toolbar
+   расписания v2 (см. widgets/layout/Topbar.module.css .viewToggleGroup). */
+.viewToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--sv2-border-default);
+  background: var(--sv2-surface-card);
+  border-radius: 999px;
+  padding: 3px;
+}
+.viewBtn {
+  border: none;
+  background: transparent;
+  color: var(--sv2-text-secondary);
+  height: 32px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.viewBtn:hover {
+  background: var(--sv2-surface-card-muted);
+  color: var(--sv2-text-primary);
+}
+/* Двойной класс — повышенная специфичность (0,2,0), чтобы перебить
+   общий .shell button { color: inherit } (специфичность 0,1,1). */
+.viewBtn.viewBtnActive {
+  background: var(--sv2-color-slate-900);
+  color: #fff;
+}
+.viewBtn.viewBtnActive:hover {
+  background: var(--sv2-color-slate-900);
+  color: #fff;
+}
+
+/* === Card frame for views === */
+.card {
+  background: var(--sv2-surface-card);
+  border: 1px solid var(--sv2-border-subtle);
+  border-radius: 18px;
+  box-shadow: var(--sv2-shadow-card);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* === Lesson colour themes === */
+.themeC1 {
+  --sv2-lesson-bg: #eff6ff;
+  --sv2-lesson-accent: #3b82f6;
+  --sv2-lesson-time: #1d4ed8;
+}
+.themeC2 {
+  --sv2-lesson-bg: #f5f3ff;
+  --sv2-lesson-accent: #8b5cf6;
+  --sv2-lesson-time: #6d28d9;
+}
+.themeC3 {
+  --sv2-lesson-bg: #fdf2f8;
+  --sv2-lesson-accent: #ec4899;
+  --sv2-lesson-time: #be185d;
+}
+.themeC4 {
+  --sv2-lesson-bg: #fffbeb;
+  --sv2-lesson-accent: #f59e0b;
+  --sv2-lesson-time: #b45309;
+}
+.themeC5 {
+  --sv2-lesson-bg: #f7fee7;
+  --sv2-lesson-accent: #a3e635;
+  --sv2-lesson-time: #65a30d;
+}
+.themeC6 {
+  --sv2-lesson-bg: #ecfeff;
+  --sv2-lesson-accent: #06b6d4;
+  --sv2-lesson-time: #0e7490;
+}
+.themeC7 {
+  --sv2-lesson-bg: #fef2f2;
+  --sv2-lesson-accent: #f43f5e;
+  --sv2-lesson-time: #be123c;
+}
+.themeC8 {
+  --sv2-lesson-bg: #f0fdf4;
+  --sv2-lesson-accent: #10b981;
+  --sv2-lesson-time: #047857;
+}
+
+/* status modifiers for chips/blocks */
+.statusCompleted {
+  opacity: 0.5;
+  filter: saturate(0.4);
+  text-decoration: line-through;
+}
+.statusCanceled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  filter: saturate(0.2);
+}
+
+/* === Month view === */
+.monthWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--sv2-border-subtle);
+  background: var(--sv2-surface-card);
+}
+.monthWeekdays > span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sv2-text-muted);
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 0 8px;
+  text-transform: uppercase;
+}
+.monthWeekdays > span.weekend {
+  color: var(--sv2-color-rose-600);
+  opacity: 0.55;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* Fit-режим без скролла: ровно столько строк, сколько недель в месяце (5 или 6),
+     каждая строка занимает 1fr доступной высоты. Лишний 6-й ряд скрывается
+     рендером. CSS-переменная --sv2-month-rows устанавливается в MonthView. */
+  grid-template-rows: repeat(var(--sv2-month-rows, 6), minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.monthCell {
+  position: relative;
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+  /* сброс дефолтных стилей <button> и явные border-ы вместо них */
+  border: 0;
+  border-right: 1px solid var(--sv2-border-subtle);
+  border-bottom: 1px solid var(--sv2-border-subtle);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  text-align: left;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.monthCell:hover {
+  background: var(--sv2-color-slate-50);
+}
+.monthCell:not(:has(.monthChip)):not(:has(.monthMore)):hover::after {
+  content: '+ Создать урок';
+  position: absolute;
+  inset: auto 0 6px 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sv2-text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.monthCell:nth-child(7n) {
+  border-right: none;
+}
+.monthCellOther {
+  background: var(--sv2-color-slate-50);
+}
+.monthCellOther .monthCellNum {
+  color: var(--sv2-color-slate-400);
+}
+.monthCellWeekend {
+  background: rgba(163, 230, 53, 0.04);
+}
+
+.monthCellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.monthCellNum {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sv2-text-primary);
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+.monthCellToday .monthCellNum {
+  background: var(--sv2-accent-primary);
+  color: var(--sv2-accent-primary-text);
+}
+.monthCellCount {
+  font-size: 10px;
+  color: var(--sv2-text-muted);
+  font-weight: 600;
+}
+
+.monthChips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.monthChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Компактные значения для fit-режима: меньше padding и fs, чтобы влезало больше уроков
+     при небольшой высоте строки. Совпадает с поведением макета. */
+  padding: 2px 6px;
+  border: none;
+  border-left: 3px solid var(--sv2-lesson-accent, var(--sv2-accent-primary));
+  background: var(--sv2-lesson-bg, var(--sv2-color-slate-100));
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--sv2-text-primary);
+  text-align: left;
+  width: 100%;
+  cursor: grab;
+  transition:
+    filter 0.12s,
+    transform 0.12s;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.monthChip:active {
+  cursor: grabbing;
+}
+.monthChip:hover {
+  filter: brightness(0.96);
+  transform: translateX(1px);
+}
+.chipTime {
+  font-weight: 700;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-700));
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.chipName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+.monthMore {
+  order: 99;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sv2-text-secondary);
+  padding: 3px 6px;
+  border: none;
+  background: var(--sv2-color-slate-100);
+  border-radius: 6px;
+  text-align: left;
+  align-self: flex-start;
+  flex-shrink: 0;
+  transition:
+    background 0.12s,
+    color 0.12s;
+  cursor: pointer;
+}
+.monthMore:hover {
+  color: var(--sv2-text-primary);
+  background: var(--sv2-color-slate-200);
+}
+
+/* === Week view === */
+.weekGrid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.weekColTimes {
+  border-right: 1px solid var(--sv2-border-subtle);
+  background: var(--sv2-surface-card);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+.weekTimeCell {
+  height: var(--sv2-row-h);
+  padding: 4px 8px 0 0;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--sv2-text-muted);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--sv2-border-subtle);
+}
+.weekDayCol {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--sv2-border-subtle);
+  min-width: 0;
+  position: relative;
+}
+.weekDayCol:last-child {
+  border-right: none;
+}
+.weekDayHead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--sv2-surface-card);
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid var(--sv2-border-subtle);
+  text-align: center;
+}
+.weekDayLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sv2-text-muted);
+  letter-spacing: 0.06em;
+}
+.weekDayNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sv2-text-primary);
+  margin-top: 2px;
+}
+.weekDayColToday {
+  background: rgba(163, 230, 53, 0.04);
+}
+.weekDayColToday .weekDayNum {
+  background: var(--sv2-accent-primary);
+  color: var(--sv2-accent-primary-text);
+}
+.weekDayColToday .weekDayLabel {
+  color: #65a30d;
+}
+
+.weekDayBody {
+  position: relative;
+  flex: 1;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--sv2-row-h) - 1px),
+    var(--sv2-border-subtle) calc(var(--sv2-row-h) - 1px),
+    var(--sv2-border-subtle) var(--sv2-row-h)
+  );
+}
+.weekBlock {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border: none;
+  border-left: 3px solid var(--sv2-lesson-accent, var(--sv2-accent-primary));
+  background: var(--sv2-lesson-bg, var(--sv2-color-slate-100));
+  color: var(--sv2-text-primary);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  text-align: left;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  transition:
+    filter 0.12s,
+    transform 0.12s;
+}
+.weekBlock:active {
+  cursor: grabbing;
+}
+.weekBlock:hover {
+  filter: brightness(0.96);
+  transform: translateX(1px);
+}
+.wbTime {
+  font-weight: 700;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-700));
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.wbName {
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wbSub {
+  font-size: 10px;
+  color: var(--sv2-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "now" line for current time */
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--sv2-color-rose-600);
+  pointer-events: none;
+  z-index: 4;
+}
+.nowLine::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sv2-color-rose-600);
+}
+
+/* === Day view === */
+.dayWrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.dayHeader {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--sv2-border-subtle);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.dayTitle {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--sv2-text-primary);
+  text-transform: capitalize;
+}
+.dayMeta {
+  color: var(--sv2-text-muted);
+  font-size: 13px;
+}
+
+.dayGrid {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+.dayTimes {
+  border-right: 1px solid var(--sv2-border-subtle);
+}
+.dayTimeRow {
+  height: calc(var(--sv2-row-h) * 2);
+  padding: 4px 12px 0 0;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sv2-text-muted);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--sv2-border-subtle);
+}
+.dayBody {
+  position: relative;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--sv2-row-h) * 2 - 1px),
+    var(--sv2-border-subtle) calc(var(--sv2-row-h) * 2 - 1px),
+    var(--sv2-border-subtle) calc(var(--sv2-row-h) * 2)
+  );
+}
+.dayBlock {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  border: none;
+  border-left: 4px solid var(--sv2-lesson-accent, var(--sv2-accent-primary));
+  background: var(--sv2-lesson-bg, var(--sv2-color-slate-100));
+  color: var(--sv2-text-primary);
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  transition:
+    filter 0.12s,
+    transform 0.12s,
+    box-shadow 0.15s;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+.dayBlock:active {
+  cursor: grabbing;
+}
+.dayBlock:hover {
+  filter: brightness(0.97);
+  transform: translateX(2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+.dbTime {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-700));
+  font-variant-numeric: tabular-nums;
+}
+.dbName {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dbSub {
+  font-size: 12px;
+  color: var(--sv2-text-muted);
+}
+
+/* === Day popover (more lessons in month cell) === */
+.dayPop {
+  position: fixed;
+  width: 280px;
+  background: var(--sv2-surface-card);
+  border: 1px solid var(--sv2-border-default);
+  border-radius: 14px;
+  box-shadow:
+    0 24px 48px -16px rgba(15, 23, 42, 0.28),
+    0 8px 16px -8px rgba(15, 23, 42, 0.12);
+  z-index: 45;
+  transform: translateY(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.18s var(--sv2-ease),
+    opacity 0.18s var(--sv2-ease);
+  overflow: hidden;
+}
+.dayPopOpen {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+.dayPopHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--sv2-border-subtle);
+}
+.dayPopDate {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dayPopNum {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--sv2-text-primary);
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+.dayPopNumToday {
+  background: var(--sv2-accent-primary);
+  color: var(--sv2-accent-primary-text);
+}
+.dayPopWd {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sv2-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dayPopClose {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--sv2-text-muted);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dayPopClose:hover {
+  background: var(--sv2-color-slate-100);
+  color: var(--sv2-text-primary);
+}
+.dayPopList {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.dayPopItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.dayPopItem:hover {
+  background: var(--sv2-color-slate-50);
+}
+.dayPopDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sv2-lesson-accent, var(--sv2-accent-primary));
+  flex-shrink: 0;
+}
+.dayPopTime {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sv2-text-primary);
+  font-variant-numeric: tabular-nums;
+  width: 56px;
+  flex-shrink: 0;
+}
+.dayPopName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sv2-text-primary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* === Lesson drawer === */
+.drawer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+.drawerOpen {
+  pointer-events: auto;
+}
+
+.drawerOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  opacity: 0;
+  transition: opacity 0.25s var(--sv2-ease);
+}
+.drawerOpen .drawerOverlay {
+  opacity: 1;
+}
+
+.drawerPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100vw);
+  background: var(--sv2-surface-card);
+  box-shadow: -16px 0 40px -12px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s var(--sv2-ease);
+  overflow: hidden;
+}
+.drawerOpen .drawerPanel {
+  transform: translateX(0);
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--sv2-border-subtle);
+}
+.drawerHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.drawerAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sv2-color-slate-100);
+  color: var(--sv2-text-primary);
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.drawerHeadText {
+  min-width: 0;
+}
+.drawerName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--sv2-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawerSubj {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--sv2-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawerHeadActions {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.drawerIconBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--sv2-color-slate-100);
+  color: var(--sv2-text-secondary);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.drawerIconBtn:hover {
+  background: var(--sv2-color-slate-200);
+  color: var(--sv2-text-primary);
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.rowLabel {
+  color: var(--sv2-text-muted);
+  font-weight: 500;
+}
+.rowValue {
+  color: var(--sv2-text-primary);
+  font-weight: 600;
+  text-align: right;
+}
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 4px;
+}
+.pillWarn {
+  background: rgba(244, 63, 94, 0.12);
+  color: #be123c;
+}
+.pillOk {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.section {
+  padding-top: 8px;
+  border-top: 1px solid var(--sv2-border-subtle);
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sv2-text-primary);
+}
+
+/* Маленькая иконка-кнопка справа от заголовка секции (+/pencil/√/×).
+   Уменьшенная версия .footIconBtn — 24px, без border. */
+.sectionAction {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--sv2-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  flex-shrink: 0;
+}
+.sectionAction:hover {
+  background: var(--sv2-color-slate-100);
+  color: var(--sv2-text-primary);
+}
+.sectionAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sectionActionPrimary {
+  color: var(--sv2-color-emerald-600);
+}
+.sectionActionPrimary:hover {
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.checkItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--sv2-text-primary);
+  padding: 4px 0;
+  border-radius: 6px;
+}
+.check {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 2px solid #cbd5e1;
+  flex-shrink: 0;
+  position: relative;
+  background: var(--sv2-surface-card);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.checkChecked {
+  background: var(--sv2-accent-primary);
+  border-color: var(--sv2-accent-primary);
+}
+.checkChecked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid var(--sv2-accent-primary-text, #111827);
+  border-bottom: 2px solid var(--sv2-accent-primary-text, #111827);
+  transform: rotate(45deg);
+}
+.checkText {
+  flex: 1;
+  min-width: 0;
+}
+.checkItemDone .checkText {
+  color: var(--sv2-text-muted);
+  text-decoration: line-through;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sv2-border-subtle);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.fileIcon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 63, 94, 0.12);
+  color: #be123c;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.fileIconAudio {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+.fileIconImage {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+.fileIconDoc {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+.fileName {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--sv2-text-primary);
+  font-weight: 500;
+}
+
+.notesView {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sv2-text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  min-height: 20px;
+}
+.notesEmpty {
+  color: var(--sv2-text-faint);
+  font-style: italic;
+}
+
+.drawerFoot {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--sv2-border-subtle);
+  background: var(--sv2-color-slate-50);
+}
+.btn {
+  flex: 1;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--sv2-border-default);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.btnGhost {
+  background: var(--sv2-surface-card);
+  color: var(--sv2-text-primary);
+}
+.btnGhost:hover {
+  background: var(--sv2-color-slate-100);
+}
+.btnPrimary {
+  flex: 1.4;
+  background: var(--sv2-accent-primary);
+  border-color: transparent;
+  color: var(--sv2-accent-primary-text);
+}
+.btnPrimary:hover {
+  background: var(--sv2-accent-primary-hover);
+}
+
+/* Нежно-красная для деструктивных действий (Отменить, Удалить).
+   Цвета согласованы с уже используемыми в проекте красными: rgba(244, 63, 94, …) + #be123c. */
+.btnDanger {
+  background: rgba(244, 63, 94, 0.1);
+  color: #be123c;
+  border-color: transparent;
+}
+.btnDanger:hover {
+  background: rgba(244, 63, 94, 0.16);
+  color: #9f1239;
+}
+
+.btnSuccess {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: transparent;
+}
+.btnSuccess:hover {
+  background: rgba(16, 185, 129, 0.18);
+  color: #065f46;
+}
+
+/* Иконочные действия слева в footer (Перенести / Отменить / Удалить).
+   Квадратные пиллы с радиусом, такой же высоты как primary "Редактировать". */
+.footIconBtn {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--sv2-border-default);
+  background: var(--sv2-surface-card);
+  color: var(--sv2-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.footIconBtn:hover {
+  background: var(--sv2-color-slate-50);
+  color: var(--sv2-text-primary);
+  border-color: var(--sv2-border-strong);
+}
+.footIconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.footIconBtn:disabled:hover {
+  background: var(--sv2-surface-card);
+  color: var(--sv2-text-secondary);
+  border-color: var(--sv2-border-default);
+}
+.footIconBtnDanger {
+  color: #be123c;
+}
+.footIconBtnDanger:hover {
+  background: rgba(244, 63, 94, 0.1);
+  color: #9f1239;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+.footSpacer {
+  flex: 1;
+}
+/* На primary "Редактировать" в новом раскладе нужна более скромная гибкость:
+   3 иконки слева + спейсер + primary справа. */
+.btnPrimaryWide {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+/* Иконка серии (loop) на чипах/блоках уроков. */
+.seriesGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-500));
+  opacity: 0.7;
+}
+.seriesGlyph svg {
+  width: 100%;
+  height: 100%;
+}
+.weekBlockSeries {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 12px;
+  height: 12px;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-500));
+  opacity: 0.7;
+  pointer-events: none;
+}
+.dayBlockSeries {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--sv2-lesson-time, var(--sv2-color-slate-500));
+  opacity: 0.6;
+  pointer-events: none;
+}

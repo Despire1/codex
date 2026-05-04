@@ -13,7 +13,8 @@ type HomeworkRoutesV2Parsers = {
 };
 
 type HomeworkRoutesV2Handlers = {
-  createFilePresignUploadV2: (req: IncomingMessage, body: Record<string, unknown>) => unknown;
+  createFilePresignUploadV2: (user: { id: number }, body: Record<string, unknown>) => Promise<unknown> | unknown;
+  getStorageQuotaV2: (user: { id: number }) => Promise<unknown>;
   listHomeworkGroupsV2: (user: unknown, params: { includeArchived?: boolean }) => Promise<unknown>;
   createHomeworkGroupV2: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   updateHomeworkGroupV2: (user: unknown, groupId: number, body: Record<string, unknown>) => Promise<unknown>;
@@ -97,8 +98,16 @@ export const tryHandleHomeworkRoutesV2 = async ({
   handlers,
 }: TryHandleHomeworkRoutesV2Payload) => {
   if (req.method === 'POST' && pathname === '/api/v2/files/presign-upload') {
+    const user = requireApiUser() as { id: number };
     const body = await readBody(req);
-    const data = handlers.createFilePresignUploadV2(req, body);
+    const data = await handlers.createFilePresignUploadV2(user, body);
+    sendJson(res, 200, data);
+    return true;
+  }
+
+  if (req.method === 'GET' && pathname === '/api/v2/files/quota') {
+    const user = requireApiUser() as { id: number };
+    const data = await handlers.getStorageQuotaV2(user);
     sendJson(res, 200, data);
     return true;
   }

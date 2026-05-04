@@ -5,6 +5,8 @@ import { AnalyticsSection } from '../../widgets/analytics/AnalyticsSection';
 import { DashboardHome } from '../../widgets/dashboard/DashboardHome';
 import { HomeworksSection } from '../../widgets/homeworks/HomeworksSection';
 import { ScheduleSection } from '../../widgets/schedule/ScheduleSection';
+import { ScheduleSectionV2 } from '../../widgets/scheduleV2/ScheduleSectionV2';
+import { SCHEDULE_V2_ENABLED } from '../config/featureFlags';
 import { SettingsSection } from '../../widgets/settings/SettingsSection';
 import { StudentDashboardSection } from '../../widgets/student-dashboard/StudentDashboardSection';
 import { StudentSettingsSection } from '../../widgets/student-settings/StudentSettingsSection';
@@ -82,6 +84,14 @@ const LegacyHomeworkTemplateEditRedirect: FC = () => {
   return <Navigate to={`${tabPathById.homeworks}/${templateId ?? ''}/edit`} replace />;
 };
 
+const LegacyStudentHomeworkAssignmentRedirect: FC = () => {
+  const { assignmentId } = useParams<{ assignmentId?: string }>();
+  if (!assignmentId || !/^\d+$/.test(assignmentId)) {
+    return <Navigate to={tabPathById.homeworks} replace />;
+  }
+  return <Navigate to={`${tabPathById.homeworks}/assignments/${assignmentId}`} replace />;
+};
+
 const AppRoutesComponent: FC<AppRoutesProps> = ({
   isStudentRole,
   resolveLastVisitedPath,
@@ -110,7 +120,7 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
           }
         />
         <Route
-          path={`${tabPathById.homeworks}/:assignmentId`}
+          path={`${tabPathById.homeworks}/assignments/:assignmentId`}
           element={
             <>
               <HomeworksSection {...homeworks} />
@@ -118,6 +128,7 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
             </>
           }
         />
+        <Route path={`${tabPathById.homeworks}/:assignmentId`} element={<LegacyStudentHomeworkAssignmentRedirect />} />
         <Route
           path={tabPathById.settings}
           element={
@@ -162,7 +173,7 @@ const AppRoutesComponent: FC<AppRoutesProps> = ({
         path={tabPathById.schedule}
         element={
           <>
-            <ScheduleSection {...schedule} />
+            {SCHEDULE_V2_ENABLED ? <ScheduleSectionV2 {...schedule} /> : <ScheduleSection {...schedule} />}
             <TeacherScheduleHints />
           </>
         }

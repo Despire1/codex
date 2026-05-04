@@ -25,6 +25,19 @@ type AutomationDependencies = {
   sendTeacherLessonReminder: (payload: Record<string, unknown>) => Promise<unknown>;
   sendStudentLessonReminder: (payload: Record<string, unknown>) => Promise<unknown>;
   sendTeacherOnboardingNudge: (payload: { teacherId: bigint; scheduledFor: Date }) => Promise<unknown>;
+  sendTeacherPostLessonPrompt: (payload: {
+    teacherId: bigint;
+    lessonId: number;
+    scheduledFor?: Date;
+    dedupeKey?: string;
+  }) => Promise<unknown>;
+  sendTeacherPaymentPrompt: (payload: {
+    teacherId: bigint;
+    lessonId: number;
+    scheduledFor?: Date;
+    dedupeKey?: string;
+  }) => Promise<unknown>;
+  sendTeacherTrialDigest: (payload: { teacherId: bigint; trialStart: Date; trialEnd: Date }) => Promise<unknown>;
   resolveTimeZone: (timeZone?: string | null) => string;
   toZonedDate: (date: Date, timeZone?: string | null) => Date;
   toUtcDateFromTimeZone: (dateKey: string, time: string, timeZone?: string | null) => Date;
@@ -61,6 +74,9 @@ export const createAutomationService = ({
   sendTeacherLessonReminder,
   sendStudentLessonReminder,
   sendTeacherOnboardingNudge,
+  sendTeacherPostLessonPrompt,
+  sendTeacherPaymentPrompt,
+  sendTeacherTrialDigest,
   toZonedDate,
   toUtcDateFromTimeZone,
   formatInTimeZone,
@@ -109,6 +125,8 @@ export const createAutomationService = ({
     return { inQuietHours: true, nextSendAt };
   };
 
+  const POST_LESSON_PROMPT_FRESH_HOURS = 24;
+
   const runLessonAutomationTick = async () => {
     if (isLessonAutomationRunning) return;
     isLessonAutomationRunning = true;
@@ -117,6 +135,28 @@ export const createAutomationService = ({
       const teachers = await prisma.teacher.findMany();
 
       for (const teacher of teachers) {
+        if (!teacher.autoConfirmLessons) {
+          let scheduledLessons = await prisma.lesson.findMany({
+            where: { teacherId: teacher.chatId, isSuppressed: false, status: 'SCHEDULED', startAt: { lt: now } },
+          });
+          scheduledLessons = await filterSuppressedLessons(prisma, scheduledLessons);
+          for (const lesson of scheduledLessons) {
+            const lessonEnd = resolveLessonEndTime(lesson);
+            if (lessonEnd + AUTO_CONFIRM_GRACE_MINUTES * 60_000 > now.getTime()) continue;
+            if (lessonEnd + POST_LESSON_PROMPT_FRESH_HOURS * 60 * 60_000 < now.getTime()) continue;
+            try {
+              await sendTeacherPostLessonPrompt({
+                teacherId: teacher.chatId,
+                lessonId: lesson.id,
+                scheduledFor: now,
+                dedupeKey: `TEACHER_POST_LESSON_PROMPT:${lesson.id}`,
+              });
+            } catch (error) {
+              console.error('Не удалось отправить post-lesson prompt', error);
+            }
+          }
+        }
+
         if (teacher.autoConfirmLessons) {
           let scheduledLessons = await prisma.lesson.findMany({
             where: { teacherId: teacher.chatId, isSuppressed: false, status: 'SCHEDULED', startAt: { lt: now } },
@@ -182,6 +222,31 @@ export const createAutomationService = ({
             await settleLessonPayments(lesson.id, teacher.chatId);
           } catch (error) {
             console.error('Не удалось списать баланс по уроку', error);
+          }
+        }
+
+        const paymentPromptFreshAfter = new Date(now.getTime() - POST_LESSON_PROMPT_FRESH_HOURS * 60 * 60_000);
+        let paymentPromptCandidates = await prisma.lesson.findMany({
+          where: {
+            teacherId: teacher.chatId,
+            isSuppressed: false,
+            status: 'COMPLETED',
+            paymentStatus: 'UNPAID',
+            paidSource: 'NONE',
+            completedAt: { gte: paymentPromptFreshAfter },
+          },
+        });
+        paymentPromptCandidates = await filterSuppressedLessons(prisma, paymentPromptCandidates);
+        for (const lesson of paymentPromptCandidates) {
+          try {
+            await sendTeacherPaymentPrompt({
+              teacherId: teacher.chatId,
+              lessonId: lesson.id,
+              scheduledFor: now,
+              dedupeKey: `TEACHER_PAYMENT_PROMPT:${lesson.id}`,
+            });
+          } catch (error) {
+            console.error('Не удалось отправить payment prompt', error);
           }
         }
 
@@ -329,6 +394,51 @@ export const createAutomationService = ({
     }
   };
 
+  const TRIAL_DIGEST_BEFORE_END_HOURS = 3 * 24;
+  const TRIAL_DIGEST_TICK_HOURS = 1;
+  const TRIAL_MAX_DURATION_DAYS = 15;
+
+  const runTrialDigestTick = async () => {
+    const now = new Date();
+    const cutoffStart = new Date(now.getTime() - TRIAL_DIGEST_TICK_HOURS * 60 * 60_000);
+    const targetWindowStart = new Date(cutoffStart.getTime() + TRIAL_DIGEST_BEFORE_END_HOURS * 60 * 60_000);
+    const targetWindowEnd = new Date(now.getTime() + TRIAL_DIGEST_BEFORE_END_HOURS * 60 * 60_000);
+
+    const candidates = await prisma.user.findMany({
+      where: {
+        role: 'TEACHER',
+        subscriptionTrialUsed: true,
+        subscriptionStartAt: { not: null },
+        subscriptionEndAt: { gte: targetWindowStart, lt: targetWindowEnd },
+      },
+      select: {
+        telegramUserId: true,
+        subscriptionStartAt: true,
+        subscriptionEndAt: true,
+      },
+    });
+
+    for (const candidate of candidates) {
+      const start = candidate.subscriptionStartAt;
+      const end = candidate.subscriptionEndAt;
+      if (!start || !end) continue;
+      const durationMs = end.getTime() - start.getTime();
+      if (durationMs > TRIAL_MAX_DURATION_DAYS * 24 * 60 * 60_000) continue;
+      try {
+        await sendTeacherTrialDigest({
+          teacherId: candidate.telegramUserId,
+          trialStart: start,
+          trialEnd: end,
+        });
+      } catch (error) {
+        console.error('Не удалось отправить trial-дайджест', {
+          teacherId: candidate.telegramUserId.toString(),
+          error,
+        });
+      }
+    }
+  };
+
   const runOnboardingNudgeTick = async () => {
     const now = new Date();
     const startedBefore = new Date(now.getTime() - ONBOARDING_NUDGE_DELAY_MS);
@@ -430,6 +540,7 @@ export const createAutomationService = ({
     runLessonAutomationTick,
     runNotificationTick,
     runOnboardingNudgeTick,
+    runTrialDigestTick,
     cleanupSessions,
     cleanupNotificationLogs,
     scheduleDailySessionCleanup,

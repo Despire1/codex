@@ -4,6 +4,7 @@ import { EditOutlinedIcon, PersonOutlineIcon } from '../../../icons/MaterialIcon
 import { isValidEmail, normalizeEmail } from '../../../shared/lib/email';
 import controls from '../../../shared/styles/controls.module.css';
 import styles from '../SettingsSection.module.css';
+import { StorageQuotaCard } from './StorageQuotaCard';
 
 interface ProfileSettingsProps {
   teacher: Teacher;
@@ -157,6 +158,8 @@ export const ProfileSettings: FC<ProfileSettingsProps> = ({
           </div>
         </fieldset>
       </section>
+
+      <StorageQuotaCard />
     </div>
   );
 };

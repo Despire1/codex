@@ -39,6 +39,7 @@ import {
   normalizeHomeworkAssignmentProblemFiltersV2,
   normalizeHomeworkAssignmentsSortV2,
   normalizeHomeworkAssignmentsTabV2,
+  assertHomeworkAttachmentsWithinLimits,
   normalizeHomeworkAttachments,
   normalizeHomeworkBlocks,
   normalizeHomeworkGroupBgColor,
@@ -62,7 +63,11 @@ import {
   sortHomeworkAssignmentsV2,
   toValidDate,
 } from './shared';
-import { buildHomeworkNotificationText, sendHomeworkNotificationToStudent } from './notifications';
+import {
+  buildHomeworkNotificationText,
+  sendHomeworkNotificationToStudent,
+  sendHomeworkSubmissionNotificationToTeacher,
+} from './notifications';
 
 type RequestRole = 'TEACHER' | 'STUDENT';
 
@@ -897,6 +902,10 @@ export const createHomeworkV2Service = ({
     const deadlineAt =
       toValidDate(body.deadlineAt) ??
       (await resolveHomeworkDefaultDeadline(teacher.chatId, studentId, lessonId)).deadlineAt;
+    // TEA-394: блокируем создание ДЗ с дедлайном в прошлом — иначе оно сразу OVERDUE.
+    if (deadlineAt && deadlineAt.getTime() < Date.now() && resolvedStatus !== 'DRAFT') {
+      throw createHttpError('Дедлайн должен быть в будущем.', 400);
+    }
 
     // TEA-24: Идемпотентность создания черновика из шаблона.
     // Если для (teacher, student, template) уже есть неотправленный DRAFT — переиспользуем его,
@@ -1052,6 +1061,14 @@ export const createHomeworkV2Service = ({
     }
     if ('deadlineAt' in body) data.deadlineAt = toValidDate(body.deadlineAt);
     if ('contentSnapshot' in body) {
+      // TEA-393: даже если бы canTeacherEditAssignment пропустил, явно блокируем
+      // изменение contentSnapshot для не-DRAFT/SCHEDULED статусов — defense in depth.
+      if (existingWorkflow.persistedStatus !== 'DRAFT' && existingWorkflow.persistedStatus !== 'SCHEDULED') {
+        throw createHttpError(
+          'Содержимое выданной домашки изменить нельзя. Отмените выдачу, отредактируйте и выдайте заново.',
+          409,
+        );
+      }
       data.contentSnapshot = JSON.stringify(normalizeHomeworkBlocks(body.contentSnapshot));
     }
 
@@ -1102,12 +1119,17 @@ export const createHomeworkV2Service = ({
     });
 
     if (teacher.homeworkNotifyOnAssign) {
+      const studentForTz = await (prisma as any).student.findUnique({
+        where: { id: updated.studentId },
+        select: { timezone: true },
+      });
+      const tzForStudent = studentForTz?.timezone ?? teacher.timezone;
       await sendHomeworkNotificationToStudent({
         teacherId: teacher.chatId,
         studentId: updated.studentId,
         type: 'HOMEWORK_ASSIGNED',
         dedupeKey: `HOMEWORK_ASSIGNED:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
-        text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
+        text: buildHomeworkNotificationText('ASSIGNED', updated, tzForStudent),
         assignmentId: updated.id,
       });
     }
@@ -1269,12 +1291,24 @@ export const createHomeworkV2Service = ({
       },
     });
 
+    // TEA-375: при reissue удаляем недо-проверенные submissions (DRAFT/SUBMITTED),
+    // чтобы новая попытка начиналась с чистого листа. REVIEWED — история, остаётся.
+    await (prisma as any).homeworkSubmission.deleteMany({
+      where: {
+        assignmentId,
+        status: { in: ['DRAFT', 'SUBMITTED'] },
+      },
+    });
+
     if (teacher.homeworkNotifyOnAssign) {
+      // TEA-402: добавляем случайный nonce и id записи, чтобы две одновременные операции reissue
+      // в пределах одной миллисекунды получили разные dedupeKey (sentAt при гонке может совпасть).
+      const reissueNonce = Math.random().toString(36).slice(2, 10);
       await sendHomeworkNotificationToStudent({
         teacherId: teacher.chatId,
         studentId: updated.studentId,
         type: 'HOMEWORK_ASSIGNED',
-        dedupeKey: `HOMEWORK_ASSIGNED:REISSUE:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}`,
+        dedupeKey: `HOMEWORK_ASSIGNED:REISSUE:${updated.id}:${updated.sentAt?.toISOString?.() ?? Date.now()}:${reissueNonce}`,
         text: buildHomeworkNotificationText('ASSIGNED', updated, teacher.timezone),
         assignmentId: updated.id,
       });
@@ -1637,7 +1671,42 @@ export const createHomeworkV2Service = ({
     const answerText = typeof body.answerText === 'string' ? body.answerText : null;
     const attachments = normalizeHomeworkAttachments(body.attachments);
     const voice = normalizeHomeworkAttachments(body.voice);
-    const testAnswers = parseObjectRecord(body.testAnswers);
+    assertHomeworkAttachmentsWithinLimits(attachments as Array<{ size?: number }>, 'homeworkSubmission');
+    assertHomeworkAttachmentsWithinLimits(voice as Array<{ size?: number }>, 'homeworkSubmissionVoice');
+    const rawTestAnswers = parseObjectRecord(body.testAnswers);
+    // TEA-390: отбрасываем ключи testAnswers, не присутствующие в contentSnapshot.questions —
+    // иначе клиент мог бы протащить «ответы» на несуществующие вопросы.
+    let testAnswers = rawTestAnswers;
+    if (rawTestAnswers) {
+      const validQuestionIds = new Set<string>();
+      const blocks = Array.isArray(assignment.contentSnapshot)
+        ? assignment.contentSnapshot
+        : (() => {
+            try {
+              const parsed = JSON.parse(assignment.contentSnapshot ?? '[]');
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })();
+      for (const block of blocks) {
+        if (!block || (block as any).type !== 'TEST') continue;
+        const questions = Array.isArray((block as any).questions) ? (block as any).questions : [];
+        for (const question of questions) {
+          if (typeof (question as any)?.id === 'string') validQuestionIds.add((question as any).id);
+        }
+      }
+      const filtered: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rawTestAnswers)) {
+        // TEA-400: пропускаем null/undefined/пустые строки — это «не отвечено», не «ответ»;
+        // TEA-390: и ключи, не относящиеся к реальным question.id.
+        if (!validQuestionIds.has(key)) continue;
+        if (value === null || value === undefined) continue;
+        if (typeof value === 'string' && value.trim() === '') continue;
+        filtered[key] = value;
+      }
+      testAnswers = Object.keys(filtered).length > 0 ? filtered : null;
+    }
     const autoScore = resolveHomeworkAutoScoreForSubmission(assignment.contentSnapshot, testAnswers);
     const submittedAt = new Date();
     const submittedAttemptState = shouldSubmit
@@ -1700,6 +1769,28 @@ export const createHomeworkV2Service = ({
           })
         : assignment;
 
+    if (shouldSubmit && assignmentUpdateData.status === 'SUBMITTED') {
+      try {
+        const studentRecord = await (prisma as any).student.findUnique({ where: { id: studentId } });
+        const studentName =
+          studentRecord?.username ||
+          [studentRecord?.firstName, studentRecord?.lastName].filter(Boolean).join(' ').trim() ||
+          `Ученик #${studentId}`;
+        await sendHomeworkSubmissionNotificationToTeacher({
+          teacherId: assignment.teacherId,
+          studentId,
+          assignmentId,
+          submissionId: submission.id,
+          studentName,
+          assignmentTitle: assignment.title ?? '',
+          attemptNo: targetAttempt,
+          dedupeKey: `HOMEWORK_SUBMITTED:${assignmentId}:${submission.id}`,
+        });
+      } catch (error) {
+        console.error('Failed to notify teacher about homework submission', error);
+      }
+    }
+
     return {
       submission: serializeHomeworkSubmissionV2(submission),
       assignment: serializeHomeworkAssignmentV2(updatedAssignment),
@@ -1727,7 +1818,8 @@ export const createHomeworkV2Service = ({
           orderBy: [{ attemptNo: 'desc' }, { id: 'desc' }],
         });
     if (!submission) throw createHttpError('Попытка не найдена', 404);
-    if (normalizeHomeworkSubmissionStatus(submission.status) !== 'SUBMITTED') {
+    const submissionStatus = normalizeHomeworkSubmissionStatus(submission.status);
+    if (submissionStatus !== 'SUBMITTED' && submissionStatus !== 'REVIEWED') {
       throw createHttpError('Проверять можно только отправленную попытку.', 409);
     }
 
@@ -1978,19 +2070,24 @@ export const createHomeworkV2Service = ({
     });
 
     for (const assignment of scheduledAssignments) {
-      const updated = await (prisma as any).homeworkAssignment.updateMany({
-        where: { id: assignment.id, status: 'SCHEDULED' },
-        data: { status: 'SENT', sentAt: now },
-      });
-      if (!updated.count || !teacher.homeworkNotifyOnAssign) continue;
-      await sendHomeworkNotificationToStudent({
-        teacherId: assignment.teacherId,
-        studentId: assignment.studentId,
-        type: 'HOMEWORK_ASSIGNED',
-        dedupeKey: `HOMEWORK_ASSIGNED:SCHEDULED:${assignment.id}`,
-        text: buildHomeworkNotificationText('ASSIGNED', assignment, teacher.timezone),
-        assignmentId: assignment.id,
-      });
+      try {
+        const updated = await (prisma as any).homeworkAssignment.updateMany({
+          where: { id: assignment.id, status: 'SCHEDULED' },
+          data: { status: 'SENT', sentAt: now },
+        });
+        if (!updated.count || !teacher.homeworkNotifyOnAssign) continue;
+        await sendHomeworkNotificationToStudent({
+          teacherId: assignment.teacherId,
+          studentId: assignment.studentId,
+          type: 'HOMEWORK_ASSIGNED',
+          dedupeKey: `HOMEWORK_ASSIGNED:SCHEDULED:${assignment.id}`,
+          text: buildHomeworkNotificationText('ASSIGNED', assignment, teacher.timezone),
+          assignmentId: assignment.id,
+        });
+      } catch (error) {
+        // TEA-397: одиночная ошибка не должна валить весь tick — остальные scheduled должны быть отправлены.
+        console.error('Failed to dispatch SCHEDULED homework assignment', assignment.id, error);
+      }
     }
   };
 

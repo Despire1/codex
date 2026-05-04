@@ -149,15 +149,7 @@ export const createLessonSchedulingService = ({
     const endZonedBase = params.repeatUntil
       ? toZonedDate(params.repeatUntil, resolvedTimeZone)
       : addYears(anchorZoned, 1);
-    const endCursor = new Date(
-      endZonedBase.getFullYear(),
-      endZonedBase.getMonth(),
-      endZonedBase.getDate(),
-      0,
-      0,
-      0,
-      0,
-    );
+    const endCursor = new Date(endZonedBase.getFullYear(), endZonedBase.getMonth(), endZonedBase.getDate(), 0, 0, 0, 0);
     const timeLabel = format(anchorZoned, 'HH:mm');
     const occurrences: Date[] = [];
 
@@ -424,7 +416,7 @@ export const createLessonSchedulingService = ({
     const meetingLink = resolveMeetingLinkValue(body?.meetingLink);
     const startDate = new Date(startAt);
     if (Number.isNaN(startDate.getTime())) throw new Error('Некорректная дата урока');
-    ensureLessonDateIsWorkingDay(startDate, teacher);
+    if (!body?.allowWeekend) ensureLessonDateIsWorkingDay(startDate, teacher);
 
     const links = await prisma.teacherStudent.findMany({
       where: { teacherId: teacher.chatId, studentId: { in: studentIds }, isArchived: false },

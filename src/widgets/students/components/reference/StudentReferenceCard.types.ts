@@ -13,4 +13,5 @@ export interface StudentReferenceCardProps extends StudentReferenceCardQuickActi
   onOpenStudent: (studentId: number) => void;
   onEditStudent: (studentId: number) => void;
   onDeleteStudent: (studentId: number) => void;
+  onToggleCompletion: (studentId: number) => void;
 }

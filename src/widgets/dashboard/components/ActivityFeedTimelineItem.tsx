@@ -72,7 +72,21 @@ export const ActivityFeedTimelineItem: FC<ActivityFeedTimelineItemProps> = ({ it
         {!isLast && <span className={styles.line} />}
       </div>
       <div className={styles.content}>
-        <div className={styles.time}>{presentation.timeLabel}</div>
+        <div className={styles.time}>
+          <span>{presentation.timeLabel}</span>
+          {presentation.groupedCount ? (
+            <span
+              className={styles.groupedBadge}
+              title={presentation.groupedRangeLabel ?? undefined}
+              aria-label={`${presentation.groupedCount} обновлений${presentation.groupedRangeLabel ? `, ${presentation.groupedRangeLabel}` : ''}`}
+            >
+              ×{presentation.groupedCount}
+              {presentation.groupedRangeLabel ? (
+                <span className={styles.groupedBadgeRange}>{presentation.groupedRangeLabel}</span>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
         <div className={styles.message}>{renderHighlightedMessage(presentation.message, item.studentName)}</div>
         {presentation.details && <div className={styles.details}>{presentation.details}</div>}
         {showBotCta && botUsername ? (

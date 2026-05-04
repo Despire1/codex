@@ -1,7 +1,12 @@
 import crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { addDays } from 'date-fns';
-import type { HomeworkAssignment, HomeworkBlock, HomeworkSubmission, HomeworkTestQuestion } from '../../../../entities/types';
+import type {
+  HomeworkAssignment,
+  HomeworkBlock,
+  HomeworkSubmission,
+  HomeworkTestQuestion,
+} from '../../../../entities/types';
 import {
   HomeworkAssignmentBucketId,
   HomeworkAssignmentsTabId,
@@ -19,14 +24,15 @@ import {
   isHomeworkQuestionAutoGradable,
   resolveHomeworkQuizCapabilities,
 } from '../../../../entities/homework-template/model/lib/quizProgress';
-import { buildHomeworkReviewItems, normalizeReviewPoints } from '../../../../features/homework-review/model/lib/questionReview';
 import {
-  formatInTimeZone,
-  resolveTimeZone,
-  toUtcDateFromTimeZone,
-} from '../../../../shared/lib/timezoneDates';
+  buildHomeworkReviewItems,
+  normalizeReviewPoints,
+} from '../../../../features/homework-review/model/lib/questionReview';
+import { formatInTimeZone, resolveTimeZone, toUtcDateFromTimeZone } from '../../../../shared/lib/timezoneDates';
+import { FILE_LIMITS, FILE_LIMIT_MESSAGES, type FileLimitContext } from '../../../../shared/config/fileLimits';
 import prisma from '../../../prismaClient';
 import { clampNumber } from '../../lib/runtimeLimits';
+import { UploadLimitError } from '../fileLimits';
 
 export type HttpError = Error & { statusCode?: number };
 
@@ -120,20 +126,48 @@ export const normalizeHomeworkAttachments = (value: unknown) => {
   if (Array.isArray(value)) {
     const normalized = value
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-      .map((item) => ({
-        id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
-        url: normalizeHomeworkAttachmentUrl(item.url),
-        fileName: typeof item.fileName === 'string' ? item.fileName : '',
-        size: Number.isFinite(Number(item.size)) ? Math.max(0, Number(item.size)) : 0,
-      }))
+      .map((item) => {
+        const fileObjectIdRaw = typeof item.fileObjectId === 'string' ? item.fileObjectId.trim() : '';
+        const base: Record<string, unknown> = {
+          id: typeof item.id === 'string' ? item.id : crypto.randomUUID(),
+          url: normalizeHomeworkAttachmentUrl(item.url),
+          fileName: typeof item.fileName === 'string' ? item.fileName : '',
+          size: Number.isFinite(Number(item.size)) ? Math.max(0, Number(item.size)) : 0,
+        };
+        if (fileObjectIdRaw) base.fileObjectId = fileObjectIdRaw;
+        return base as { id: string; url: string; fileName: string; size: number; fileObjectId?: string };
+      })
       .filter((item) => item.url);
     return Array.from(
-      new Map(
-        normalized.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const),
-      ).values(),
+      new Map(normalized.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const)).values(),
     );
   }
   return parseObjectArray(value);
+};
+
+export const assertHomeworkAttachmentsWithinLimits = (
+  attachments: Array<{ size?: number }>,
+  ctx: FileLimitContext,
+): void => {
+  const maxCount =
+    ctx === 'homeworkSubmissionVoice'
+      ? FILE_LIMITS.maxVoiceFilesPerSubmission
+      : ctx === 'homeworkSubmission'
+        ? FILE_LIMITS.maxFilesPerSubmission
+        : ctx === 'homeworkTemplate'
+          ? FILE_LIMITS.maxFilesPerHomeworkTemplate
+          : ctx === 'lesson'
+            ? FILE_LIMITS.maxFilesPerLesson
+            : FILE_LIMITS.maxFilesPerSeries;
+  if (attachments.length > maxCount) {
+    throw new UploadLimitError('too_many_files', FILE_LIMIT_MESSAGES.tooManyFiles(ctx, maxCount));
+  }
+  for (const a of attachments) {
+    const sz = Number(a.size ?? 0);
+    if (Number.isFinite(sz) && sz > FILE_LIMITS.maxFileBytes) {
+      throw new UploadLimitError('file_too_large', FILE_LIMIT_MESSAGES.fileTooLarge());
+    }
+  }
 };
 
 export type HomeworkAssignmentBucketV2 = HomeworkAssignmentBucketId;
@@ -227,9 +261,7 @@ export const normalizeHomeworkAssignmentsSortV2 = (value: unknown): HomeworkAssi
   return 'urgency';
 };
 
-export const normalizeHomeworkAssignmentProblemFiltersV2 = (
-  value: unknown,
-): HomeworkAssignmentProblemFilterV2[] => {
+export const normalizeHomeworkAssignmentProblemFiltersV2 = (value: unknown): HomeworkAssignmentProblemFilterV2[] => {
   const rawItems = Array.isArray(value)
     ? value
     : typeof value === 'string'
@@ -250,9 +282,7 @@ export const normalizeHomeworkAssignmentProblemFiltersV2 = (
 
 export const attachLatestSubmissionMetaToAssignments = async (items: any[]) => {
   if (!items.length) return items;
-  const assignmentIds = items
-    .map((item) => Number(item.id))
-    .filter((id) => Number.isFinite(id) && id > 0);
+  const assignmentIds = items.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
   if (!assignmentIds.length) return items;
 
   const submissions = await (prisma as any).homeworkSubmission.findMany({
@@ -307,9 +337,7 @@ export const attachAssignmentDisplayMeta = async (teacherId: bigint, assignments
     const workflow = resolveHomeworkAssignmentWorkflow(assignment, now);
     const studentLink = linkByStudentId.get(assignment.studentId);
     const studentName =
-      studentLink?.customName?.trim() ||
-      assignment.student?.username?.trim() ||
-      `Ученик #${assignment.studentId}`;
+      studentLink?.customName?.trim() || assignment.student?.username?.trim() || `Ученик #${assignment.studentId}`;
     return {
       ...assignment,
       studentName,
@@ -588,8 +616,16 @@ export const buildHomeworkReviewResultV2 = ({
       : Number.isFinite(draftScore)
         ? normalizeReviewPoints(Number(draftScore), item.maxPoints)
         : normalizeReviewPoints(item.initialPoints, item.maxPoints);
+    let decision: 'ACCEPTED' | 'REWORK_REQUIRED';
+    if (reviewItem?.decision) {
+      decision = reviewItem.decision;
+    } else if (!item.answered) {
+      decision = 'ACCEPTED';
+    } else {
+      decision = score >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED';
+    }
     acc[item.id] = {
-      decision: reviewItem?.decision ?? (score >= item.maxPoints ? 'ACCEPTED' : 'REWORK_REQUIRED'),
+      decision,
       score,
       comment: reviewItem?.comment ?? (typeof draftComment === 'string' && draftComment.trim() ? draftComment : null),
     };
@@ -727,35 +763,38 @@ export const finalizeTimedOutDraftSubmission = async (
     autoScore,
     submittedAt,
   });
-  const [updatedSubmission, updatedAssignment] = await Promise.all([
-    (prisma as any).homeworkSubmission.update({
-      where: { id: draftSubmission.id },
-      data: {
-        status: attemptState.submissionStatus,
-        submittedAt,
-        reviewedAt: attemptState.submissionReviewedAt,
-        autoScore: attemptState.autoScore,
-        manualScore: null,
-        finalScore: attemptState.finalScore,
-      },
-    }),
-    (prisma as any).homeworkAssignment.update({
-      where: { id: assignment.id },
-      data: {
-        status: attemptState.assignmentStatus,
-        autoScore: attemptState.autoScore,
-        manualScore: null,
-        finalScore: attemptState.finalScore,
-        reviewedAt: attemptState.assignmentReviewedAt,
-        teacherComment: null,
-      },
-    }),
-  ]);
-
-  return {
-    assignment: updatedAssignment,
-    submission: updatedSubmission,
-  };
+  // TEA-398: атомарный finalize — оба update в одной транзакции, чтобы исключить
+  // расхождение submission.status и assignment.status при сетевой ошибке.
+  try {
+    const [updatedSubmission, updatedAssignment] = await (prisma as any).$transaction([
+      (prisma as any).homeworkSubmission.update({
+        where: { id: draftSubmission.id },
+        data: {
+          status: attemptState.submissionStatus,
+          submittedAt,
+          reviewedAt: attemptState.submissionReviewedAt,
+          autoScore: attemptState.autoScore,
+          manualScore: null,
+          finalScore: attemptState.finalScore,
+        },
+      }),
+      (prisma as any).homeworkAssignment.update({
+        where: { id: assignment.id },
+        data: {
+          status: attemptState.assignmentStatus,
+          autoScore: attemptState.autoScore,
+          manualScore: null,
+          finalScore: attemptState.finalScore,
+          reviewedAt: attemptState.assignmentReviewedAt,
+          teacherComment: null,
+        },
+      }),
+    ]);
+    return { assignment: updatedAssignment, submission: updatedSubmission };
+  } catch (error) {
+    console.error('Failed to finalize timed-out homework submission', draftSubmission.id, error);
+    return null;
+  }
 };
 
 export const assignmentWasExplicitlyReissued = (assignment: any, latestSubmission: any) => {
@@ -776,11 +815,17 @@ const normalizeAnswerString = (value: unknown, caseSensitive = false) => {
 
 const normalizeQuestionPoints = (question: Record<string, unknown>) => {
   const points = Number(question.points);
-  if (!Number.isFinite(points) || points <= 0) return 1;
+  if (question.points === null || question.points === undefined) return 1;
+  if (!Number.isFinite(points) || points <= 0) {
+    throw createHttpError(`Балл вопроса должен быть больше 0 (получено: ${question.points})`, 400);
+  }
   return points;
 };
 
-export const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], testAnswersRaw: unknown): number | null => {
+export const calculateHomeworkAutoScore = (
+  blocks: Record<string, unknown>[],
+  testAnswersRaw: unknown,
+): number | null => {
   const answers = parseObjectRecord(testAnswersRaw) ?? {};
   const questions = blocks
     .filter((block) => block.type === 'TEST')
@@ -970,9 +1015,7 @@ export const calculateHomeworkAutoScore = (blocks: Record<string, unknown>[], te
       const tablePartialCredit =
         tableRecord.partialCredit === undefined ? undefined : Boolean(tableRecord.partialCredit);
       const allowPartialCredit =
-        question.allowPartialCredit === undefined
-          ? (tablePartialCredit ?? true)
-          : Boolean(question.allowPartialCredit);
+        question.allowPartialCredit === undefined ? (tablePartialCredit ?? true) : Boolean(question.allowPartialCredit);
       if (allowPartialCredit) {
         earned += (correctCells / totalCells) * points;
       } else if (correctCells === totalCells) {
@@ -1017,6 +1060,5 @@ export const resolveHomeworkFallbackDeadline = (now: Date, timeZone?: string | n
 };
 
 export const resolveHomeworkAttemptLimit = (contentSnapshot: unknown) =>
-  readHomeworkTemplateQuizSettingsFromBlocks(
-    normalizeHomeworkBlocks(contentSnapshot) as unknown as HomeworkBlock[],
-  ).attemptsLimit;
+  readHomeworkTemplateQuizSettingsFromBlocks(normalizeHomeworkBlocks(contentSnapshot) as unknown as HomeworkBlock[])
+    .attemptsLimit;

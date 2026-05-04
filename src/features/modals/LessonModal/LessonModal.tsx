@@ -77,6 +77,9 @@ interface LessonModalProps {
   onCancelLesson?: () => void;
   variant?: 'modal' | 'sheet';
   focusTarget?: LessonModalFocus;
+  /** Если true — модалка не сдвигает выбранную дату с выходного на ближайший рабочий
+      (когда пользователь явно подтвердил создание на выходной). */
+  allowWeekend?: boolean;
 }
 
 export const LessonModal: FC<LessonModalProps> = ({
@@ -98,6 +101,7 @@ export const LessonModal: FC<LessonModalProps> = ({
   onCancelLesson,
   variant = 'modal',
   focusTarget = 'full',
+  allowWeekend = false,
 }) => {
   const timeZone = useTimeZone();
   const isSheet = variant === 'sheet';
@@ -128,11 +132,12 @@ export const LessonModal: FC<LessonModalProps> = ({
   }, [draft.meetingLink, normalizedMeetingLink]);
   const dateSelectionError = useMemo(() => {
     if (!draft.date) return null;
+    if (allowWeekend) return null;
     const selectedDate = toZonedDate(toUtcDateFromTimeZone(draft.date, '00:00', timeZone), timeZone);
     return isDateInWeekdayList(selectedDate, normalizedWeekendWeekdays)
       ? 'Это выходной день. На него нельзя поставить занятие.'
       : null;
-  }, [draft.date, normalizedWeekendWeekdays, timeZone]);
+  }, [allowWeekend, draft.date, normalizedWeekendWeekdays, timeZone]);
   const recurringWeekendError = useMemo(
     () =>
       draft.isRecurring && hasWeekdayOverlap(draft.repeatWeekdays, normalizedWeekendWeekdays)
@@ -238,6 +243,7 @@ export const LessonModal: FC<LessonModalProps> = ({
       return;
     }
     if (isEditing) return;
+    if (allowWeekend) return;
     if (weekendAdjustedRef.current) return;
     if (!draft.date) return;
     if (normalizedWeekendWeekdays.length === 0) return;
@@ -259,7 +265,7 @@ export const LessonModal: FC<LessonModalProps> = ({
       }
     }
     weekendAdjustedRef.current = true;
-  }, [draft, isEditing, normalizedWeekendWeekdays, onDraftChange, open, timeZone]);
+  }, [draft, isEditing, normalizedWeekendWeekdays, onDraftChange, open, timeZone, allowWeekend]);
 
   const handleOpenMeetingLink = () => {
     if (!normalizedMeetingLink || meetingLinkError) return;

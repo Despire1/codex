@@ -11,6 +11,8 @@ export type ActivityTimelinePresentation = {
   message: string;
   details: string | null;
   tone: ActivityTimelineTone;
+  groupedCount: number | null;
+  groupedRangeLabel: string | null;
 };
 
 const sentence = (value: string) => {
@@ -466,10 +468,18 @@ export const buildActivityTimelinePresentation = (
       ? resolveFailureDetails(item)
       : (lessonDetails ?? notificationDetails ?? item.details?.trim() ?? null);
 
+  const groupedCount = typeof item.groupedCount === 'number' && item.groupedCount > 1 ? item.groupedCount : null;
+  const groupedRangeLabel =
+    groupedCount && item.groupedFirstOccurredAt
+      ? `с ${formatInTimeZone(item.groupedFirstOccurredAt, 'HH:mm', { timeZone })}`
+      : null;
+
   return {
     timeLabel: resolveTimeLabel(item.occurredAt, timeZone),
     message,
     details: baseDetails && item.category === 'STUDENT' ? normalizeStudentDetails(baseDetails) : baseDetails,
     tone,
+    groupedCount,
+    groupedRangeLabel,
   };
 };

@@ -38,6 +38,7 @@ interface StudentsReferenceListViewProps {
   onAddStudent: () => void;
   onEditStudent: (studentId: number) => void;
   onDeleteStudent: (studentId: number) => void;
+  onToggleCompletion: (studentId: number) => void;
   onScheduleLesson?: (studentId: number) => void;
   onWriteStudent?: (studentId: number) => void;
   onTopUpBalance?: (studentId: number) => void;
@@ -86,6 +87,7 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
   onAddStudent,
   onEditStudent,
   onDeleteStudent,
+  onToggleCompletion,
   onScheduleLesson,
   onWriteStudent,
   onTopUpBalance,
@@ -266,6 +268,7 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                     onOpenStudent={onOpenStudent}
                     onEditStudent={onEditStudent}
                     onDeleteStudent={onDeleteStudent}
+                    onToggleCompletion={onToggleCompletion}
                     onScheduleLesson={onScheduleLesson}
                     onWriteStudent={onWriteStudent}
                     onTopUpBalance={onTopUpBalance}
@@ -294,6 +297,7 @@ export const StudentsReferenceListView: FC<StudentsReferenceListViewProps> = ({
                   onOpenStudent={onOpenStudent}
                   onEditStudent={onEditStudent}
                   onDeleteStudent={onDeleteStudent}
+                  onToggleCompletion={onToggleCompletion}
                   onScheduleLesson={onScheduleLesson}
                   onWriteStudent={onWriteStudent}
                   onTopUpBalance={onTopUpBalance}

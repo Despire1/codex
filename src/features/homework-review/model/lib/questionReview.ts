@@ -100,11 +100,7 @@ const resolveAnswerSummary = (
 
   if (kind === 'CHOICE' && question.type === 'SINGLE_CHOICE') {
     const selected =
-      typeof answer === 'string'
-        ? answer
-        : Array.isArray(answer) && typeof answer[0] === 'string'
-          ? answer[0]
-          : '';
+      typeof answer === 'string' ? answer : Array.isArray(answer) && typeof answer[0] === 'string' ? answer[0] : '';
     if (!selected) return 'Ответ не выбран';
     return resolveChoiceOptionText(question, selected);
   }
@@ -197,7 +193,13 @@ const resolveCorrectSummary = (question: HomeworkTestQuestion): string | null =>
 
   if (kind === 'TABLE') {
     const rows = (question.table?.rows ?? [])
-      .map((row) => `${row.lead}: ${(row.answers ?? []).map((item) => item.trim()).filter(Boolean).join(', ')}`)
+      .map(
+        (row) =>
+          `${row.lead}: ${(row.answers ?? [])
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .join(', ')}`,
+      )
       .filter(Boolean);
     return rows.length > 0 ? rows.join(' | ') : null;
   }
@@ -279,9 +281,7 @@ const evaluateQuestion = (question: HomeworkTestQuestion, answer: unknown): Ques
     if (correctIds.length === 0) {
       return { ratio: null, isAutoGradable: false, status: 'manual' };
     }
-    const selectedIds = Array.isArray(answer)
-      ? answer.filter((item): item is string => typeof item === 'string')
-      : [];
+    const selectedIds = Array.isArray(answer) ? answer.filter((item): item is string => typeof item === 'string') : [];
     const correctSet = new Set(correctIds);
     const selectedSet = new Set(selectedIds);
     let correctSelected = 0;
@@ -301,9 +301,8 @@ const evaluateQuestion = (question: HomeworkTestQuestion, answer: unknown): Ques
     if (pairs.length === 0) {
       return { ratio: null, isAutoGradable: false, status: 'manual' };
     }
-    const answerMap = answer && typeof answer === 'object' && !Array.isArray(answer)
-      ? (answer as Record<string, unknown>)
-      : {};
+    const answerMap =
+      answer && typeof answer === 'object' && !Array.isArray(answer) ? (answer as Record<string, unknown>) : {};
     const correctPairs = pairs.reduce((sum, pair) => {
       return typeof answerMap[pair.left] === 'string' && String(answerMap[pair.left]) === pair.right ? sum + 1 : sum;
     }, 0);
@@ -367,9 +366,8 @@ const evaluateQuestion = (question: HomeworkTestQuestion, answer: unknown): Ques
     if (rows.length === 0) {
       return { ratio: null, isAutoGradable: false, status: 'manual' };
     }
-    const answerMap = answer && typeof answer === 'object' && !Array.isArray(answer)
-      ? (answer as Record<string, unknown>)
-      : {};
+    const answerMap =
+      answer && typeof answer === 'object' && !Array.isArray(answer) ? (answer as Record<string, unknown>) : {};
     const caseSensitive = Boolean(question.caseSensitive);
     let totalCells = 0;
     let correctCells = 0;
@@ -410,9 +408,7 @@ const evaluateQuestion = (question: HomeworkTestQuestion, answer: unknown): Ques
     }
     const caseSensitive = Boolean(question.caseSensitive);
     const normalizedAnswer = normalizeAnswerString(answer, caseSensitive);
-    const isCorrect = accepted.some(
-      (value) => normalizeAnswerString(value, caseSensitive) === normalizedAnswer,
-    );
+    const isCorrect = accepted.some((value) => normalizeAnswerString(value, caseSensitive) === normalizedAnswer);
     const ratio = isCorrect ? 1 : 0;
     return { ratio, isAutoGradable: true, status: resolveEvaluationStatus(ratio) };
   }
@@ -445,9 +441,10 @@ export const buildHomeworkReviewItems = (
   assignment: HomeworkAssignment,
   submission: HomeworkSubmission,
 ): HomeworkReviewItem[] => {
-  const testAnswers = submission.testAnswers && typeof submission.testAnswers === 'object' && !Array.isArray(submission.testAnswers)
-    ? (submission.testAnswers as Record<string, unknown>)
-    : {};
+  const testAnswers =
+    submission.testAnswers && typeof submission.testAnswers === 'object' && !Array.isArray(submission.testAnswers)
+      ? (submission.testAnswers as Record<string, unknown>)
+      : {};
   const result: HomeworkReviewItem[] = [];
 
   let order = 0;
@@ -483,13 +480,14 @@ export const buildHomeworkReviewItems = (
   const responseConfig = resolveAssignmentResponseConfig(assignment);
   const allQuestionKinds = new Set(
     result
-      .filter((item): item is HomeworkReviewItem & { question: HomeworkTestQuestion } => item.kind === 'QUESTION' && Boolean(item.question))
+      .filter(
+        (item): item is HomeworkReviewItem & { question: HomeworkTestQuestion } =>
+          item.kind === 'QUESTION' && Boolean(item.question),
+      )
       .map((item) => resolveQuestionKind(item.question!)),
   );
   const hasTestItems = result.length > 0;
-  const responsePoints = hasTestItems
-    ? { text: 2, attachments: 1, voice: 1 }
-    : { text: 4, attachments: 3, voice: 3 };
+  const responsePoints = hasTestItems ? { text: 2, attachments: 1, voice: 1 } : { text: 4, attachments: 3, voice: 3 };
 
   if (responseConfig.allowText || submission.answerText?.trim()) {
     order += 1;
@@ -505,7 +503,7 @@ export const buildHomeworkReviewItems = (
       typeLabel: 'Свободный ответ',
       hint: 'Проверьте связность, грамматику и полноту',
       maxPoints: responsePoints.text,
-      initialPoints: answered ? responsePoints.text : 0,
+      initialPoints: 0,
       studentAnswerSummary: submission.answerText?.trim() || 'Текстовый ответ не добавлен',
       correctAnswerSummary: null,
       answered,
@@ -514,7 +512,15 @@ export const buildHomeworkReviewItems = (
     });
   }
 
-  if ((responseConfig.allowFiles || responseConfig.allowPhotos || responseConfig.allowDocuments || responseConfig.allowAudio || responseConfig.allowVideo || submission.attachments.length > 0) && !allQuestionKinds.has('FILE')) {
+  if (
+    (responseConfig.allowFiles ||
+      responseConfig.allowPhotos ||
+      responseConfig.allowDocuments ||
+      responseConfig.allowAudio ||
+      responseConfig.allowVideo ||
+      submission.attachments.length > 0) &&
+    !allQuestionKinds.has('FILE')
+  ) {
     order += 1;
     const answered = submission.attachments.length > 0;
     result.push({
@@ -528,10 +534,8 @@ export const buildHomeworkReviewItems = (
       typeLabel: 'Вложения',
       hint: 'Проверьте соответствие и качество материалов',
       maxPoints: responsePoints.attachments,
-      initialPoints: answered ? responsePoints.attachments : 0,
-      studentAnswerSummary: answered
-        ? `Загружено файлов: ${submission.attachments.length}`
-        : 'Файлы не загружены',
+      initialPoints: 0,
+      studentAnswerSummary: answered ? `Загружено файлов: ${submission.attachments.length}` : 'Файлы не загружены',
       correctAnswerSummary: null,
       answered,
       isAutoGradable: false,
@@ -553,7 +557,7 @@ export const buildHomeworkReviewItems = (
       typeLabel: 'Голос',
       hint: 'Оцените произношение и полноту ответа',
       maxPoints: responsePoints.voice,
-      initialPoints: answered ? responsePoints.voice : 0,
+      initialPoints: 0,
       studentAnswerSummary: answered
         ? `Голосовых сообщений: ${submission.voice.length}`
         : 'Голосовой ответ не добавлен',

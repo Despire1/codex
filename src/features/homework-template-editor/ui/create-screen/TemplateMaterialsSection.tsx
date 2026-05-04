@@ -163,10 +163,11 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
     const oversizedFiles = pickedFiles.filter((file) => file.size > MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES);
     const validFiles = pickedFiles.filter((file) => file.size <= MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES);
 
+    const maxMb = Math.round(MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES / (1024 * 1024));
     if (validFiles.length === 0) {
       setError(
         oversizedFiles.length > 0
-          ? `Каждый файл должен быть до 50MB. Не подходят: ${oversizedFiles.map((file) => file.name).join(', ')}`
+          ? `Каждый файл должен быть до ${maxMb} МБ. Не подходят: ${oversizedFiles.map((file) => file.name).join(', ')}`
           : 'Выберите хотя бы один файл',
       );
       return;
@@ -176,7 +177,15 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
     setUploading(true);
 
     try {
-      const results = await Promise.allSettled(validFiles.map((file) => uploadFileToHomeworkStorage(file)));
+      const baseCount = attachments.length;
+      const results = await Promise.allSettled(
+        validFiles.map((file, idx) =>
+          uploadFileToHomeworkStorage(file, 'homework-student-attachment', {
+            kind: 'homeworkTemplate',
+            currentCount: baseCount + idx,
+          }),
+        ),
+      );
       const uploaded: HomeworkAttachment[] = [];
       const failedNames: string[] = [];
 
@@ -194,7 +203,7 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
 
       const problems: string[] = [];
       if (oversizedFiles.length > 0) {
-        problems.push(`Больше 50MB: ${oversizedFiles.map((file) => file.name).join(', ')}`);
+        problems.push(`Больше ${maxMb} МБ: ${oversizedFiles.map((file) => file.name).join(', ')}`);
       }
       if (failedNames.length > 0) {
         problems.push(`Не загрузились: ${failedNames.join(', ')}`);
@@ -259,17 +268,15 @@ export const TemplateMaterialsSection: FC<TemplateMaterialsSectionProps> = ({
         <div className={styles.materialsList}>
           {materialItems.map((item) => (
             <article key={item.attachment.id} className={styles.materialCard}>
-              <div className={`${styles.typeBadge} ${TYPE_BADGE_CLASS_MAP[item.kind]}`}>{resolveTypeIcon(item.kind)}</div>
+              <div className={`${styles.typeBadge} ${TYPE_BADGE_CLASS_MAP[item.kind]}`}>
+                {resolveTypeIcon(item.kind)}
+              </div>
               <div className={styles.materialContent}>
                 <Tooltip content={item.title}>
-                  <h4 className={styles.materialTitle}>
-                    {item.title}
-                  </h4>
+                  <h4 className={styles.materialTitle}>{item.title}</h4>
                 </Tooltip>
                 <Tooltip content={item.details}>
-                  <p className={styles.materialMeta}>
-                    {item.details}
-                  </p>
+                  <p className={styles.materialMeta}>{item.details}</p>
                 </Tooltip>
               </div>
               <div className={styles.materialActions}>

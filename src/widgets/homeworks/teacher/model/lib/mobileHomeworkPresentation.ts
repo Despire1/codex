@@ -11,10 +11,7 @@ import {
   resolveHomeworkLibrarySearchText,
   resolveHomeworkLibraryUpdatedLabel,
 } from './homeworkLibraryPresentation';
-import {
-  formatAssignmentStatus,
-  resolveAssignmentResponseMeta,
-} from './assignmentPresentation';
+import { formatAssignmentStatus, resolveAssignmentResponseMeta } from './assignmentPresentation';
 
 export type MobileLibraryScope = 'all' | 'active' | 'favorites' | 'archived';
 export type MobileLibrarySort = 'updated' | 'title' | 'issued';
@@ -57,7 +54,10 @@ export const resolveMobileTemplateCollection = (template: HomeworkTemplate) =>
 export const resolveDraftChangedLabel = (assignment: HomeworkAssignment) => {
   const date = new Date(assignment.updatedAt);
   if (Number.isNaN(date.getTime())) return 'Изменён недавно';
-  return `Изменён ${formatDistanceToNow(date, { addSuffix: true, locale: ru })}`;
+  // TEA-354: future timestamps (clock skew) → «только что».
+  const safeDate = date.getTime() > Date.now() ? new Date() : date;
+  if (Date.now() - safeDate.getTime() < 60_000) return 'Изменён только что';
+  return `Изменён ${formatDistanceToNow(safeDate, { addSuffix: true, locale: ru })}`;
 };
 
 export const resolveDraftSavedLabel = (assignment: HomeworkAssignment) => {

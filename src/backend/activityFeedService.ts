@@ -30,6 +30,71 @@ type ActivityEventLogPayload = {
   payload?: Record<string, unknown> | null;
   occurredAt?: Date;
   dedupeKey?: string | null;
+  /** false → отключить авто-сворачивание для конкретного вызова. */
+  collapsible?: boolean;
+};
+
+const COLLAPSE_WINDOW_MS = 30 * 60 * 1000;
+const COLLAPSE_HISTORY_LIMIT = 20;
+const GROUPED_PAYLOAD_KEY = '_grouped';
+
+const NON_COLLAPSIBLE_ACTIONS = new Set([
+  'CREATE',
+  'CREATE_RECURRING',
+  'DELETE',
+  'DELETE_FOLLOWING',
+  'CONVERT_TO_SERIES',
+  'SEND',
+  'REMIND',
+  'REMIND_PAYMENT',
+  'AUTO_COMPLETE',
+]);
+
+type GroupedMeta = {
+  count: number;
+  firstOccurredAt: string;
+  history: { occurredAt: string; payload: Record<string, unknown> | null }[];
+};
+
+const buildAutoDedupeKey = (payload: ActivityEventLogPayload): string | null => {
+  if (payload.collapsible === false) return null;
+  if (NON_COLLAPSIBLE_ACTIONS.has(payload.action)) return null;
+  const lessonId = payload.lessonId ?? null;
+  const studentId = payload.studentId ?? null;
+  const homeworkId = payload.homeworkId ?? null;
+  const entityKind = lessonId ? 'l' : studentId ? 's' : homeworkId ? 'h' : null;
+  const entityId = lessonId ?? studentId ?? homeworkId ?? null;
+  if (!entityKind || entityId === null) return null;
+  const occurredAt = payload.occurredAt ?? new Date();
+  const bucket = Math.floor(occurredAt.getTime() / COLLAPSE_WINDOW_MS);
+  const status = payload.status ?? 'SUCCESS';
+  const source = payload.source ?? 'USER';
+  return `g:${payload.teacherId.toString()}:${payload.category}:${payload.action}:${entityKind}:${entityId}:${status}:${source}:${bucket}`;
+};
+
+const sanitizePayload = (payload: Record<string, unknown> | null): Record<string, unknown> | null => {
+  if (!payload) return null;
+  const cleaned = Object.fromEntries(Object.entries(payload).filter(([key]) => key !== GROUPED_PAYLOAD_KEY));
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+};
+
+const readGroupedMeta = (payload: Record<string, unknown> | null): GroupedMeta | null => {
+  if (!payload) return null;
+  const raw = payload[GROUPED_PAYLOAD_KEY];
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Record<string, unknown>;
+  const count = typeof candidate.count === 'number' && Number.isFinite(candidate.count) ? candidate.count : null;
+  const firstOccurredAt = typeof candidate.firstOccurredAt === 'string' ? candidate.firstOccurredAt : null;
+  const historyRaw = Array.isArray(candidate.history) ? candidate.history : [];
+  if (count === null || !firstOccurredAt) return null;
+  const history = historyRaw
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => ({
+      occurredAt: typeof entry.occurredAt === 'string' ? entry.occurredAt : '',
+      payload: entry.payload && typeof entry.payload === 'object' ? (entry.payload as Record<string, unknown>) : null,
+    }))
+    .filter((entry) => entry.occurredAt);
+  return { count, firstOccurredAt, history };
 };
 
 type FeedItemInternal = ActivityFeedItem & {
@@ -307,7 +372,9 @@ const mapActivityEventToFeedItem = (
   context: FeedItemContext = {},
 ): FeedItemInternal => {
   const parsedCategory = parseCategory(event.category) ?? 'SETTINGS';
-  const payload = withLessonStartAt(parsePayload(event.payload), context.lessonStartAt);
+  const rawPayload = parsePayload(event.payload);
+  const grouped = readGroupedMeta(rawPayload);
+  const cleanPayload = withLessonStartAt(sanitizePayload(rawPayload), context.lessonStartAt);
   return {
     id: `activity_${event.id}`,
     sourceRecord: 'ACTIVITY_EVENT',
@@ -322,7 +389,9 @@ const mapActivityEventToFeedItem = (
     studentName: context.studentName ?? null,
     lessonId: event.lessonId,
     homeworkId: event.homeworkId,
-    payload,
+    payload: cleanPayload,
+    groupedCount: grouped?.count ?? null,
+    groupedFirstOccurredAt: grouped?.firstOccurredAt ?? null,
     _sourceId: event.id,
     _occurredAtMs: event.occurredAt.getTime(),
   };
@@ -604,7 +673,11 @@ export const listActivityFeedForTeacher = async (
 
 export const logActivityEvent = async (payload: ActivityEventLogPayload) => {
   const occurredAt = payload.occurredAt ?? new Date();
-  const serializedPayload = payload.payload ? JSON.stringify(payload.payload) : null;
+  const dedupeKey = payload.dedupeKey ?? buildAutoDedupeKey({ ...payload, occurredAt });
+  const status = payload.status ?? 'SUCCESS';
+  const source = payload.source ?? 'USER';
+  const incomingPayload = payload.payload ?? null;
+
   try {
     return await prisma.activityEvent.create({
       data: {
@@ -614,21 +687,68 @@ export const logActivityEvent = async (payload: ActivityEventLogPayload) => {
         homeworkId: payload.homeworkId ?? null,
         category: payload.category,
         action: payload.action,
-        status: payload.status ?? 'SUCCESS',
-        source: payload.source ?? 'USER',
+        status,
+        source,
         title: payload.title,
         details: payload.details ?? null,
-        payload: serializedPayload,
+        payload: incomingPayload ? JSON.stringify(incomingPayload) : null,
         occurredAt,
-        dedupeKey: payload.dedupeKey ?? null,
+        dedupeKey,
       },
     });
   } catch (error: any) {
-    if (error?.code === 'P2002') {
-      return null;
+    if (error?.code !== 'P2002' || !dedupeKey) {
+      if (error?.code === 'P2002') return null;
+      throw error;
     }
-    throw error;
   }
+
+  const existing = await prisma.activityEvent.findUnique({ where: { dedupeKey } });
+  if (!existing) return null;
+
+  if (payload.collapsible === false) return existing;
+
+  const existingPayload = parsePayload(existing.payload);
+  const existingGrouped = readGroupedMeta(existingPayload);
+  const previousSnapshot = sanitizePayload(existingPayload);
+
+  const newHistoryEntry = {
+    occurredAt: occurredAt.toISOString(),
+    payload: sanitizePayload(incomingPayload),
+  };
+
+  const baseHistory = existingGrouped?.history ?? [];
+  const seedHistory =
+    !existingGrouped && previousSnapshot
+      ? [{ occurredAt: existing.occurredAt.toISOString(), payload: previousSnapshot }]
+      : [];
+  const nextHistory = [...seedHistory, ...baseHistory, newHistoryEntry].slice(-COLLAPSE_HISTORY_LIMIT);
+
+  const nextGrouped: GroupedMeta = {
+    count: existingGrouped ? existingGrouped.count + 1 : 2,
+    firstOccurredAt: existingGrouped?.firstOccurredAt ?? existing.occurredAt.toISOString(),
+    history: nextHistory,
+  };
+
+  const mergedPayload = {
+    ...(sanitizePayload(incomingPayload) ?? {}),
+    [GROUPED_PAYLOAD_KEY]: nextGrouped,
+  };
+
+  return prisma.activityEvent.update({
+    where: { dedupeKey },
+    data: {
+      occurredAt,
+      title: payload.title,
+      details: payload.details ?? null,
+      status,
+      source,
+      payload: JSON.stringify(mergedPayload),
+      studentId: payload.studentId ?? existing.studentId,
+      lessonId: payload.lessonId ?? existing.lessonId,
+      homeworkId: payload.homeworkId ?? existing.homeworkId,
+    },
+  });
 };
 
 export type { ActivityFeedFilters, ActivityEventLogPayload };

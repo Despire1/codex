@@ -95,6 +95,7 @@ model TeacherStudent {
   pricePerLesson     Int     @default(0)
   uiColor            String  @default("#5A8DFF")
   isArchived         Boolean @default(false)
+  completedAt        DateTime?
   payments           Payment[]
 
   teacher Teacher @relation(fields: [teacherId], references: [chatId])
@@ -262,6 +263,11 @@ model Lesson {
   recurrenceUntil     DateTime?
   recurrenceGroupId   String?
   recurrenceWeekdays  String?
+  topic               String?
+  format              String?
+  notes               String?
+  // null = inherits plan from series; "[]" = explicitly empty for this lesson; otherwise overriding plan as JSON.
+  planItemsOverride   String?
   teacher             Teacher             @relation(fields: [teacherId], references: [chatId])
   student             Student             @relation(fields: [studentId], references: [id])
   series              LessonSeries?       @relation(fields: [seriesId], references: [id], onDelete: SetNull)
@@ -272,11 +278,13 @@ model Lesson {
   notificationLogs    NotificationLog[]
   activityEvents      ActivityEvent[]
   homeworkAssignments HomeworkAssignment[]
+  attachments         LessonAttachment[]
   createdAt           DateTime            @default(now())
 
   @@index([recurrenceGroupId])
   @@index([seriesId])
   @@index([seriesId, seriesOriginalStartAt])
+  @@index([teacherId, studentId, startAt])
 }
 
 model ScheduleNote {
@@ -306,6 +314,8 @@ model LessonSeries {
   color              String                 @default("blue")
   meetingLink        String?
   status             String                 @default("ACTIVE")
+  // JSON array of {id, text, completed} — series-default plan, inherited by lessons unless overridden.
+  planItems          String                 @default("[]")
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @default(now()) @updatedAt
 
@@ -313,6 +323,7 @@ model LessonSeries {
   participants       LessonSeriesParticipant[]
   exceptions         LessonSeriesException[]
   lessons            Lesson[]
+  attachments        SeriesAttachment[]
 
   @@index([teacherId, status])
   @@index([teacherId, anchorStartAt])
@@ -396,6 +407,55 @@ model PaymentEvent {
   @@index([createdAt])
 }
 
+model LessonAttachment {
+  id           String   @id
+  lessonId     Int
+  fileObjectId String?
+  fileName     String
+  url          String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  lesson       Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileObject   FileObject? @relation(fields: [fileObjectId], references: [id], onDelete: SetNull)
+
+  @@index([lessonId])
+  @@index([fileObjectId])
+}
+
+model SeriesAttachment {
+  id           String   @id
+  seriesId     Int
+  fileObjectId String
+  fileName     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  series       LessonSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  fileObject   FileObject   @relation(fields: [fileObjectId], references: [id], onDelete: Cascade)
+
+  @@index([seriesId])
+  @@index([fileObjectId])
+}
+
+model FileObject {
+  id           String   @id
+  ownerUserId  Int
+  hash         String
+  mime         String
+  size         Int
+  storageKey   String   @unique
+  createdAt    DateTime @default(now())
+
+  owner        User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  lessonAttachments  LessonAttachment[]
+  seriesAttachments  SeriesAttachment[]
+
+  @@unique([ownerUserId, hash])
+  @@index([ownerUserId])
+  @@index([hash])
+}
+
 model LessonParticipant {
   id        Int      @id @default(autoincrement())
   lessonId  Int
@@ -450,6 +510,7 @@ model User {
   sessions        Session[]
   transferTokens  TransferToken[]
   webPushSubscriptions WebPushSubscription[]
+  fileObjects     FileObject[]
 }
 
 model NotificationLog {

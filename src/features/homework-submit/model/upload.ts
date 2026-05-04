@@ -1,5 +1,6 @@
 import { HomeworkAttachment } from '../../../entities/types';
 import { api } from '../../../shared/api/client';
+import { FILE_LIMITS } from '../../../shared/config/fileLimits';
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').trim();
 
@@ -39,10 +40,19 @@ export const resolveHomeworkStorageUrl = (value: string) => {
   }
 };
 
+type PresignContext = NonNullable<Parameters<typeof api.createFilePresignV2>[0]['context']>;
+
 export const uploadFileToHomeworkStorage = async (
   file: File,
   scope: 'homework-student-attachment' | 'homework-student-voice' = 'homework-student-attachment',
+  context?: PresignContext,
 ): Promise<HomeworkAttachment> => {
+  if (!Number.isFinite(file.size) || file.size <= 0) {
+    throw new Error('upload_failed:invalid_size');
+  }
+  if (file.size > FILE_LIMITS.maxFileBytes) {
+    throw new Error('upload_failed:file_too_large');
+  }
   const contentType = normalizeContentType(file.type);
   let presign: Awaited<ReturnType<typeof api.createFilePresignV2>>;
   try {
@@ -51,6 +61,7 @@ export const uploadFileToHomeworkStorage = async (
       contentType,
       size: file.size,
       scope,
+      context,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'presign_request_failed';
@@ -78,11 +89,24 @@ export const uploadFileToHomeworkStorage = async (
     throw new Error(message || `upload_failed_${response.status}`);
   }
 
+  const parsed = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    fileObjectId?: string;
+    fileUrl?: string;
+    size?: number;
+  } | null;
+  const fileObjectId = parsed?.fileObjectId;
+  const finalFileUrl = parsed?.fileUrl
+    ? resolveHomeworkStorageUrl(parsed.fileUrl)
+    : resolveHomeworkStorageUrl(presign.fileUrl);
+  const finalSize = typeof parsed?.size === 'number' && parsed.size > 0 ? parsed.size : file.size;
+
   return {
     id: createAttachmentId(),
     fileName: file.name,
-    size: file.size,
-    url: resolveHomeworkStorageUrl(presign.fileUrl),
+    size: finalSize,
+    url: finalFileUrl,
+    fileObjectId,
     status: 'ready',
   };
 };

@@ -249,6 +249,12 @@ export const HomeworkTemplateCreateScreen: FC<HomeworkTemplateCreateScreenProps>
     if (!node) return;
 
     node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    node.setAttribute('data-validation-flash', 'true');
+    window.setTimeout(() => {
+      if (node.getAttribute('data-validation-flash') === 'true') {
+        node.removeAttribute('data-validation-flash');
+      }
+    }, 1600);
     if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement || node instanceof HTMLSelectElement) {
       node.focus({ preventScroll: true });
       return;

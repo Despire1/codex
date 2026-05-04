@@ -133,7 +133,7 @@ export const createLessonEditingService = ({
 
     const targetStart = startAt ? new Date(startAt) : existing.startAt;
     if (Number.isNaN(targetStart.getTime())) throw new Error('Некорректная дата урока');
-    ensureLessonDateIsWorkingDay(targetStart, teacher);
+    if (!body?.allowWeekend) ensureLessonDateIsWorkingDay(targetStart, teacher);
 
     const existingLesson = existing as any;
     const normalizedColor = normalizeLessonColor(body?.color ?? existingLesson.color);
@@ -144,7 +144,7 @@ export const createLessonEditingService = ({
     const recurrenceEndRaw = repeatUntil !== undefined ? repeatUntil : undefined;
     const requestedMeetingLink = resolveMeetingLinkValue(body?.meetingLink);
     const resolvedSeriesMeetingLink =
-      requestedMeetingLink === undefined ? existingLesson.meetingLink ?? null : requestedMeetingLink;
+      requestedMeetingLink === undefined ? (existingLesson.meetingLink ?? null) : requestedMeetingLink;
     const scope = normalizeLessonScope(requestedScope ?? (applyToSeries ? 'SERIES' : 'SINGLE'));
     const recurrenceEnd =
       recurrenceEndRaw === undefined ? undefined : recurrenceEndRaw ? new Date(recurrenceEndRaw) : null;
@@ -159,16 +159,15 @@ export const createLessonEditingService = ({
     const existingWeekdays = parseWeekdays(existingLesson.recurrenceWeekdays);
     const recurrenceWeekdaysChanged =
       weekdays !== undefined &&
-      (weekdays.length !== existingWeekdays.length ||
-        weekdays.some((day, index) => day !== existingWeekdays[index]));
+      (weekdays.length !== existingWeekdays.length || weekdays.some((day, index) => day !== existingWeekdays[index]));
     const existingRecurrenceUntilTs = existingLesson.recurrenceUntil
       ? new Date(existingLesson.recurrenceUntil).getTime()
       : null;
     const nextRecurrenceUntilTs =
       recurrenceEnd === undefined ? existingRecurrenceUntilTs : recurrenceEnd ? recurrenceEnd.getTime() : null;
-    const recurrenceUntilChanged =
-      recurrenceEnd !== undefined && existingRecurrenceUntilTs !== nextRecurrenceUntilTs;
-    const structuralChange = participantsChanged || recurrenceWeekdaysChanged || recurrenceUntilChanged || scope !== 'SINGLE';
+    const recurrenceUntilChanged = recurrenceEnd !== undefined && existingRecurrenceUntilTs !== nextRecurrenceUntilTs;
+    const structuralChange =
+      participantsChanged || recurrenceWeekdaysChanged || recurrenceUntilChanged || scope !== 'SINGLE';
 
     return {
       existing,
@@ -368,8 +367,7 @@ export const createLessonEditingService = ({
     const { draft, preview } = previewData;
     const acknowledgeRisk = Boolean(body?.acknowledgeRisk);
     const paymentHandling = normalizeLessonPaymentHandling(body?.paymentHandling);
-    const shouldResetPayment =
-      preview.resolution === 'requiresPaymentReset' && paymentHandling === 'RETURN_TO_BALANCE';
+    const shouldResetPayment = preview.resolution === 'requiresPaymentReset' && paymentHandling === 'RETURN_TO_BALANCE';
     const existingLesson = draft.existingLesson;
 
     if (preview.isBlocked) {
@@ -564,7 +562,8 @@ export const createLessonEditingService = ({
     if (existingLesson.startAt.getTime() !== updatedLesson.startAt.getTime()) changedFields.push('date_time');
     if (existingLesson.durationMinutes !== updatedLesson.durationMinutes) changedFields.push('duration');
     if (draft.participantsChanged) changedFields.push('participants');
-    if ((existingLesson.meetingLink ?? null) !== (updatedLesson.meetingLink ?? null)) changedFields.push('meeting_link');
+    if ((existingLesson.meetingLink ?? null) !== (updatedLesson.meetingLink ?? null))
+      changedFields.push('meeting_link');
     if (existingLesson.color !== updatedLesson.color) changedFields.push('color');
     if (shouldResetPayment) changedFields.push('payment_reset');
 

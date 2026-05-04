@@ -17,11 +17,10 @@ export const resolveNotificationChannelDedupeKey = (
   dedupeKey: string | null | undefined,
   channel: NotificationLogChannel,
 ) => {
-  const normalized =
-    typeof dedupeKey === 'string' && dedupeKey.trim().length > 0 ? dedupeKey.trim() : null;
+  const normalized = typeof dedupeKey === 'string' && dedupeKey.trim().length > 0 ? dedupeKey.trim() : null;
 
   if (!normalized) return null;
-  if (channel === 'TELEGRAM') return normalized;
+  // TEA-378: явно суффиксуем КАЖДЫЙ канал, чтобы разные каналы не перетирали друг друга в логе.
   if (normalized.endsWith(`:${channel}`)) return normalized;
   return `${normalized}:${channel}`;
 };
@@ -37,9 +36,7 @@ export const createNotificationLogEntry = async (payload: {
   dedupeKey?: string | null;
 }) => {
   const normalizedDedupeKey =
-    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0
-      ? payload.dedupeKey.trim()
-      : null;
+    typeof payload.dedupeKey === 'string' && payload.dedupeKey.trim().length > 0 ? payload.dedupeKey.trim() : null;
 
   try {
     const teacherExists = await prisma.teacher.findUnique({
@@ -49,10 +46,26 @@ export const createNotificationLogEntry = async (payload: {
     if (!teacherExists) return null;
 
     if (normalizedDedupeKey) {
-      const existing = await prisma.notificationLog.findUnique({
-        where: { dedupeKey: normalizedDedupeKey },
+      // Atomic INSERT ... ON CONFLICT DO NOTHING via createMany + skipDuplicates.
+      // Если запись уже существовала, count=0 → шлём null, чтобы send не сработал второй раз.
+      const inserted = await prisma.notificationLog.createMany({
+        data: [
+          {
+            teacherId: payload.teacherId,
+            studentId: payload.studentId ?? null,
+            lessonId: payload.lessonId ?? null,
+            type: payload.type,
+            source: payload.source ?? null,
+            channel: payload.channel ?? 'TELEGRAM',
+            scheduledFor: payload.scheduledFor ?? null,
+            status: 'PENDING',
+            dedupeKey: normalizedDedupeKey,
+          },
+        ],
+        skipDuplicates: true,
       });
-      if (existing) return null;
+      if (inserted.count === 0) return null;
+      return prisma.notificationLog.findUnique({ where: { dedupeKey: normalizedDedupeKey } });
     }
 
     return await prisma.notificationLog.create({
@@ -97,16 +110,13 @@ export const finalizeNotificationLogEntry = async (
     },
   });
 
-export const summarizeNotificationChannelDelivery = (
-  results: NotificationChannelDeliveryResult[],
-) => {
+export const summarizeNotificationChannelDelivery = (results: NotificationChannelDeliveryResult[]) => {
   if (results.some((result) => result.status === 'sent')) {
     return { status: 'sent' as const };
   }
 
   const failed = results.filter(
-    (result): result is Extract<NotificationChannelDeliveryResult, { status: 'failed' }> =>
-      result.status === 'failed',
+    (result): result is Extract<NotificationChannelDeliveryResult, { status: 'failed' }> => result.status === 'failed',
   );
   if (failed.length > 0) {
     return {

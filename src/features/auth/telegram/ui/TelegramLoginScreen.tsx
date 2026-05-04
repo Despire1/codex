@@ -239,7 +239,51 @@ export const TelegramLoginScreen: FC<TelegramLoginScreenProps> = ({ onAuthentica
             )}
           </button>
         )}
+        <DevLocalLoginButton />
       </div>
     </Shell>
+  );
+};
+
+/**
+ * Dev-only кнопка: видна только при сборке `import.meta.env.DEV`.
+ * Дёргает /auth/local-dev-login (бэкенд сам отбивает запрос в проде/не-localhost).
+ */
+const DevLocalLoginButton: FC = () => {
+  if (!import.meta.env.DEV) return null;
+  const handleClick = async () => {
+    try {
+      const response = await fetch('/auth/local-dev-login', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        alert('Локальный логин недоступен (NODE_ENV=production или не localhost).');
+        return;
+      }
+      const params = new URLSearchParams(window.location.search);
+      window.location.href = params.get('next') || '/dashboard';
+    } catch (error) {
+      alert(`Не удалось войти под local teacher: ${(error as Error).message}`);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      style={{
+        marginTop: 12,
+        padding: '10px 14px',
+        borderRadius: 12,
+        border: '1px dashed #94a3b8',
+        background: 'transparent',
+        color: '#475569',
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+      }}
+    >
+      Войти как Local teacher (dev)
+    </button>
   );
 };

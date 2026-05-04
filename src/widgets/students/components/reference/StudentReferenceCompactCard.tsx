@@ -1,6 +1,10 @@
 import { type CSSProperties, type FC, type KeyboardEvent, useMemo } from 'react';
 import { Tooltip } from '@/shared/ui/Tooltip/Tooltip';
-import { buildCompactStudentCardPresentation, getStudentDisplayName, getStudentInitials } from '../../model/referencePresentation';
+import {
+  buildCompactStudentCardPresentation,
+  getStudentDisplayName,
+  getStudentInitials,
+} from '../../model/referencePresentation';
 import { StudentReferenceCardMenu } from './StudentReferenceCardMenu';
 import { type StudentReferenceCardProps } from './StudentReferenceCard.types';
 import styles from './StudentReferenceCompactCard.module.css';
@@ -11,6 +15,7 @@ export const StudentReferenceCompactCard: FC<StudentReferenceCardProps> = ({
   onOpenStudent,
   onEditStudent,
   onDeleteStudent,
+  onToggleCompletion,
   onScheduleLesson,
   onWriteStudent,
   onTopUpBalance,
@@ -18,7 +23,8 @@ export const StudentReferenceCompactCard: FC<StudentReferenceCardProps> = ({
 }) => {
   const presentation = useMemo(() => buildCompactStudentCardPresentation(item, timeZone), [item, timeZone]);
   const hasAlerts = presentation.alerts.length > 0;
-  const inactiveStudentHint = 'Ученик ещё не активирован: ему нужно нажать Start в Telegram, чтобы появиться в системе и получать уведомления.';
+  const inactiveStudentHint =
+    'Ученик ещё не активирован: ему нужно нажать Start в Telegram, чтобы появиться в системе и получать уведомления.';
   const accentStyle = useMemo(
     () =>
       ({
@@ -105,8 +111,10 @@ export const StudentReferenceCompactCard: FC<StudentReferenceCardProps> = ({
 
           <StudentReferenceCardMenu
             studentId={item.student.id}
+            isCompleted={Boolean(item.link.completedAt)}
             onEditStudent={onEditStudent}
             onDeleteStudent={onDeleteStudent}
+            onToggleCompletion={onToggleCompletion}
             onScheduleLesson={onScheduleLesson}
             onWriteStudent={onWriteStudent}
             onTopUpBalance={onTopUpBalance}

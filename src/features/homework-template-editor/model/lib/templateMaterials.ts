@@ -1,10 +1,11 @@
 import { HomeworkAttachment } from '../../../../entities/types';
+import { FILE_ACCEPT_ATTRIBUTE, FILE_HINT_TEXT, FILE_LIMITS } from '../../../../shared/config/fileLimits';
 
 export type TemplateMaterialKind = 'pdf' | 'word' | 'image' | 'audio' | 'video' | 'link' | 'file';
 
-export const MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-export const TEMPLATE_MATERIAL_FILE_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.mp3,.mp4';
-export const TEMPLATE_MATERIAL_FILE_HINT = 'PDF, DOC, JPG, PNG, MP3, MP4 до 50MB';
+export const MAX_TEMPLATE_MATERIAL_FILE_SIZE_BYTES = FILE_LIMITS.maxFileBytes;
+export const TEMPLATE_MATERIAL_FILE_ACCEPT = FILE_ACCEPT_ATTRIBUTE;
+export const TEMPLATE_MATERIAL_FILE_HINT = FILE_HINT_TEXT;
 
 const HTTP_PROTOCOL_REGEXP = /^https?:\/\//i;
 const EXTENSION_REGEXP = /\.([a-z0-9]{1,10})$/i;

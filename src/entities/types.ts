@@ -67,6 +67,7 @@ export interface TeacherStudent {
   pricePerLesson: number;
   uiColor?: string | null;
   isArchived?: boolean;
+  completedAt?: string | null;
 }
 
 export type HomeworkStatus = 'DRAFT' | 'ASSIGNED' | 'IN_PROGRESS' | 'DONE';
@@ -76,8 +77,17 @@ export interface HomeworkAttachment {
   url: string;
   fileName: string;
   size: number;
+  fileObjectId?: string;
   status?: 'ready' | 'uploading' | 'error';
 }
+
+/**
+ * Универсальный alias: «прикреплённый файл» одинаково устроен и в домашках, и в уроках.
+ * Используем на фронте/бэке для всех новых мест, где нужно крепить файлы (например, материалы к уроку),
+ * чтобы не плодить параллельные интерфейсы. Серверная таблица отдельная (LessonAttachment),
+ * но shape совпадает со схемой HomeworkAttachment.
+ */
+export type Attachment = HomeworkAttachment;
 
 export interface Homework {
   id: number;
@@ -348,6 +358,20 @@ export interface LessonParticipant {
   student?: Student;
 }
 
+export type LessonFormat =
+  | 'ONLINE_ZOOM'
+  | 'ONLINE_SKYPE'
+  | 'ONLINE_MEET'
+  | 'IN_PERSON_STUDENT'
+  | 'IN_PERSON_OFFICE'
+  | 'OTHER';
+
+export interface LessonPlanItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 export interface Lesson {
   id: number;
   teacherId: number;
@@ -374,6 +398,15 @@ export interface Lesson {
   recurrenceGroupId?: string | null;
   recurrenceWeekdays?: number[] | null;
   participants?: LessonParticipant[];
+  // Schedule v2 fields:
+  topic?: string | null;
+  format?: LessonFormat | null;
+  notes?: string | null;
+  // null = inherits plan from series; [] = explicitly empty for this lesson; non-empty = override.
+  planItemsOverride?: LessonPlanItem[] | null;
+  // Effective plan items (computed server-side from override + series.planItems).
+  planItems?: LessonPlanItem[];
+  attachments?: Attachment[];
 }
 
 export interface WeekendConflictLessonSummary {
@@ -597,6 +630,8 @@ export interface ActivityFeedItem {
   lessonId?: number | null;
   homeworkId?: number | null;
   payload?: Record<string, unknown> | null;
+  groupedCount?: number | null;
+  groupedFirstOccurredAt?: string | null;
 }
 
 export interface ActivityFeedListResponse {

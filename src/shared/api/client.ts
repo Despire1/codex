@@ -569,6 +569,11 @@ export const api = {
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}`, {
       method: 'DELETE',
     }),
+  setStudentCompletion: (studentId: number, completed: boolean) =>
+    apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/completion`, {
+      method: 'POST',
+      body: JSON.stringify({ completed }),
+    }),
   toggleAutoRemind: (studentId: number, value: boolean) =>
     apiFetch<{ link: TeacherStudent }>(`/api/students/${studentId}/auto-remind`, {
       method: 'POST',
@@ -591,6 +596,7 @@ export const api = {
     durationMinutes: number;
     color?: LessonColor;
     meetingLink?: string | null;
+    allowWeekend?: boolean;
   }) => apiFetch<{ lesson: Lesson }>('/api/lessons', { method: 'POST', body: JSON.stringify(payload) }),
   createRecurringLessons: (payload: {
     studentId?: number;
@@ -612,6 +618,7 @@ export const api = {
       studentIds?: number[];
       repeatWeekdays?: number[];
       repeatUntil?: string | null;
+      allowWeekend?: boolean;
     },
   ) =>
     apiFetch<{ preview: LessonMutationPreview }>(`/api/lessons/${id}/preview`, {
@@ -632,6 +639,7 @@ export const api = {
       repeatUntil?: string | null;
       acknowledgeRisk?: boolean;
       paymentHandling?: LessonPaymentHandling;
+      allowWeekend?: boolean;
     },
   ) =>
     apiFetch<{ lesson?: Lesson; lessons?: Lesson[]; links?: TeacherStudent[] }>(`/api/lessons/${id}`, {
@@ -1112,7 +1120,18 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
-  createFilePresignV2: (payload: { fileName: string; contentType: string; size: number; scope?: string }) =>
+  createFilePresignV2: (payload: {
+    fileName: string;
+    contentType: string;
+    size: number;
+    scope?: string;
+    context?:
+      | { kind: 'lesson'; lessonId: number }
+      | { kind: 'series'; seriesId: number }
+      | { kind: 'homeworkTemplate'; currentCount: number }
+      | { kind: 'homeworkSubmission'; currentCount: number }
+      | { kind: 'homeworkSubmissionVoice'; currentCount: number };
+  }) =>
     apiFetch<{
       uploadUrl: string;
       method: 'PUT';
@@ -1124,6 +1143,111 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  // Schedule v2: drawer/edit endpoints
+  getLessonV2: (lessonId: number) => apiFetch<ScheduleV2LessonDetail>(`/api/v2/schedule/lessons/${lessonId}`),
+  updateLessonV2: (lessonId: number, payload: ScheduleV2LessonUpdatePayload) =>
+    apiFetch<ScheduleV2LessonDetail>(`/api/v2/schedule/lessons/${lessonId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  updateSeriesPlanV2: (seriesId: number, planItems: ScheduleV2PlanItem[]) =>
+    apiFetch<{ planItems: ScheduleV2PlanItem[] }>(`/api/v2/schedule/series/${seriesId}/plan`, {
+      method: 'PUT',
+      body: JSON.stringify({ planItems }),
+    }),
+  addLessonAttachmentV2: (
+    lessonId: number,
+    payload: { fileName: string; size: number; url?: string; fileObjectId?: string },
+  ) =>
+    apiFetch<{
+      id: string;
+      fileName: string;
+      url: string;
+      size: number;
+      fileObjectId: string | null;
+    }>(`/api/v2/schedule/lessons/${lessonId}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  removeLessonAttachmentV2: (lessonId: number, attachmentId: string) =>
+    apiFetch<{ ok: true }>(`/api/v2/schedule/lessons/${lessonId}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  listSeriesAttachmentsV2: (seriesId: number) =>
+    apiFetch<
+      Array<{
+        id: string;
+        fileName: string;
+        size: number;
+        fileObjectId: string;
+        url: string | null;
+      }>
+    >(`/api/v2/schedule/series/${seriesId}/attachments`),
+  addSeriesAttachmentV2: (seriesId: number, payload: { fileObjectId: string; fileName: string }) =>
+    apiFetch<{
+      id: string;
+      fileName: string;
+      size: number;
+      fileObjectId: string;
+      url: string;
+    }>(`/api/v2/schedule/series/${seriesId}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  removeSeriesAttachmentV2: (seriesId: number, attachmentId: string) =>
+    apiFetch<{ ok: true }>(`/api/v2/schedule/series/${seriesId}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  getStorageQuotaV2: () =>
+    apiFetch<{
+      usedBytes: number;
+      quotaBytes: number;
+      maxFileBytes: number;
+      maxFilesPerLesson: number;
+      maxFilesPerSeries: number;
+      maxFilesPerHomeworkTemplate: number;
+      maxFilesPerSubmission: number;
+      maxVoiceFilesPerSubmission: number;
+    }>('/api/v2/files/quota'),
+  listStudentTopicsV2: (studentId: number) =>
+    apiFetch<{ topics: { topic: string; usedAt: string }[] }>(`/api/v2/schedule/students/${studentId}/topics`),
+  devSwitchRole: (role: 'TEACHER' | 'STUDENT') =>
+    apiFetch<{
+      user: SessionUser;
+      studentContext: { teacherId: number; studentId: number } | null;
+    }>('/api/_dev/switch-role', {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    }),
 };
+
+export interface ScheduleV2PlanItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface ScheduleV2LessonDetail {
+  id: number;
+  topic: string | null;
+  format: 'ONLINE_ZOOM' | 'ONLINE_SKYPE' | 'ONLINE_MEET' | 'IN_PERSON_STUDENT' | 'IN_PERSON_OFFICE' | 'OTHER' | null;
+  notes: string | null;
+  planItems: ScheduleV2PlanItem[];
+  planSource: 'series' | 'override';
+  planItemsOverride: ScheduleV2PlanItem[] | null;
+  seriesPlanItems: ScheduleV2PlanItem[] | null;
+  attachments: { id: string; fileName: string; url: string; size: number; fileObjectId?: string | null }[];
+  seriesAttachments: { id: string; fileName: string; size: number; fileObjectId: string; url: string | null }[];
+  seriesId: number | null;
+}
+
+export interface ScheduleV2LessonUpdatePayload {
+  topic?: string | null;
+  format?: ScheduleV2LessonDetail['format'];
+  notes?: string | null;
+  price?: number;
+  planItemsOverride?: ScheduleV2PlanItem[] | null;
+  /** ISO-строка нового startAt. Допускается только для уроков без серии. */
+  startAt?: string;
+  /** Новая длительность урока в минутах. Допускается только для уроков без серии. */
+  durationMinutes?: number;
+}
 
 export type ApiClient = typeof api;

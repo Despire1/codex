@@ -39,9 +39,7 @@ const urlBase64ToUint8Array = (value: string) => {
   return outputArray;
 };
 
-const serializePushSubscription = (
-  subscription: PushSubscription,
-): PwaPushSubscriptionPayload | null => {
+const serializePushSubscription = (subscription: PushSubscription): PwaPushSubscriptionPayload | null => {
   const data = subscription.toJSON();
   const endpoint = typeof data.endpoint === 'string' ? data.endpoint.trim() : '';
   const p256dh = typeof data.keys?.p256dh === 'string' ? data.keys.p256dh.trim() : '';
@@ -59,14 +57,22 @@ const serializePushSubscription = (
   };
 };
 
+// TEA-388: на iOS Safari Web Push доступен только в standalone PWA (>=16.4).
+// Если открыто в обычном Safari-табе — Push API хоть и присутствует, не работает,
+// поэтому отказываем в подписке заранее.
+const isLikelyIos = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) && !(window as { MSStream?: unknown }).MSStream;
+};
+
 export const isPwaNotificationSupported = () => {
   if (typeof window === 'undefined') return false;
-  return (
-    'Notification' in window &&
-    'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    window.isSecureContext
-  );
+  const baseSupported =
+    'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window && window.isSecureContext;
+  if (!baseSupported) return false;
+  if (isLikelyIos() && !isStandaloneDisplayMode()) return false;
+  return true;
 };
 
 export const getPwaNotificationPermission = (): PwaNotificationPermission => {

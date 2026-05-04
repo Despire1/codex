@@ -397,10 +397,30 @@ export const createAuthService = (config: AuthServiceConfig) => {
     return hashToken(token);
   };
 
+  /**
+   * Dev-only логин под локальным учителем. Используется кнопкой «Войти как Local teacher»
+   * на странице /login во время локальной разработки. Безопасность:
+   *   • активен только если NODE_ENV !== 'production' (флаг из переменной окружения),
+   *   • дополнительно требует локальный запрос (isLocalhostRequest), чтобы случайно
+   *     включённый dev-бандл в проде не давал прямой вход через интернет.
+   * Возвращает true, если сессия выдана; false — если условия не соблюдены.
+   */
+  const loginAsLocalDev = async (
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse,
+  ): Promise<boolean> => {
+    if (process.env.NODE_ENV === 'production') return false;
+    if (!isLocalhostRequest(req)) return false;
+    const user = await ensureLocalDevUser(config.localDevUser);
+    await createSession(user.id, req, res);
+    return true;
+  };
+
   return {
     createSession,
     getSessionTokenHash,
     getSessionUser,
     resolveSessionUser,
+    loginAsLocalDev,
   };
 };

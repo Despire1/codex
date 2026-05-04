@@ -25,10 +25,7 @@ export const createStudentAccessService = ({
     const normalizedUsername = normalizeTelegramUsername(user.username);
     const students = await prisma.student.findMany({
       where: {
-        OR: [
-          { telegramId: user.telegramUserId },
-          ...(normalizedUsername ? [{ username: normalizedUsername }] : []),
-        ],
+        OR: [{ telegramId: user.telegramUserId }, ...(normalizedUsername ? [{ username: normalizedUsername }] : [])],
       },
       select: { id: true },
     });
@@ -52,19 +49,28 @@ export const createStudentAccessService = ({
     requestedTeacherId?: number | null,
     requestedStudentId?: number | null,
   ) => {
-    const teacherId = Number.isFinite(Number(requestedTeacherId)) ? Number(requestedTeacherId) : null;
-    const studentId = Number.isFinite(Number(requestedStudentId)) ? Number(requestedStudentId) : null;
+    const teacherIdProvided = requestedTeacherId !== null && requestedTeacherId !== undefined;
+    const studentIdProvided = requestedStudentId !== null && requestedStudentId !== undefined;
+    const teacherIdNumeric = teacherIdProvided ? Number(requestedTeacherId) : NaN;
+    const studentIdNumeric = studentIdProvided ? Number(requestedStudentId) : NaN;
+    if (teacherIdProvided && !Number.isFinite(teacherIdNumeric)) return null;
+    if (studentIdProvided && !Number.isFinite(studentIdNumeric)) return null;
+    const teacherId = teacherIdProvided ? teacherIdNumeric : null;
+    const studentId = studentIdProvided ? studentIdNumeric : null;
 
     if (teacherId !== null && studentId !== null) {
-      return links.find((link) => Number(link.teacherId) === teacherId && link.studentId === studentId) ?? null;
+      const matches = links.filter((link) => Number(link.teacherId) === teacherId && link.studentId === studentId);
+      return matches.length === 1 ? matches[0] : null;
     }
 
     if (teacherId !== null) {
-      return links.find((link) => Number(link.teacherId) === teacherId) ?? null;
+      const matches = links.filter((link) => Number(link.teacherId) === teacherId);
+      return matches.length === 1 ? matches[0] : null;
     }
 
     if (studentId !== null) {
-      return links.find((link) => link.studentId === studentId) ?? null;
+      const matches = links.filter((link) => link.studentId === studentId);
+      return matches.length === 1 ? matches[0] : null;
     }
 
     if (links.length === 1) return links[0];

@@ -21,6 +21,8 @@ import {
 } from './webPushService';
 import { inflectFirstName } from '../shared/lib/inflectName';
 import { formatInTimeZone, resolveTimeZone, toZonedDate } from '../shared/lib/timezoneDates';
+import { escapeHtml } from '../shared/lib/htmlEscape';
+import { pluralizeRu } from '../shared/lib/pluralizeRu';
 import {
   DEFAULT_STUDENT_PAYMENT_DUE_TEMPLATE,
   DEFAULT_STUDENT_UPCOMING_LESSON_TEMPLATE,
@@ -37,6 +39,9 @@ type NotificationType =
   | 'TEACHER_DAILY_SUMMARY'
   | 'TEACHER_TOMORROW_SUMMARY'
   | 'TEACHER_ONBOARDING_NUDGE'
+  | 'TEACHER_POST_LESSON_PROMPT'
+  | 'TEACHER_PAYMENT_PROMPT'
+  | 'TEACHER_TRIAL_DIGEST'
   | 'STUDENT_LESSON_REMINDER'
   | 'STUDENT_PAYMENT_REMINDER'
   | 'MANUAL_STUDENT_PAYMENT_REMINDER'
@@ -108,6 +113,7 @@ const sendTelegramWebAppMessage = async (chatId: bigint | number, text: string) 
     throw new Error('TELEGRAM_WEBAPP_URL is required');
   }
   await sendTelegramMessage(chatId, text, {
+    parseMode: 'HTML',
     webAppButton: { label: 'Открыть приложение', url: TELEGRAM_WEBAPP_URL },
   });
 };
@@ -131,7 +137,6 @@ const buildLessonReminderMessage = ({
   startAt,
   durationMinutes,
   studentName,
-  meetingLink,
   timeZone,
   target,
   minutesBefore,
@@ -147,33 +152,17 @@ const buildLessonReminderMessage = ({
   const dayLabel = formatLessonDayLabel(startAt, timeZone);
   const timeLabel = formatInTimeZone(startAt, 'HH:mm', { timeZone: resolveTimeZone(timeZone) });
   const leadTimeLabel = formatLeadTimeLabel(minutesBefore);
-  const leadTimeLine = leadTimeLabel ? `⏱️ До начала: ${leadTimeLabel}` : null;
 
   if (target === 'teacher') {
-    const name = studentName?.trim() || 'учеником';
-    const trimmedLink = meetingLink?.trim();
-    return [
-      '⏰ Напоминание о занятии',
-      `📅 День: ${dayLabel}`,
-      `🕒 Время: ${timeLabel}`,
-      leadTimeLine,
-      `👤 Ученик: ${name}`,
-      `⏳ Длительность: ${durationMinutes} мин`,
-      trimmedLink ? `🔗 Ссылка: ${trimmedLink}` : null,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const safeName = studentName?.trim() ? escapeHtml(studentName.trim()) : 'учеником';
+    const heading = leadTimeLabel
+      ? `⏰ <b>Через ${leadTimeLabel} — урок с ${safeName}</b>`
+      : `⏰ <b>Скоро урок с ${safeName}</b>`;
+    return `${heading}\n\n${dayLabel} · ${timeLabel} · ${durationMinutes} мин`;
   }
 
-  return [
-    '⏰ Скоро занятие',
-    `📅 День: ${dayLabel}`,
-    `🕒 Время: ${timeLabel}`,
-    leadTimeLine,
-    `⏳ Длительность: ${durationMinutes} мин`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const heading = leadTimeLabel ? `⏰ <b>Через ${leadTimeLabel} — занятие</b>` : '⏰ <b>Скоро занятие</b>';
+  return `${heading}\n\n${dayLabel} · ${timeLabel} · ${durationMinutes} мин`;
 };
 
 const formatLessonDateLabel = (startAt: Date, timeZone?: string | null) =>
@@ -217,11 +206,9 @@ const buildTeacherPaymentReminderMessage = ({
   source: 'AUTO' | 'MANUAL';
 }) => {
   const dateLabel = formatLessonDateLabel(startAt, timeZone);
-  const studentDative = inflectFirstName(studentName, 'dative');
-  if (source === 'MANUAL') {
-    return `Готово ✅ Напоминание отправлено ученику ${studentDative} по занятию ${dateLabel}.`;
-  }
-  return `Авто-напоминание отправлено ученику ${studentDative} по занятию ${dateLabel}.`;
+  const studentDative = escapeHtml(inflectFirstName(studentName, 'dative'));
+  const heading = source === 'MANUAL' ? '✅ <b>Напоминание отправлено</b>' : '<b>Авто-напоминание отправлено</b>';
+  return `${heading}\n\n${studentDative} · ${dateLabel}`;
 };
 
 const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: string | null) => {
@@ -233,7 +220,6 @@ const formatTimeRange = (startAt: Date, durationMinutes: number, timeZone?: stri
 
 const buildTeacherDailySummaryMessage = ({
   scope,
-  summaryDate,
   lessons,
   unpaidLessons,
   timeZone,
@@ -245,42 +231,41 @@ const buildTeacherDailySummaryMessage = ({
   timeZone?: string | null;
 }) => {
   const resolvedTimeZone = resolveTimeZone(timeZone);
-  const dayLabel = scope === 'today' ? 'сегодня' : 'завтра';
-  const title = scope === 'today' ? '🌅 Сводка на сегодня' : '🌙 Сводка на завтра';
-  const dateLabel = formatInTimeZone(summaryDate, 'd MMMM', { locale: ru, timeZone: resolvedTimeZone });
+  const dayWord = scope === 'today' ? 'Сегодня' : 'Завтра';
+  const lessonCount = lessons.length;
 
-  const lessonLines =
-    lessons.length > 0
-      ? lessons.map((lesson) => {
-          const timeRange = formatTimeRange(lesson.startAt, lesson.durationMinutes, resolvedTimeZone);
-          const nameLabel = lesson.studentNames.length ? lesson.studentNames.join(', ') : 'ученик';
-          return `• ${timeRange} · ${nameLabel}`;
-        })
-      : [`${dayLabel[0].toUpperCase()}${dayLabel.slice(1)} занятий нет — можно выдохнуть.`];
+  const sections: string[] = [];
 
-  const sections = [
-    title,
-    `📅 ${dayLabel[0].toUpperCase()}${dayLabel.slice(1)}, ${dateLabel}`,
-    '',
-    '📚 Занятия',
-    ...lessonLines,
-  ];
+  if (lessonCount === 0) {
+    sections.push(`📅 <b>${dayWord} занятий нет</b>`);
+  } else {
+    const lessonsLabel = pluralizeRu(lessonCount, { one: 'урок', few: 'урока', many: 'уроков' });
+    sections.push(`📅 <b>${dayWord} — ${lessonsLabel}</b>`);
+    for (const lesson of lessons) {
+      const timeRange = formatTimeRange(lesson.startAt, lesson.durationMinutes, resolvedTimeZone);
+      const safeNames = lesson.studentNames.length
+        ? lesson.studentNames.map((name) => escapeHtml(name)).join(', ')
+        : 'ученик';
+      sections.push(`${timeRange} · ${safeNames}`);
+    }
+  }
 
-  if (scope === 'today') {
-    const unpaidLines =
-      unpaidLessons && unpaidLessons.length > 0
-        ? unpaidLessons.map((lesson) => {
-            const dateTime = formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', {
-              locale: ru,
-              timeZone: resolvedTimeZone,
-            });
-            const priceLabel =
-              lesson.price !== null && Number.isFinite(lesson.price) && lesson.price > 0 ? `${lesson.price} ₽` : '—';
-            return `• ${dateTime} · ${lesson.studentName} · ${priceLabel}`;
-          })
-        : ['✅ Все занятия оплачены.'];
-
-    sections.push('', '💳 Неоплаченные занятия', ...unpaidLines);
+  if (scope === 'today' && unpaidLessons && unpaidLessons.length > 0) {
+    const unpaidLabel = pluralizeRu(unpaidLessons.length, {
+      one: 'урок',
+      few: 'урока',
+      many: 'уроков',
+    });
+    sections.push('', `💰 <b>Не оплачено: ${unpaidLabel}</b>`);
+    for (const lesson of unpaidLessons) {
+      const dateTime = formatInTimeZone(lesson.startAt, 'd MMM, HH:mm', {
+        locale: ru,
+        timeZone: resolvedTimeZone,
+      });
+      const priceLabel =
+        lesson.price !== null && Number.isFinite(lesson.price) && lesson.price > 0 ? ` · ${lesson.price} ₽` : '';
+      sections.push(`${dateTime} · ${escapeHtml(lesson.studentName)}${priceLabel}`);
+    }
   }
 
   return sections.join('\n');
@@ -289,6 +274,56 @@ const buildTeacherDailySummaryMessage = ({
 const isTelegramUnreachableError = (message: string) => {
   const normalized = message.toLowerCase();
   return normalized.includes('chat not found') || normalized.includes('blocked by the user');
+};
+
+const TELEGRAM_DAILY_CAP_PER_RECIPIENT = 6;
+
+const TEACHER_NOTIFICATION_TYPES: NotificationType[] = [
+  'TEACHER_LESSON_REMINDER',
+  'TEACHER_DAILY_SUMMARY',
+  'TEACHER_TOMORROW_SUMMARY',
+  'TEACHER_ONBOARDING_NUDGE',
+  'TEACHER_POST_LESSON_PROMPT',
+  'TEACHER_PAYMENT_PROMPT',
+  'TEACHER_TRIAL_DIGEST',
+  'PAYMENT_REMINDER_TEACHER',
+];
+
+const STUDENT_NOTIFICATION_TYPES: NotificationType[] = [
+  'STUDENT_LESSON_REMINDER',
+  'STUDENT_PAYMENT_REMINDER',
+  'MANUAL_STUDENT_PAYMENT_REMINDER',
+  'PAYMENT_REMINDER_STUDENT',
+];
+
+const isStudentNotificationType = (type: NotificationType) => STUDENT_NOTIFICATION_TYPES.includes(type);
+
+const startOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const isTelegramDailyCapReached = async (params: {
+  type: NotificationType;
+  teacherId: bigint;
+  studentId?: number | null;
+}) => {
+  const since = startOfDay(new Date());
+  const where: Record<string, unknown> = {
+    channel: 'TELEGRAM',
+    status: 'SENT',
+    createdAt: { gte: since },
+  };
+  if (isStudentNotificationType(params.type)) {
+    if (!params.studentId) return false;
+    where.studentId = params.studentId;
+  } else {
+    where.teacherId = params.teacherId;
+    where.NOT = { type: { in: STUDENT_NOTIFICATION_TYPES } };
+  }
+  const count = await prisma.notificationLog.count({ where });
+  return count >= TELEGRAM_DAILY_CAP_PER_RECIPIENT;
 };
 
 const deliverNotificationChannel = async (payload: {
@@ -301,11 +336,23 @@ const deliverNotificationChannel = async (payload: {
   source?: 'AUTO' | 'MANUAL' | null;
   scheduledFor?: Date | null;
   dedupeKey?: string | null;
+  respectDailyCap?: boolean;
   send: () => Promise<void>;
   onFailure?: (message: string) => Promise<void> | void;
 }): Promise<NotificationChannelDeliveryResult> => {
   if (!payload.enabled) {
     return { channel: payload.channel, status: 'skipped' };
+  }
+
+  if (payload.respectDailyCap && payload.channel === 'TELEGRAM') {
+    const capped = await isTelegramDailyCapReached({
+      type: payload.type,
+      teacherId: payload.teacherId,
+      studentId: payload.studentId ?? null,
+    });
+    if (capped) {
+      return { channel: payload.channel, status: 'skipped' };
+    }
   }
 
   const log = await createNotificationLogEntry({
@@ -384,8 +431,10 @@ export const sendTeacherLessonReminder = async ({
       type: 'TEACHER_LESSON_REMINDER',
       scheduledFor,
       dedupeKey,
+      respectDailyCap: true,
       send: () =>
         sendTelegramMessage(teacher.chatId, text, {
+          parseMode: 'HTML',
           webAppButton: lessonLink ? { label: lessonLink.label, url: lessonLink.fullUrl } : null,
         }),
     }),
@@ -474,6 +523,7 @@ export const sendStudentLessonReminder = async ({
       type: 'STUDENT_LESSON_REMINDER',
       scheduledFor,
       dedupeKey,
+      respectDailyCap: true,
       send: () =>
         sendTelegramMessage(telegramId as bigint, normalizedText, {
           webAppButton: lessonLink ? { label: lessonLink.label, url: lessonLink.fullUrl } : null,
@@ -598,10 +648,9 @@ export const sendTeacherOnboardingNudge = async ({
   teacherId: bigint;
   scheduledFor?: Date;
 }) => {
-  const text =
-    'Привет! Быстрый совет: добавь одного ученика — и дальше будет гораздо проще вести занятия и оплаты. Это займёт пару минут.';
+  const text = '<b>Добавьте первого ученика</b>\n\nДальше всё будет логично.';
   const pwaPayload = buildWebPushTextNotificationPayload({
-    text,
+    text: 'Добавьте первого ученика — дальше всё будет логично.',
     defaultTitle: 'TeacherBot',
     path: '/dashboard',
     tag: 'teacher-onboarding-nudge',
@@ -614,6 +663,7 @@ export const sendTeacherOnboardingNudge = async ({
       teacherId,
       type: 'TEACHER_ONBOARDING_NUDGE',
       scheduledFor: scheduledFor ?? null,
+      respectDailyCap: true,
       send: () => sendTelegramWebAppMessage(teacherId, text),
     }),
     deliverNotificationChannel({
@@ -680,8 +730,10 @@ export const sendTeacherDailySummary = async ({
       type,
       scheduledFor,
       dedupeKey,
+      respectDailyCap: true,
       send: () =>
         sendTelegramMessage(teacher.chatId, text, {
+          parseMode: 'HTML',
           webAppButton: summaryLink ? { label: summaryLink.label, url: summaryLink.fullUrl } : null,
         }),
     }),
@@ -770,6 +822,7 @@ export const sendStudentPaymentReminder = async ({
       lessonId,
       type: 'PAYMENT_REMINDER_STUDENT',
       source,
+      respectDailyCap: source === 'AUTO',
       send: () =>
         sendTelegramMessage(telegramId as bigint, normalizedText, {
           webAppButton: paymentStudentLink ? { label: 'Открыть занятие', url: paymentStudentLink.fullUrl } : null,
@@ -843,8 +896,10 @@ export const sendTeacherPaymentReminderNotice = async ({
       lessonId,
       type: 'PAYMENT_REMINDER_TEACHER',
       source,
+      respectDailyCap: source === 'AUTO',
       send: () =>
         sendTelegramMessage(teacher.chatId, text, {
+          parseMode: 'HTML',
           webAppButton: paymentTeacherLink
             ? { label: paymentTeacherLink.label, url: paymentTeacherLink.fullUrl }
             : null,
@@ -867,4 +922,203 @@ export const sendTeacherPaymentReminderNotice = async ({
     }),
   ]);
   return summarizeNotificationChannelDelivery(results);
+};
+
+const resolveLessonStudentName = async (teacherId: bigint, studentId: number) => {
+  const link = await prisma.teacherStudent.findUnique({
+    where: { teacherId_studentId: { teacherId, studentId } },
+    include: { student: true },
+  });
+  return link?.customName?.trim() || link?.student?.username?.trim() || 'учеником';
+};
+
+export const sendTeacherPostLessonPrompt = async ({
+  teacherId,
+  lessonId,
+  scheduledFor,
+  dedupeKey,
+}: {
+  teacherId: bigint;
+  lessonId: number;
+  scheduledFor?: Date;
+  dedupeKey?: string;
+}) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
+  if (!teacher) return { status: 'skipped' as const };
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacherId) return { status: 'skipped' as const };
+
+  const safeName = escapeHtml(await resolveLessonStudentName(teacherId, lesson.studentId));
+  const dateLabel = formatLessonDateLabel(lesson.startAt, teacher.timezone);
+  const timeLabel = formatLessonTimeLabel(lesson.startAt, teacher.timezone);
+  const text = `<b>Урок с ${safeName} прошёл?</b>\n\n${dateLabel} · ${timeLabel}`;
+  const inlineKeyboard: TelegramInlineButton[][] = [
+    [
+      { text: 'Да, прошёл', callback_data: `lpost:done:${lessonId}` },
+      { text: 'Перенести', callback_data: `lpost:pone:${lessonId}` },
+    ],
+    [{ text: 'Отмена', callback_data: `lpost:canc:${lessonId}` }],
+  ];
+
+  return deliverNotificationChannel({
+    channel: 'TELEGRAM',
+    enabled: Boolean(TELEGRAM_BOT_TOKEN),
+    teacherId,
+    studentId: lesson.studentId,
+    lessonId,
+    type: 'TEACHER_POST_LESSON_PROMPT',
+    scheduledFor,
+    dedupeKey,
+    respectDailyCap: true,
+    send: () =>
+      sendTelegramMessage(teacher.chatId, text, {
+        parseMode: 'HTML',
+        inlineKeyboard,
+      }),
+  });
+};
+
+export const sendTeacherTrialDigest = async (params: { teacherId: bigint; trialStart: Date; trialEnd: Date }) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: params.teacherId } });
+  if (!teacher) return { status: 'skipped' as const };
+
+  const since = params.trialStart;
+
+  const [completedLessons, paymentReminders, sentHomework] = await Promise.all([
+    prisma.lesson.count({
+      where: {
+        teacherId: params.teacherId,
+        status: 'COMPLETED',
+        completedAt: { gte: since },
+      },
+    }),
+    prisma.notificationLog.count({
+      where: {
+        teacherId: params.teacherId,
+        type: 'PAYMENT_REMINDER_STUDENT',
+        status: 'SENT',
+        createdAt: { gte: since },
+      },
+    }),
+    prisma.homeworkAssignment.count({
+      where: {
+        teacherId: params.teacherId,
+        sentAt: { gte: since },
+      },
+    }),
+  ]);
+
+  const lines: string[] = ['<b>Бот рядом уже 11 дней</b>', ''];
+  if (completedLessons > 0) {
+    const word = pluralizeRu(completedLessons, { one: 'урок', few: 'урока', many: 'уроков' });
+    lines.push(`📅 ${word} прошло`);
+  }
+  if (paymentReminders > 0) {
+    const word = pluralizeRu(paymentReminders, {
+      one: 'напоминание',
+      few: 'напоминания',
+      many: 'напоминаний',
+    });
+    lines.push(`💰 ${word} об оплате`);
+  }
+  if (sentHomework > 0) {
+    const word = pluralizeRu(sentHomework, { one: 'домашка', few: 'домашки', many: 'домашек' });
+    lines.push(`📝 ${word} ушло ученикам`);
+  }
+  if (lines.length === 2) {
+    lines.push('Бот следит за расписанием и оплатами.');
+  }
+  lines.push('', 'Trial — ещё 3 дня. Дальше — 790 ₽/мес.');
+
+  const text = lines.join('\n');
+  const dedupeKey = `TEACHER_TRIAL_DIGEST:${params.teacherId.toString()}`;
+
+  return deliverNotificationChannel({
+    channel: 'TELEGRAM',
+    enabled: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_WEBAPP_URL),
+    teacherId: params.teacherId,
+    type: 'TEACHER_TRIAL_DIGEST',
+    scheduledFor: new Date(),
+    dedupeKey,
+    send: () => sendTelegramWebAppMessage(params.teacherId, text),
+  });
+};
+
+export const sendTeacherFirstStudentMilestone = async (teacherId: bigint) => {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_WEBAPP_URL) return;
+  const text = '✅ <b>Ученик добавлен</b>\n\nТеперь добавьте первый урок — и я начну напоминать о нём Вам и ученику.';
+  try {
+    await sendTelegramMessage(teacherId, text, {
+      parseMode: 'HTML',
+      webAppButton: { label: 'Открыть приложение', url: TELEGRAM_WEBAPP_URL },
+    });
+  } catch (error) {
+    console.error('Failed to send first-student milestone', error);
+  }
+};
+
+export const markTeacherPaymentPromptDelivered = async (payload: {
+  teacherId: bigint;
+  studentId: number;
+  lessonId: number;
+}) => {
+  const dedupeKey = `TEACHER_PAYMENT_PROMPT:${payload.lessonId}`;
+  const log = await createNotificationLogEntry({
+    teacherId: payload.teacherId,
+    studentId: payload.studentId,
+    lessonId: payload.lessonId,
+    type: 'TEACHER_PAYMENT_PROMPT',
+    source: null,
+    channel: 'TELEGRAM',
+    scheduledFor: null,
+    dedupeKey: resolveNotificationChannelDedupeKey(dedupeKey, 'TELEGRAM'),
+  });
+  if (!log) return;
+  await finalizeNotificationLogEntry(log.id, { status: 'SENT' });
+};
+
+export const sendTeacherPaymentPrompt = async ({
+  teacherId,
+  lessonId,
+  scheduledFor,
+  dedupeKey,
+}: {
+  teacherId: bigint;
+  lessonId: number;
+  scheduledFor?: Date;
+  dedupeKey?: string;
+}) => {
+  const teacher = await prisma.teacher.findUnique({ where: { chatId: teacherId } });
+  if (!teacher) return { status: 'skipped' as const };
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
+  if (!lesson || lesson.teacherId !== teacherId) return { status: 'skipped' as const };
+
+  const safeName = escapeHtml(await resolveLessonStudentName(teacherId, lesson.studentId));
+  const dateLabel = formatLessonDateLabel(lesson.startAt, teacher.timezone);
+  const priceLine = typeof lesson.price === 'number' && lesson.price > 0 ? ` · ${lesson.price} ₽` : '';
+  const text = `💰 <b>Урок не оплачен</b>\n\n${safeName} · ${dateLabel}${priceLine}`;
+  const inlineKeyboard: TelegramInlineButton[][] = [
+    [
+      { text: 'Оплачен', callback_data: `lpay:paid:${lessonId}` },
+      { text: 'Напомнить', callback_data: `lpay:rem:${lessonId}` },
+    ],
+    [{ text: 'Позже', callback_data: `lpay:later:${lessonId}` }],
+  ];
+
+  return deliverNotificationChannel({
+    channel: 'TELEGRAM',
+    enabled: Boolean(TELEGRAM_BOT_TOKEN),
+    teacherId,
+    studentId: lesson.studentId,
+    lessonId,
+    type: 'TEACHER_PAYMENT_PROMPT',
+    scheduledFor,
+    dedupeKey,
+    respectDailyCap: true,
+    send: () =>
+      sendTelegramMessage(teacher.chatId, text, {
+        parseMode: 'HTML',
+        inlineKeyboard,
+      }),
+  });
 };

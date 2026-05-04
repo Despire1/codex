@@ -51,7 +51,9 @@ import {
 } from '../../../entities/homework-submission/model/lib/reviewResult';
 import { resolveHomeworkStorageUrl, uploadFileToHomeworkStorage } from '../model/upload';
 import {
+  clearArchivedStudentHomeworkSubmissionDraft,
   clearStoredStudentHomeworkSubmissionDraft,
+  loadArchivedStudentHomeworkSubmissionDraft,
   loadStoredStudentHomeworkSubmissionDraft,
   saveStoredStudentHomeworkSubmissionDraft,
 } from '../model/lib/submissionDraftStorage';
@@ -385,12 +387,13 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
   const canEditTest = canInteractWithAttempt && Boolean(responseConfig?.hasTest);
   const canUploadAttachments =
-    Boolean(responseConfig?.allowFiles) ||
-    Boolean(responseConfig?.allowPhotos) ||
-    Boolean(responseConfig?.allowDocuments) ||
-    Boolean(responseConfig?.allowAudio) ||
-    Boolean(responseConfig?.allowVideo);
-  const canUploadVoice = Boolean(responseConfig?.allowVoice);
+    canInteractWithAttempt &&
+    (Boolean(responseConfig?.allowFiles) ||
+      Boolean(responseConfig?.allowPhotos) ||
+      Boolean(responseConfig?.allowDocuments) ||
+      Boolean(responseConfig?.allowAudio) ||
+      Boolean(responseConfig?.allowVideo));
+  const canUploadVoice = canInteractWithAttempt && Boolean(responseConfig?.allowVoice);
   const canEditText = canInteractWithAttempt && Boolean(responseConfig?.allowText);
   const activeReviewSubmission =
     quizAttemptState.isFinalAutoResult && quizAttemptState.latestResolvedSubmission
@@ -465,12 +468,35 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const storedDraft = !isPreview
       ? loadStoredStudentHomeworkSubmissionDraft(assignment.id, assignment.updatedAt)
       : null;
-    setAnswerText(storedDraft?.answerText ?? latestEditableSubmission?.answerText ?? '');
-    setAttachments(storedDraft?.attachments ?? latestEditableSubmission?.attachments ?? []);
-    setVoice(storedDraft?.voice ?? latestEditableSubmission?.voice ?? []);
-    setTestAnswers(
-      storedDraft?.testAnswers ?? (latestEditableSubmission?.testAnswers as Record<string, unknown>) ?? {},
-    );
+    let restoredFromArchive = false;
+    let archiveDraft: ReturnType<typeof loadArchivedStudentHomeworkSubmissionDraft> = null;
+    if (!isPreview && !storedDraft) {
+      archiveDraft = loadArchivedStudentHomeworkSubmissionDraft(assignment.id);
+      if (archiveDraft && archiveDraft.answerText.trim().length > 0) {
+        const restore =
+          typeof window !== 'undefined' &&
+          window.confirm(
+            'Условия задания изменились с момента вашего последнего черновика. Восстановить старый текст ответа? (Иначе он будет удалён.)',
+          );
+        if (restore) {
+          restoredFromArchive = true;
+        } else {
+          clearArchivedStudentHomeworkSubmissionDraft(assignment.id);
+          archiveDraft = null;
+        }
+      } else if (archiveDraft) {
+        clearArchivedStudentHomeworkSubmissionDraft(assignment.id);
+        archiveDraft = null;
+      }
+    }
+    const draftToUse = storedDraft ?? (restoredFromArchive ? archiveDraft : null);
+    setAnswerText(draftToUse?.answerText ?? latestEditableSubmission?.answerText ?? '');
+    setAttachments(draftToUse?.attachments ?? latestEditableSubmission?.attachments ?? []);
+    setVoice(draftToUse?.voice ?? latestEditableSubmission?.voice ?? []);
+    setTestAnswers(draftToUse?.testAnswers ?? (latestEditableSubmission?.testAnswers as Record<string, unknown>) ?? {});
+    if (restoredFromArchive) {
+      clearArchivedStudentHomeworkSubmissionDraft(assignment.id);
+    }
   }, [
     assignment,
     assignment?.id,
@@ -673,8 +699,15 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     }
     setUploading(true);
     try {
+      const baseCount = attachments.length;
+      const filesArr = Array.from(files);
       const uploaded = await Promise.all(
-        Array.from(files).map((file) => uploadFileToHomeworkStorage(file, 'homework-student-attachment')),
+        filesArr.map((file, idx) =>
+          uploadFileToHomeworkStorage(file, 'homework-student-attachment', {
+            kind: 'homeworkSubmission',
+            currentCount: baseCount + idx,
+          }),
+        ),
       );
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (error) {
@@ -689,8 +722,16 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     if (!canEditReviewItem('response_voice') || recording || !canUploadVoice) return;
     setLocalError(null);
 
-    if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') {
-      setLocalError('Запись голосового недоступна на этом устройстве');
+    if (typeof MediaRecorder === 'undefined') {
+      setLocalError(
+        'Ваш браузер не поддерживает запись голосовых сообщений. Откройте задание в Telegram-боте и отправьте голосовое там.',
+      );
+      return;
+    }
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+      setLocalError(
+        'Браузер не даёт доступ к микрофону. Откройте сайт в Safari/Chrome (не в WebView) или используйте Telegram-бота.',
+      );
       return;
     }
 
@@ -700,7 +741,20 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       setRecordingLevel(0);
       setRecordingDurationMs(0);
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (permissionError) {
+        const name = (permissionError as { name?: string } | null)?.name ?? '';
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+          setLocalError('Доступ к микрофону запрещён. Разрешите его в настройках браузера и попробуйте снова.');
+        } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+          setLocalError('Микрофон не найден. Подключите устройство ввода и обновите страницу.');
+        } else {
+          setLocalError('Не удалось получить доступ к микрофону. Попробуйте перезагрузить страницу.');
+        }
+        return;
+      }
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       mediaStreamRef.current = stream;
@@ -739,7 +793,10 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
             return;
           }
           setUploading(true);
-          const uploaded = await uploadFileToHomeworkStorage(file, 'homework-student-voice');
+          const uploaded = await uploadFileToHomeworkStorage(file, 'homework-student-voice', {
+            kind: 'homeworkSubmissionVoice',
+            currentCount: voice.length,
+          });
           setVoice((prev) => [...prev, uploaded]);
         } catch (error) {
           const message = error instanceof Error ? error.message : '';
@@ -821,7 +878,11 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
     const normalizedAttachments = canUploadAttachments ? attachments : [];
     const normalizedVoice = canUploadVoice
       ? Array.from(
-          new Map(voice.map((item) => [`${item.fileName.trim().toLowerCase()}_${item.size}`, item] as const)).values(),
+          // TEA-384: дедуп по item.id (либо fileObjectId), а не по name+size — два разных
+          // голосовых сообщения с одинаковой длительностью могут совпадать по name+size.
+          new Map(
+            voice.map((item) => [item.id ?? item.fileObjectId ?? `${item.url}_${item.size}`, item] as const),
+          ).values(),
         )
       : [];
     const normalizedTestAnswers = responseConfig.hasTest && Object.keys(testAnswers).length ? testAnswers : null;
@@ -840,10 +901,19 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
     if (submit) {
       clearStoredStudentHomeworkSubmissionDraft(assignment.id);
+      // TEA-391: уведомляем другие вкладки о завершённом submit, чтобы они переключились
+      // в read-only без 409 при попытке повторной отправки.
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`submission.${assignment.id}.lastSubmittedAt`, new Date().toISOString());
+        }
+      } catch {
+        // ignore
+      }
       return;
     }
 
-    saveStoredStudentHomeworkSubmissionDraft({
+    const persisted = saveStoredStudentHomeworkSubmissionDraft({
       assignmentId: assignment.id,
       assignmentUpdatedAt: assignment.updatedAt,
       answerText,
@@ -852,14 +922,39 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
       testAnswers,
       savedAt: new Date().toISOString(),
     });
+    if (!persisted) {
+      setLocalError(
+        'Не удалось сохранить черновик локально (память переполнена или приватный режим браузера). Отправьте задание сразу, чтобы не потерять ответ.',
+      );
+    }
   };
+
+  // TEA-391: подписка на cross-tab signal "уже отправлено в другой вкладке".
+  useEffect(() => {
+    if (typeof window === 'undefined' || !assignment) return;
+    const storageKey = `submission.${assignment.id}.lastSubmittedAt`;
+    const handler = (event: StorageEvent) => {
+      if (event.key !== storageKey || !event.newValue) return;
+      setLocalError('Это задание только что отправлено в другой вкладке. Здесь оно теперь только для просмотра.');
+      onRefresh();
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [assignment, onRefresh]);
 
   useEffect(() => {
     if (!isTimedAttemptExpired || !latestDraftSubmission || !canEdit) return;
     const timeoutKey = String(latestDraftSubmission.id);
     if (handledTimeoutAttemptKeyRef.current === timeoutKey) return;
     handledTimeoutAttemptKeyRef.current = timeoutKey;
-    setLocalError('Время вышло. Ответы отправлены автоматически, редактирование заблокировано.');
+    setLocalError(
+      'Время истекло — попытка завершена и автоматически отправлена на проверку. Редактирование больше недоступно.',
+    );
+    if (typeof window !== 'undefined') {
+      window.alert(
+        'Время вышло. Попытка завершена и автоматически отправлена на проверку.\n\nОжидайте обратную связь от преподавателя.',
+      );
+    }
     onRefresh();
   }, [canEdit, isTimedAttemptExpired, latestDraftSubmission, onRefresh]);
 
@@ -905,7 +1000,8 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
     questionCards.forEach((card) => {
       if (card.kind === 'essay') {
-        result[card.id] = Boolean(answerText.trim());
+        // TEA-364: эссе считается выполненным только если набрано хотя бы ESSAY_MIN_WORDS слов.
+        result[card.id] = countWords(answerText) >= ESSAY_MIN_WORDS;
         return;
       }
       const questionKind = resolveQuestionKind(card.question);
@@ -968,20 +1064,29 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   const sentTs = parseTimestamp(assignment?.sentAt ?? assignment?.createdAt);
   const deadlineRemainingMs = deadlineTs === null ? null : Math.max(0, deadlineTs - nowTs);
 
-  const timeLabel = timerConfig.enabled
-    ? requiresTimedAttemptStart
-      ? formatMinutesLabel(timerConfig.durationMinutes ?? 0)
-      : formatCountdown(timedAttemptRemainingMs)
-    : formatCountdown(deadlineRemainingMs);
-  const timeHint = timerConfig.enabled
-    ? requiresTimedAttemptStart
-      ? 'таймер запустится после нажатия «Начать»'
-      : 'до конца попытки'
-    : canStartFreshAttempt
-      ? 'для новой попытки сначала нажмите «Начать»'
-      : deadlineRemainingMs === null
-        ? 'без ограничения по времени'
-        : 'до дедлайна';
+  const isAttemptFinalized =
+    !canEdit &&
+    (assignment?.status === 'REVIEWED' || assignment?.status === 'SUBMITTED' || assignment?.status === 'IN_REVIEW');
+  const timeLabel = isAttemptFinalized
+    ? '—'
+    : timerConfig.enabled
+      ? requiresTimedAttemptStart
+        ? formatMinutesLabel(timerConfig.durationMinutes ?? 0)
+        : formatCountdown(timedAttemptRemainingMs)
+      : formatCountdown(deadlineRemainingMs);
+  const timeHint = isAttemptFinalized
+    ? assignment?.status === 'REVIEWED'
+      ? 'попытка проверена'
+      : 'попытка засчитана'
+    : timerConfig.enabled
+      ? requiresTimedAttemptStart
+        ? 'таймер запустится после нажатия «Начать»'
+        : 'до конца попытки'
+      : canStartFreshAttempt
+        ? 'для новой попытки сначала нажмите «Начать»'
+        : deadlineRemainingMs === null
+          ? 'без ограничения по времени'
+          : 'до дедлайна';
 
   const timeProgressPercent = useMemo(() => {
     if (timerConfig.enabled) {
@@ -1017,7 +1122,7 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
   ]);
 
   const passingScorePercent = quizSettings.passingScorePercent;
-  const attemptsLabel = quizSettings.attemptsLimit === null ? '∞' : String(quizSettings.attemptsLimit);
+  const attemptsLabel = quizSettings.attemptsLimit === null ? 'без ограничений' : String(quizSettings.attemptsLimit);
   const currentAttemptLabel =
     latestDraftSubmission?.attemptNo ?? quizAttemptState.latestResolvedSubmission?.attemptNo ?? 1;
 
@@ -1589,6 +1694,30 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
 
           <div className={styles.mainGrid}>
             <div className={styles.questionsColumn}>
+              {(() => {
+                const teacherCommentText =
+                  latestReviewedSubmission?.teacherComment?.trim() ||
+                  reviewResult?.generalComment?.trim() ||
+                  assignment?.teacherComment?.trim() ||
+                  '';
+                if (!teacherCommentText) return null;
+                return (
+                  <section className={styles.questionCard}>
+                    <div className={styles.questionHeader}>
+                      <div className={styles.questionMeta}>
+                        <div className={styles.questionTopRow}>
+                          <span className={`${styles.questionTypeBadge} ${styles.badgeInfo}`}>
+                            Комментарий преподавателя
+                          </span>
+                        </div>
+                        <p className={styles.questionHint} style={{ whiteSpace: 'pre-wrap' }}>
+                          {teacherCommentText}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
               {questionCards.length === 0 ? (
                 <section className={styles.questionCard}>
                   <div className={styles.questionHeader}>
@@ -1863,12 +1992,22 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
               <section className={styles.submitSection}>
                 <div className={styles.submitSectionContent}>
                   <h3 className={styles.submitSectionTitle}>
-                    {isPreview ? 'Готовы завершить предпросмотр?' : 'Готовы отправить?'}
+                    {isPreview
+                      ? 'Готовы завершить предпросмотр?'
+                      : !canEdit && assignment?.status === 'REVIEWED'
+                        ? 'Задание проверено'
+                        : !canEdit && (assignment?.status === 'SUBMITTED' || assignment?.status === 'IN_REVIEW')
+                          ? 'Ответ отправлен на проверку'
+                          : 'Готовы отправить?'}
                   </h3>
                   <p className={styles.submitSectionText}>
                     {isPreview
                       ? 'Можно пройти задание целиком, проверить вопросы и навигацию. Никакие ответы в этом режиме не отправляются ученику или преподавателю.'
-                      : 'Проверьте все ответы перед отправкой. До истечения времени можно вернуться к любому вопросу.'}
+                      : !canEdit && assignment?.status === 'REVIEWED'
+                        ? 'Преподаватель оценил вашу работу. Результат и комментарии — выше.'
+                        : !canEdit && (assignment?.status === 'SUBMITTED' || assignment?.status === 'IN_REVIEW')
+                          ? 'Преподаватель скоро его проверит и пришлёт обратную связь.'
+                          : 'Проверьте все ответы перед отправкой. До истечения времени можно вернуться к любому вопросу.'}
                   </p>
                 </div>
                 {canEdit ? (
@@ -1992,7 +2131,9 @@ export const StudentHomeworkDetailView: FC<StudentHomeworkDetailViewProps> = ({
                       <div className={styles.attemptMetaRow}>
                         <span>Осталось</span>
                         <strong>
-                          {quizAttemptState.attemptsRemaining === null ? '∞' : quizAttemptState.attemptsRemaining}
+                          {quizAttemptState.attemptsRemaining === null
+                            ? 'без ограничений'
+                            : quizAttemptState.attemptsRemaining}
                         </strong>
                       </div>
                     </div>

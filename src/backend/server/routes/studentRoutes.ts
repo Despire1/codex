@@ -29,6 +29,7 @@ type StudentRoutesHandlers = {
   addStudent: (user: unknown, body: Record<string, unknown>) => Promise<unknown>;
   updateStudent: (user: unknown, studentId: number, body: Record<string, unknown>) => Promise<unknown>;
   archiveStudentLink: (user: unknown, studentId: number) => Promise<unknown>;
+  setStudentCompletion: (user: unknown, studentId: number, completed: boolean) => Promise<unknown>;
   listStudentHomeworks: (
     user: unknown,
     studentId: number,
@@ -141,6 +142,16 @@ export const tryHandleStudentRoutes = async ({
   if (req.method === 'DELETE' && studentDeleteMatch) {
     const studentId = Number(studentDeleteMatch[1]);
     const link = await handlers.archiveStudentLink(requireApiUser(), studentId);
+    sendJson(res, 200, { link });
+    return true;
+  }
+
+  const studentCompletionMatch = pathname.match(/^\/api\/students\/(\d+)\/completion$/);
+  if (req.method === 'POST' && studentCompletionMatch) {
+    const studentId = Number(studentCompletionMatch[1]);
+    const body = await readBody(req);
+    const completed = Boolean((body as any)?.completed);
+    const link = await handlers.setStudentCompletion(requireApiUser(), studentId, completed);
     sendJson(res, 200, { link });
     return true;
   }

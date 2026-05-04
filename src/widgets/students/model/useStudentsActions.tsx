@@ -78,6 +78,7 @@ export type StudentsActionsContextValue = {
   setStudentDraft: (draft: StudentDraft) => void;
   submitStudent: () => void;
   requestDeleteStudent: (studentId: number) => void;
+  requestToggleCompletion: (studentId: number) => void;
 
   startEditPrice: (student: Student & { link: TeacherStudent }) => void;
   setPriceValue: (value: string) => void;
@@ -422,6 +423,48 @@ export const useStudentsActionsInternal = ({
     [links, openConfirmDialog, performDeleteStudent],
   );
 
+  const performSetCompletion = useCallback(
+    async (studentId: number, completed: boolean) => {
+      try {
+        const data = await api.setStudentCompletion(studentId, completed);
+        setLinks((prev) => prev.map((link) => (link.studentId === studentId ? data.link : link)));
+        triggerStudentsListReload();
+        showToast({
+          message: completed ? 'Обучение завершено' : 'Обучение возобновлено',
+          variant: 'success',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Не удалось обновить статус ученика';
+        showInfoDialog('Ошибка', message);
+      }
+    },
+    [setLinks, showInfoDialog, showToast, triggerStudentsListReload],
+  );
+
+  const requestToggleCompletion = useCallback(
+    (studentId: number) => {
+      const link = links.find((entry) => entry.studentId === studentId);
+      if (!link) return;
+      const studentName = link.customName || 'ученика';
+      const isCompleted = Boolean(link.completedAt);
+      if (isCompleted) {
+        void performSetCompletion(studentId, false);
+        return;
+      }
+      openConfirmDialog({
+        title: `Завершить обучение: ${studentName}?`,
+        message:
+          'Ученик переедет в раздел «Завершили». Это можно отменить в любой момент через меню «Возобновить обучение».',
+        confirmText: 'Завершить',
+        cancelText: 'Отмена',
+        onConfirm: () => {
+          void performSetCompletion(studentId, true);
+        },
+      });
+    },
+    [links, openConfirmDialog, performSetCompletion],
+  );
+
   const startEditPrice = useCallback((student: Student & { link: TeacherStudent }) => {
     setPriceEditState({ id: student.id, value: String(student.link.pricePerLesson ?? '') });
   }, []);
@@ -524,6 +567,7 @@ export const useStudentsActionsInternal = ({
       setStudentDraft,
       submitStudent,
       requestDeleteStudent,
+      requestToggleCompletion,
       startEditPrice,
       setPriceValue,
       savePrice,
@@ -543,6 +587,7 @@ export const useStudentsActionsInternal = ({
       openEditStudentModal,
       priceEditState,
       requestDeleteStudent,
+      requestToggleCompletion,
       savePrice,
       setPriceValue,
       setStudentDraft,

@@ -1349,13 +1349,14 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
 
     setEntry(REVIEW_UNSAVED_ENTRY_KEY, {
       isDirty: true,
-      title: 'Вы точно хотите выйти?',
-      message: 'Домашнее задание проверяется. Вы можете сохранить проверку и выйти.',
-      confirmText: 'Сохранить и выйти',
+      title: 'Сохранить черновик проверки?',
+      message:
+        'Ученик пока не увидит оценку и комментарии. Чтобы опубликовать проверку, вернитесь и нажмите «Опубликовать оценку».',
+      confirmText: 'Сохранить черновик и выйти',
       cancelText: 'Остаться на проверке',
       cancelKeepsEditing: true,
       onSave: saveReviewDraft,
-      onSaveErrorMessage: 'Не удалось сохранить проверку',
+      onSaveErrorMessage: 'Не удалось сохранить черновик проверки',
     });
 
     return () => {
@@ -2520,7 +2521,9 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
           });
         });
 
-        void Promise.allSettled([loadStudentDetail(), loadStudentList({ append: false })]);
+        // TEA-401: detail уже применён локально (выше). Дублирующий loadStudentDetail убран —
+        // оставляем только обновление списка, чтобы счётчики/бейджи sidebar были актуальны.
+        void loadStudentList({ append: false });
 
         showToast({
           message: payload.submit ? 'Домашка отправлена' : 'Черновик сохранён',
@@ -3081,7 +3084,7 @@ export const HomeworksSection: FC<HomeworksSectionProps> = ({ mode, onOpenMobile
         if (studentNextOffset === null) return;
         void loadStudentList({ append: true });
       }}
-      onOpenAssignment={(assignment) => navigate(`/homeworks/${assignment.id}`)}
+      onOpenAssignment={(assignment) => navigate(`/homeworks/assignments/${assignment.id}`)}
     />
   );
 };
